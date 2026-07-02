@@ -1,0 +1,860 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paperpush.org/schemas/venues.schema.json",
+  "title": "paperpush venue database",
+  "description": "Schema for venues.json. The top-level object maps a venue slug to a venue definition. Generated from the Field/Venue dataclasses in paperpush/database.py; run scripts/gen_venues_schema.py to regenerate.",
+  "type": "object",
+  "propertyNames": {
+    "description": "Venue slug. The canonical identifier is the lowercase slug; case variants collapse to one venue at load time.",
+    "pattern": "^[A-Za-z0-9_]+$"
+  },
+  "additionalProperties": {
+    "$ref": "#/$defs/venue"
+  },
+  "$defs": {
+    "fieldOverride": {
+      "description": "A single field a venue asks for during submission.\n\nThe per-attribute descriptions below are attached with\n``Annotated[..., pydantic.Field(description=...)]`` so they serve double duty:\ndocumentation for readers of this class and the field descriptions in the\ngenerated ``venues.schema.json`` (see :mod:`paperpush.schema_models`).\nThe annotations are inert at runtime -- this is a plain stdlib dataclass and\nperforms no validation.",
+      "properties": {
+        "id": {
+          "description": "Stable identifier, unique within the venue; the key used in the .sub file and for inheritance merges.",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Human-readable prompt shown for the field."
+        },
+        "type": {
+          "anyOf": [
+            {
+              "enum": [
+                "text",
+                "textarea",
+                "choice",
+                "multichoice",
+                "boolean",
+                "int",
+                "file",
+                "filelist",
+                "authorlist"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Widget/value kind."
+        },
+        "required": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether submission requires a value."
+        },
+        "help": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Guidance shown alongside the field."
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Allowed values for `choice`/`multichoice`."
+        },
+        "options_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Name of a newline-separated keyword file under `venues/_assets/` whose lines become this field's `options`. Lets a long controlled vocabulary live in one shared text file instead of being inlined (and duplicated) in the database. When set, it supersedes any inline `options`."
+        },
+        "options_recommended": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a `choice`/`multichoice` field, whether `options` is advisory (a value outside the list is a WARNING, not an ERROR) rather than a closed set."
+        },
+        "default": {
+          "description": "Default value (any JSON type)."
+        },
+        "accept": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Permitted file extensions for `file`/`filelist`, e.g. [\".pdf\", \".docx\"]. Omit (not []) when the upload imposes no extension restriction."
+        },
+        "fields": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sub-field names for a structured field such as `authorlist`."
+        },
+        "type_options": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Per-file 'file type' dropdown choices applied to this field's uploads."
+        },
+        "min_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inclusive lower bound on item count for a multi-item field (multichoice selections, filelist/authorlist/list-textarea lines)."
+        },
+        "max_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inclusive upper bound on item count for a multi-item field."
+        },
+        "word_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum length in words for a `text`/`textarea` value."
+        },
+        "character_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum length in characters for a `text`/`textarea` value."
+        },
+        "require_url": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a `text`/`textarea`, require each non-blank line of the value to be a valid http/https URL."
+        },
+        "max_words_before_refs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a manuscript `file`, the maximum word count of the main text before the reference list."
+        },
+        "max_pages_before_refs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a manuscript `file` (PDF), the maximum page count before the reference list."
+        },
+        "max_words": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a manuscript `file`, the maximum word count of the whole document (references included)."
+        },
+        "max_pages": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a manuscript `file`, the maximum page count of the whole document. Verified for PDF; for .docx a best-effort cached count."
+        },
+        "max_words_before_refs_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConditionalLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`max_words_before_refs` selected by a sibling field's value (e.g. by article type)."
+        },
+        "max_pages_before_refs_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConditionalLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`max_pages_before_refs` selected by a sibling field's value."
+        },
+        "max_words_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConditionalLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`max_words` selected by a sibling field's value."
+        },
+        "max_pages_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConditionalLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`max_pages` selected by a sibling field's value (e.g. Bioinformatics' page cap by article type)."
+        },
+        "min_value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inclusive lower bound on the numeric value of an `int` field."
+        },
+        "max_value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inclusive upper bound on the numeric value of an `int` field."
+        },
+        "max_file_size_mb": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum size, in megabytes, of each individual file uploaded for a `file`/`filelist` field. Distinct from the venue-level max_upload_mb."
+        },
+        "autofill": {
+          "anyOf": [
+            {
+              "enum": [
+                "extract",
+                "classify",
+                "filemap",
+                "never",
+                ""
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How an autofill engine may populate the field: extract | classify | filemap | never. Empty string means infer from `type`."
+        },
+        "confirm": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a required `boolean`, whether it is a consent checkbox that must be affirmative (vs. an informational yes/no question)."
+        },
+        "required_if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Id of another field in the same venue; when that field has a non-empty value, this field becomes required. Combined with `required` (unconditional)."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "field": {
+      "description": "A single field a venue asks for during submission.\n\nThe per-attribute descriptions below are attached with\n``Annotated[..., pydantic.Field(description=...)]`` so they serve double duty:\ndocumentation for readers of this class and the field descriptions in the\ngenerated ``venues.schema.json`` (see :mod:`paperpush.schema_models`).\nThe annotations are inert at runtime -- this is a plain stdlib dataclass and\nperforms no validation.",
+      "properties": {
+        "id": {
+          "description": "Stable identifier, unique within the venue; the key used in the .sub file and for inheritance merges.",
+          "type": "string"
+        },
+        "label": {
+          "description": "Human-readable prompt shown for the field.",
+          "type": "string"
+        },
+        "type": {
+          "description": "Widget/value kind.",
+          "enum": [
+            "text",
+            "textarea",
+            "choice",
+            "multichoice",
+            "boolean",
+            "int",
+            "file",
+            "filelist",
+            "authorlist"
+          ],
+          "type": "string"
+        },
+        "required": {
+          "description": "Whether submission requires a value.",
+          "type": "boolean"
+        },
+        "help": {
+          "description": "Guidance shown alongside the field.",
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Allowed values for `choice`/`multichoice`."
+        },
+        "options_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Name of a newline-separated keyword file under `venues/_assets/` whose lines become this field's `options`. Lets a long controlled vocabulary live in one shared text file instead of being inlined (and duplicated) in the database. When set, it supersedes any inline `options`."
+        },
+        "options_recommended": {
+          "description": "For a `choice`/`multichoice` field, whether `options` is advisory (a value outside the list is a WARNING, not an ERROR) rather than a closed set.",
+          "type": "boolean"
+        },
+        "default": {
+          "description": "Default value (any JSON type)."
+        },
+        "accept": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Permitted file extensions for `file`/`filelist`, e.g. [\".pdf\", \".docx\"]. Omit (not []) when the upload imposes no extension restriction."
+        },
+        "fields": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Sub-field names for a structured field such as `authorlist`."
+        },
+        "type_options": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Per-file 'file type' dropdown choices applied to this field's uploads."
+        },
+        "min_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inclusive lower bound on item count for a multi-item field (multichoice selections, filelist/authorlist/list-textarea lines)."
+        },
+        "max_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inclusive upper bound on item count for a multi-item field."
+        },
+        "word_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum length in words for a `text`/`textarea` value."
+        },
+        "character_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum length in characters for a `text`/`textarea` value."
+        },
+        "require_url": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a `text`/`textarea`, require each non-blank line of the value to be a valid http/https URL."
+        },
+        "max_words_before_refs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a manuscript `file`, the maximum word count of the main text before the reference list."
+        },
+        "max_pages_before_refs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a manuscript `file` (PDF), the maximum page count before the reference list."
+        },
+        "max_words": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a manuscript `file`, the maximum word count of the whole document (references included)."
+        },
+        "max_pages": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a manuscript `file`, the maximum page count of the whole document. Verified for PDF; for .docx a best-effort cached count."
+        },
+        "max_words_before_refs_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConditionalLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`max_words_before_refs` selected by a sibling field's value (e.g. by article type)."
+        },
+        "max_pages_before_refs_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConditionalLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`max_pages_before_refs` selected by a sibling field's value."
+        },
+        "max_words_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConditionalLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`max_words` selected by a sibling field's value."
+        },
+        "max_pages_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConditionalLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`max_pages` selected by a sibling field's value (e.g. Bioinformatics' page cap by article type)."
+        },
+        "min_value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inclusive lower bound on the numeric value of an `int` field."
+        },
+        "max_value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inclusive upper bound on the numeric value of an `int` field."
+        },
+        "max_file_size_mb": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum size, in megabytes, of each individual file uploaded for a `file`/`filelist` field. Distinct from the venue-level max_upload_mb."
+        },
+        "autofill": {
+          "description": "How an autofill engine may populate the field: extract | classify | filemap | never. Empty string means infer from `type`.",
+          "enum": [
+            "extract",
+            "classify",
+            "filemap",
+            "never",
+            ""
+          ],
+          "type": "string"
+        },
+        "confirm": {
+          "description": "For a required `boolean`, whether it is a consent checkbox that must be affirmative (vs. an informational yes/no question).",
+          "type": "boolean"
+        },
+        "required_if": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Id of another field in the same venue; when that field has a non-empty value, this field becomes required. Combined with `required` (unconditional)."
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "type"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "venueCommon": {
+      "description": "A supported venue and the fields it requires.",
+      "properties": {
+        "name": {
+          "description": "Display name. Defaults to the slug when omitted.",
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fieldOverride"
+          }
+        },
+        "full_name": {
+          "description": "Full, unabbreviated venue name.",
+          "type": "string"
+        },
+        "submission_url": {
+          "description": "Submission/portal URL.",
+          "type": "string"
+        },
+        "venue_type": {
+          "description": "Kind of venue: a preprint server, a venue, or a conference.",
+          "enum": [
+            "preprint",
+            "venue",
+            "conference"
+          ],
+          "type": "string"
+        },
+        "site_url": {
+          "description": "Public homepage URL.",
+          "type": "string"
+        },
+        "submission_guide": {
+          "description": "URL of the author/submission guide.",
+          "type": "string"
+        },
+        "description": {
+          "description": "Short description of the venue.",
+          "type": "string"
+        },
+        "file_type_options": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Labels offered by the portal's per-file 'file type' dropdown (venue-level because the same dropdown applies to every upload)."
+        },
+        "max_upload_mb": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum combined size, in megabytes, of all files in one submission."
+        },
+        "deprecated": {
+          "description": "Hidden from listings but still reachable by get_venue.",
+          "type": "boolean"
+        },
+        "inherits": {
+          "description": "Slug this venue inherits its field schema from. Empty/absent for a standalone venue. Distinct from submission sharing (which portal/runner/login a venue submits through), which is defined in code, not here.",
+          "type": "string"
+        },
+        "removed_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Inherited field ids to drop. Only meaningful on an inheriting venue."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "venue": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/venueCommon"
+        },
+        {
+          "if": {
+            "required": [
+              "inherits"
+            ],
+            "properties": {
+              "inherits": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "then": {
+            "description": "Inheriting venue: field entries are partial overrides; removed_fields is allowed.",
+            "properties": {
+              "fields": {
+                "items": {
+                  "$ref": "#/$defs/fieldOverride"
+                }
+              }
+            }
+          },
+          "else": {
+            "description": "Standalone venue: every field must be a full definition and removed_fields is not applicable.",
+            "properties": {
+              "fields": {
+                "items": {
+                  "$ref": "#/$defs/field"
+                }
+              },
+              "removed_fields": false
+            }
+          }
+        }
+      ]
+    },
+    "ConditionalLimit": {
+      "description": "A length limit whose value depends on a sibling field's value.\n\nSome venues set a manuscript's page or word cap by article type -- e.g.\nBioinformatics allows up to 7 pages for an Original Paper but 4 for an\nApplications Note. ``field`` names the sibling field that selects the limit\n(``article_type``), ``values`` maps each of that field's values to the limit\nthat applies, and ``default`` is the limit used when the selected value is\nnot in the map. Used as the ``*_by`` companion to a scalar ``max_*`` limit on\na manuscript ``file`` field (see :class:`Field`); the scalar acts as the\nfallback when no conditional limit resolves.",
+      "properties": {
+        "field": {
+          "description": "Id of the sibling field whose value selects the limit.",
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Map from the selector field's value to the limit that applies.",
+          "type": "object"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Limit used when the selector's value is absent from `values`. None means no limit applies then."
+        }
+      },
+      "required": [
+        "field",
+        "values"
+      ],
+      "type": "object"
+    }
+  }
+}

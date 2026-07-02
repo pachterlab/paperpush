@@ -1,0 +1,203 @@
+APP: AI for Education & Learning Technologies
+APP: AI for Science (Natural & Physical Sciences)
+APP: Climate, Sustainability & Environment
+APP: Healthcare & Bioinformatics Applications
+APP: Humanities & Computational Social Science
+APP: IoT, Sensor Networks & Smart Cities
+APP: Mobility, Transportation & Autonomous Systems
+APP: Natural Sciences
+APP: Other Applications
+APP: Security & Privacy Applications
+APP: Social Networks & Web
+APP: Software Engineering
+AUD: Audio Deepfake Detection & Anti-Spoofing
+AUD: Audio Representation Learning & Foundation Models
+AUD: Audio-Visual & Multimodal Learning
+AUD: Automatic Speech Recognition & Spoken Language Understanding
+AUD: Bias, Fairness, Privacy, Low-Resource & Multilingual Speech
+AUD: Datasets & Benchmarks for Audio & Speech
+AUD: Environmental Sound, Acoustic Scenes & Event Detection
+AUD: Music Information Retrieval & Generation
+AUD: Other Foundations of Audio & Speech Processing
+AUD: Paralinguistics & Affective Speech
+AUD: Speaker Recognition, Diarization & Verification
+AUD: Speech Enhancement, Separation & Source Separation
+AUD: Speech Synthesis, Voice Conversion & Generation
+CMS: Affective Computing & Social Cognition
+CMS: Cognitive Architectures & Conceptual Reasoning
+CMS: Computational Creativity
+CMS: Other Foundations of Cognitive Modeling & Systems
+CMS: Simulating Human Behavior
+CMS: Symbolic Representations & Agent Architectures
+CSO: Constraint Optimization & Programming
+CSO: Constraint Satisfaction & Learning
+CSO: Distributed & Mixed Discrete/Continuous Optimization
+CSO: Other Foundations of Constraint Satisfaction
+CSO: Satisfiability & SMT
+CSO: Search, Solvers & Tools
+CV: 3D Computer Vision
+CV: Adversarial Attacks & Robustness
+CV: Bias, Fairness, Privacy & Interpretability
+CV: Biometrics, Face, Gesture & Pose
+CV: Computational Photography, Image & Video Synthesis
+CV: Datasets & Benchmarks for Vision
+CV: Diffusion & Generative Models for Vision
+CV: Image and Video Retrieval
+CV: Language, Vision & Multi-modal
+CV: Learning & Optimization for CV
+CV: Low-Level & Physics-based Vision
+CV: Medical and Biological Imaging
+CV: Motion, Tracking & Activity Analysis
+CV: Object Detection, Segmentation & Scene Understanding
+CV: Other Foundations of Computer Vision
+CV: Remote Sensing / Geospatial AI
+CV: Representation Learning & Vision Foundation Models
+CV: Vision for Robotics, Embodied & Autonomous Driving
+CV: Visual Reasoning & Symbolic Representations
+DMKM: Anomaly Detection & Pattern Mining
+DMKM: Conversational, Query & Retrieval Systems
+DMKM: Data Stream & Spatio-Temporal Mining
+DMKM: Data Visualization & Summarization
+DMKM: Datasets & Benchmarks for Data Mining
+DMKM: Graph Mining & Social Network Analysis
+DMKM: Knowledge Graphs, Linked Data & Semantic Web
+DMKM: Mining of Visual, Multimedia & Multimodal Data
+DMKM: Other Foundations of Data Mining & Knowledge Management
+DMKM: Recommender Systems
+DMKM: Scalability, Parallel & Distributed Systems
+GTEP: Cooperative & Behavioral Game Theory
+GTEP: Coordination & Adversarial LearningCoordination, Collaboration & Adversarial Interaction
+GTEP: Game Theory, Equilibrium & Imperfect Information
+GTEP: Mechanism Design & Auctions
+GTEP: Other Foundations of Game Theory & Economic Paradigms
+GTEP: Social Choice, Voting & Fair Division
+HAI: AI for Accessibility
+HAI: Emotional Intelligence & Brain-Sensing
+HAI: Explainable AI for Human Understanding
+HAI: Game Design & Procedural Generation
+HAI: Human-AI Collaboration, Trust & Teaming
+HAI: Human-Aware Planning & Decision Support
+HAI: Human-Computer Interaction & Interfaces
+HAI: Human-in-the-loop ML & Crowd Sourcing
+HAI: Learning Human Values & Preferences
+HAI: Other Foundations of Human Computation & AI
+KRR: Action, Change & Spatio-Temporal Reasoning
+KRR: Automated Reasoning & Theorem Proving
+KRR: Common-Sense, Causal & Qualitative Reasoning
+KRR: Diagnosis, Abduction & Argumentation
+KRR: Knowledge Acquisition, Engineering & Ontologies
+KRR: KR Languages, Preferences & Beliefs
+KRR: Logic Programming & Description Logics
+KRR: Neuro-Symbolic Reasoning
+KRR: Nonmonotonic Reasoning & Computational Complexity
+KRR: Other Foundations of Knowledge Representation & Reasoning
+MAS: Agent Theories, Architectures & Communication
+MAS: Agent-Based Simulation & Emergent Behavior
+MAS: Agentic Safety, Security & Alignment
+MAS: LLM-based Agents & Agentic Systems
+MAS: MAS under Uncertainty & Adversarial Agents
+MAS: Mechanism Design & Modeling other Agents
+MAS: Multiagent Learning
+MAS: Multiagent Planning & Coordination
+MAS: Negotiation, Argumentation & Agreement
+MAS: Other Foundations of Multiagent Systems
+MAS: Tool Use, Orchestration & Multi-Agent Coordination for LLMs
+ML: Adversarial Learning & Robustness
+ML: AutoML & Hyperparameter Tuning
+ML: Bayesian Learning & Uncertainty Quantification
+ML: Causal Learning
+ML: Classification, Regression & Kernel Methods
+ML: Clustering & Unsupervised/Self-Supervised Learning
+ML: Data-Centric AI, Synthetic Data & Data Curation
+ML: Deep Generative Models & Autoencoders
+ML: Deep Learning Algorithms, Architectures & Foundation Models
+ML: Deep Learning Theory & Learning Theory
+ML: Dimensionality Reduction, Manifolds & Matrix/Tensor Methods
+ML: Distributed & Federated Learning
+ML: Efficient, Edge, Green & Hardware-aware ML
+ML: Ensemble & Multi-class/Multi-label Learning
+ML: Ethics, Bias, Fairness & Privacy
+ML: Evaluation, Benchmarking, Datasets & Analysis
+ML: Evolutionary Learning
+ML: Graph-based Machine Learning
+ML: Machine Unlearning, Data Deletion & Model Editing
+ML: Mixture of Experts (MoE)
+ML: Multimodal & Large Multimodal Models (LMMs)
+ML: Neuro-Symbolic Learning
+ML: Online Learning & Bandits
+ML: Optimization for ML
+ML: Other Foundations of Machine Learning
+ML: Post-Training, Fine-Tuning & Model Alignment
+ML: Probabilistic Circuits & Graphical Models
+ML: Quantum Machine Learning
+ML: Reasoning & Test-Time Compute
+ML: Reinforcement, Imitation & Inverse RL
+ML: Representation Learning
+ML: Scalability of ML Systems
+ML: Semi-Supervised & Active Learning
+ML: Time-Series & Data Streams
+ML: Transfer, Domain Adaptation & Continual Learning
+ML: Transparent, Interpretable & Explainable ML
+ML: World Models, Simulation & Environment Models
+NLP: (Large) Language Models
+NLP: Code Generation / Program Synthesis
+NLP: Conversational AI & Dialog Systems
+NLP: Datasets & Benchmarks for NLP
+NLP: Fact-Checking & Misinformation Detection
+NLP: Generation & Summarization
+NLP: Information Extraction & Question Answering
+NLP: Interpretability, Analysis & Evaluation (incl. Factuality & Hallucination)
+NLP: Language Grounding & Multi-modal NLP
+NLP: Machine Translation & Multilinguality
+NLP: Other Foundations of Natural Language Processing
+NLP: Prompt Engineering & In-Context Learning
+NLP: Retrieval-Augmented Generation & Knowledge-Grounded NLP
+NLP: Safety, Ethics, Bias & Fairness
+NLP: Semantics, Textual Inference & Discourse
+NLP: Sentiment, Stylistic & Text Classification
+NLP: Syntax, Morphology & Lexical Semantics
+PEAI: Accountability, Interpretability & Explainability
+PEAI: AI Alignment & Oversight
+PEAI: AI Evaluation, Auditing & Red Teaming
+PEAI: AI, Law, Justice, Regulation & Governance
+PEAI: Bias, Fairness & Equity
+PEAI: Generative AI Safety, Provenance & Misuse
+PEAI: Morality & Value-based AI
+PEAI: Other Foundations of Philosophy & Ethics of AI
+PEAI: Philosophical Foundations, Epistemology & AGI
+PEAI: Privacy & Security
+PEAI: Safety, Robustness & Trustworthiness
+PEAI: Societal Impact, Jobs & Labor
+PRS: Deterministic & Temporal Planning
+PRS: Learning for Planning & Scheduling
+PRS: Mixed Discrete/Continuous Planning & Model-Based Reasoning
+PRS: Optimization of Spatio-temporal Systems
+PRS: Other Foundations of Planning, Routing & Scheduling
+PRS: Plan Execution, Monitoring, Replanning & Recognition
+PRS: Planning under Uncertainty & Markov Models
+PRS: Planning with Language Models & Agentic Planning
+PRS: Scheduling & Routing
+ROB: Datasets & Benchmarks for Robotics
+ROB: Embodied AI
+ROB: Human-Robot Interaction
+ROB: Localization, Mapping & Navigation
+ROB: Manipulation & Cognitive Robotics
+ROB: Motion & Path Planning
+ROB: Multi-Robot Systems
+ROB: Other Foundations and ApplicationsOther Foundations of Intelligent Robotics
+ROB: Perception, Sensor Fusion & State Estimation
+ROB: Robot Learning, Control & Foundation Models
+RU: Causality
+RU: Decision/Utility Theory & Sequential Decision Making
+RU: Other Foundations of Reasoning under Uncertainty
+RU: Probabilistic & Relational Probabilistic Models
+RU: Probabilistic Inference & Graphical Models
+RU: Stochastic Optimization
+RU: Uncertainty Representations
+SO: Algorithm Configuration & Sampling-based Search
+SO: Combinatorial & Non-convex Optimization
+SO: Distributed & Mixed Discrete/Continuous Search
+SO: Evolutionary Computation
+SO: Heuristic, Adversarial & Local Search
+SO: Metareasoning, Metaheuristics & Learning to Search
+SO: Other Foundations of Search & Optimization

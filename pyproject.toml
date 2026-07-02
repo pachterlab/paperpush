@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paperpush"
+version = "0.1.0"
+description = "A Python library for automating the submission of manuscripts to academic venues."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    {name = "Joseph Rich", email = "josephrich98@gmail.com"}
+]
+maintainers = [
+    {name = "Joseph Rich", email = "josephrich98@gmail.com"}
+]
+dependencies = [
+    "playwright>=1.40",
+    "keyring>=24.0",
+    "pydantic>=2.0",
+    "pypdf>=6.0.0",
+]
+
+[project.optional-dependencies]
+autofill = ["anthropic>=0.40"]
+dev = ["pytest>=7.0", "bandit", "Pillow", "black", "chromium", "jsonschema>=4.18"]
+
+[project.scripts]
+paperpush = "paperpush.cli:main"
+
+[tool.pytest.ini_options]
+# Put the repo root on sys.path so test modules can import the `tests` package
+# (e.g. `from tests.conftest import ...`) regardless of whether pytest is invoked
+# as `pytest` or `python -m pytest`.
+pythonpath = ["."]
+markers = [
+    "portal: test hits a real submission portal; skipped unless --run-portal (or PAPERPUSH_RUN_PORTAL=1) is given",
+]
+
+[tool.setuptools]
+packages = [
+    "paperpush",
+    "paperpush.venues",
+    "paperpush.venues.arxiv",
+    "paperpush.venues.biorxiv",
+    "paperpush.venues.editorialmanager",
+    "paperpush.venues.snapp",
+    "paperpush.venues.scholarone",
+    "paperpush.venues.nature",
+    "paperpush.venues.science",
+]
+
+[tool.setuptools.package-data]
+paperpush = ["venues.json", "venues.schema.json", "subfile_templates/*.sub"]
+"paperpush.venues" = ["_assets/*.json"]
+
+[tool.black]
+target-version = ["py310", "py311", "py312"]

@@ -1,0 +1,89 @@
+name: Monthly submission
+
+# Runs the real `paperpush submit` click-through once a month. The wizard
+# fills the venue portal from a committed .sub file and stops before the final
+# submit (see _cmd_submit in paperpush/cli.py), so an unattended run drives
+# the portal without irreversibly submitting.
+#
+# This is deliberately NOT part of the per-push CI (ci.yml runs `pytest`, which
+# skips submit tests). Submission is outward-facing, so it is gated to a monthly
+# schedule and manual dispatch only.
+#
+# SETUP (one time): a saved portal session, same as check-portal.yml.
+#   1. Locally sign in and save a session:
+#        paperpush check-portal --login
+#   2. Base64-encode it:
+#        base64 -i ~/.config/paperpush/biorxiv_session.json | pbcopy
+#   3. Repo -> Settings -> Secrets and variables -> Actions -> New secret:
+#        name:  BIORXIV_SESSION_B64    value: (paste)
+#
+# The .sub file to submit defaults to tests/sub_files/biorxiv/biorxiv.sub. Override it per repo
+# under Settings -> Secrets and variables -> Actions -> Variables as SUBFILE,
+# or per run via the workflow_dispatch input below.
+#
+# Security note: BIORXIV_SESSION_B64 is a live session to a real account. Keep
+# this repo PRIVATE -- anyone who can edit a workflow could exfiltrate it.
+
+on:
+  schedule:
+    - cron: "0 9 1 * *"   # 09:00 UTC on the 1st of every month
+  workflow_dispatch:
+    inputs:
+      subfile:
+        description: "Path to the .sub file to submit"
+        required: false
+        default: ""
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install paperpush + Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          python -m playwright install --with-deps chromium
+
+      - name: Restore portal session
+        env:
+          SESSION_B64: ${{ secrets.BIORXIV_SESSION_B64 }}
+        run: |
+          if [ -z "${SESSION_B64}" ]; then
+            echo "::error::BIORXIV_SESSION_B64 secret is not set. See the setup notes in this workflow file."
+            exit 1
+          fi
+          mkdir -p "${HOME}/.config/paperpush"
+          echo "${SESSION_B64}" | base64 --decode > "${HOME}/.config/paperpush/biorxiv_session.json"
+
+      - name: Resolve .sub file
+        id: resolve
+        env:
+          INPUT_SUBFILE: ${{ inputs.subfile }}
+          VAR_SUBFILE: ${{ vars.SUBFILE }}
+        run: |
+          subfile="${INPUT_SUBFILE:-${VAR_SUBFILE:-tests/sub_files/biorxiv/biorxiv.sub}}"
+          if [ ! -f "${subfile}" ]; then
+            echo "::error::.sub file not found: ${subfile}"
+            exit 1
+          fi
+          echo "subfile=${subfile}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run submission
+        run: |
+          set -o pipefail
+          paperpush submit "${{ steps.resolve.outputs.subfile }}" --headless | tee submit.log
+
+      - name: Upload submission log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: submit-log
+          path: submit.log
+          if-no-files-found: ignore

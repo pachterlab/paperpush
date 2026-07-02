@@ -1,0 +1,82 @@
+{
+  // Treat .sub submission files as YAML. This gives built-in syntax coloring
+  // even when the "Highlight" extension below is NOT installed (the format is
+  // YAML-like). When Highlight IS installed, its rules layer on top by filename.
+  "files.associations": {
+    "*.sub": "yaml"
+  },
+
+  // Power autocomplete and inline validation for the venue database from the
+  // generated schema. The schema's source of truth is the pydantic models in
+  // paperpush/schema_models.py; regenerate with
+  // `python scripts/gen_venues_schema.py` (CI drift-checks it).
+  "json.schemas": [
+    {
+      "fileMatch": ["paperpush/venues.json"],
+      "url": "./paperpush/venues.schema.json"
+    }
+  ],
+
+  // Built-in YAML is a coloring-only grammar, so it won't flag "@venue" or
+  // colons inside a value. But if the Red Hat YAML extension is installed it
+  // would; disabling its validator keeps .sub files squiggle-free.
+  "yaml.validate": false,
+
+  // Extra coloring (field names, REQUIRED/optional markers) comes from the
+  // "Highlight" extension (fabiospampinato.vscode-highlight). It is optional --
+  // without it you still get the YAML fallback above. Install it, then reload.
+  //
+  // IMPORTANT: in this extension decorations[i] styles CAPTURING GROUP i+1,
+  // not the whole match. Every rule below therefore wraps the part to color
+  // in (parentheses), with exactly one decoration per group. When two rules
+  // match overlapping text, the EARLIER rule wins on the overlap, so the
+  // REQUIRED/optional marker rules must come BEFORE the grey comment rule for
+  // their color to override the comment color on their sub-range.
+  "highlight.regexFlags": "gm",
+  "highlight.regexes": {
+    // "optional" marker inside comments -> green (must precede the comment rule)
+    "(optional)": {
+      "filterFileRegex": ".*\\.sub$",
+      "decorations": [
+        { "color": "#43a047", "fontWeight": "bold" }
+      ]
+    },
+    // "REQUIRED" marker inside comments -> red (must precede the comment rule)
+    "(REQUIRED)": {
+      "filterFileRegex": ".*\\.sub$",
+      "decorations": [
+        { "color": "#e53935", "fontWeight": "bold" }
+      ]
+    },
+    // Whole comment line -> dim grey
+    "^(#.*)$": {
+      "filterFileRegex": ".*\\.sub$",
+      "decorations": [
+        { "color": "#9e9e9e" }
+      ]
+    },
+    // Field name at start of line, incl. "@venue" -> teal
+    "^(@?[A-Za-z0-9_]+)(?=:)": {
+      "filterFileRegex": ".*\\.sub$",
+      "decorations": [
+        { "color": "#00897b", "fontWeight": "bold" }
+      ]
+    },
+    // Answer value after "key:" on the same line -> blue.
+    // (.+) is greedy, so a value containing a colon (e.g. a title) is fully
+    // captured and colored.
+    "^(?!#)@?[A-Za-z0-9_]+:[ \\t]+(.+)$": {
+      "filterFileRegex": ".*\\.sub$",
+      "decorations": [
+        { "color": "#1e88e5" }
+      ]
+    },
+    // Answer value on an indented continuation line under "key: |" -> blue.
+    "^(?!#)[ \\t]{2,}(\\S.*)$": {
+      "filterFileRegex": ".*\\.sub$",
+      "decorations": [
+        { "color": "#1e88e5" }
+      ]
+    }
+  }
+}

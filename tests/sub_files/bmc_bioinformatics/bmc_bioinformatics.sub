@@ -1,0 +1,76 @@
+# paperpush submission file for bmc_bioinformatics  -*- mode: yaml -*-
+# BMC Bioinformatics
+#
+# Edit the values below, then run:  paperpush submit bmc_bioinformatics.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: bmc_bioinformatics
+# submission guide: https://link.springer.com/venue/12859/submission-guidelines
+
+# Article type (choice, REQUIRED)
+#   The article type selected from the 'Article type:' drop-down on the first step of the Springer Nature wizard. Matched to the menu by its option value; defaults to 'research' when blank.
+#   options: comment | database | editorial | matters-arising | research | review | software
+article_type: research
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript, typed into the Title rich-text editor on the details step.
+title: title of the manuscript
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract, typed into the Abstract rich-text editor on the details step.
+abstract: |
+  brief abstract of the manuscript
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript, uploaded to the manuscript slot on the first step.
+#   each file at most 2000 MB
+manuscript_file: tests/manuscript_files/bmc_bioinformatics/manuscript.docx
+
+# Supplementary file (file, optional)
+#   Optional. Supplementary material.
+supplementary_file: tests/manuscript_files/bmc_bioinformatics/supplement.pdf
+
+# Cover letter (file, REQUIRED)
+#   Path to the cover letter, uploaded to the cover-letter slot on the details step.
+cover_letter: tests/manuscript_files/bmc_bioinformatics/cover_letter.pdf
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: name | email | institution | city | country | department (optional) | corresponding(yes/no). The first author marked corresponding (or the first author when none is) is set as the responsible corresponding author.
+authors: |
+  Joseph Richie | jmrich@caltech.edu | California Institute of Technology | Pasadena | USA | Biology | yes
+  Joseph Rich | jmrich@usc.edu | University of Southern California | Los Angeles | USA | Radiology | no
+
+# Author contributions statement (textarea, REQUIRED)
+#   The author-contributions statement, typed into the box on the authors step. Use initials to specify who did what (e.g. 'A.B. and C.D. wrote the manuscript; E.F. prepared figures 1-3').
+author_contributions: |
+  here is my statement
+
+# Competing interests (boolean, REQUIRED)
+#   Whether the authors have competing interests to declare. When yes, fill 'competing_interests_statement'.
+competing_interests: no
+
+# Competing interests statement (textarea, optional)
+#   Required when 'competing_interests' is yes. The statement typed into the competing-interests box on the declarations step.
+competing_interests_statement: |
+  
+
+# Data availability statement (textarea, optional)
+#   Optional. When provided, the declarations step records that data were used or generated and this statement is entered; when blank, the not-applicable option is selected.
+data_availability_statement: |
+  
+
+# Acknowledgements (textarea, optional)
+#   Optional. Typed into the acknowledgements box on the declarations step.
+acknowledgements: |
+  
+
+# Research funding (boolean, optional)
+#   Whether the research was funded. Set yes (or list funders below) to record funding on the declarations step.
+research_funding: no
+
+# Funding sources (textarea, optional)
+#   Optional. One funder per line as 'funder name | grant id' (the grant id optional). On the declarations step each line opens a funding row attributed to the first author: the funder name and grant id are typed and the row is saved. Providing any funder implies research funding = yes.
+funding: |
+  
+
+# vim: set filetype=yaml :

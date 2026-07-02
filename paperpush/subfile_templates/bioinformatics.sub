@@ -1,0 +1,211 @@
+# paperpush submission file for bioinformatics  -*- mode: yaml -*-
+# Bioinformatics (Oxford University Press)
+#
+# Edit the values below, then run:  paperpush submit bioinformatics.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: bioinformatics
+# submission guide: https://academic.oup.com/bioinformatics/pages/General_Instructions
+
+# Manuscript type (choice, REQUIRED)
+#   Original Paper: up to 7 pages (approx. 5,000 words, excluding figures); original papers describing new research developments in computational molecular biology, for example new models, algorithms, software involving new methods, biological databases and networks, information services, and their impact on molecular biology or computer science; biological data, as opposed to purely simulated data, must be used. Letter to the Editor: up to 2 pages (approx. 1,300 words, or 1,000 words plus one figure); letters on the broad range of topics covered by the venue, including political, technical, and scientific analyses of issues related to bioinformatics and computational biology, and may include discussion of papers published by the venue. Applications Note: up to 4 pages (approx. 2,600 words, or 2,000 words plus one figure); short descriptions of novel software or new algorithm implementations, databases, and network services (web servers and interfaces); software or data must be freely available to non-commercial users, availability and implementation must be clearly stated in the article, and the name of the application should be included in the title. Review: 3-8 pages (approx. 3,000-6,000 words, excluding figures); most reviews are commissioned, although the editors welcome suggestions from prospective authors, who should in the first instance email a draft or abstract/summary no longer than a page to the editorial office.
+#   options: Original Paper | Letter to the Editor | Applications Note | Review
+article_type: 
+
+# Manuscript title (text, REQUIRED)
+#   Full title of the manuscript. For Applications Notes, the name of the application must be included in the title.
+title: 
+
+# Abstract (textarea, REQUIRED)
+#   Original Papers use a structured abstract with the headings 'Motivation:', 'Results:', 'Availability and implementation:', 'Contact:', and (optional) 'Supplementary information:'.
+#   at most 250 words
+abstract: |
+  
+
+# Subject category (choice, REQUIRED)
+#   Please select your manuscript subject category
+#   options: Genome analysis | Bioimage informatics | Databases and ontologies | Data and text mining | Systems biology | Genetics and population analysis | Gene expression | Structural bioinformatics | Phylogenetics | Sequence analysis
+section: 
+
+# Does your manuscript involve Next Generation Sequencing data analysis? (boolean, REQUIRED)
+#   Set to yes if manuscript involves Next Generation Sequencing data analysis.
+next_gen_sequencing: 
+
+# Does your manuscript involve Machine Learning? (boolean, REQUIRED)
+#   Set to yes if manuscript involves machine learning.
+machine_learning: 
+
+# Portal Keywords (multichoice, REQUIRED)
+#   Portal keywords selected on the ScholarOne keywords step. The vocabulary below is recommended but not required; any term you enter is accepted, with a warning if it is off the list. Choose 3 to 6; enter them comma-separated. List the recommended vocabulary from the command line with `python -m paperpush.venues.bioinformatics`.
+#   select 3-6, comma-separated
+#   options: run 'paperpush options bioinformatics.portal_keywords' to list the choices
+portal_keywords: 
+
+# Keywords (multichoice, optional)
+#   Free keywords selected on the ScholarOne keywords step. The vocabulary shared with Portal Keywords is recommended but not required; any term you enter is accepted, with a warning if it is off the list. Choose up to 6; enter them comma-separated. List the recommended vocabulary from the command line with `python -m paperpush.venues.bioinformatics`.
+#   select 0-6, comma-separated
+#   options: run 'paperpush options bioinformatics.keywords' to list the choices
+keywords: 
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: email | prefix | name | institution | country/region | city | corresponding(yes/no). Each author is added on ScholarOne by email lookup, so an email is required for every author. If the email is already registered the remaining columns are ignored; if it is not, the author is created from the prefix, name, institution, country/region, and city. Mark exactly one corresponding author. Prefix must be one of: Dr., Miss, Mr., Mrs., Ms., Prof., Mx. Institution and country/region are picked from ScholarOne drop-down lists, so spell them as they appear there.
+authors: |
+  
+
+# Cover letter (file, REQUIRED)
+#   Mandatory; submissions without a cover letter may be editorially rejected. Must explain the paper's suitability, disclose any related preprints, dissertations, or manuscripts and how this work differs, and declare conflicts of interest and any generative AI/LLM use.
+#   at most 32768 characters
+cover_letter: 
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript. A PDF is typically uploaded for review; Word (.docx) or LaTeX source is required for the final accepted manuscript. The page and word limits depend on the article type: Original Paper up to 7 pages (approx. 5,000 words), Letter to the Editor up to 2 pages (approx. 1,300 words), Applications Note up to 4 pages (approx. 2,600 words), and Review up to 8 pages (approx. 3,000-6,000 words). These are encoded in max_pages_by, keyed on the article_type field.
+manuscript_file: 
+
+# Figures (filelist, optional)
+#   Optional. One path per line. Provide high-resolution figure files. Each uploads with the 'Figure' file type.
+figures: |
+  
+
+# Tables (filelist, optional)
+#   Optional. One path per line. Tables uploaded as separate files, each with the 'Table' file type.
+tables: |
+  
+
+# Number of pages (int, REQUIRED)
+#   Total number of pages in the manuscript.
+#   whole number, range 1-any inclusive
+num_pages: 
+
+# Number of tables (int, optional)
+#   Total number of tables in the manuscript.
+#   whole number, range 0-any inclusive
+num_tables: 
+
+# Number of figures (int, optional)
+#   Total number of figures in the manuscript.
+#   whole number, range 0-any inclusive
+num_figures: 
+
+# Supplementary materials (file, optional)
+#   Optional. Supplementary materials should be combined into a single file and cannot be altered or replaced after acceptance.
+supplementary_file: 
+
+# Data availability statement (textarea, REQUIRED)
+#   Required for all papers. Describe and provide the means of access to the underlying data, linking to the data or providing a unique identifier. Data sets cited in the manuscript should also appear in the reference list.
+data_availability: |
+  
+
+# Conflict of interest statement (textarea, REQUIRED)
+#   All authors must disclose competing interests at submission. The corresponding author is responsible for ensuring all authors' conflicts are declared. Enter 'None declared.' if there are none.
+conflict_of_interest: |
+  
+
+# Funding statement (textarea, optional)
+#   Funding sources and grant numbers.
+funding: |
+  
+
+# Ethics statement (textarea, optional)
+#   Where ethically relevant, confirm the research followed applicable international and local guidelines and any required approvals were obtained.
+ethics: |
+  
+
+# Author contributions (CRediT) (textarea, optional)
+#   Describe each author's contribution using the CRediT contributor roles taxonomy.
+author_contributions: |
+  
+
+# Generative AI use disclosure (textarea, optional)
+#   Disclose any use of generative AI or LLM tools in both the cover letter and the Methods or Acknowledgements section, with sufficient detail. AI tools cannot be listed as authors.
+ai_disclosure: |
+  
+
+# Reviewers (textarea, REQUIRED)
+#   One reviewer per line. Format: name | email | stance | reason. stance must be 'recommended' or 'opposed' (case-insensitive); reason is optional (a free-text justification shown to the editor). At least 4 recommended reviewers are required; opposed reviewers do not count toward that minimum. Each reviewer is added through the ScholarOne 'Add Reviewer' form, which splits the name into first/last on the last space, so write the name as 'First Last'.
+#   provide 4-any item(s), one per line
+reviewers: |
+  
+
+# Is there funding to report for this submission? (boolean, REQUIRED)
+#   Declaration answered on the final submission step. Set to yes if there is funding to report for this submission. Report the funding sources and grant numbers in the funding statement.
+funding_to_report: 
+
+# Is this a resubmission of a manuscript which was previously submitted under a different manuscript number? (boolean, REQUIRED)
+#   Declaration answered on the final submission step. Set to yes if this manuscript was previously submitted under a different manuscript number. When yes, provide that number in previous_manuscript_id.
+resubmission: 
+
+# If yes, what is the manuscript ID of the previous submission? (text, optional)
+#   Only needed when resubmission is yes. The manuscript ID (manuscript number) of the previous submission.
+previous_manuscript_id: 
+
+# Do you or your co-authors have any conflict of interest? (boolean, REQUIRED)
+#   Declaration answered on the final submission step. Set to yes if you or any co-author has a conflict of interest. When yes, state it in conflict_of_interest_details.
+has_conflict_of_interest: 
+
+# If yes, please state your conflict of interest: (textarea, optional)
+#   Only needed when has_conflict_of_interest is yes. State the conflict(s) of interest for you and your co-authors.
+conflict_of_interest_details: |
+  
+
+# Have you cited any works that are unpublished or in press? (boolean, REQUIRED)
+#   Declaration answered on the final submission step. Set to yes if you have cited any unpublished or in-press works; if so, they must be uploaded as a 'Supplementary Material for Review Only' file so reviewers can understand their relation to the manuscript. No means no such works were cited.
+cited_unpublished_works: 
+
+# Is an algorithm or software central to the paper? (boolean, REQUIRED)
+#   Reproducibility checklist item answered on the final declarations step. Set to yes if an algorithm or software is central to the paper.
+algorithm_or_software_central: 
+
+# The text of the article includes a link to the code in an open-source repository (e.g., GitHub). (boolean, REQUIRED)
+#   Reproducibility checklist item answered on the final declarations step. Set to yes if the manuscript text itself contains a link to the code in an open-source repository such as GitHub.
+code_in_text: 
+
+# Please provide the link to the repository below (optional): (text, optional)
+#   Optional. The URL of the open-source code repository (e.g., a GitHub repository). When provided, it must be a valid http/https URL.
+#   each non-blank line must be a valid http/https URL
+code_repository_link: 
+
+# The software can be installed from an open package repository (e.g. Bioconda, PyPI, Bioconductor) or contains an extensive installation guide and all software dependencies are listed. (boolean, REQUIRED)
+#   Reproducibility checklist item. Set to yes if the software is installable from an open package repository, or if it provides an extensive installation guide and lists all software dependencies.
+software_installable: 
+
+# Someone that is not familiar with the tool has tested its installation and use prior to submission. (boolean, REQUIRED)
+#   Reproducibility checklist item. Set to yes if a person unfamiliar with the tool tested its installation and use before submission.
+software_tested: 
+
+# The software repository contains a link to a test dataset, and the README includes the instructions to run the method on the test dataset, with the input and output clearly described. (boolean, REQUIRED)
+#   Reproducibility checklist item. Set to yes if the repository links to a test dataset and the README documents how to run the method on it, with the input and output clearly described.
+test_dataset_provided: 
+
+# The data used in the manuscript is clearly documented. (boolean, REQUIRED)
+#   Reproducibility checklist item. Set to yes if the sources of all datasets (including training and evaluation datasets) are provided, all datasets are versioned, and the source and process of ground-truth annotations are provided.
+data_documented: 
+
+# Please provide the link(s)/accessions/reference(s) to the data sources: (text, optional)
+#   Optional. Links, accession numbers, or references to the data sources used in the manuscript. Accession numbers and citations are accepted in addition to URLs, so no URL format is enforced.
+data_sources_link: 
+
+# Is this a Machine Learning / Deep Learning paper? (boolean, REQUIRED)
+#   Set to yes if the manuscript is a machine learning (ML) or deep learning (DL) paper. When yes, three additional checklist questions about train-test splits, dataset transformations, and performance metrics are answered on the same step.
+is_ml_dl_paper: 
+
+# The details of train-test splits or cross-validation folds are explicitly mentioned in the manuscript. (boolean, optional)
+#   Only applicable when is_ml_dl_paper is yes. Set to yes if the manuscript explicitly describes the train-test splits or cross-validation folds.
+ml_train_test_splits: 
+
+# All transformations of the dataset from its raw form to the form used in the model are reported, and the corresponding pre-processing code is provided. (boolean, optional)
+#   Only applicable when is_ml_dl_paper is yes. Set to yes if every transformation of the dataset from its raw form to the form used in the model (for instance, treatment of missing data and normalization) is reported and the corresponding pre-processing code is provided.
+ml_data_transformations: 
+
+# All metrics used to assess and compare model performance are provided along with uncertainty estimates. (boolean, optional)
+#   Only applicable when is_ml_dl_paper is yes. Set to yes if all metrics used to assess and compare model performance (e.g., accuracy, area under the receiver operating characteristic curve) are provided along with uncertainty estimates (e.g., confidence intervals, standard deviations).
+ml_metrics_uncertainty: 
+
+# Is this manuscript posted as a preprint? (boolean, optional)
+#   Set to yes if a version is posted on a preprint server such as bioRxiv. The manuscript must not be under consideration at more than one venue simultaneously.
+is_preprint: 
+
+# Preprint DOI (if applicable) (text, optional)
+#   Only needed when is_preprint is yes. Update the preprint with the published DOI if accepted.
+preprint_doi: 
+
+# vim: set filetype=yaml :

@@ -1,0 +1,903 @@
+{
+  "biorxiv.sub": {
+    "journal": "biorxiv",
+    "fields": {
+      "result_type": "New Results",
+      "server_suitability": "Biological research",
+      "article_scope": "Research article with data",
+      "subject_category": "Bioinformatics",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "manuscript_file": "tests/manuscript_files/biorxiv/manuscript.pdf",
+      "license": "CC-BY-NC-ND",
+      "competing_interest": "The authors have declared no competing interest.",
+      "is_revision": "no",
+      "transfer_to_venue": "no",
+      "author_consent": "yes"
+    }
+  },
+  "biorxiv_figures.sub": {
+    "journal": "biorxiv",
+    "fields": {
+      "result_type": "New Results",
+      "server_suitability": "Biological research",
+      "article_scope": "Research article with data",
+      "subject_category": "Bioinformatics",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "manuscript_file": "tests/manuscript_files/biorxiv/manuscript.pdf",
+      "license": "CC-BY-NC-ND",
+      "competing_interest": "The authors have declared no competing interest.",
+      "is_revision": "no",
+      "transfer_to_venue": "no",
+      "author_consent": "yes",
+      "figure_files": "tests/manuscript_files/biorxiv/figures/fig1.png | Figure 1\ntests/manuscript_files/biorxiv/figures/fig2.png | Figure 2"
+    }
+  },
+  "biorxiv_funding.sub": {
+    "journal": "biorxiv",
+    "fields": {
+      "result_type": "New Results",
+      "server_suitability": "Biological research",
+      "article_scope": "Research article with data",
+      "subject_category": "Bioinformatics",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "manuscript_file": "tests/manuscript_files/biorxiv/manuscript.pdf",
+      "license": "CC-BY-NC-ND",
+      "competing_interest": "The authors have declared no competing interest.",
+      "is_revision": "no",
+      "transfer_to_venue": "no",
+      "author_consent": "yes",
+      "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
+    }
+  },
+  "biorxiv_supplement.sub": {
+    "journal": "biorxiv",
+    "fields": {
+      "result_type": "New Results",
+      "server_suitability": "Biological research",
+      "article_scope": "Research article with data",
+      "subject_category": "Bioinformatics",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "manuscript_file": "tests/manuscript_files/biorxiv/manuscript.pdf",
+      "license": "CC-BY-NC-ND",
+      "competing_interest": "The authors have declared no competing interest.",
+      "is_revision": "no",
+      "transfer_to_venue": "no",
+      "author_consent": "yes",
+      "supplementary_files": "tests/manuscript_files/biorxiv/supplement.pdf | pdf | Supplementary Text"
+    }
+  },
+  "medrxiv.sub": {
+    "journal": "medrxiv",
+    "fields": {
+      "subject_category": "Epidemiology",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "manuscript_file": "tests/manuscript_files/medrxiv/manuscript.pdf",
+      "license": "CC-BY-NC-ND",
+      "competing_interest": "The authors have declared no competing interest.",
+      "data_availability": "All data produced in the present study are available upon reasonable request to the authors.",
+      "data_availability_links": "https://github.com/example/repo",
+      "human_subjects": "No",
+      "clinical_trial": "Not applicable",
+      "is_revision": "no",
+      "transfer_to_venue": "no",
+      "author_consent": "yes"
+    }
+  },
+  "medrxiv_figures.sub": {
+    "journal": "medrxiv",
+    "fields": {
+      "subject_category": "Epidemiology",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "manuscript_file": "tests/manuscript_files/medrxiv/manuscript.pdf",
+      "license": "CC-BY-NC-ND",
+      "competing_interest": "The authors have declared no competing interest.",
+      "data_availability": "All data produced in the present study are available upon reasonable request to the authors.",
+      "data_availability_links": "https://github.com/example/repo",
+      "human_subjects": "No",
+      "clinical_trial": "Not applicable",
+      "is_revision": "no",
+      "transfer_to_venue": "no",
+      "author_consent": "yes",
+      "figure_files": "tests/manuscript_files/medrxiv/figures/fig1.png | Figure 1\ntests/manuscript_files/medrxiv/figures/fig2.png | Figure 2"
+    }
+  },
+  "medrxiv_funding.sub": {
+    "journal": "medrxiv",
+    "fields": {
+      "subject_category": "Epidemiology",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "manuscript_file": "tests/manuscript_files/medrxiv/manuscript.pdf",
+      "license": "CC-BY-NC-ND",
+      "competing_interest": "The authors have declared no competing interest.",
+      "data_availability": "All data produced in the present study are available upon reasonable request to the authors.",
+      "data_availability_links": "https://github.com/example/repo",
+      "human_subjects": "No",
+      "clinical_trial": "Not applicable",
+      "is_revision": "no",
+      "transfer_to_venue": "no",
+      "author_consent": "yes",
+      "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
+    }
+  },
+  "medrxiv_supplement.sub": {
+    "journal": "medrxiv",
+    "fields": {
+      "subject_category": "Epidemiology",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "manuscript_file": "tests/manuscript_files/medrxiv/manuscript.pdf",
+      "license": "CC-BY-NC-ND",
+      "competing_interest": "The authors have declared no competing interest.",
+      "data_availability": "All data produced in the present study are available upon reasonable request to the authors.",
+      "data_availability_links": "https://github.com/example/repo",
+      "human_subjects": "No",
+      "clinical_trial": "Not applicable",
+      "is_revision": "no",
+      "transfer_to_venue": "no",
+      "author_consent": "yes",
+      "supplementary_files": "tests/manuscript_files/medrxiv/supplement.pdf | pdf | Supplementary Text"
+    }
+  },
+  "medrxiv_human_subjects.sub": {
+    "journal": "medrxiv",
+    "fields": {
+      "subject_category": "Epidemiology",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "manuscript_file": "tests/manuscript_files/medrxiv/manuscript.pdf",
+      "license": "CC-BY-NC-ND",
+      "competing_interest": "The authors have declared no competing interest.",
+      "data_availability": "All data produced in the present study are available upon reasonable request to the authors.",
+      "data_availability_links": "https://github.com/example/repo",
+      "human_subjects": "Yes",
+      "clinical_trial": "Not applicable",
+      "is_revision": "no",
+      "transfer_to_venue": "no",
+      "author_consent": "yes",
+      "public_data_only": "No",
+      "ethics_statement": "Ethics committee/IRB of the California Institute of Technology gave ethical approval for this work."
+    }
+  },
+  "bioinformatics.sub": {
+    "journal": "bioinformatics",
+    "fields": {
+      "article_type": "Original Paper",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "section": "Sequence analysis",
+      "next_gen_sequencing": "no",
+      "machine_learning": "no",
+      "portal_keywords": "Sequence alignment, Algorithms, Bayesian",
+      "keywords": "Secondary structure, Algorithms",
+      "authors": "jmrich@caltech.edu | Dr. | Joseph Richie | California Institute of Technology | United States | Pasadena | no\njmrich@usc.edu | Prof. | Joseph Rich | University of Southern California | United States | Los Angeles | yes\n",
+      "reviewers": "Alice Reviewer | alice.reviewer@example.com | recommended | Expert in sequence alignment algorithms.\nBob Referee | bob.referee@example.com | recommended | Works on Bayesian methods for genomics.\nCarol Editor | carol.editor@example.org | recommended | Authority on RNA secondary structure prediction.\nDan Scholar | dan.scholar@example.net | recommended | Specialist in machine learning for bioinformatics.\n",
+      "cover_letter": "tests/manuscript_files/bioinformatics/cover_letter.pdf",
+      "manuscript_file": "tests/manuscript_files/bioinformatics/manuscript.pdf",
+      "num_pages": "7",
+      "data_availability": "All data and source code are available at https://github.com/example/repo.",
+      "conflict_of_interest": "The authors declare no conflict of interest.",
+      "algorithm_or_software_central": "yes",
+      "code_in_text": "yes",
+      "code_repository_link": "https://github.com/example/repo",
+      "software_installable": "yes",
+      "software_tested": "yes",
+      "test_dataset_provided": "yes",
+      "data_documented": "yes",
+      "data_sources_link": "https://github.com/example/repo, GSE12345",
+      "is_ml_dl_paper": "yes",
+      "ml_train_test_splits": "yes",
+      "ml_data_transformations": "yes",
+      "ml_metrics_uncertainty": "yes",
+      "funding_to_report": "no",
+      "resubmission": "no",
+      "has_conflict_of_interest": "no",
+      "cited_unpublished_works": "no"
+    }
+  },
+  "bioinformatics_figures.sub": {
+    "journal": "bioinformatics",
+    "fields": {
+      "article_type": "Original Paper",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "section": "Sequence analysis",
+      "next_gen_sequencing": "no",
+      "machine_learning": "no",
+      "portal_keywords": "Sequence alignment, Algorithms, Bayesian",
+      "keywords": "Secondary structure, Algorithms",
+      "authors": "jmrich@caltech.edu | Dr. | Joseph Richie | California Institute of Technology | United States | Pasadena | no\njmrich@usc.edu | Prof. | Joseph Rich | University of Southern California | United States | Los Angeles | yes\n",
+      "reviewers": "Alice Reviewer | alice.reviewer@example.com | recommended | Expert in sequence alignment algorithms.\nBob Referee | bob.referee@example.com | recommended | Works on Bayesian methods for genomics.\nCarol Editor | carol.editor@example.org | recommended | Authority on RNA secondary structure prediction.\nDan Scholar | dan.scholar@example.net | recommended | Specialist in machine learning for bioinformatics.\n",
+      "cover_letter": "tests/manuscript_files/bioinformatics/cover_letter.pdf",
+      "manuscript_file": "tests/manuscript_files/bioinformatics/manuscript.pdf",
+      "num_pages": "7",
+      "data_availability": "All data and source code are available at https://github.com/example/repo.",
+      "conflict_of_interest": "The authors declare no conflict of interest.",
+      "algorithm_or_software_central": "yes",
+      "code_in_text": "yes",
+      "code_repository_link": "https://github.com/example/repo",
+      "software_installable": "yes",
+      "software_tested": "yes",
+      "test_dataset_provided": "yes",
+      "data_documented": "yes",
+      "data_sources_link": "https://github.com/example/repo, GSE12345",
+      "is_ml_dl_paper": "yes",
+      "ml_train_test_splits": "yes",
+      "ml_data_transformations": "yes",
+      "ml_metrics_uncertainty": "yes",
+      "funding_to_report": "yes",
+      "resubmission": "yes",
+      "previous_manuscript_id": "BIOINF-2024-5678",
+      "has_conflict_of_interest": "yes",
+      "conflict_of_interest_details": "J.R. consults for Example Genomics Inc.",
+      "cited_unpublished_works": "yes",
+      "figures": "tests/manuscript_files/bioinformatics/figures/fig1.png\ntests/manuscript_files/bioinformatics/figures/fig2.png"
+    }
+  },
+  "nucleic_acids_research.sub": {
+    "journal": "nucleic_acids_research",
+    "fields": {
+      "article_type": "Standard Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "Sequence alignment, Algorithms, Bayesian",
+      "key_points": "A novel method for nucleic acid sequence analysis.\nOutperforms existing tools on benchmark datasets.\nFreely available as open-source software.",
+      "authors": "jmrich@caltech.edu | Dr | Joseph Richie | California Institute of Technology | United States | Pasadena | no\njmrich@usc.edu | Prof. | Joseph Rich | University of Southern California | United States | Los Angeles | yes\n",
+      "cover_letter": "tests/manuscript_files/bioinformatics/cover_letter.pdf",
+      "manuscript_file": "tests/manuscript_files/bioinformatics/manuscript.pdf",
+      "data_availability": "All data and source code are available at https://github.com/example/repo.",
+      "conflict_of_interest": "The authors declare no conflict of interest.",
+      "reviewers": "Alice Reviewer | alice.reviewer@example.com | recommended | Expert in nucleic acid chemistry.\nBob Referee | bob.referee@example.com | recommended | Works on RNA-protein complexes.\nCarol Editor | carol.editor@example.org | recommended | Authority on nucleic acid enzymes.\nDan Scholar | dan.scholar@example.net | recommended | Specialist in genome integrity and repair.\nErin Researcher | erin.researcher@example.com | recommended | Studies synthetic biology and bioengineering.\nFrank Analyst | frank.analyst@example.org | recommended | Expert in computational biology of nucleic acids.\nGrace Opposer | grace.opposer@example.net | opposed | Direct competitor on the same method.\n",
+      "category": "Computational Biology",
+      "is_resubmission": "no",
+      "author_list_altered": "Not Applicable",
+      "back_to_back": "no",
+      "novel_method": "no",
+      "supplementary_online": "no",
+      "publication_charge_funding": "Publication charges covered by the corresponding author's institutional open access fund.",
+      "institution_verification": "verified"
+    }
+  },
+  "nucleic_acids_research_declarations.sub": {
+    "journal": "nucleic_acids_research",
+    "fields": {
+      "article_type": "Standard Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "Sequence alignment, Algorithms, Bayesian",
+      "key_points": "A novel method for nucleic acid sequence analysis.\nOutperforms existing tools on benchmark datasets.\nFreely available as open-source software.",
+      "authors": "jmrich@caltech.edu | Dr | Joseph Richie | California Institute of Technology | United States | Pasadena | no\njmrich@usc.edu | Prof. | Joseph Rich | University of Southern California | United States | Los Angeles | yes\n",
+      "cover_letter": "tests/manuscript_files/bioinformatics/cover_letter.pdf",
+      "manuscript_file": "tests/manuscript_files/bioinformatics/manuscript.pdf",
+      "data_availability": "All data and source code are available at https://github.com/example/repo.",
+      "conflict_of_interest": "The authors declare no conflict of interest.",
+      "reviewers": "Alice Reviewer | alice.reviewer@example.com | recommended | Expert in nucleic acid chemistry.\nBob Referee | bob.referee@example.com | recommended | Works on RNA-protein complexes.\nCarol Editor | carol.editor@example.org | recommended | Authority on nucleic acid enzymes.\nDan Scholar | dan.scholar@example.net | recommended | Specialist in genome integrity and repair.\nErin Researcher | erin.researcher@example.com | recommended | Studies synthetic biology and bioengineering.\nFrank Analyst | frank.analyst@example.org | recommended | Expert in computational biology of nucleic acids.\nGrace Opposer | grace.opposer@example.net | opposed | Direct competitor on the same method.\n",
+      "category": "Computational Biology",
+      "is_resubmission": "no",
+      "author_list_altered": "Not Applicable",
+      "back_to_back": "no",
+      "novel_method": "no",
+      "supplementary_online": "yes",
+      "publication_charge_funding": "Publication charges covered by the corresponding author's institutional open access fund.",
+      "institution_verification": "verified",
+      "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2",
+      "supplementary_file": "tests/manuscript_files/bioinformatics/supplement.pdf",
+      "data_deposition_types": "Novel nucleic acid sequences, Software and source codes"
+    }
+  },
+  "arxiv.sub": {
+    "journal": "arxiv",
+    "fields": {
+      "primary_archive": "cs",
+      "primary_category": "cs.AI",
+      "license": "CC BY 4.0",
+      "title": "Title goes here",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "manuscript_file": "tests/manuscript_files/arxiv/manuscript.pdf"
+    }
+  },
+  "arxiv_tex.sub": {
+    "journal": "arxiv",
+    "fields": {
+      "primary_archive": "cs",
+      "primary_category": "cs.AI",
+      "license": "CC BY 4.0",
+      "title": "Title goes here",
+      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "manuscript_file": "tests/manuscript_files/arxiv/manuscript_tex_bundle.zip"
+    }
+  },
+  "cell.sub": {
+    "journal": "cell",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes"
+    }
+  },
+  "cell_code.sub": {
+    "journal": "cell",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "yes",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes",
+      "code_url": "https://github.com/example/repo"
+    }
+  },
+  "cell_funding.sub": {
+    "journal": "cell",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes",
+      "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
+    }
+  },
+  "cell_figures.sub": {
+    "journal": "cell",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes",
+      "figure_files": "tests/manuscript_files/cell/figures/fig1.png | Figure 1\ntests/manuscript_files/cell/figures/fig2.png | Figure 2"
+    }
+  },
+  "cell_corresponding_second.sub": {
+    "journal": "cell",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | no\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | yes\n",
+      "manuscript_file": "tests/manuscript_files/cell/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes"
+    }
+  },
+  "cell_systems.sub": {
+    "journal": "cell_systems",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell_systems/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell_systems/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell_systems/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes"
+    }
+  },
+  "cell_systems_code.sub": {
+    "journal": "cell_systems",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell_systems/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell_systems/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell_systems/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "yes",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes",
+      "code_url": "https://github.com/example/repo"
+    }
+  },
+  "cell_systems_funding.sub": {
+    "journal": "cell_systems",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell_systems/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell_systems/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell_systems/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes",
+      "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
+    }
+  },
+  "cell_systems_figures.sub": {
+    "journal": "cell_systems",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell_systems/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell_systems/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell_systems/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes",
+      "figure_files": "tests/manuscript_files/cell_systems/figures/fig1.png | Figure 1\ntests/manuscript_files/cell_systems/figures/fig2.png | Figure 2"
+    }
+  },
+  "cell_systems_corresponding_second.sub": {
+    "journal": "cell_systems",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | no\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | yes\n",
+      "manuscript_file": "tests/manuscript_files/cell_systems/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell_systems/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell_systems/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes"
+    }
+  },
+  "cell_genomics.sub": {
+    "journal": "cell_genomics",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell_genomics/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell_genomics/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell_genomics/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes"
+    }
+  },
+  "cell_genomics_code.sub": {
+    "journal": "cell_genomics",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell_genomics/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell_genomics/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell_genomics/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "yes",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes",
+      "code_url": "https://github.com/example/repo"
+    }
+  },
+  "cell_genomics_funding.sub": {
+    "journal": "cell_genomics",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell_genomics/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell_genomics/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell_genomics/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes",
+      "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
+    }
+  },
+  "cell_genomics_figures.sub": {
+    "journal": "cell_genomics",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell_genomics/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell_genomics/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell_genomics/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes",
+      "figure_files": "tests/manuscript_files/cell_genomics/figures/fig1.png | Figure 1\ntests/manuscript_files/cell_genomics/figures/fig2.png | Figure 2"
+    }
+  },
+  "cell_genomics_corresponding_second.sub": {
+    "journal": "cell_genomics",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | no\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | yes\n",
+      "manuscript_file": "tests/manuscript_files/cell_genomics/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell_genomics/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell_genomics/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes"
+    }
+  },
+  "plos_compbio.sub": {
+    "journal": "plos_compbio",
+    "fields": {
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "keyword1;keyword2",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "manuscript_file": "tests/manuscript_files/cell/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/cell/cover_letter.pdf",
+      "declaration_file": "tests/manuscript_files/cell/declaration_of_interest.pdf",
+      "related_work": "No",
+      "original_code": "no",
+      "alternate_contact": "josephrich98@gmail.com",
+      "reviewers": "Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her\nXavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him\nJohn Reviewer | john@gmail.com | Caltech | opposed | No no no",
+      "declarations_confirmed": "yes",
+      "section": "Systems Biology",
+      "classifications": "Systems biology\nBioinformatics\nGenomics\nProteomics\nGenome analysis",
+      "competing_interests": "The authors have declared that no competing interests exist.",
+      "data_availability": "All relevant data are within the manuscript and its Supporting Information files.",
+      "human_participants": "No"
+    }
+  },
+  "nature.sub": {
+    "journal": "nature",
+    "fields": {
+      "manuscript_type": "Biological Sciences - Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "subject_level": "Biological sciences | Biochemistry | Proteomics\nBiological sciences | Biophysics",
+      "authors": "Dr | Joseph | Richie | jmrich@caltech.edu | California Institute of Technology | United States | Pasadena | no\nProfessor | Joseph | Rich | jmrich@usc.edu | University of Southern California | United States | Los Angeles | yes\n",
+      "manuscript_file": "tests/manuscript_files/nature/manuscript.pdf",
+      "figure_files": "tests/manuscript_files/nature/figures/fig1.tif | Figure 1\ntests/manuscript_files/nature/figures/fig2.tif | Figure 2",
+      "supplementary_files": "tests/manuscript_files/nature/supplement.pdf | Supplementary Information",
+      "are_you_corresponding": "yes",
+      "corresponding_gender": "Prefer not to disclose",
+      "competing_interests": "no",
+      "dual_publication": "no",
+      "peer_review": "single-anonymized",
+      "open_access": "no"
+    }
+  },
+  "nature_biotech.sub": {
+    "journal": "nature_biotech",
+    "fields": {
+      "manuscript_type": "Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "subject_level": "Biological sciences | Biochemistry | Proteomics\nBiological sciences | Biophysics",
+      "authors": "Dr | Joseph | Richie | jmrich@caltech.edu | California Institute of Technology | United States | Pasadena | no\nProfessor | Joseph | Rich | jmrich@usc.edu | University of Southern California | United States | Los Angeles | yes\n",
+      "manuscript_file": "tests/manuscript_files/nature_biotech/manuscript.pdf",
+      "figure_files": "tests/manuscript_files/nature_biotech/figures/fig1.tif | Figure 1\ntests/manuscript_files/nature_biotech/figures/fig2.tif | Figure 2",
+      "supplementary_files": "tests/manuscript_files/nature_biotech/supplement.pdf | Supplementary Information",
+      "are_you_corresponding": "yes",
+      "corresponding_gender": "Prefer not to disclose",
+      "competing_interests": "no",
+      "dual_publication": "no",
+      "peer_review": "single-anonymized",
+      "open_access": "no"
+    }
+  },
+  "nature_methods.sub": {
+    "journal": "nature_methods",
+    "fields": {
+      "manuscript_type": "Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "subject_level": "Biological sciences | Biochemistry | Proteomics\nBiological sciences | Biophysics",
+      "authors": "Dr | Joseph | Richie | jmrich@caltech.edu | California Institute of Technology | United States | Pasadena | no\nProfessor | Joseph | Rich | jmrich@usc.edu | University of Southern California | United States | Los Angeles | yes\n",
+      "manuscript_file": "tests/manuscript_files/nature_methods/manuscript.pdf",
+      "figure_files": "tests/manuscript_files/nature_methods/figures/fig1.tif | Figure 1\ntests/manuscript_files/nature_methods/figures/fig2.tif | Figure 2",
+      "supplementary_files": "tests/manuscript_files/nature_methods/supplement.pdf | Supplementary Information",
+      "are_you_corresponding": "yes",
+      "corresponding_gender": "Prefer not to disclose",
+      "competing_interests": "no",
+      "dual_publication": "no",
+      "peer_review": "single-anonymized",
+      "open_access": "no"
+    }
+  },
+  "genome_biology.sub": {
+    "journal": "genome_biology",
+    "fields": {
+      "article_type": "research",
+      "title": "title of the manuscript",
+      "abstract": "brief abstract of the manuscript",
+      "manuscript_file": "tests/manuscript_files/genome_biology/manuscript.docx",
+      "supplementary_file": "tests/manuscript_files/genome_biology/supplement.pdf",
+      "cover_letter": "tests/manuscript_files/genome_biology/cover_letter.pdf",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | Pasadena | USA | Biology | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | Los Angeles | USA | Radiology | no",
+      "author_contributions": "here is my statement",
+      "competing_interests": "no",
+      "research_funding": "no"
+    }
+  },
+  "bmc_bioinformatics.sub": {
+    "journal": "bmc_bioinformatics",
+    "fields": {
+      "article_type": "research",
+      "title": "title of the manuscript",
+      "abstract": "brief abstract of the manuscript",
+      "manuscript_file": "tests/manuscript_files/bmc_bioinformatics/manuscript.docx",
+      "supplementary_file": "tests/manuscript_files/bmc_bioinformatics/supplement.pdf",
+      "cover_letter": "tests/manuscript_files/bmc_bioinformatics/cover_letter.pdf",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | Pasadena | USA | Biology | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | Los Angeles | USA | Radiology | no",
+      "author_contributions": "here is my statement",
+      "competing_interests": "no",
+      "research_funding": "no"
+    }
+  },
+  "science.sub": {
+    "journal": "science",
+    "fields": {
+      "publication": "Science",
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "funders": "National Institutes of Health | R01-123456 | Joseph Rich\nNational Science Foundation | NSF-7891011 | Easyy Editorial",
+      "subject_areas": "Molecular biology, Genetics",
+      "additional_datasets": "Zenodo | https://zenodo.org/record/1234567\nGitHub | https://github.com/paperpush/manuscript",
+      "authors": "Easyy | Editorial | easyeditorial26@gmail.com | 5116 | 03taz7m60 | yes | yes | no | yes\nJoseph | Rich | jmrich@usc.edu | 6469 | 05dxps055 | yes | no | no | no\n",
+      "manuscript_file": "tests/manuscript_files/science/manuscript.docx",
+      "combined_pdf": "tests/manuscript_files/science/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/science/cover_letter.pdf",
+      "figure_files": "tests/manuscript_files/science/figures/fig1.tif | Figure 1",
+      "supplementary_material": "tests/manuscript_files/science/supplement.pdf",
+      "agree_terms": "yes",
+      "suggested_reviewers": "Alice | Reviewer | alice.reviewer@uni.edu | Stanford University | Genetics\nBob | Referee | bob.referee@inst.org | Broad Institute | Computational Biology",
+      "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
+    }
+  },
+  "science_advances.sub": {
+    "journal": "science_advances",
+    "fields": {
+      "publication": "Science Advances",
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "funders": "National Institutes of Health | R01-123456 | Joseph Rich\nNational Science Foundation | NSF-7891011 | Easyy Editorial",
+      "subject_areas": "Molecular biology, Genetics",
+      "additional_datasets": "Zenodo | https://zenodo.org/record/1234567\nGitHub | https://github.com/paperpush/manuscript",
+      "authors": "Easyy | Editorial | easyeditorial26@gmail.com | 5116 | 03taz7m60 | yes | yes | no | yes\nJoseph | Rich | jmrich@usc.edu | 6469 | 05dxps055 | yes | no | no | no\n",
+      "manuscript_file": "tests/manuscript_files/science/manuscript.docx",
+      "combined_pdf": "tests/manuscript_files/science/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/science/cover_letter.pdf",
+      "figure_files": "tests/manuscript_files/science/figures/fig1.tif | Figure 1",
+      "supplementary_material": "tests/manuscript_files/science/supplement.pdf",
+      "agree_terms": "yes",
+      "suggested_reviewers": "Alice | Reviewer | alice.reviewer@uni.edu | Stanford University | Genetics\nBob | Referee | bob.referee@inst.org | Broad Institute | Computational Biology",
+      "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
+    }
+  },
+  "science_immunology.sub": {
+    "journal": "science_immunology",
+    "fields": {
+      "publication": "Science Immunology",
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "funders": "National Institutes of Health | R01-123456 | Joseph Rich\nNational Science Foundation | NSF-7891011 | Easyy Editorial",
+      "subject_areas": "Molecular biology, Genetics",
+      "additional_datasets": "Zenodo | https://zenodo.org/record/1234567\nGitHub | https://github.com/paperpush/manuscript",
+      "authors": "Easyy | Editorial | easyeditorial26@gmail.com | 5116 | 03taz7m60 | yes | yes | no | yes\nJoseph | Rich | jmrich@usc.edu | 6469 | 05dxps055 | yes | no | no | no\n",
+      "manuscript_file": "tests/manuscript_files/science/manuscript.docx",
+      "combined_pdf": "tests/manuscript_files/science/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/science/cover_letter.pdf",
+      "figure_files": "tests/manuscript_files/science/figures/fig1.tif | Figure 1",
+      "supplementary_material": "tests/manuscript_files/science/supplement.pdf",
+      "agree_terms": "yes",
+      "suggested_reviewers": "Alice | Reviewer | alice.reviewer@uni.edu | Stanford University | Genetics\nBob | Referee | bob.referee@inst.org | Broad Institute | Computational Biology",
+      "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
+    }
+  },
+  "science_robotics.sub": {
+    "journal": "science_robotics",
+    "fields": {
+      "publication": "Science Robotics",
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "funders": "National Institutes of Health | R01-123456 | Joseph Rich\nNational Science Foundation | NSF-7891011 | Easyy Editorial",
+      "subject_areas": "Molecular biology, Genetics",
+      "additional_datasets": "Zenodo | https://zenodo.org/record/1234567\nGitHub | https://github.com/paperpush/manuscript",
+      "authors": "Easyy | Editorial | easyeditorial26@gmail.com | 5116 | 03taz7m60 | yes | yes | no | yes\nJoseph | Rich | jmrich@usc.edu | 6469 | 05dxps055 | yes | no | no | no\n",
+      "manuscript_file": "tests/manuscript_files/science/manuscript.docx",
+      "combined_pdf": "tests/manuscript_files/science/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/science/cover_letter.pdf",
+      "figure_files": "tests/manuscript_files/science/figures/fig1.tif | Figure 1",
+      "supplementary_material": "tests/manuscript_files/science/supplement.pdf",
+      "agree_terms": "yes",
+      "suggested_reviewers": "Alice | Reviewer | alice.reviewer@uni.edu | Stanford University | Genetics\nBob | Referee | bob.referee@inst.org | Broad Institute | Computational Biology",
+      "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
+    }
+  },
+  "science_signaling.sub": {
+    "journal": "science_signaling",
+    "fields": {
+      "publication": "Science Signaling",
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "funders": "National Institutes of Health | R01-123456 | Joseph Rich\nNational Science Foundation | NSF-7891011 | Easyy Editorial",
+      "subject_areas": "Molecular biology, Genetics",
+      "additional_datasets": "Zenodo | https://zenodo.org/record/1234567\nGitHub | https://github.com/paperpush/manuscript",
+      "authors": "Easyy | Editorial | easyeditorial26@gmail.com | 5116 | 03taz7m60 | yes | yes | no | yes\nJoseph | Rich | jmrich@usc.edu | 6469 | 05dxps055 | yes | no | no | no\n",
+      "manuscript_file": "tests/manuscript_files/science/manuscript.docx",
+      "combined_pdf": "tests/manuscript_files/science/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/science/cover_letter.pdf",
+      "figure_files": "tests/manuscript_files/science/figures/fig1.tif | Figure 1",
+      "supplementary_material": "tests/manuscript_files/science/supplement.pdf",
+      "agree_terms": "yes",
+      "suggested_reviewers": "Alice | Reviewer | alice.reviewer@uni.edu | Stanford University | Genetics\nBob | Referee | bob.referee@inst.org | Broad Institute | Computational Biology",
+      "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
+    }
+  },
+  "science_translational_medicine.sub": {
+    "journal": "science_translational_medicine",
+    "fields": {
+      "publication": "Science Translational Medicine",
+      "article_type": "Research Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "funders": "National Institutes of Health | R01-123456 | Joseph Rich\nNational Science Foundation | NSF-7891011 | Easyy Editorial",
+      "subject_areas": "Molecular biology, Genetics",
+      "additional_datasets": "Zenodo | https://zenodo.org/record/1234567\nGitHub | https://github.com/paperpush/manuscript",
+      "authors": "Easyy | Editorial | easyeditorial26@gmail.com | 5116 | 03taz7m60 | yes | yes | no | yes\nJoseph | Rich | jmrich@usc.edu | 6469 | 05dxps055 | yes | no | no | no\n",
+      "manuscript_file": "tests/manuscript_files/science/manuscript.docx",
+      "combined_pdf": "tests/manuscript_files/science/manuscript.pdf",
+      "cover_letter": "tests/manuscript_files/science/cover_letter.pdf",
+      "figure_files": "tests/manuscript_files/science/figures/fig1.tif | Figure 1",
+      "supplementary_material": "tests/manuscript_files/science/supplement.pdf",
+      "agree_terms": "yes",
+      "suggested_reviewers": "Alice | Reviewer | alice.reviewer@uni.edu | Stanford University | Genetics\nBob | Referee | bob.referee@inst.org | Broad Institute | Computational Biology",
+      "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
+    }
+  },
+  "aaai_2027.sub": {
+    "journal": "aaai_2027",
+    "fields": {
+      "title": "Title goes here",
+      "authors": " | Joseph Rich | caltech.edu, usc.edu | no\n | Lior Pachter | caltech.edu | no\n",
+      "tldr": "A one-sentence summary of the paper.",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "primary_topic": "APP: AI for Education & Learning Technologies",
+      "secondary_topics": "APP: Natural Sciences\nAPP: Software Engineering",
+      "country": "United States",
+      "pdf_file": "tests/manuscript_files/aaai_2027/manuscript.pdf"
+    }
+  },
+  "aaai_2027_supplements.sub": {
+    "journal": "aaai_2027",
+    "fields": {
+      "title": "Title goes here",
+      "authors": "~Joseph_Rich1 |  |  | no\n | Lior Pachter | caltech.edu | yes\n",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "primary_topic": "APP: AI for Education & Learning Technologies",
+      "secondary_topics": "APP: Natural Sciences",
+      "country": "United States, Canada",
+      "pdf_file": "tests/manuscript_files/aaai_2027/manuscript.pdf",
+      "reproducibility_checklist": "tests/manuscript_files/aaai_2027/supplement.pdf",
+      "technical_supplement": "tests/manuscript_files/aaai_2027/declaration_of_interest.pdf",
+      "media_supplement": "tests/manuscript_files/aaai_2027/cover_letter.pdf",
+      "code_data_supplement": "tests/manuscript_files/aaai_2027/manuscript.pdf",
+      "conflicts": " | Jane Smith | mit.edu | "
+    }
+  },
+  "discrete_mathematics.sub": {
+    "journal": "discrete_mathematics",
+    "fields": {
+      "article_type": "Contribution",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "graph theory;combinatorics",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | no\nJoseph Rich | jmrich@usc.edu | University of Southern California | yes\n",
+      "manuscript_file": "tests/manuscript_files/discrete_mathematics/manuscript.pdf",
+      "no_competing_interests": "yes",
+      "data_statement": "No data was used for the research described in the article.",
+      "declarations_confirmed": "yes"
+    }
+  },
+  "discrete_mathematics_supplements.sub": {
+    "journal": "discrete_mathematics",
+    "fields": {
+      "article_type": "Note",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "graph theory;combinatorics;posets",
+      "authors": "Joseph Rich | jmrich@caltech.edu | California Institute of Technology | yes\n",
+      "manuscript_file": "tests/manuscript_files/discrete_mathematics/manuscript.pdf",
+      "declaration_file": "tests/manuscript_files/discrete_mathematics/declaration_of_interest.pdf",
+      "figure_files": "tests/manuscript_files/discrete_mathematics/figures/fig1.pdf | Figure 1",
+      "latex_source": "tests/manuscript_files/discrete_mathematics/manuscript_tex_bundle.zip",
+      "supplementary_files": "tests/manuscript_files/discrete_mathematics/supplement.pdf | Supplement",
+      "data_statement": "The data that has been used is confidential.",
+      "declarations_confirmed": "yes"
+    }
+  }
+}

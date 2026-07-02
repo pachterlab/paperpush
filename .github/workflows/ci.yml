@@ -1,0 +1,41 @@
+name: CI
+
+# Runs the test suite on every push and pull request. A bare `pytest` skips
+# only the real-portal tests (those marked @pytest.mark.portal); all offline
+# submit logic still runs. So this never touches a real submission portal --
+# see tests/conftest.py. The real submission runs monthly from submit.yml.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install paperpush (with dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Check README venues table is in sync with venues.json
+        run: python scripts/gen_readme_venues.py --check
+
+      - name: Check venues.schema.json is in sync with the schema models
+        run: python scripts/gen_venues_schema.py --check
+
+      - name: Run tests (real-portal tests skipped by default)
+        run: pytest -v

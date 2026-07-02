@@ -1,0 +1,144 @@
+# paperpush submission file for plos_compbio  -*- mode: yaml -*-
+# PLOS Computational Biology (PLOS)
+#
+# Edit the values below, then run:  paperpush submit plos_compbio.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: plos_compbio
+# submission guide: https://venues.plos.org/ploscompbiol/s/submission-guidelines
+
+# Article type (choice, REQUIRED)
+#   The Editorial Manager 'Select Article Type' value. Pick the label that matches your submission; if the runner cannot match the label it falls back to the article-type drop-down's first option.
+#   options: Research Article | Resource | Short Article | Matters Arising | Correspondence | Review | Perspective
+article_type: Research Article
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript, typed into the Editorial Manager rich-text title editor.
+#   at most 250 characters
+title: Title goes here
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract, typed into the Editorial Manager rich-text abstract editor.
+#   at most 500 words
+abstract: |
+  Abstract goes here. It's a really good abstract.
+
+# Keywords (text, optional)
+#   Semicolon-separated list of keywords (e.g. 'keyword1;keyword2'), typed into the Editorial Manager keywords box.
+keywords: keyword1;keyword2
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name | email | institution | country | corresponding(yes/no). Write the name as 'First Last'; the Editorial Manager 'Add Author' form splits it into given/family name on the last space. The author marked corresponding=yes must be the submitting account holder (Editorial Manager pre-fills that author); their pre-filled row is edited to fill in any missing details. Every other line is added through the '+Add Another Author' form. Country is mapped to the Editorial Manager country drop-down (e.g. USA/US/United States all map to 'us').
+authors: |
+  Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes
+  Joseph Rich | jmrich@usc.edu | University of Southern California | USA | no
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript, uploaded as the main document on the Editorial Manager 'Attach Files' step.
+manuscript_file: tests/manuscript_files/cell/manuscript.pdf
+
+# Cover letter (file, REQUIRED)
+#   Path to the cover letter, uploaded with the 'Cover Letter' item type on the Editorial Manager 'Attach Files' step.
+cover_letter: tests/manuscript_files/cell/cover_letter.pdf
+
+# Figure / image files (filelist, optional)
+#   Optional. One figure file per line as 'path | label' (label optional and unused at upload). Each is uploaded as a separate attachment with the 'Figure' item type on the Editorial Manager 'Attach Files' step.
+figure_files: |
+  
+
+# Related Work, Copyright, & Dual Submission (textarea, REQUIRED)
+#   PLOS asks: have any of the results, data, or figures in this manuscript been published elsewhere, or are they under consideration for publication elsewhere? If no, enter 'No'. If yes, identify which results, data, or figures were taken from other published or pending manuscripts and explain why inclusion here does not constitute dual publication; upload a copy of the related work as a 'Related Manuscript' file type (reviewers may be asked to comment on the overlap); and provide the image source, copyright license information, and any permissions received for figures or material adapted from copyrighted material, uploading permissions documents as an 'Other' file type.
+related_work: |
+  No
+
+# Does the manuscript report original code? (boolean, REQUIRED)
+#   Cell asks whether the manuscript reports original computer code, algorithms, or computational models. Set to yes to declare original code (then fill in code_url).
+original_code: no
+
+# Original code repository URL (text, optional)
+#   Only used when original_code is yes. URL of the repository where the original code is available (e.g. a GitHub link).
+code_url: 
+
+# Alternate contact email (text, REQUIRED)
+#   Optional. An alternate contact email Cell can use if the corresponding author is unavailable.
+#   at most 200 characters
+alternate_contact: josephrich98@gmail.com
+
+# Funding statement (textarea, optional)
+#   Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match an Editorial Manager funder, since the funder box only accepts a picked autocomplete suggestion. Leave empty to mark funding information as not available.
+funding: |
+  
+
+# Suggested / opposed reviewers (textarea, REQUIRED)
+#   Optional. One reviewer per line. Format: name | email | institution | stance | reason. stance is 'suggested' or 'opposed' (case-insensitive, default 'suggested'); email, institution, and reason are optional. Write the name as 'First Last'; the Editorial Manager reviewer form splits it into given/family name on the last space. Each line is added through the '+Add Suggested Reviewer' or '+Add Opposed Reviewer' form, which mirrors the author form.
+#   provide 2-any item(s), one per line
+reviewers: |
+  Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her
+  Xavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him
+  John Reviewer | john@gmail.com | Caltech | opposed | No no no
+
+# Submission declarations confirmed (boolean, REQUIRED)
+#   Confirms the standard Cell submission declarations (the paper conforms to all requirements, all contributors are listed, all authors have seen the manuscript, and status updates will be shared). The runner checks these boxes only when this is yes.
+declarations_confirmed: yes
+
+# Open access (choice, optional)
+#   On the Publishing Options step shown after 'Build PDF for Approval', Cell offers an open-access publishing model that carries an article-publishing charge. Choose 'Yes' to select open access or 'No' to keep the standard (subscription) model. The runner opens the Publishing Options popup and applies this choice best-effort.
+#   options: Yes | No
+open_access: 
+
+# Manuscript short title (text, optional)
+#   Short title.
+#   at most 90 characters
+short_title: 
+
+# Section / Category (choice, REQUIRED)
+#   The PLOS Computational Biology section the manuscript belongs to, picked on the Editorial Manager 'Section/Category' step. Choose the label that matches your submission; if the runner cannot match the label it falls back to the section drop-down's first option.
+#   options: Biological Macromolecules | Cell Biology and Physiology | Epidemiology and Public Health | Evolution, Ecology, and Behavior | Genomics, Epigenomics, and Proteomics | Immunology and Microbiology | Neuroscience | Systems Biology
+section: Systems Biology
+
+# Classifications (textarea, REQUIRED)
+#   Submission classifications (subject-area keywords) for the Editorial Manager 'Classifications' step. One classification per line; provide at least five. Each line is typed into the classifications-popup search box, the matching checkbox is checked, and the entry is added with 'Add->'. Use the exact wording from the PLOS classification list so the search returns a matching checkbox. List the full classification vocabulary from the command line with `python -m paperpush.venues.plos_compbio`.
+#   provide 5-any item(s), one per line
+#   options: run 'paperpush options plos_compbio.classifications' to list the choices
+classifications: |
+  Systems biology
+  Bioinformatics
+  Genomics
+  Proteomics
+  Genome analysis
+
+# Competing interests statement (textarea, REQUIRED)
+#   Competing-interests statement for the PLOS declarations page. Typed verbatim into the 'Competing Interests' box. If there are no competing interests, state so explicitly (e.g. 'The authors have declared that no competing interests exist.').
+competing_interests: |
+  The authors have declared that no competing interests exist.
+
+# Data availability statement (textarea, REQUIRED)
+#   Data-availability statement for the PLOS declarations page. Typed verbatim into the 'Data Availability' box. Describe where the data underlying the results can be found, or state why it cannot be shared.
+data_availability: |
+  All relevant data are within the manuscript and its Supporting Information files.
+
+# Previous interactions with PLOS (textarea, optional)
+#   Optional. Leave blank if there were none. When set, the 'I have had previous interactions...' box is checked on the PLOS declarations page and this text is filled in as the explanation.
+previous_interactions: |
+  
+
+# Prior submission / consideration history (textarea, optional)
+#   Optional. Leave blank if not applicable. When set, the 'This manuscript was...' box is checked on the PLOS declarations page and this text is filled in as the explanation.
+prior_submission: |
+  
+
+# Preprint DOI (text, optional)
+#   Optional. DOI of preprint. If no preprint, leave empty.
+preprint_doi: 
+
+# Funding country (choice, optional)
+#   Country of the funding source, selected on the PLOS financial-disclosure step's country drop-down. Required when a funding statement is given. Pick the country name; the runner matches it against the drop-down's options.
+#   options: run 'paperpush options plos_compbio.funding_country' to list the choices
+funding_country: 
+
+# Human participants, data, specimens, or tissue (choice, REQUIRED)
+#   PLOS asks whether the study involved human participants, data, specimens, or tissue. Answer 'No' (the default) or 'Yes'. When 'Yes', the runner selects the affirmative option and checks the three human-subjects confirmation boxes on the declarations page.
+#   options: Yes | No
+human_participants: No
+
+# vim: set filetype=yaml :

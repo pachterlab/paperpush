@@ -1,0 +1,2932 @@
+{
+  "biorxiv": {
+    "venue_type": "preprint",
+    "name": "bioRxiv",
+    "full_name": "bioRxiv - The Preprint Server for Biology",
+    "submission_url": "https://submit.biorxiv.org/submit_gateway.dtl?newms=true",
+    "site_url": "https://www.biorxiv.org",
+    "submission_guide": "https://www.biorxiv.org/submit-a-manuscript",
+    "max_upload_mb": 40,
+    "description": "Free online archive and distribution service for unpublished preprints in the life sciences.",
+    "fields": [
+      {
+        "id": "result_type",
+        "autofill": "classify",
+        "label": "Type of result",
+        "type": "choice",
+        "required": true,
+        "help": "bioRxiv categorizes manuscripts by how the results relate to prior work.",
+        "options": [
+          "New Results",
+          "Confirmatory Results",
+          "Contradictory Results"
+        ],
+        "default": "New Results"
+      },
+      {
+        "id": "server_suitability",
+        "autofill": "never",
+        "label": "Is your manuscript better suited for bioRxiv or medRxiv?",
+        "type": "choice",
+        "required": true,
+        "help": "openRxiv routes manuscripts to bioRxiv (biology) or medRxiv (clinical/health). Pick the category that best describes your content.",
+        "options": [
+          "Diagnostic tools or medical equipment tested in humans",
+          "Epidemiological and/or public health study in humans",
+          "Clinical treatment claims",
+          "Studies linking human gene(s) variant(s) with disease(s) (including small GWAS and UK Biobank n=1)",
+          "Biological research"
+        ],
+        "default": "Biological research"
+      },
+      {
+        "id": "article_scope",
+        "autofill": "never",
+        "label": "Is your article within scope for bioRxiv?",
+        "type": "choice",
+        "required": true,
+        "help": "bioRxiv verifies that your article type is in scope for the preprint server. Select the option that best describes it.",
+        "options": [
+          "Announcements/Application notes without analyses/data",
+          "Perspectives article",
+          "Proposal/Guidelines",
+          "Narrative review",
+          "Research article with data"
+        ],
+        "default": "Research article with data"
+      },
+      {
+        "id": "subject_category",
+        "autofill": "classify",
+        "label": "Subject category / collection",
+        "type": "choice",
+        "required": true,
+        "help": "Select the single category that best describes your findings.",
+        "options": [
+          "Animal Behavior and Cognition",
+          "Biochemistry",
+          "Bioengineering",
+          "Bioinformatics",
+          "Biophysics",
+          "Cancer Biology",
+          "Cell Biology",
+          "Clinical Trials",
+          "Developmental Biology",
+          "Ecology",
+          "Epidemiology",
+          "Evolutionary Biology",
+          "Genetics",
+          "Genomics",
+          "Immunology",
+          "Microbiology",
+          "Molecular Biology",
+          "Neuroscience",
+          "Paleontology",
+          "Pathology",
+          "Pharmacology and Toxicology",
+          "Physiology",
+          "Plant Biology",
+          "Scientific Communication and Education",
+          "Synthetic Biology",
+          "Systems Biology",
+          "Zoology"
+        ]
+      },
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Manuscript title",
+        "type": "text",
+        "required": true,
+        "help": "The full title of the manuscript."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "help": "Plain-text abstract as it should appear on the bioRxiv abstract page."
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). Mark exactly one author as the corresponding author.",
+        "fields": [
+          "name",
+          "email",
+          "affiliation",
+          "orcid",
+          "corresponding"
+        ]
+      },
+      {
+        "id": "manuscript_file",
+        "autofill": "filemap",
+        "label": "Manuscript file",
+        "type": "file",
+        "required": true,
+        "help": "Path to the manuscript. Accepted formats: PDF, Word (.docx), or a LaTeX source bundle.",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".doc"
+        ]
+      },
+      {
+        "id": "figure_files",
+        "autofill": "filemap",
+        "label": "Figure / image files",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. One file per line as 'path | label' (label optional). Uploaded to the figure dropzone."
+      },
+      {
+        "id": "supplementary_files",
+        "autofill": "filemap",
+        "label": "Supplementary files",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. One file per line as 'path | type | linktext' (these are the only three fields; type and linktext optional). type is the bioRxiv supplemental file-type and must be one of: avi, csv, doc, docx, gif, gz, html, jpg, mov, mp4, mpg, pdf, ppt, pptx, tif, tsv, txt, wmv, xls, xlsx, zip. linktext is the displayed link text. Uploaded to the supplemental dropzone.",
+        "type_options": [
+          "avi",
+          "csv",
+          "doc",
+          "docx",
+          "gif",
+          "gz",
+          "html",
+          "jpg",
+          "mov",
+          "mp4",
+          "mpg",
+          "pdf",
+          "ppt",
+          "pptx",
+          "tif",
+          "tsv",
+          "txt",
+          "wmv",
+          "xls",
+          "xlsx",
+          "zip"
+        ]
+      },
+      {
+        "id": "license",
+        "autofill": "never",
+        "label": "License / reuse terms",
+        "type": "choice",
+        "required": true,
+        "help": "Distribution license under which the preprint is posted.",
+        "options": [
+          "CC-BY",
+          "CC-BY-NC",
+          "CC-BY-ND",
+          "CC-BY-NC-ND",
+          "CC0",
+          "No reuse without permission"
+        ],
+        "default": "CC-BY-NC-ND"
+      },
+      {
+        "id": "competing_interest",
+        "autofill": "extract",
+        "label": "Competing interest statement",
+        "type": "textarea",
+        "required": true,
+        "help": "Declare any competing interests. Enter 'The authors have declared no competing interest.' if none.",
+        "default": "The authors have declared no competing interest."
+      },
+      {
+        "id": "funding",
+        "autofill": "extract",
+        "label": "Funding statement",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match a FundRef funder, since bioRxiv requires picking an autocomplete suggestion."
+      },
+      {
+        "id": "data_availability_links",
+        "autofill": "extract",
+        "label": "Data availability links",
+        "type": "textarea",
+        "required": false,
+        "require_url": true,
+        "help": "Optional. One URL per line for external datasets or supplementary material at other repositories that pertain to this manuscript. These links are shown to readers once the submission is posted online (e.g. https://www.example.com). Each line must be a valid URL."
+      },
+      {
+        "id": "is_revision",
+        "autofill": "never",
+        "label": "Is this a revision of an existing bioRxiv preprint?",
+        "type": "boolean",
+        "required": false,
+        "help": "Set to yes if submitting a revised version of a preprint already on bioRxiv.",
+        "default": false
+      },
+      {
+        "id": "previous_doi",
+        "autofill": "never",
+        "label": "DOI of the existing preprint (if a revision)",
+        "type": "text",
+        "required": false,
+        "help": "Only needed when is_revision is yes."
+      },
+      {
+        "id": "transfer_to_venue",
+        "autofill": "never",
+        "label": "Forward to a venue via B2J on posting?",
+        "type": "boolean",
+        "required": false,
+        "help": "bioRxiv-to-Venue (B2J): offer to forward the manuscript to a participating venue.",
+        "default": false
+      },
+      {
+        "id": "venue_destination",
+        "autofill": "never",
+        "label": "Destination venue for B2J",
+        "type": "text",
+        "required": false,
+        "help": "Only needed when transfer_to_venue is yes."
+      },
+      {
+        "id": "author_consent",
+        "autofill": "never",
+        "label": "All authors consent to deposit and to the chosen license",
+        "type": "boolean",
+        "required": true,
+        "confirm": true,
+        "help": "Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.",
+        "default": false
+      }
+    ]
+  },
+  "medrxiv": {
+    "venue_type": "preprint",
+    "inherits": "biorxiv",
+    "name": "medRxiv",
+    "full_name": "medRxiv - The Preprint Server for Health Sciences",
+    "description": "Free online archive and distribution server for complete but unpublished manuscripts (preprints) in the medical, clinical, and related health sciences.",
+    "site_url": "https://www.medrxiv.org",
+    "submission_guide": "https://www.medrxiv.org/submit-a-manuscript",
+    "submission_url": "https://submit.medrxiv.org/submit_gateway.dtl?newms=true",
+    "removed_fields": [
+      "result_type",
+      "server_suitability",
+      "article_scope"
+    ],
+    "fields": [
+      {
+        "id": "subject_category",
+        "label": "Subject category",
+        "help": "Select the single medRxiv subject area that best describes the manuscript.",
+        "options": [
+          "Addiction Medicine",
+          "Allergy and Immunology",
+          "Anesthesia",
+          "Cardiovascular Medicine",
+          "Dentistry and Oral Medicine",
+          "Dermatology",
+          "Emergency Medicine",
+          "Endocrinology (including Diabetes Mellitus and Metabolic Disease)",
+          "Epidemiology",
+          "Forensic Medicine",
+          "Gastroenterology",
+          "Genetic and Genomic Medicine",
+          "Geriatric Medicine",
+          "Health Economics",
+          "Health Informatics",
+          "Health Policy",
+          "Health Systems and Quality Improvement",
+          "Hematology",
+          "HIV/AIDS",
+          "Infectious Diseases",
+          "Intensive Care and Critical Care Medicine",
+          "Medical Education",
+          "Medical Ethics",
+          "Nephrology",
+          "Neurology",
+          "Nursing",
+          "Nutrition",
+          "Obstetrics and Gynecology",
+          "Occupational and Environmental Health",
+          "Oncology",
+          "Ophthalmology",
+          "Orthopedics",
+          "Otolaryngology",
+          "Pain Medicine",
+          "Palliative Medicine",
+          "Pathology",
+          "Pediatrics",
+          "Pharmacology and Therapeutics",
+          "Primary Care Research",
+          "Psychiatry and Clinical Psychology",
+          "Public and Global Health",
+          "Radiology and Imaging",
+          "Rehabilitation Medicine and Physical Therapy",
+          "Respiratory Medicine",
+          "Rheumatology",
+          "Sexual and Reproductive Health",
+          "Sports Medicine",
+          "Surgery",
+          "Toxicology",
+          "Transplantation",
+          "Urology"
+        ]
+      },
+      {
+        "id": "data_availability_links",
+        "help": "Optional. One URL per line for external datasets or supplementary material at other repositories. On medRxiv the same links populate both the external-dataset and clinical-trial protocol link sections. They are shown to readers once the preprint posts (e.g. https://www.example.com). Each line must be a valid URL."
+      },
+      {
+        "id": "data_availability",
+        "autofill": "extract",
+        "label": "Data availability statement",
+        "type": "textarea",
+        "required": false,
+        "default": "All data produced in the present study are available upon reasonable request to the authors.",
+        "help": "Free-text description of data availability shown on the medRxiv declarations page."
+      },
+      {
+        "id": "human_subjects",
+        "autofill": "never",
+        "label": "Does the study use human data, samples, or involve human subjects?",
+        "type": "choice",
+        "required": true,
+        "help": "medRxiv screening question. Answer 'Yes' if the work uses human data/samples or involves human subjects (including public datasets, surveys, patient records, or clinical protocols); otherwise 'No'.",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "default": "No"
+      },
+      {
+        "id": "public_data_only",
+        "autofill": "classify",
+        "label": "Did this work use ONLY simulated data or ONLY openly public data?",
+        "type": "choice",
+        "required": false,
+        "help": "Only used when human_subjects is 'Yes'. Answer 'Yes' if the work used ONLY simulated data or ONLY data that were openly available to the public before the study began; answer 'No' if any data required application, screening, or registration for access, or otherwise involved human subjects requiring ethics oversight.",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "default": "Yes"
+      },
+      {
+        "id": "public_data_source",
+        "autofill": "extract",
+        "label": "Source of the openly available data",
+        "type": "textarea",
+        "required": false,
+        "help": "Only used when human_subjects is 'Yes' and public_data_only is 'Yes'. State where the openly available data were originally located (with links, if applicable), e.g. 'The study used ONLY openly available human data that were originally located at: <URL>'.",
+        "default": ""
+      },
+      {
+        "id": "ethics_statement",
+        "autofill": "extract",
+        "label": "Ethics oversight / approval statement",
+        "type": "textarea",
+        "required": false,
+        "help": "Only used when human_subjects is 'Yes' and public_data_only is 'No'. State the full, non-abbreviated institutional affiliation and name of the ethics oversight body, and whether ethical approval was granted or waived, e.g. 'Ethics committee/IRB of <Full Institution name> gave ethical approval for this work'.",
+        "default": ""
+      },
+      {
+        "id": "clinical_trial",
+        "autofill": "never",
+        "label": "Is this manuscript reporting a clinical trial?",
+        "type": "choice",
+        "required": true,
+        "help": "medRxiv screening question. Select 'Yes' for a registered clinical trial, 'No' for a non-trial study, or 'Not applicable'.",
+        "options": [
+          "Yes",
+          "No",
+          "Not applicable"
+        ],
+        "default": "Not applicable"
+      },
+      {
+        "id": "is_revision",
+        "label": "Is this a revision of an existing medRxiv preprint?",
+        "help": "Set to yes if submitting a revised version of a preprint already on medRxiv."
+      },
+      {
+        "id": "transfer_to_venue",
+        "label": "Forward to a venue via M2J on posting?",
+        "help": "medRxiv-to-Venue (M2J): offer to forward the manuscript to a participating venue."
+      }
+    ]
+  },
+  "bioinformatics": {
+    "venue_type": "venue",
+    "name": "Bioinformatics",
+    "full_name": "Bioinformatics (Oxford University Press)",
+    "submission_url": "https://mc.manuscriptcentral.com/bioinformatics",
+    "site_url": "https://academic.oup.com/bioinformatics",
+    "submission_guide": "https://academic.oup.com/bioinformatics/pages/General_Instructions",
+    "description": "Computational molecular biology covering new algorithms, software, databases, and analyses of biological data.",
+    "file_type_options": [
+      "Main Document (Word or Pdf)",
+      "Graphical Abstract",
+      "Figure",
+      "Table",
+      "Supplementary Material for Review & Online Publication",
+      "Supplementary Material for Review Only",
+      "Latex Source - Zipped file",
+      "Response to Decision letter (Transfer Desk use only)"
+    ],
+    "fields": [
+      {
+        "id": "article_type",
+        "autofill": "classify",
+        "label": "Manuscript type",
+        "type": "choice",
+        "required": true,
+        "help": "Original Paper: up to 7 pages (approx. 5,000 words, excluding figures); original papers describing new research developments in computational molecular biology, for example new models, algorithms, software involving new methods, biological databases and networks, information services, and their impact on molecular biology or computer science; biological data, as opposed to purely simulated data, must be used. Letter to the Editor: up to 2 pages (approx. 1,300 words, or 1,000 words plus one figure); letters on the broad range of topics covered by the venue, including political, technical, and scientific analyses of issues related to bioinformatics and computational biology, and may include discussion of papers published by the venue. Applications Note: up to 4 pages (approx. 2,600 words, or 2,000 words plus one figure); short descriptions of novel software or new algorithm implementations, databases, and network services (web servers and interfaces); software or data must be freely available to non-commercial users, availability and implementation must be clearly stated in the article, and the name of the application should be included in the title. Review: 3-8 pages (approx. 3,000-6,000 words, excluding figures); most reviews are commissioned, although the editors welcome suggestions from prospective authors, who should in the first instance email a draft or abstract/summary no longer than a page to the editorial office.",
+        "options": [
+          "Original Paper",
+          "Letter to the Editor",
+          "Applications Note",
+          "Review"
+        ],
+        "default": "Original Paper"
+      },
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Manuscript title",
+        "type": "text",
+        "required": true,
+        "help": "Full title of the manuscript. For Applications Notes, the name of the application must be included in the title."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "word_count": 250,
+        "help": "Original Papers use a structured abstract with the headings 'Motivation:', 'Results:', 'Availability and implementation:', 'Contact:', and (optional) 'Supplementary information:'."
+      },
+      {
+        "id": "section",
+        "autofill": "classify",
+        "label": "Subject category",
+        "type": "choice",
+        "required": true,
+        "help": "Please select your manuscript subject category",
+        "options": [
+          "Genome analysis",
+          "Bioimage informatics",
+          "Databases and ontologies",
+          "Data and text mining",
+          "Systems biology",
+          "Genetics and population analysis",
+          "Gene expression",
+          "Structural bioinformatics",
+          "Phylogenetics",
+          "Sequence analysis"
+        ]
+      },
+      {
+        "id": "next_gen_sequencing",
+        "autofill": "classify",
+        "label": "Does your manuscript involve Next Generation Sequencing data analysis?",
+        "type": "boolean",
+        "required": true,
+        "help": "Set to yes if manuscript involves Next Generation Sequencing data analysis.",
+        "default": false
+      },
+      {
+        "id": "machine_learning",
+        "autofill": "classify",
+        "label": "Does your manuscript involve Machine Learning?",
+        "type": "boolean",
+        "required": true,
+        "help": "Set to yes if manuscript involves machine learning.",
+        "default": false
+      },
+      {
+        "id": "portal_keywords",
+        "autofill": "classify",
+        "label": "Portal Keywords",
+        "type": "multichoice",
+        "required": true,
+        "min_count": 3,
+        "max_count": 6,
+        "help": "Portal keywords selected on the ScholarOne keywords step. The vocabulary below is recommended but not required; any term you enter is accepted, with a warning if it is off the list. Choose 3 to 6; enter them comma-separated. List the recommended vocabulary from the command line with `python -m paperpush.venues.bioinformatics`.",
+        "options_file": "bioinformatics_keywords.txt",
+        "options_recommended": true
+      },
+      {
+        "id": "keywords",
+        "autofill": "classify",
+        "label": "Keywords",
+        "type": "multichoice",
+        "required": false,
+        "min_count": 0,
+        "max_count": 6,
+        "help": "Free keywords selected on the ScholarOne keywords step. The vocabulary shared with Portal Keywords is recommended but not required; any term you enter is accepted, with a warning if it is off the list. Choose up to 6; enter them comma-separated. List the recommended vocabulary from the command line with `python -m paperpush.venues.bioinformatics`.",
+        "options_file": "bioinformatics_keywords.txt",
+        "options_recommended": true
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: email | prefix | name | institution | country/region | city | corresponding(yes/no). Each author is added on ScholarOne by email lookup, so an email is required for every author. If the email is already registered the remaining columns are ignored; if it is not, the author is created from the prefix, name, institution, country/region, and city. Mark exactly one corresponding author. Prefix must be one of: Dr., Miss, Mr., Mrs., Ms., Prof., Mx. Institution and country/region are picked from ScholarOne drop-down lists, so spell them as they appear there.",
+        "fields": [
+          "email",
+          "prefix",
+          "name",
+          "institution",
+          "country",
+          "city",
+          "corresponding"
+        ]
+      },
+      {
+        "id": "cover_letter",
+        "autofill": "filemap",
+        "label": "Cover letter",
+        "type": "file",
+        "required": true,
+        "character_count": 32768,
+        "help": "Mandatory; submissions without a cover letter may be editorially rejected. Must explain the paper's suitability, disclose any related preprints, dissertations, or manuscripts and how this work differs, and declare conflicts of interest and any generative AI/LLM use.",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".doc",
+          ".txt"
+        ]
+      },
+      {
+        "id": "manuscript_file",
+        "autofill": "filemap",
+        "label": "Manuscript file",
+        "type": "file",
+        "required": true,
+        "max_pages_by": {
+          "field": "article_type",
+          "values": {
+            "Original Paper": 7,
+            "Letter to the Editor": 2,
+            "Applications Note": 4,
+            "Review": 8
+          }
+        },
+        "help": "Path to the manuscript. A PDF is typically uploaded for review; Word (.docx) or LaTeX source is required for the final accepted manuscript. The page and word limits depend on the article type: Original Paper up to 7 pages (approx. 5,000 words), Letter to the Editor up to 2 pages (approx. 1,300 words), Applications Note up to 4 pages (approx. 2,600 words), and Review up to 8 pages (approx. 3,000-6,000 words). These are encoded in max_pages_by, keyed on the article_type field.",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".doc",
+          ".tex",
+          ".zip"
+        ]
+      },
+      {
+        "id": "figures",
+        "autofill": "filemap",
+        "label": "Figures",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. One path per line. Provide high-resolution figure files. Each uploads with the 'Figure' file type.",
+        "accept": [
+          ".tiff",
+          ".eps",
+          ".pdf",
+          ".jpg",
+          ".png"
+        ]
+      },
+      {
+        "id": "tables",
+        "autofill": "filemap",
+        "label": "Tables",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. One path per line. Tables uploaded as separate files, each with the 'Table' file type.",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".xlsx",
+          ".csv"
+        ]
+      },
+      {
+        "id": "num_pages",
+        "autofill": "extract",
+        "label": "Number of pages",
+        "type": "int",
+        "required": true,
+        "min_value": 1,
+        "help": "Total number of pages in the manuscript."
+      },
+      {
+        "id": "num_tables",
+        "autofill": "extract",
+        "label": "Number of tables",
+        "type": "int",
+        "required": false,
+        "min_value": 0,
+        "help": "Total number of tables in the manuscript."
+      },
+      {
+        "id": "num_figures",
+        "autofill": "extract",
+        "label": "Number of figures",
+        "type": "int",
+        "required": false,
+        "min_value": 0,
+        "help": "Total number of figures in the manuscript."
+      },
+      {
+        "id": "supplementary_file",
+        "autofill": "filemap",
+        "label": "Supplementary materials",
+        "type": "file",
+        "required": false,
+        "help": "Optional. Supplementary materials should be combined into a single file and cannot be altered or replaced after acceptance.",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".zip"
+        ]
+      },
+      {
+        "id": "data_availability",
+        "autofill": "extract",
+        "label": "Data availability statement",
+        "type": "textarea",
+        "required": true,
+        "help": "Required for all papers. Describe and provide the means of access to the underlying data, linking to the data or providing a unique identifier. Data sets cited in the manuscript should also appear in the reference list."
+      },
+      {
+        "id": "conflict_of_interest",
+        "autofill": "extract",
+        "label": "Conflict of interest statement",
+        "type": "textarea",
+        "required": true,
+        "help": "All authors must disclose competing interests at submission. The corresponding author is responsible for ensuring all authors' conflicts are declared. Enter 'None declared.' if there are none."
+      },
+      {
+        "id": "funding",
+        "autofill": "extract",
+        "label": "Funding statement",
+        "type": "textarea",
+        "required": false,
+        "help": "Funding sources and grant numbers."
+      },
+      {
+        "id": "ethics",
+        "autofill": "extract",
+        "label": "Ethics statement",
+        "type": "textarea",
+        "required": false,
+        "help": "Where ethically relevant, confirm the research followed applicable international and local guidelines and any required approvals were obtained."
+      },
+      {
+        "id": "author_contributions",
+        "autofill": "extract",
+        "label": "Author contributions (CRediT)",
+        "type": "textarea",
+        "required": false,
+        "help": "Describe each author's contribution using the CRediT contributor roles taxonomy."
+      },
+      {
+        "id": "ai_disclosure",
+        "autofill": "never",
+        "label": "Generative AI use disclosure",
+        "type": "textarea",
+        "required": false,
+        "help": "Disclose any use of generative AI or LLM tools in both the cover letter and the Methods or Acknowledgements section, with sufficient detail. AI tools cannot be listed as authors."
+      },
+      {
+        "id": "reviewers",
+        "autofill": "never",
+        "label": "Reviewers",
+        "type": "textarea",
+        "required": true,
+        "min_count": 4,
+        "help": "One reviewer per line. Format: name | email | stance | reason. stance must be 'recommended' or 'opposed' (case-insensitive); reason is optional (a free-text justification shown to the editor). At least 4 recommended reviewers are required; opposed reviewers do not count toward that minimum. Each reviewer is added through the ScholarOne 'Add Reviewer' form, which splits the name into first/last on the last space, so write the name as 'First Last'."
+      },
+      {
+        "id": "funding_to_report",
+        "autofill": "classify",
+        "label": "Is there funding to report for this submission?",
+        "type": "boolean",
+        "required": true,
+        "help": "Declaration answered on the final submission step. Set to yes if there is funding to report for this submission. Report the funding sources and grant numbers in the funding statement.",
+        "default": false
+      },
+      {
+        "id": "resubmission",
+        "autofill": "classify",
+        "label": "Is this a resubmission of a manuscript which was previously submitted under a different manuscript number?",
+        "type": "boolean",
+        "required": true,
+        "help": "Declaration answered on the final submission step. Set to yes if this manuscript was previously submitted under a different manuscript number. When yes, provide that number in previous_manuscript_id.",
+        "default": false
+      },
+      {
+        "id": "previous_manuscript_id",
+        "autofill": "never",
+        "label": "If yes, what is the manuscript ID of the previous submission?",
+        "type": "text",
+        "required": false,
+        "help": "Only needed when resubmission is yes. The manuscript ID (manuscript number) of the previous submission."
+      },
+      {
+        "id": "has_conflict_of_interest",
+        "autofill": "classify",
+        "label": "Do you or your co-authors have any conflict of interest?",
+        "type": "boolean",
+        "required": true,
+        "help": "Declaration answered on the final submission step. Set to yes if you or any co-author has a conflict of interest. When yes, state it in conflict_of_interest_details.",
+        "default": false
+      },
+      {
+        "id": "conflict_of_interest_details",
+        "autofill": "extract",
+        "label": "If yes, please state your conflict of interest:",
+        "type": "textarea",
+        "required": false,
+        "help": "Only needed when has_conflict_of_interest is yes. State the conflict(s) of interest for you and your co-authors."
+      },
+      {
+        "id": "cited_unpublished_works",
+        "autofill": "classify",
+        "label": "Have you cited any works that are unpublished or in press?",
+        "type": "boolean",
+        "required": true,
+        "help": "Declaration answered on the final submission step. Set to yes if you have cited any unpublished or in-press works; if so, they must be uploaded as a 'Supplementary Material for Review Only' file so reviewers can understand their relation to the manuscript. No means no such works were cited.",
+        "default": false
+      },
+      {
+        "id": "algorithm_or_software_central",
+        "autofill": "classify",
+        "label": "Is an algorithm or software central to the paper?",
+        "type": "boolean",
+        "required": true,
+        "help": "Reproducibility checklist item answered on the final declarations step. Set to yes if an algorithm or software is central to the paper.",
+        "default": false
+      },
+      {
+        "id": "code_in_text",
+        "autofill": "classify",
+        "label": "The text of the article includes a link to the code in an open-source repository (e.g., GitHub).",
+        "type": "boolean",
+        "required": true,
+        "help": "Reproducibility checklist item answered on the final declarations step. Set to yes if the manuscript text itself contains a link to the code in an open-source repository such as GitHub.",
+        "default": false
+      },
+      {
+        "id": "code_repository_link",
+        "autofill": "extract",
+        "label": "Please provide the link to the repository below (optional):",
+        "type": "text",
+        "required": false,
+        "require_url": true,
+        "help": "Optional. The URL of the open-source code repository (e.g., a GitHub repository). When provided, it must be a valid http/https URL."
+      },
+      {
+        "id": "software_installable",
+        "autofill": "classify",
+        "label": "The software can be installed from an open package repository (e.g. Bioconda, PyPI, Bioconductor) or contains an extensive installation guide and all software dependencies are listed.",
+        "type": "boolean",
+        "required": true,
+        "help": "Reproducibility checklist item. Set to yes if the software is installable from an open package repository, or if it provides an extensive installation guide and lists all software dependencies.",
+        "default": false
+      },
+      {
+        "id": "software_tested",
+        "autofill": "never",
+        "label": "Someone that is not familiar with the tool has tested its installation and use prior to submission.",
+        "type": "boolean",
+        "required": true,
+        "help": "Reproducibility checklist item. Set to yes if a person unfamiliar with the tool tested its installation and use before submission.",
+        "default": false
+      },
+      {
+        "id": "test_dataset_provided",
+        "autofill": "never",
+        "label": "The software repository contains a link to a test dataset, and the README includes the instructions to run the method on the test dataset, with the input and output clearly described.",
+        "type": "boolean",
+        "required": true,
+        "help": "Reproducibility checklist item. Set to yes if the repository links to a test dataset and the README documents how to run the method on it, with the input and output clearly described.",
+        "default": false
+      },
+      {
+        "id": "data_documented",
+        "autofill": "classify",
+        "label": "The data used in the manuscript is clearly documented.",
+        "type": "boolean",
+        "required": true,
+        "help": "Reproducibility checklist item. Set to yes if the sources of all datasets (including training and evaluation datasets) are provided, all datasets are versioned, and the source and process of ground-truth annotations are provided.",
+        "default": false
+      },
+      {
+        "id": "data_sources_link",
+        "autofill": "extract",
+        "label": "Please provide the link(s)/accessions/reference(s) to the data sources:",
+        "type": "text",
+        "required": false,
+        "help": "Optional. Links, accession numbers, or references to the data sources used in the manuscript. Accession numbers and citations are accepted in addition to URLs, so no URL format is enforced."
+      },
+      {
+        "id": "is_ml_dl_paper",
+        "autofill": "classify",
+        "label": "Is this a Machine Learning / Deep Learning paper?",
+        "type": "boolean",
+        "required": true,
+        "help": "Set to yes if the manuscript is a machine learning (ML) or deep learning (DL) paper. When yes, three additional checklist questions about train-test splits, dataset transformations, and performance metrics are answered on the same step.",
+        "default": false
+      },
+      {
+        "id": "ml_train_test_splits",
+        "autofill": "classify",
+        "label": "The details of train-test splits or cross-validation folds are explicitly mentioned in the manuscript.",
+        "type": "boolean",
+        "required": false,
+        "help": "Only applicable when is_ml_dl_paper is yes. Set to yes if the manuscript explicitly describes the train-test splits or cross-validation folds.",
+        "default": false
+      },
+      {
+        "id": "ml_data_transformations",
+        "autofill": "classify",
+        "label": "All transformations of the dataset from its raw form to the form used in the model are reported, and the corresponding pre-processing code is provided.",
+        "type": "boolean",
+        "required": false,
+        "help": "Only applicable when is_ml_dl_paper is yes. Set to yes if every transformation of the dataset from its raw form to the form used in the model (for instance, treatment of missing data and normalization) is reported and the corresponding pre-processing code is provided.",
+        "default": false
+      },
+      {
+        "id": "ml_metrics_uncertainty",
+        "autofill": "classify",
+        "label": "All metrics used to assess and compare model performance are provided along with uncertainty estimates.",
+        "type": "boolean",
+        "required": false,
+        "help": "Only applicable when is_ml_dl_paper is yes. Set to yes if all metrics used to assess and compare model performance (e.g., accuracy, area under the receiver operating characteristic curve) are provided along with uncertainty estimates (e.g., confidence intervals, standard deviations).",
+        "default": false
+      },
+      {
+        "id": "is_preprint",
+        "autofill": "classify",
+        "label": "Is this manuscript posted as a preprint?",
+        "type": "boolean",
+        "required": false,
+        "help": "Set to yes if a version is posted on a preprint server such as bioRxiv. The manuscript must not be under consideration at more than one venue simultaneously.",
+        "default": false
+      },
+      {
+        "id": "preprint_doi",
+        "autofill": "never",
+        "label": "Preprint DOI (if applicable)",
+        "type": "text",
+        "required": false,
+        "help": "Only needed when is_preprint is yes. Update the preprint with the published DOI if accepted."
+      }
+    ]
+  },
+  "nucleic_acids_research": {
+    "venue_type": "venue",
+    "inherits": "bioinformatics",
+    "name": "Nucleic Acids Research",
+    "full_name": "Nucleic Acids Research (Oxford University Press)",
+    "submission_url": "https://mc.manuscriptcentral.com/nar",
+    "site_url": "https://academic.oup.com/nar",
+    "submission_guide": "https://academic.oup.com/nar/pages/General_Instructions",
+    "description": "Leading research in nucleic acids, including their chemistry, biology, and applications, and computational and structural studies of nucleic acids and their interactions.",
+    "file_type_options": [
+      "Response to Referees",
+      "Manuscript file - clean",
+      "Manuscript file - marked revisions",
+      "Table",
+      "Figure",
+      "Supplementary data - for compiled PDF",
+      "Supplementary data - NOT for compiled PDF (eg video, Excel, large data files)",
+      "TeX/LaTeX Suppl File",
+      "Other",
+      "Graphical Abstract",
+      "Data - for review, not for publication"
+    ],
+    "removed_fields": [
+      "section",
+      "next_gen_sequencing",
+      "machine_learning",
+      "portal_keywords",
+      "num_pages",
+      "num_tables",
+      "num_figures",
+      "ethics",
+      "ai_disclosure",
+      "author_contributions",
+      "is_preprint",
+      "preprint_doi",
+      "funding_to_report",
+      "resubmission",
+      "previous_manuscript_id",
+      "has_conflict_of_interest",
+      "conflict_of_interest_details",
+      "cited_unpublished_works",
+      "algorithm_or_software_central",
+      "code_in_text",
+      "code_repository_link",
+      "software_installable",
+      "software_tested",
+      "test_dataset_provided",
+      "data_documented",
+      "data_sources_link",
+      "is_ml_dl_paper",
+      "ml_train_test_splits",
+      "ml_data_transformations",
+      "ml_metrics_uncertainty"
+    ],
+    "fields": [
+      {
+        "id": "article_type",
+        "label": "Manuscript type",
+        "default": "Standard Article",
+        "options": [
+          "Standard Article",
+          "Methods",
+          "Database Issue",
+          "Web Server Issue",
+          "Critical Reviews and Perspectives",
+          "Editorial",
+          "Matters Arising"
+        ],
+        "help": "The type of manuscript being submitted to Nucleic Acids Research, selected on the first submission step."
+      },
+      {
+        "id": "key_points",
+        "autofill": "extract",
+        "label": "Key Points",
+        "type": "textarea",
+        "required": true,
+        "min_count": 3,
+        "max_count": 3,
+        "help": "Exactly 3 bullet points summarizing the manuscript's contribution to the field, one per line, 100 characters maximum per point. Entered in the Key Points box on page 1, after the abstract."
+      },
+      {
+        "id": "keywords",
+        "label": "Keywords",
+        "type": "multichoice",
+        "required": true,
+        "min_count": 3,
+        "max_count": 5,
+        "options_file": null,
+        "options": null,
+        "options_recommended": null,
+        "help": "Required. Provide 3 to 5 free keywords describing the manuscript, comma-separated. Entered on the ScholarOne keywords step; any term is accepted."
+      },
+      {
+        "id": "manuscript_file",
+        "max_pages_by": null
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: email | prefix | name | institution | country/region | city | corresponding(yes/no). Each author is added on ScholarOne by email lookup, so an email is required for every author. If the email is already registered the remaining columns are ignored; if it is not, the author is created from the prefix, name, institution, country/region, and city. Mark exactly one corresponding author. Prefix must be one of: Dr, Prof., Mx . Institution and country/region are picked from ScholarOne drop-down lists, so spell them as they appear there.",
+        "fields": [
+          "email",
+          "prefix",
+          "name",
+          "institution",
+          "country",
+          "city",
+          "corresponding"
+        ]
+      },
+      {
+        "id": "funding",
+        "label": "Funding",
+        "help": "Optional. One funder per line, formatted 'funder | grant id' (the grant id optional). Drives the 'Add Funder' step on the declarations page; leave empty to declare no funding."
+      },
+      {
+        "id": "reviewers",
+        "label": "Referees",
+        "min_count": 6,
+        "help": "One referee per line. Format: name | email | stance | reason. stance must be 'recommended' or 'opposed' (case-insensitive); a reason is required for every referee. At least 6 recommended referees are required; at most 3 opposed referees are allowed (opposed referees do not count toward the minimum). Each referee is added through the ScholarOne 'Add Referee' form, which splits the name into first/last on the last space, so write the name as 'First Last'."
+      },
+      {
+        "id": "category",
+        "autofill": "classify",
+        "label": "Manuscript category",
+        "type": "choice",
+        "required": true,
+        "help": "Select the Nucleic Acids Research manuscript category on the declarations step. Category descriptions are linked from the submission form.",
+        "options": [
+          "Chemical Biology and Nucleic Acid Chemistry",
+          "Computational Biology",
+          "Critical Reviews and Perspectives",
+          "Data Resources and Analyses",
+          "Database Issue",
+          "Gene regulation, Chromatin and Epigenetics",
+          "Genome integrity, repair and replication",
+          "Genomics",
+          "Methods",
+          "Molecular and Structural Biology",
+          "Nucleic Acid Enzymes",
+          "Nucleic Acid Therapeutics",
+          "RNA and RNA-protein complexes",
+          "Synthetic Biology and Bioengineering",
+          "Web Server Issue",
+          "Matters Arising",
+          "Editorial"
+        ]
+      },
+      {
+        "id": "is_resubmission",
+        "autofill": "never",
+        "label": "Is this manuscript a resubmission of previous work?",
+        "type": "boolean",
+        "required": true,
+        "default": false,
+        "help": "Set to yes if this manuscript is a resubmission of previous work."
+      },
+      {
+        "id": "resubmission_id",
+        "autofill": "never",
+        "label": "Manuscript ID of the previous submission (if a resubmission)",
+        "type": "text",
+        "required": false,
+        "help": "Only needed when is_resubmission is yes: the manuscript ID of the previous submission."
+      },
+      {
+        "id": "conflict_of_interest",
+        "label": "Conflict of interest statement",
+        "help": "Disclose any conflict of interest for you or your co-authors. Leave empty or enter 'None declared.' if there are none; any other text answers the conflict-of-interest question 'Yes' and is provided as the details."
+      },
+      {
+        "id": "author_list_altered",
+        "autofill": "never",
+        "label": "If this is a resubmission or revision, has the author list been altered?",
+        "type": "choice",
+        "required": true,
+        "default": "Not Applicable",
+        "options": [
+          "Yes",
+          "No",
+          "Not Applicable"
+        ],
+        "help": "For a resubmission or revision, whether the author list has been altered. Use 'Not Applicable' for a new submission."
+      },
+      {
+        "id": "author_list_change_details",
+        "autofill": "never",
+        "label": "If the author list has been altered, please provide details",
+        "type": "textarea",
+        "required": false,
+        "help": "Only needed when author_list_altered is 'Yes': describe how the author list changed."
+      },
+      {
+        "id": "back_to_back",
+        "autofill": "never",
+        "label": "Should this manuscript be published back-to-back with another?",
+        "type": "boolean",
+        "required": true,
+        "default": false,
+        "help": "Set to yes if this manuscript should be published back-to-back with another manuscript."
+      },
+      {
+        "id": "back_to_back_authors",
+        "autofill": "never",
+        "label": "First three authors of the accompanying manuscript (if back-to-back)",
+        "type": "textarea",
+        "required": false,
+        "help": "Only needed when back_to_back is yes: list the first three authors of the accompanying manuscript."
+      },
+      {
+        "id": "novel_method",
+        "autofill": "classify",
+        "label": "Does the manuscript contain a Novel Method?",
+        "type": "boolean",
+        "required": true,
+        "default": false,
+        "help": "Set to yes if the manuscript contains a novel method."
+      },
+      {
+        "id": "novel_method_description",
+        "autofill": "extract",
+        "label": "Brief description of the novel method (if any)",
+        "type": "textarea",
+        "required": false,
+        "help": "Only needed when novel_method is yes: briefly describe the novel method."
+      },
+      {
+        "id": "supplementary_online",
+        "autofill": "never",
+        "label": "Is this manuscript accompanied by supplementary material for publication online only?",
+        "type": "boolean",
+        "required": true,
+        "default": false,
+        "help": "Set to yes if the manuscript is accompanied by supplementary material intended for online-only publication."
+      },
+      {
+        "id": "publication_charge_funding",
+        "autofill": "never",
+        "label": "Source of funding for publication charges",
+        "type": "textarea",
+        "required": true,
+        "help": "Required. State the source of funding for your publication charges (Nucleic Acids Research is a fully open access venue)."
+      },
+      {
+        "id": "institution_verification",
+        "autofill": "never",
+        "label": "Institution verification status",
+        "type": "choice",
+        "required": true,
+        "default": "verified",
+        "options": [
+          "verified",
+          "not in list",
+          "N/A entered"
+        ],
+        "help": "On the authors step, OUP asks you to confirm your institution. Choose 'verified' if you confirm your institution is verified, 'not in list' if you have an institution but it is not available in the list, or 'N/A entered' if you do not have an institution and have entered 'N/A'."
+      },
+      {
+        "id": "data_availability",
+        "label": "Data availability statement",
+        "help": "Required. Paste the data availability statement from the manuscript text, including any accession numbers, login details, or reviewer tokens."
+      },
+      {
+        "id": "data_deposition_types",
+        "autofill": "classify",
+        "label": "Data deposition: which of the following does the manuscript use or report?",
+        "type": "multichoice",
+        "required": false,
+        "min_count": 0,
+        "help": "Select every listed data type the manuscript uses or reports; access to such data must be given at submission. Selected types are answered 'Yes' and the rest 'No'. Comma-separated; leave empty if none apply.",
+        "options": [
+          "New genome expression or sequencing data (ChIP-seq, RNA-seq)",
+          "New genome-wide binding/interaction data or genome-wide mutation data",
+          "Novel nucleic acid sequences",
+          "Illumina-type genome sequencing data",
+          "Novel protein sequences",
+          "Novel molecular structures (X-ray, NMR, CryoEM/EM)",
+          "Novel molecular models (SAXS, computational modeling)",
+          "Molecular behaviour studies (biological NMR spectroscopy data)",
+          "Novel nucleic acids structure",
+          "Structures of nucleosides, nucleotides, other small molecules",
+          "Mass spectrometry proteomics",
+          "Microarray data",
+          "Quantitative PCR",
+          "Synthetic nucleic acid oligonucleotides including siRNAs or shRNAs",
+          "Software and source codes",
+          "Gel images, micrographs, graphs, and tables"
+        ]
+      }
+    ]
+  },
+  "arxiv": {
+    "venue_type": "preprint",
+    "name": "arXiv",
+    "full_name": "arXiv - Open-access archive for scholarly articles",
+    "submission_url": "https://arxiv.org/submit",
+    "site_url": "https://arxiv.org",
+    "submission_guide": "https://info.arxiv.org/help/submit/index.html",
+    "max_upload_mb": 50,
+    "description": "Free distribution service and open-access archive for preprints in physics, mathematics, computer science, quantitative biology, quantitative finance, statistics, and more.",
+    "fields": [
+      {
+        "id": "primary_archive",
+        "autofill": "classify",
+        "label": "Primary archive",
+        "type": "choice",
+        "required": true,
+        "help": "The top-level arXiv archive your work belongs to. This is the value of the submission form's archive drop-down (#select_arch), so use the archive code (e.g. 'cs' for Computer Science, 'q-bio' for Quantitative Biology, 'stat' for Statistics).",
+        "options": [
+          "astro-ph",
+          "cond-mat",
+          "cs",
+          "econ",
+          "eess",
+          "gr-qc",
+          "hep-ex",
+          "hep-lat",
+          "hep-ph",
+          "hep-th",
+          "math",
+          "math-ph",
+          "nlin",
+          "nucl-ex",
+          "nucl-th",
+          "physics",
+          "q-bio",
+          "q-fin",
+          "quant-ph",
+          "stat"
+        ]
+      },
+      {
+        "id": "primary_category",
+        "autofill": "classify",
+        "label": "Primary subject category",
+        "type": "text",
+        "required": true,
+        "help": "The specific subject class within the primary archive, as the value of the form's subject-class drop-down (#select_sc). Use the full category code, e.g. 'cs.AI' (Artificial Intelligence), 'q-bio.GN' (Genomics), or 'stat.ML' (Machine Learning). It must belong to the chosen primary_archive. See https://arxiv.org/category_taxonomy for the full list.",
+        "options_file": "arxiv_categories.txt"
+      },
+      {
+        "id": "crosslist_archives",
+        "autofill": "never",
+        "label": "Cross-list archives",
+        "type": "multichoice",
+        "required": false,
+        "min_count": 0,
+        "help": "Optional. Additional top-level archives to cross-list the paper under, comma-separated (e.g. 'cs, stat'). Same archive codes as primary_archive, with no limit on how many. Each entry is paired positionally with the matching entry in crosslist_categories and added on the metadata step after the primary category.",
+        "options": [
+          "astro-ph",
+          "cond-mat",
+          "cs",
+          "econ",
+          "eess",
+          "gr-qc",
+          "hep-ex",
+          "hep-lat",
+          "hep-ph",
+          "hep-th",
+          "math",
+          "math-ph",
+          "nlin",
+          "nucl-ex",
+          "nucl-th",
+          "physics",
+          "q-bio",
+          "q-fin",
+          "quant-ph",
+          "stat"
+        ]
+      },
+      {
+        "id": "crosslist_categories",
+        "autofill": "never",
+        "label": "Cross-list categories",
+        "type": "multichoice",
+        "required": false,
+        "min_count": 0,
+        "help": "Optional. Additional subject categories to cross-list the paper under, comma-separated (e.g. 'cs.LG, stat.ML'). Same category codes as primary_category, with no limit on how many. Each entry is paired positionally with the matching entry in crosslist_archives and added on the metadata step after the primary category.",
+        "options_file": "arxiv_categories.txt"
+      },
+      {
+        "id": "license",
+        "autofill": "never",
+        "label": "License",
+        "type": "choice",
+        "required": true,
+        "help": "Distribution license for the submission. The arXiv perpetual, non-exclusive license is the minimum arXiv requires; the Creative Commons options grant broader reuse. Note: the runner currently selects the license radio captured in the recording (the first option); full license-by-name selection is pending, so confirm the license in the browser before the final submit.",
+        "options": [
+          "arXiv.org perpetual, non-exclusive license 1.0",
+          "CC BY 4.0",
+          "CC BY-SA 4.0",
+          "CC BY-NC-SA 4.0",
+          "CC BY-NC-ND 4.0",
+          "CC0 1.0"
+        ],
+        "default": "arXiv.org perpetual, non-exclusive license 1.0"
+      },
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Title",
+        "type": "text",
+        "required": true,
+        "help": "The full title of the article."
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). arXiv records authors as a single comma-separated list of names, so only the Name column is used for the metadata field; mark exactly one corresponding author (the account submitting). Use the form 'Firstname Lastname' for each name.",
+        "fields": [
+          "name",
+          "email",
+          "affiliation",
+          "orcid",
+          "corresponding"
+        ]
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "help": "Plain-text abstract as it should appear on the arXiv abstract page."
+      },
+      {
+        "id": "manuscript_file",
+        "autofill": "filemap",
+        "label": "Manuscript file",
+        "type": "file",
+        "required": true,
+        "help": "Path to the submission. arXiv prefers a LaTeX source bundle (a .zip or .tar.gz of the .tex, figures, and .bbl); a single PDF is accepted for PDF-only submissions. The file is uploaded, processed, and confirmed on the Files step.",
+        "accept": [
+          ".zip",
+          ".tar.gz",
+          ".tgz",
+          ".tar",
+          ".pdf",
+          ".tex"
+        ]
+      },
+      {
+        "id": "comments",
+        "autofill": "extract",
+        "label": "Comments",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Free-text comments shown on the abstract page, conventionally the page/figure count and notes (e.g. '10 pages, 4 figures; submitted to JOSS')."
+      },
+      {
+        "id": "report_number",
+        "autofill": "never",
+        "label": "Report number",
+        "type": "text",
+        "required": false,
+        "help": "Optional. Author-assigned report or preprint number, if any."
+      },
+      {
+        "id": "journal_reference",
+        "autofill": "never",
+        "label": "Journal reference",
+        "type": "text",
+        "required": false,
+        "help": "Optional. Full bibliographic reference once the article has been published in a journal."
+      },
+      {
+        "id": "acm_class",
+        "autofill": "never",
+        "label": "ACM classification",
+        "type": "text",
+        "required": false,
+        "help": "Optional. ACM Computing Classification System code(s), semicolon-separated (e.g. 'F.2.2; I.2.7'). Relevant mainly for cs submissions."
+      },
+      {
+        "id": "msc_class",
+        "autofill": "never",
+        "label": "MSC classification",
+        "type": "text",
+        "required": false,
+        "help": "Optional. Mathematics Subject Classification code(s), comma-separated (e.g. '14J60, 14F05'). Relevant mainly for math submissions."
+      },
+      {
+        "id": "doi",
+        "autofill": "never",
+        "label": "DOI",
+        "type": "text",
+        "required": false,
+        "help": "Optional. DOI of a published version of this article, if one exists."
+      }
+    ]
+  },
+  "nature": {
+    "venue_type": "venue",
+    "name": "Nature",
+    "full_name": "Nature - International weekly venue of science",
+    "submission_url": "https://mts-nature.nature.com/cgi-bin/main.plex",
+    "site_url": "https://www.nature.com",
+    "submission_guide": "https://www.nature.com/nature/for-authors/initial-submission",
+    "max_upload_mb": 30,
+    "description": "Weekly multidisciplinary venue publishing peer-reviewed research of outstanding significance across all fields of science and technology, alongside news and commentary.",
+    "fields": [
+      {
+        "id": "manuscript_type",
+        "autofill": "classify",
+        "label": "Manuscript type",
+        "type": "choice",
+        "required": true,
+        "default": "Biological Sciences - Article",
+        "help": "The submission category, selected on the opening eJournalPress manuscript-type page. Choose one of the listed options exactly. For Nature, the type also names the research area and whether this is a full submission or a presubmission enquiry (e.g. 'Biological Sciences - Article').",
+        "options": [
+          "Biological Sciences - Article",
+          "Biological Sciences - Presubmission Enquiry",
+          "Social Sciences - Article",
+          "Social Sciences - Presubmission Enquiry",
+          "Physical Sciences - Article",
+          "Physical Sciences - Presubmission Enquiry",
+          "Submit - Perspective",
+          "Submit - Review",
+          "Review/Perspective Synopsis",
+          "Matters Arising",
+          "Registered Report"
+        ]
+      },
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Manuscript title",
+        "type": "text",
+        "required": true,
+        "help": "The full title of the manuscript, typed into the eJournalPress title box."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "help": "Plain-text abstract, typed into the eJournalPress abstract box."
+      },
+      {
+        "id": "subject_level",
+        "autofill": "extract",
+        "label": "Subject categories",
+        "type": "textarea",
+        "required": true,
+        "help": "Nature subject classification, chosen from the dependent menus on the eJournalPress subjects step. The category tree is not a fixed depth: every branch has a level 1 and level 2, and some continue deeper, to as many as six levels. Format each category as its level names joined by ' | ' (subject_level_1 | subject_level_2 | ...), giving as many levels as the chosen branch offers; level 1 and level 2 are required and the deeper levels are optional. Provide between two and five categories in total, each on its own line. Each part must match a category name exactly. List the valid values from the command line with python -m paperpush.venues.nature: run it with no arguments for the level-1 categories, then add the chosen names one at a time (a quoted level-1 name for its level-2 categories, a quoted level-1 and level-2 pair for its level-3 categories, a level-1/level-2/level-3 triple for its level-4 categories) to drill deeper. Example: python -m paperpush.venues.nature 'Biological sciences | Biochemistry | Proteomics'."
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: title | first name | last name | email | institution | country/region | city | corresponding(yes/no). The title is the name prefix selected in the eJournalPress drop-down (e.g. Mr, Ms, Dr, Professor). City is optional. The author marked corresponding=yes fills the corresponding-author sub-form; the boxes that the signed-in account already pre-filled (typically first name, last name, email) are left untouched. Country/region is matched to the eJournalPress drop-down by name (US/USA map to 'United States', UK to 'United Kingdom').",
+        "fields": [
+          "title",
+          "first_name",
+          "last_name",
+          "email",
+          "institution",
+          "country",
+          "city",
+          "corresponding"
+        ]
+      },
+      {
+        "id": "manuscript_file",
+        "autofill": "filemap",
+        "label": "Manuscript file",
+        "type": "file",
+        "required": true,
+        "help": "Path to the manuscript, uploaded as the 'Article File' on the eJournalPress upload step.",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".doc"
+        ]
+      },
+      {
+        "id": "cover_letter",
+        "autofill": "filemap",
+        "label": "Cover letter",
+        "type": "file",
+        "required": false,
+        "help": "Optional. Path to the cover letter, uploaded as the 'Author Cover Letter' on the eJournalPress upload step.",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".doc",
+          ".txt"
+        ]
+      },
+      {
+        "id": "figure_files",
+        "autofill": "filemap",
+        "label": "Figure files",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. Main figures, one per line as 'path | title | color'. Every column after the path is optional. Each file uploads on the eJournalPress step with the 'Figure' file type. The title names the figure on the per-object metadata step (e.g. 'Figure 1', 'Figure 2A'), falling back to the file name when blank. The color is the per-figure color choice ('color' or 'bw', defaulting to 'color'). Example: 'figs/fig1.eps | Figure 1 | color'.",
+        "accept": [
+            ".pdf",
+            ".jpg",
+            ".jpeg",
+            ".ppt"
+        ]
+      },
+      {
+        "id": "table_files",
+        "autofill": "filemap",
+        "label": "Table files",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. Main tables uploaded as separate files, one per line as 'path | title' (the title is optional). Each file uploads with the 'Table' file type. Example: 'tables/table1.xlsx | Table 1'."
+      },
+      {
+        "id": "supplementary_files",
+        "autofill": "filemap",
+        "label": "Supplementary information files",
+        "type": "filelist",
+        "required": false,
+        "max_file_size_mb": 100,
+        "help": "Optional. Supplementary information files, one per line as 'path | title | description'. Every column after the path is optional. Each file uploads with the 'Supplementary Information' file type. eJournalPress has no distinct supplementary-figure type, so supplementary figures belong here. The title names the object on the per-object metadata step; the description is optional. Example: 'supp/supp_methods.pdf | Supplementary Information | Extended methods'."
+      },
+      {
+        "id": "supplementary_tables",
+        "autofill": "filemap",
+        "label": "Supplementary table files",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. Supplementary tables, one per line as 'path | title | description'. Every column after the path is optional. Each file uploads with the 'Supplementary Table' file type. The title names the object on the per-object metadata step; the description is optional. Example: 'supp/supp_table1.xlsx | Supplementary Table 1 | Source measurements'."
+      },
+      {
+        "id": "additional_files",
+        "autofill": "filemap",
+        "label": "Other files",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. Any further eJournalPress files that are not main figures, main tables, supplementary information, or supplementary tables (use the dedicated fields above for those). One per line as 'path | type | title | extra'; every column after the path is optional. The type must be one of the listed file types; when omitted the eJournalPress default is left in place. The title names a figure or supplementary object on the per-object metadata step; the extra column is a figure's color ('color' or 'bw') or a supplementary file's description. Example: 'data/source_fig1.zip | Source Data |  | Raw gels'.",
+        "type_options": [
+          "Response to Referees Letter",
+          "Extended Data",
+          "Supplementary Video/Audio",
+          "Related Manuscript File",
+          "Source Data"
+        ]
+      },
+      {
+        "id": "are_you_corresponding",
+        "autofill": "never",
+        "label": "Are you the corresponding author?",
+        "type": "boolean",
+        "required": true,
+        "help": "Whether you (the submitting account holder) are the corresponding author. Answer yes or no."
+      },
+      {
+        "id": "corresponding_gender",
+        "autofill": "never",
+        "label": "Gender of corresponding author",
+        "type": "choice",
+        "required": false,
+        "help": "Optional. Your gender, asked by eJournalPress only when you (the submitting account holder) are the corresponding author (are_you_corresponding: yes). Choose one of the listed options, or leave blank to skip. Ignored when are_you_corresponding is no.",
+        "options": [
+          "Man",
+          "Woman",
+          "Non-binary or gender diverse",
+          "Prefer not to disclose"
+        ]
+      },
+      {
+        "id": "code_availability",
+        "autofill": "extract",
+        "label": "Code availability statement",
+        "type": "textarea",
+        "required": false,
+        "character_count": 4000,
+        "help": "Optional. Code availability statement for the eJournalPress Code Ocean / code-deposition step. Leave blank to decline (the default: no Code Ocean capsule created). When provided, eJournalPress is told a Code Ocean capsule has been created and this text (up to 4000 characters) is entered as the code availability statement."
+      },
+      {
+        "id": "competing_interests",
+        "autofill": "classify",
+        "label": "Competing interests",
+        "type": "choice",
+        "required": true,
+        "help": "Nature Portfolio requires every submission to declare competing financial and/or non-financial interests. Answer 'no' if the authors have no competing interests, or 'yes' if they do (in which case list them in 'competing_interests_statement' and in a paragraph at the end of the manuscript).",
+        "options": [
+          "no",
+          "yes"
+        ]
+      },
+      {
+        "id": "competing_interests_statement",
+        "autofill": "extract",
+        "label": "Competing interests statement",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Used only when 'competing_interests' is 'yes': the paragraph describing the competing interests, typed into the eJournalPress statement box."
+      },
+      {
+        "id": "dual_publication",
+        "autofill": "never",
+        "label": "Published or under consideration elsewhere",
+        "type": "choice",
+        "required": false,
+        "help": "Whether any of the results/data/figures in this manuscript have been published, or are under consideration for publication, elsewhere. Answer 'no' (the default) or 'yes'; if 'yes', explain in 'dual_publication_statement' why it is not dual publication.",
+        "options": [
+          "no",
+          "yes"
+        ]
+      },
+      {
+        "id": "dual_publication_statement",
+        "autofill": "never",
+        "label": "Prior/concurrent publication statement",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Used only when 'dual_publication' is 'yes': identify the results/data/figures taken from other published or pending manuscripts and explain why this does not constitute dual publication."
+      },
+      {
+        "id": "peer_review",
+        "autofill": "never",
+        "label": "Peer-review anonymization",
+        "type": "choice",
+        "required": false,
+        "help": "Optional. Whether author information is shown to reviewers. 'single-anonymized' shows author information to reviewers (the default); 'double-anonymized' hides it, in which case all identifying information must be removed from the files and placed in the cover letter (see https://www.nature.com/documents/nr-double-blind-peer-review.pdf). Left at the form default when blank.",
+        "options": [
+          "single-anonymized",
+          "double-anonymized"
+        ]
+      },
+      {
+        "id": "comments_to_editor",
+        "autofill": "never",
+        "label": "Comments to the editor",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Additional information for the editor, typed into the eJournalPress comments box: previous manuscript numbers for earlier versions, suggested or excluded referees, or (for a presubmission enquiry) the references used."
+      }
+    ]
+  },
+  "nature_biotech": {
+    "venue_type": "venue",
+    "name": "Nature Biotechnology",
+    "full_name": "Nature Biotechnology",
+    "submission_url": "https://mts-nbt.nature.com/cgi-bin/main.plex",
+    "site_url": "https://www.nature.com/nbt",
+    "submission_guide": "https://www.nature.com/nbt/submission-guidelines",
+    "description": "Publishes peer-reviewed research and analysis on the science and business of biotechnology, covering the application of biological systems to therapeutics, diagnostics, agriculture, and related areas.",
+    "inherits": "nature",
+    "fields": [
+      {
+        "id": "manuscript_type",
+        "default": "Article",
+        "help": "The submission category, selected on the opening eJournalPress manuscript-type page. Choose one of the listed options exactly.",
+        "options": [
+          "Article",
+          "Brief Communication",
+          "Correspondence",
+          "Review Article",
+          "Comment",
+          "Perspective",
+          "Feature",
+          "Patents",
+          "Career Feature",
+          "Matters Arising",
+          "Progress",
+          "Resource"
+        ]
+      },
+      {
+        "id": "supplementary_files",
+        "help": "Optional. Supplementary information files, one per line as 'path | title | description'. Every column after the path is optional. Each file uploads with the 'Supplemental & Additional Information' file type. eJournalPress has no distinct supplementary-figure type, so supplementary figures belong here. The title names the object on the per-object metadata step; the description is optional. Example: 'supp/supp_methods.pdf | Supplementary Information | Extended methods'."
+      }
+    ]
+  },
+  "nature_methods": {
+    "venue_type": "venue",
+    "name": "Nature Methods",
+    "full_name": "Nature Methods",
+    "submission_url": "https://mts-nmeth.nature.com/cgi-bin/main.plex",
+    "site_url": "https://www.nature.com/nmeth",
+    "submission_guide": "https://www.nature.com/nmeth/submission-guidelines",
+    "description": "Publishes peer-reviewed novel methods and significant improvements to techniques across the life sciences, including their development, validation, and application.",
+    "inherits": "nature",
+    "removed_fields": [
+      "code_availability"
+    ],
+    "fields": [
+      {
+        "id": "manuscript_type",
+        "default": "Article",
+        "help": "The submission category, selected on the opening eJournalPress manuscript-type page. Choose one of the listed options exactly.",
+        "options": [
+          "Article",
+          "Brief Communication",
+          "Presubmission Enquiry",
+          "Correspondence",
+          "Review Article",
+          "Perspective",
+          "Comment",
+          "Analysis",
+          "Resource",
+          "News & Views",
+          "Matters Arising",
+          "Registered Reports"
+        ]
+      },
+      {
+        "id": "subject_level",
+        "help": "Nature subject classification, chosen from the dependent menus on the eJournalPress subjects step. The category tree is not a fixed depth: every branch has a level 1 and level 2, and some continue deeper, to as many as six levels. Format each category as its level names joined by ' | ' (subject_level_1 | subject_level_2 | ...), giving as many levels as the chosen branch offers; level 1 and level 2 are required and the deeper levels are optional. Provide between two and five categories in total, each on its own line. Each part must match a category name exactly. List the valid values from the command line with python -m paperpush.venues.nature_methods: run it with no arguments for the level-1 categories, then add the chosen names one at a time (a quoted level-1 name for its level-2 categories, a quoted level-1 and level-2 pair for its level-3 categories, a level-1/level-2/level-3 triple for its level-4 categories) to drill deeper. Example: python -m paperpush.venues.nature_methods 'Biological sciences | Biochemistry | Proteomics'."
+      },
+      {
+        "id": "figure_files",
+        "max_file_size_mb": null
+      },
+      {
+        "id": "supplementary_files",
+        "help": "Optional. Supplementary information files, one per line as 'path | title | description'. Every column after the path is optional. Each file uploads with the 'Supplementary and Additional Material' file type. eJournalPress has no distinct supplementary-figure type, so supplementary figures belong here. The title names the object on the per-object metadata step; the description is optional. Example: 'supp/supp_methods.pdf | Supplementary Information | Extended methods'."
+      }
+    ]
+  },
+  "cell": {
+    "venue_type": "venue",
+    "name": "Cell",
+    "full_name": "Cell (Cell Press)",
+    "submission_url": "https://www.editorialmanager.com/cell/default.aspx",
+    "site_url": "https://www.cell.com/cell/home",
+    "submission_guide": "https://www.cell.com/cell/authors",
+    "description": "Cell Press flagship venue publishing high-impact peer-reviewed research across the full breadth of the life sciences.",
+    "max_upload_mb": 20,
+    "fields": [
+      {
+        "id": "article_type",
+        "autofill": "classify",
+        "label": "Article type",
+        "type": "choice",
+        "required": true,
+        "help": "The Editorial Manager 'Select Article Type' value. Pick the label that matches your submission; if the runner cannot match the label it falls back to the article-type drop-down's first option.",
+        "options": [
+          "Research Article",
+          "Resource",
+          "Short Article",
+          "Matters Arising",
+          "Correspondence",
+          "Review",
+          "Perspective"
+        ],
+        "default": "Research Article"
+      },
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Manuscript title",
+        "type": "text",
+        "required": true,
+        "character_count": 150,
+        "help": "The full title of the manuscript, typed into the Editorial Manager rich-text title editor."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "word_count": 150,
+        "help": "Plain-text abstract, typed into the Editorial Manager rich-text abstract editor."
+      },
+      {
+        "id": "keywords",
+        "autofill": "extract",
+        "label": "Keywords",
+        "type": "text",
+        "required": false,
+        "help": "Semicolon-separated list of keywords (e.g. 'keyword1;keyword2'), typed into the Editorial Manager keywords box."
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: Name | email | institution | country | corresponding(yes/no). Write the name as 'First Last'; the Editorial Manager 'Add Author' form splits it into given/family name on the last space. The author marked corresponding=yes must be the submitting account holder (Editorial Manager pre-fills that author); their pre-filled row is edited to fill in any missing details. Every other line is added through the '+Add Another Author' form. Country is mapped to the Editorial Manager country drop-down (e.g. USA/US/United States all map to 'us').",
+        "fields": [
+          "name",
+          "email",
+          "institution",
+          "country",
+          "corresponding"
+        ]
+      },
+      {
+        "id": "manuscript_file",
+        "autofill": "filemap",
+        "label": "Manuscript file",
+        "type": "file",
+        "required": true,
+        "help": "Path to the manuscript, uploaded as the main document on the Editorial Manager 'Attach Files' step.",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".doc"
+        ]
+      },
+      {
+        "id": "cover_letter",
+        "autofill": "filemap",
+        "label": "Cover letter",
+        "type": "file",
+        "required": true,
+        "help": "Path to the cover letter, uploaded with the 'Cover Letter' item type on the Editorial Manager 'Attach Files' step.",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".doc",
+          ".txt"
+        ]
+      },
+      {
+        "id": "declaration_file",
+        "autofill": "filemap",
+        "label": "Declaration of Interests file",
+        "type": "file",
+        "required": true,
+        "help": "Path to a Declaration of Interests document, uploaded with the 'Declaration of Interests' item type on the Editorial Manager 'Attach Files' step.",
+        "accept": [".pdf"]
+      },
+      {
+        "id": "figure_files",
+        "autofill": "filemap",
+        "label": "Figure / image files",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. One figure file per line as 'path | label' (label optional and unused at upload). Each is uploaded as a separate attachment with the 'Figure' item type on the Editorial Manager 'Attach Files' step.",
+        "accept": [
+          ".pdf",
+          ".tif",
+          ".tiff",
+          ".jpg",
+          ".jpeg",
+          ".eps",
+          ".cdx",
+          ".ai",
+          ".psd",
+          ".ppt"
+        ]
+      },
+      {
+        "id": "related_work",
+        "autofill": "never",
+        "label": "Related work in press or under consideration elsewhere?",
+        "type": "choice",
+        "required": true,
+        "help": "Cell asks whether you or any co-author has work related to this manuscript in press or under consideration elsewhere. Answer 'Yes' or 'No'.",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "default": "No"
+      },
+      {
+        "id": "original_code",
+        "autofill": "classify",
+        "label": "Does the manuscript report original code?",
+        "type": "boolean",
+        "required": true,
+        "help": "Cell asks whether the manuscript reports original computer code, algorithms, or computational models. Set to yes to declare original code (then fill in code_url).",
+        "default": false
+      },
+      {
+        "id": "code_url",
+        "autofill": "extract",
+        "label": "Original code repository URL",
+        "type": "text",
+        "required": false,
+        "help": "Only used when original_code is yes. URL of the repository where the original code is available (e.g. a GitHub link)."
+      },
+      {
+        "id": "alternate_contact",
+        "autofill": "never",
+        "label": "Alternate contact email",
+        "type": "text",
+        "required": true,
+        "character_count": 200,
+        "help": "Optional. An alternate contact email Cell can use if the corresponding author is unavailable."
+      },
+      {
+        "id": "funding",
+        "autofill": "extract",
+        "label": "Funding statement",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match an Editorial Manager funder, since the funder box only accepts a picked autocomplete suggestion. Leave empty to mark funding information as not available."
+      },
+      {
+        "id": "reviewers",
+        "autofill": "never",
+        "label": "Suggested / opposed reviewers",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. One reviewer per line. Format: name | email | institution | stance | reason. stance is 'suggested' or 'opposed' (case-insensitive, default 'suggested'); email, institution, and reason are optional. Write the name as 'First Last'; the Editorial Manager reviewer form splits it into given/family name on the last space. Each line is added through the '+Add Suggested Reviewer' or '+Add Opposed Reviewer' form, which mirrors the author form."
+      },
+      {
+        "id": "declarations_confirmed",
+        "autofill": "never",
+        "label": "Submission declarations confirmed",
+        "type": "boolean",
+        "required": true,
+        "confirm": true,
+        "help": "Confirms the standard Cell submission declarations (the paper conforms to all requirements, all contributors are listed, all authors have seen the manuscript, and status updates will be shared). The runner checks these boxes only when this is yes.",
+        "default": false
+      },
+      {
+        "id": "open_access",
+        "autofill": "never",
+        "label": "Open access",
+        "type": "choice",
+        "required": false,
+        "help": "On the Publishing Options step shown after 'Build PDF for Approval', Cell offers an open-access publishing model that carries an article-publishing charge. Choose 'Yes' to select open access or 'No' to keep the standard (subscription) model. The runner opens the Publishing Options popup and applies this choice best-effort.",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "default": "No"
+      }
+    ]
+  },
+  "cell_systems": {
+    "venue_type": "venue",
+    "inherits": "cell",
+    "name": "Cell Systems",
+    "full_name": "Cell Systems (Cell Press)",
+    "description": "Cell Press venue publishing research in systems biology, including quantitative, computational, and theoretical approaches to understanding biological systems across scales.",
+    "site_url": "https://www.cell.com/cell-systems/home",
+    "submission_guide": "https://www.cell.com/cell-systems/authors",
+    "submission_url": "https://www.editorialmanager.com/cell-systems/default.aspx",
+    "fields": [
+      {
+        "id": "open_access",
+        "help": "On the Publishing Options step shown after 'Build PDF for Approval', Cell Systems offers an open-access publishing model that carries an article-publishing charge. Choose 'Yes' to select open access or 'No' to keep the standard (subscription) model. The runner opens the Publishing Options popup and applies this choice best-effort."
+      }
+    ]
+  },
+  "cell_genomics": {
+    "venue_type": "venue",
+    "inherits": "cell",
+    "name": "Cell Genomics",
+    "full_name": "Cell Genomics (Cell Press)",
+    "description": "Open-access Cell Press venue publishing research across genetics and genomics, including functional, evolutionary, and computational genomics and their applications to health and disease.",
+    "site_url": "https://www.cell.com/cell-genomics/home",
+    "submission_guide": "https://www.cell.com/cell-genomics/authors",
+    "submission_url": "https://www.editorialmanager.com/cell-genomics/default.aspx",
+    "removed_fields": [
+      "open_access"
+    ]
+  },
+  "plos_compbio": {
+    "venue_type": "venue",
+    "inherits": "cell",
+    "name": "PLOS Computational Biology",
+    "full_name": "PLOS Computational Biology (PLOS)",
+    "submission_url": "https://www.editorialmanager.com/pcompbiol/default.aspx",
+    "site_url": "https://venues.plos.org/ploscompbiol/",
+    "submission_guide": "https://venues.plos.org/ploscompbiol/s/submission-guidelines",
+    "description": "Open-access venue publishing research that applies computational methods to understand living systems across all scales, from molecules to ecosystems.",
+    "removed_fields": [
+        "declaration_file"
+    ],
+    "fields": [
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Manuscript title",
+        "type": "text",
+        "required": true,
+        "character_count": 250,
+        "help": "The full title of the manuscript, typed into the Editorial Manager rich-text title editor."
+      },
+      {
+        "id": "short_title",
+        "autofill": "extract",
+        "label": "Manuscript short title",
+        "type": "text",
+        "required": false,
+        "character_count": 90,
+        "help": "Short title."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "word_count": 500,
+        "help": "Plain-text abstract, typed into the Editorial Manager rich-text abstract editor."
+      },
+      {
+        "id": "section",
+        "autofill": "classify",
+        "label": "Section / Category",
+        "type": "choice",
+        "required": true,
+        "help": "The PLOS Computational Biology section the manuscript belongs to, picked on the Editorial Manager 'Section/Category' step. Choose the label that matches your submission; if the runner cannot match the label it falls back to the section drop-down's first option.",
+        "options": [
+          "Biological Macromolecules",
+          "Cell Biology and Physiology",
+          "Epidemiology and Public Health",
+          "Evolution, Ecology, and Behavior",
+          "Genomics, Epigenomics, and Proteomics",
+          "Immunology and Microbiology",
+          "Neuroscience",
+          "Systems Biology"
+        ],
+        "default": "Systems Biology"
+      },
+      {
+        "id": "classifications",
+        "autofill": "extract",
+        "label": "Classifications",
+        "type": "textarea",
+        "required": true,
+        "min_count": 5,
+        "help": "Submission classifications (subject-area keywords) for the Editorial Manager 'Classifications' step. One classification per line; provide at least five. Each line is typed into the classifications-popup search box, the matching checkbox is checked, and the entry is added with 'Add->'. Use the exact wording from the PLOS classification list so the search returns a matching checkbox. List the full classification vocabulary from the command line with `python -m paperpush.venues.plos_compbio`.",
+        "options_file": "plos_compbio_classifications.txt"
+      },
+      {
+        "id": "reviewers",
+        "autofill": "never",
+        "label": "Suggested / opposed reviewers",
+        "type": "textarea",
+        "required": true,
+        "min_count": 2,
+        "help": "Optional. One reviewer per line. Format: name | email | institution | stance | reason. stance is 'suggested' or 'opposed' (case-insensitive, default 'suggested'); email, institution, and reason are optional. Write the name as 'First Last'; the Editorial Manager reviewer form splits it into given/family name on the last space. Each line is added through the '+Add Suggested Reviewer' or '+Add Opposed Reviewer' form, which mirrors the author form."
+      },
+      {
+        "id": "competing_interests",
+        "autofill": "extract",
+        "label": "Competing interests statement",
+        "type": "textarea",
+        "required": true,
+        "help": "Competing-interests statement for the PLOS declarations page. Typed verbatim into the 'Competing Interests' box. If there are no competing interests, state so explicitly (e.g. 'The authors have declared that no competing interests exist.')."
+      },
+      {
+        "id": "data_availability",
+        "autofill": "extract",
+        "label": "Data availability statement",
+        "type": "textarea",
+        "required": true,
+        "help": "Data-availability statement for the PLOS declarations page. Typed verbatim into the 'Data Availability' box. Describe where the data underlying the results can be found, or state why it cannot be shared."
+      },
+      {
+        "id": "previous_interactions",
+        "autofill": "never",
+        "label": "Previous interactions with PLOS",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Leave blank if there were none. When set, the 'I have had previous interactions...' box is checked on the PLOS declarations page and this text is filled in as the explanation."
+      },
+      {
+        "id": "prior_submission",
+        "autofill": "never",
+        "label": "Prior submission / consideration history",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Leave blank if not applicable. When set, the 'This manuscript was...' box is checked on the PLOS declarations page and this text is filled in as the explanation."
+      },
+      {
+        "id": "preprint_doi",
+        "autofill": "never",
+        "label": "Preprint DOI",
+        "type": "text",
+        "required": false,
+        "help": "Optional. DOI of preprint. If no preprint, leave empty."
+      },
+      {
+        "id": "related_work",
+        "autofill": "never",
+        "label": "Related Work, Copyright, & Dual Submission",
+        "type": "textarea",
+        "options": null,
+        "help": "PLOS asks: have any of the results, data, or figures in this manuscript been published elsewhere, or are they under consideration for publication elsewhere? If no, enter 'No'. If yes, identify which results, data, or figures were taken from other published or pending manuscripts and explain why inclusion here does not constitute dual publication; upload a copy of the related work as a 'Related Manuscript' file type (reviewers may be asked to comment on the overlap); and provide the image source, copyright license information, and any permissions received for figures or material adapted from copyrighted material, uploading permissions documents as an 'Other' file type."
+      },
+      {
+        "id": "funding_country",
+        "autofill": "never",
+        "label": "Funding country",
+        "type": "choice",
+        "required": false,
+        "required_if": "funding",
+        "options_file": "plos_compbio_funding_countries.txt",
+        "help": "Country of the funding source, selected on the PLOS financial-disclosure step's country drop-down. Required when a funding statement is given. Pick the country name; the runner matches it against the drop-down's options."
+      },
+      {
+        "id": "human_participants",
+        "autofill": "never",
+        "label": "Human participants, data, specimens, or tissue",
+        "type": "choice",
+        "required": true,
+        "default": "No",
+        "options": ["Yes", "No"],
+        "help": "PLOS asks whether the study involved human participants, data, specimens, or tissue. Answer 'No' (the default) or 'Yes'. When 'Yes', the runner selects the affirmative option and checks the three human-subjects confirmation boxes on the declarations page."
+      }
+    ]
+  },
+  "genome_biology": {
+    "venue_type": "venue",
+    "name": "Genome Biology",
+    "full_name": "Genome Biology",
+    "submission_url": "https://submission.springernature.com/",
+    "site_url": "https://genomebiology.biomedcentral.com",
+    "submission_guide": "https://genomebiology.biomedcentral.com/submission-guidelines",
+    "description": "Open-access venue publishing peer-reviewed research and methods across all areas of biology and biomedicine studied from a genomic and post-genomic perspective.",
+    "file_type_options": [
+      "Manuscript",
+      "Figure",
+      "Supplementary file",
+      "Cover letter"
+    ],
+    "fields": [
+      {
+        "id": "article_type",
+        "autofill": "classify",
+        "label": "Article type",
+        "type": "choice",
+        "required": true,
+        "help": "The article type selected from the 'Article type:' drop-down on the first step of the Springer Nature wizard. Matched to the menu by its option value; defaults to 'research' when blank.",
+        "options": [
+          "brief-report",
+          "comment",
+          "correspondence",
+          "database",
+          "editorial",
+          "matters-arising",
+          "methodology",
+          "research",
+          "review",
+          "software",
+          "q-and-a"
+        ],
+        "default": "research"
+      },
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Manuscript title",
+        "type": "text",
+        "required": true,
+        "help": "The full title of the manuscript, typed into the Title rich-text editor on the details step."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "help": "Plain-text abstract, typed into the Abstract rich-text editor on the details step."
+      },
+      {
+        "id": "manuscript_file",
+        "autofill": "filemap",
+        "label": "Manuscript file",
+        "type": "file",
+        "required": true,
+        "help": "Path to the manuscript, uploaded to the manuscript slot on the first step.",
+        "max_file_size_mb": 2000,
+        "accept": [
+          ".docx",
+          ".doc",
+          ".zip"
+        ]
+      },
+      {
+        "id": "supplementary_file",
+        "autofill": "filemap",
+        "label": "Supplementary file",
+        "type": "file",
+        "required": false,
+        "help": "Optional. Supplementary material."
+      },
+      {
+        "id": "cover_letter",
+        "autofill": "filemap",
+        "label": "Cover letter",
+        "type": "file",
+        "required": true,
+        "help": "Path to the cover letter, uploaded to the cover-letter slot on the details step.",
+        "accept": [
+          ".doc",
+          ".docx",
+          ".pdf"
+        ]
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: name | email | institution | city | country | department (optional) | corresponding(yes/no). The first author marked corresponding (or the first author when none is) is set as the responsible corresponding author.",
+        "fields": [
+          "name",
+          "email",
+          "institution",
+          "city",
+          "country",
+          "department",
+          "corresponding"
+        ]
+      },
+      {
+        "id": "author_contributions",
+        "autofill": "extract",
+        "label": "Author contributions statement",
+        "type": "textarea",
+        "required": true,
+        "help": "The author-contributions statement, typed into the box on the authors step. Use initials to specify who did what (e.g. 'A.B. and C.D. wrote the manuscript; E.F. prepared figures 1-3')."
+      },
+      {
+        "id": "competing_interests",
+        "autofill": "classify",
+        "label": "Competing interests",
+        "type": "boolean",
+        "required": true,
+        "default": false,
+        "help": "Whether the authors have competing interests to declare. When yes, fill 'competing_interests_statement'."
+      },
+      {
+        "id": "competing_interests_statement",
+        "autofill": "extract",
+        "label": "Competing interests statement",
+        "type": "textarea",
+        "required": false,
+        "help": "Required when 'competing_interests' is yes. The statement typed into the competing-interests box on the declarations step."
+      },
+      {
+        "id": "data_availability_statement",
+        "autofill": "extract",
+        "label": "Data availability statement",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. When provided, the declarations step records that data were used or generated and this statement is entered; when blank, the not-applicable option is selected."
+      },
+      {
+        "id": "acknowledgements",
+        "autofill": "extract",
+        "label": "Acknowledgements",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Typed into the acknowledgements box on the declarations step."
+      },
+      {
+        "id": "research_funding",
+        "autofill": "never",
+        "label": "Research funding",
+        "type": "boolean",
+        "required": false,
+        "default": false,
+        "help": "Whether the research was funded. Set yes (or list funders below) to record funding on the declarations step."
+      },
+      {
+        "id": "funding",
+        "autofill": "extract",
+        "label": "Funding sources",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. One funder per line as 'funder name | grant id' (the grant id optional). On the declarations step each line opens a funding row attributed to the first author: the funder name and grant id are typed and the row is saved. Providing any funder implies research funding = yes."
+      }
+    ]
+  },
+  "bmc_bioinformatics": {
+    "venue_type": "venue",
+    "inherits": "genome_biology",
+    "name": "BMC Bioinformatics",
+    "full_name": "BMC Bioinformatics",
+    "description": "BMC Bioinformatics is an open access, peer-reviewed venue that considers articles describing novel computational algorithms and software, models and tools, including statistical methods, machine learning and artificial intelligence, for the modelling and analysis of all kinds of biological data, as well as systems biology.",
+    "site_url": "https://link.springer.com/venue/12859",
+    "submission_guide": "https://link.springer.com/venue/12859/submission-guidelines",
+    "submission_url": "https://submission.springernature.com/",
+    "fields": [
+      {
+        "id": "article_type",
+        "autofill": "classify",
+        "label": "Article type",
+        "type": "choice",
+        "required": true,
+        "help": "The article type selected from the 'Article type:' drop-down on the first step of the Springer Nature wizard. Matched to the menu by its option value; defaults to 'research' when blank.",
+        "options": [
+          "comment",
+          "database",
+          "editorial",
+          "matters-arising",
+          "research",
+          "review",
+          "software"
+        ],
+        "default": "research"
+      }
+    ]
+  },
+  "science": {
+    "venue_type": "venue",
+    "name": "Science",
+    "full_name": "Science - American Association for the Advancement of Science (AAAS)",
+    "submission_url": "https://cts.sciencemag.org/scc/",
+    "site_url": "https://www.science.org",
+    "submission_guide": "https://www.science.org/content/page/science-information-authors",
+    "max_upload_mb": 50,
+    "description": "Peer-reviewed flagship venue of the American Association for the Advancement of Science (AAAS), publishing significant original research across all scientific disciplines along with news and commentary.",
+    "file_type_options": [
+      "Main Manuscript",
+      "Cover Letter",
+      "Figure",
+      "Table",
+      "Supplementary Material",
+      "Movie",
+      "Data File"
+    ],
+    "fields": [
+      {
+        "id": "publication",
+        "autofill": "never",
+        "label": "Publication",
+        "type": "choice",
+        "required": true,
+        "help": "The AAAS venue to submit to, chosen from the first drop-down on the New Submission screen. Matched to the portal's menu by name; when blank or unmatched the menu's first selectable option is left in place. The article-type drop-down that follows is specific to the chosen publication.",
+        "options": [
+          "Science",
+          "Science Advances",
+          "Science Immunology",
+          "Science Robotics",
+          "Science Signaling",
+          "Science Translational Medicine"
+        ],
+        "default": "Science"
+      },
+      {
+        "id": "article_type",
+        "autofill": "classify",
+        "label": "Article type",
+        "type": "choice",
+        "required": true,
+        "help": "The submission type selected from the second drop-down on the New Submission screen, after the publication. Matched to the portal's menu by name; when blank or unmatched the first selectable option is left in place. Common Science types are listed; the live menu is authoritative.",
+        "options": [
+          "Research Article",
+          "Review",
+          "Perspective",
+          "Policy Forum",
+          "Letter",
+          "Book or Media Review",
+          "Policy Article",
+          "Analytical Review",
+          "Research Resource",
+          "Editorial",
+          "Focus",
+          "Viewpoint",
+          "Editors' Choice"
+        ]
+      },
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Manuscript title",
+        "type": "text",
+        "required": true,
+        "character_count": 135,
+        "help": "The full title of the manuscript, typed into the title box on the manuscript-information step."
+      },
+      {
+        "id": "short_title",
+        "autofill": "extract",
+        "label": "Manuscript short title",
+        "type": "text",
+        "required": false,
+        "character_count": 80,
+        "help": "Short title."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "word_count": 150,
+        "help": "Plain-text abstract, typed into the abstract box on the manuscript-information step."
+      },
+      {
+        "id": "funders",
+        "autofill": "extract",
+        "label": "Funding sources",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. One funding source per line as 'funder name | award number | investigator full name'. On the manuscript-information step each line opens a funding row: the funder name is matched against the Crossref Funder Registry (http://www.crossref.org/fundref/) and the first suggestion is taken, the award/grant number is typed, and the investigator is chosen from the author drop-down. The award number and investigator are optional."
+      },
+      {
+        "id": "subject_areas",
+        "autofill": "classify",
+        "label": "Subject areas",
+        "type": "multichoice",
+        "required": true,
+        "min_count": 1,
+        "max_count": 2,
+        "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
+        "options": [
+          "Agriculture",
+          "Anthropology",
+          "Applied ecology",
+          "Applied physics",
+          "Astronomy",
+          "Atmospheric science",
+          "Biochemistry",
+          "Biophysics",
+          "Cancer",
+          "Cell biology",
+          "Cellular neuroscience",
+          "Chemical physics",
+          "Chemistry",
+          "Climatology",
+          "Cognitive neuroscience",
+          "Computer science",
+          "Condensed matter physics",
+          "Developmental biology",
+          "Developmental neuroscience",
+          "Diseases and disorders",
+          "Ecology",
+          "Economics",
+          "Electrochemistry",
+          "Engineering",
+          "Epidemiology",
+          "Evolutionary biology",
+          "Genetics",
+          "Geology",
+          "Geophysics",
+          "Health and medicine",
+          "Human genetics",
+          "Immunology",
+          "Materials science",
+          "Mathematics",
+          "Microbiology",
+          "Molecular biology",
+          "Network science",
+          "Neurophysiology",
+          "Oceanography",
+          "Optics",
+          "Organic chemistry",
+          "Organismal biology",
+          "Paleontology",
+          "Physics",
+          "Physiology",
+          "Planetary science",
+          "Plant sciences",
+          "Psychological Science",
+          "Research methods",
+          "Science policy",
+          "Scientific community",
+          "Signal transduction",
+          "Social sciences",
+          "Structural biology",
+          "Surface chemistry",
+          "Synthetic biology",
+          "Systems biology",
+          "Virology"
+        ]
+      },
+      {
+        "id": "additional_datasets",
+        "autofill": "extract",
+        "label": "Additional datasets",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Data deposited in an external repository, one per line as 'repository | dataset URI'. On the manuscript-information step each line opens a dataset row: the repository is chosen from the drop-down and the URI is typed, then 'Add' files it. Repository options: Zenodo | GitHub | Dataverse | Figshare | Other."
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: first name | last name | email | ringgold_id | ror_id | first author(yes/no) | corresponding(yes/no) | contributed equally(yes/no) | submitter(yes/no).",
+        "fields": [
+          "first_name",
+          "last_name",
+          "email",
+          "ringgold_id",
+          "ror_id",
+          "first_author",
+          "corresponding",
+          "contributed_equally",
+          "submitter"
+        ]
+      },
+      {
+        "id": "manuscript_file",
+        "autofill": "filemap",
+        "label": "Manuscript file (Word/source)",
+        "type": "file",
+        "required": true,
+        "help": "Path to the Word (.docx) manuscript, uploaded as the first file on the file-upload step. Word files facilitate data extraction that speeds submission and may be used for editing if the manuscript proceeds to revision. Only upload a PDF here if your source file is .tex and you do not have a .docx file; LaTeX users upload their source files in a later section.",
+        "max_words_before_refs_by": {
+          "field": "article_type",
+          "values": {
+            "Research Article": 3000
+          }
+        },
+        "accept": [
+          ".docx",
+          ".doc",
+          ".pdf"
+        ]
+      },
+      {
+        "id": "combined_pdf",
+        "autofill": "filemap",
+        "label": "Combined PDF",
+        "type": "file",
+        "required": true,
+        "help": "Path to a combined PDF that includes the complete main manuscript, figures, and supplementary materials, uploaded as the second file on the file-upload step. The combined PDF is used for the evaluation process and is provided to reviewers.",
+        "accept": [
+          ".pdf"
+        ]
+      },
+      {
+        "id": "cover_letter",
+        "autofill": "filemap",
+        "label": "Cover letter",
+        "type": "file",
+        "required": false,
+        "help": "Optional. Path to the cover letter, uploaded as the 'Cover Letter' on the file-upload step. doc, docx, or pdf.",
+        "accept": [
+          ".doc",
+          ".docx",
+          ".pdf"
+        ]
+      },
+      {
+        "id": "supplementary_material",
+        "autofill": "filemap",
+        "label": "Supplementary Material",
+        "type": "file",
+        "required": false,
+        "help": "Optional. one document that includes any supplementary materials and methods, figures, and single page tables, combined into a single file. References cited in the supplementary material should be included in the reference list found in the main text. doc, docx, or pdf.",
+        "accept": [
+          ".doc",
+          ".docx",
+          ".pdf"
+        ]
+      },
+      {
+        "id": "agree_terms",
+        "autofill": "never",
+        "label": "Agree to submission terms",
+        "type": "boolean",
+        "required": true,
+        "confirm": true,
+        "help": "Confirmation of the Science submission terms and conditions, checked on the terms step. Must be 'yes' to submit."
+      },
+      {
+        "id": "suggested_reviewers",
+        "autofill": "never",
+        "label": "Suggested reviewers",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Reviewers you suggest, one per line as 'first name | last name | email | institution | department'. The institution and department are optional. On the reviewers step each line opens a suggested-reviewer form filled with these values and saved; left blank skips it."
+      },
+      {
+        "id": "excluded_reviewers",
+        "autofill": "never",
+        "label": "Excluded reviewers",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Reviewers to exclude, one per line as 'first name | last name | email | institution | reason'. The institution and reason are optional; the reason is typed into the form's free-text box. On the reviewers step each line opens an excluded-reviewer form filled with these values and saved; left blank skips it."
+      },
+      {
+        "id": "comments_to_editor",
+        "autofill": "never",
+        "label": "Comments to the editor",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. Additional information for the editor, typed into the comments box when that step is present."
+      }
+    ]
+  },
+  "science_advances": {
+    "venue_type": "venue",
+    "inherits": "science",
+    "name": "Science Advances",
+    "full_name": "Science Advances - American Association for the Advancement of Science (AAAS)",
+    "description": "AAAS open-access multidisciplinary venue publishing peer-reviewed original research across the physical, life, social, and computer sciences and engineering.",
+    "fields": [
+      {
+        "id": "publication",
+        "default": "Science Advances"
+      }
+    ]
+  },
+  "science_immunology": {
+    "venue_type": "venue",
+    "inherits": "science",
+    "name": "Science Immunology",
+    "full_name": "Science Immunology - American Association for the Advancement of Science (AAAS)",
+    "description": "AAAS venue publishing peer-reviewed original research across immunology in all organisms and model systems, spanning molecular, cellular, and translational immunology.",
+    "fields": [
+      {
+        "id": "publication",
+        "default": "Science Immunology"
+      }
+    ]
+  },
+  "science_robotics": {
+    "venue_type": "venue",
+    "inherits": "science",
+    "name": "Science Robotics",
+    "full_name": "Science Robotics - American Association for the Advancement of Science (AAAS)",
+    "description": "AAAS venue publishing peer-reviewed original research on advances in robotics and related disciplines, including robot design, control, autonomy, and applications.",
+    "fields": [
+      {
+        "id": "publication",
+        "default": "Science Robotics"
+      }
+    ]
+  },
+  "science_signaling": {
+    "venue_type": "venue",
+    "inherits": "science",
+    "name": "Science Signaling",
+    "full_name": "Science Signaling - American Association for the Advancement of Science (AAAS)",
+    "description": "AAAS venue publishing peer-reviewed original research on cellular signaling and regulatory networks, including signal transduction, systems biology, and relevance to disease.",
+    "fields": [
+      {
+        "id": "publication",
+        "default": "Science Signaling"
+      }
+    ]
+  },
+  "science_translational_medicine": {
+    "venue_type": "venue",
+    "inherits": "science",
+    "name": "Science Translational Medicine",
+    "full_name": "Science Translational Medicine - American Association for the Advancement of Science (AAAS)",
+    "description": "AAAS venue publishing peer-reviewed original research that bridges basic science and clinical medicine to advance human health.",
+    "fields": [
+      {
+        "id": "publication",
+        "default": "Science Translational Medicine"
+      }
+    ]
+  },
+  "aaai_2027": {
+    "venue_type": "conference",
+    "name": "AAAI 2027",
+    "full_name": "The Association for the Advancement of Artificial Intelligence",
+    "submission_url": "https://openreview.net/group?id=AAAI.org/2027/Conference&referrer=%5BHomepage%5D(%2F)#tab-recent-activity",
+    "site_url": "https://aaai.org/conference/aaai/aaai-27/",
+    "submission_guide": "https://aaai.org/conference/aaai/aaai-27/",
+    "description": "Promote research in Artificial Intelligence (AI) and foster scientific exchange between researchers, practitioners, scientists, students, and engineers across the entirety of AI and its affiliated disciplines.",
+    "fields": [
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Title",
+        "type": "text",
+        "required": true,
+        "help": "The full title of the paper."
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: Open Review ID | Name | Email suffixes | Reciprocal Reviewer(yes/no). If Open Review ID is added, then name and email suffixes are optional. Each author is added to the OpenReview author page by a profile search on the Name column, so the name must match the author's OpenReview profile. Email suffixes should be comma-separated, in decreasing order of likelihood of association with the author. At least one author is required.",
+        "fields": [
+          "open_review_id",
+          "name",
+          "email_suffixes",
+          "reciprocal_reviewer"
+        ]
+      },
+      {
+        "id": "tldr",
+        "autofill": "extract",
+        "label": "TL;DR",
+        "type": "text",
+        "required": false,
+        "help": "Optional. A one-sentence summary of the paper (\"too long; didn't read\")."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "help": "Plain-text abstract of the paper."
+      },
+      {
+        "id": "primary_topic",
+        "autofill": "classify",
+        "label": "Primary topic",
+        "type": "choice",
+        "required": true,
+        "help": "Exactly one primary topic, chosen from the AAAI 2027 topic list (_assets/aaai_2027_topics.txt). Use the full topic label as it appears in the dropdown.",
+        "options_file": "aaai_2027_topics.txt"
+      },
+      {
+        "id": "secondary_topics",
+        "autofill": "classify",
+        "label": "Secondary topics",
+        "type": "textarea",
+        "required": false,
+        "min_count": 0,
+        "max_count": 5,
+        "help": "Zero to five secondary topics, one per line, each chosen from the AAAI 2027 topic list (_assets/aaai_2027_topics.txt). Use the full topic label as it appears in the dropdown. (One-per-line rather than comma-separated because many topic labels contain commas.)",
+        "options_file": "aaai_2027_topics.txt"
+      },
+      {
+        "id": "country",
+        "autofill": "classify",
+        "label": "Countries of institutions",
+        "type": "multichoice",
+        "required": true,
+        "min_count": 1,
+        "help": "The countries of the authors' institutions, chosen from the AAAI 2027 country list (_assets/aaai_2027_countries.txt). Provide one or more, comma-separated; each is selected in turn from the dropdown.",
+        "options_file": "aaai_2027_countries.txt"
+      },
+      {
+        "id": "pdf_file",
+        "autofill": "filemap",
+        "label": "PDF",
+        "type": "file",
+        "required": false,
+        "help": "Optional. The paper PDF.",
+        "accept": [
+          ".pdf"
+        ]
+      },
+      {
+        "id": "reproducibility_checklist",
+        "autofill": "filemap",
+        "label": "Reproducibility checklist",
+        "type": "file",
+        "required": false,
+        "help": "Optional. The completed AAAI reproducibility checklist (see the AAAI 2027 Author's Kit).",
+        "accept": [
+          ".pdf"
+        ]
+      },
+      {
+        "id": "technical_supplement",
+        "autofill": "filemap",
+        "label": "Technical supplement",
+        "type": "file",
+        "required": false,
+        "max_file_size_mb": 10,
+        "help": "Optional. Technical appendix / supplementary material. Maximum 10 MB.",
+        "accept": [
+          ".pdf"
+        ]
+      },
+      {
+        "id": "media_supplement",
+        "autofill": "filemap",
+        "label": "Media supplement",
+        "type": "file",
+        "required": false,
+        "max_file_size_mb": 50,
+        "help": "Optional. Media (video / audio / images) supplement. Maximum 50 MB.",
+        "accept": [
+          ".zip"
+        ]
+      },
+      {
+        "id": "code_data_supplement",
+        "autofill": "filemap",
+        "label": "Code and data supplement",
+        "type": "file",
+        "required": false,
+        "max_file_size_mb": 50,
+        "help": "Optional. Code and/or data supplement. Maximum 50 MB.",
+        "accept": [
+          ".zip"
+        ]
+      },
+      {
+        "id": "conflicts",
+        "autofill": "never",
+        "label": "Self-declared conflicts of interest",
+        "type": "authorlist",
+        "required": false,
+        "help": "Optional. Self-declared conflicts of interest, one per line, in the same format as Authors: Open Review ID | Name | Email suffixes | Reciprocal Reviewer. Leave the Reciprocal Reviewer column blank -- it is not used for conflicts. If Open Review ID is added, then name and email suffixes are optional; otherwise the name is searched against OpenReview and must match a profile. Each conflict must NOT be one of the submission's authors. A profile that OpenReview's search does not return is warned about and skipped.",
+        "fields": [
+          "open_review_id",
+          "name",
+          "email_suffixes",
+          "reciprocal_reviewer"
+        ]
+      }
+    ]
+  },
+  "discrete_mathematics": {
+    "venue_type": "venue",
+    "name": "Discrete Mathematics",
+    "full_name": "Discrete Mathematics (Elsevier)",
+    "submission_url": "https://submit.elsevier.com/DISCM/submissions",
+    "site_url": "https://www.sciencedirect.com/journal/discrete-mathematics",
+    "submission_guide": "https://www.sciencedirect.com/journal/discrete-mathematics/publish/guide-for-authors",
+    "description": "Elsevier journal publishing original research and survey articles across combinatorics, graph theory, and the broader field of discrete mathematics.",
+    "fields": [
+      {
+        "id": "article_type",
+        "autofill": "classify",
+        "label": "Article type",
+        "type": "choice",
+        "required": true,
+        "help": "The submission type chosen on the Elsevier portal's first step (a radio button). Pick the label that matches your submission; if the runner cannot match the label it leaves the portal's default selection.",
+        "options": ["Contribution", "Note"],
+        "default": "Contribution"
+      },
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Manuscript title",
+        "type": "text",
+        "required": true,
+        "help": "The full title of the manuscript, typed into the portal's 'Your title' box."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "help": "Plain-text abstract, typed into the portal's 'Your abstract' box."
+      },
+      {
+        "id": "keywords",
+        "autofill": "extract",
+        "label": "Keywords",
+        "type": "text",
+        "required": true,
+        "help": "Semicolon-separated list of 1-7 keywords (e.g. 'graph theory;combinatorics'), typed into the portal's 'Your keywords' box."
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: Name | email | institution | corresponding(yes/no). Write the name as 'First Last'; the portal's author form splits it into first/last name on the last space. The institution box is an autocomplete: type the affiliation and the runner takes the first suggestion. Mark exactly one author corresponding=yes.",
+        "fields": ["name", "email", "institution", "corresponding"]
+      },
+      {
+        "id": "manuscript_file",
+        "autofill": "filemap",
+        "label": "Manuscript file",
+        "type": "file",
+        "required": true,
+        "help": "Path to the manuscript, uploaded as the 'Manuscript' required item on the portal's upload step.",
+        "accept": [".pdf", ".docx", ".doc", ".tex", ".zip"]
+      },
+      {
+        "id": "declaration_file",
+        "autofill": "filemap",
+        "label": "Declaration of competing interests file",
+        "type": "file",
+        "required": false,
+        "help": "Optional. Path to a Declaration of competing interests document, uploaded as the 'Declaration of competing interests' item. Leave blank and set no_competing_interests to yes if there are no competing interests. See https://declarations.elsevier.com/home?journalAcronym=DISCM for the template.",
+        "accept": [".pdf", ".docx", ".doc"]
+      },
+      {
+        "id": "no_competing_interests",
+        "autofill": "classify",
+        "label": "No competing interests to declare",
+        "type": "boolean",
+        "required": false,
+        "help": "Set to yes to tick the 'I confirm that no authors have competing interests' checkbox instead of uploading a declaration file. Ignored when declaration_file is provided.",
+        "default": false
+      },
+      {
+        "id": "figure_files",
+        "autofill": "filemap",
+        "label": "Figure files",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. One figure file per line as 'path | label' (label optional and unused at upload). Each is uploaded as a separate 'Figure' optional item.",
+        "accept": [".pdf", ".eps", ".tif", ".tiff", ".jpg", ".jpeg", ".png"]
+      },
+      {
+        "id": "latex_source",
+        "autofill": "filemap",
+        "label": "LaTeX source files",
+        "type": "file",
+        "required": false,
+        "help": "Optional. Path to the LaTeX source (a single .tex file or a .zip bundle of sources), uploaded as the 'LaTeX source files' optional item.",
+        "accept": [".tex", ".zip"]
+      },
+      {
+        "id": "supplementary_files",
+        "autofill": "filemap",
+        "label": "Supplementary material",
+        "type": "filelist",
+        "required": false,
+        "help": "Optional. One supplementary file per line as 'path | label' (label optional and unused at upload). Each is uploaded as a separate 'Supplementary material' optional item.",
+        "accept": [".pdf", ".docx", ".doc", ".txt", ".zip"]
+      },
+      {
+        "id": "data_statement",
+        "autofill": "classify",
+        "label": "Research data statement",
+        "type": "choice",
+        "required": true,
+        "help": "The research-data answer on the portal's 'Do you want to share data?' step. The runner selects 'No' and picks this statement from the dropdown. Sharing data in a repository is not automated; do that step by hand if it applies.",
+        "options": [
+          "No data was used for the research described in the article.",
+          "The data that has been used is confidential.",
+          "The authors do not have permission to share data.",
+          "The authors are unable or have chosen not to specify which data has been used."
+        ],
+        "default": "No data was used for the research described in the article."
+      },
+      {
+        "id": "declarations_confirmed",
+        "autofill": "never",
+        "label": "Final submission declarations confirmed",
+        "type": "boolean",
+        "required": true,
+        "confirm": true,
+        "help": "Confirms the portal's final declarations (ethics-in-publishing policy, copyright terms, and that all sources/conflicts are mentioned). The runner ticks these boxes only when this is yes.",
+        "default": false
+      }
+    ]
+  }
+}
+

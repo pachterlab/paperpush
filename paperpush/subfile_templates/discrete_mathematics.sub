@@ -1,0 +1,68 @@
+# paperpush submission file for discrete_mathematics  -*- mode: yaml -*-
+# Discrete Mathematics (Elsevier)
+#
+# Edit the values below, then run:  paperpush submit discrete_mathematics.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: discrete_mathematics
+# submission guide: https://www.sciencedirect.com/journal/discrete-mathematics/publish/guide-for-authors
+
+# Article type (choice, REQUIRED)
+#   The submission type chosen on the Elsevier portal's first step (a radio button). Pick the label that matches your submission; if the runner cannot match the label it leaves the portal's default selection.
+#   options: Contribution | Note
+article_type: 
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript, typed into the portal's 'Your title' box.
+title: 
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract, typed into the portal's 'Your abstract' box.
+abstract: |
+  
+
+# Keywords (text, REQUIRED)
+#   Semicolon-separated list of 1-7 keywords (e.g. 'graph theory;combinatorics'), typed into the portal's 'Your keywords' box.
+keywords: 
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name | email | institution | corresponding(yes/no). Write the name as 'First Last'; the portal's author form splits it into first/last name on the last space. The institution box is an autocomplete: type the affiliation and the runner takes the first suggestion. Mark exactly one author corresponding=yes.
+authors: |
+  
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript, uploaded as the 'Manuscript' required item on the portal's upload step.
+manuscript_file: 
+
+# Declaration of competing interests file (file, optional)
+#   Optional. Path to a Declaration of competing interests document, uploaded as the 'Declaration of competing interests' item. Leave blank and set no_competing_interests to yes if there are no competing interests. See https://declarations.elsevier.com/home?journalAcronym=DISCM for the template.
+declaration_file: 
+
+# No competing interests to declare (boolean, optional)
+#   Set to yes to tick the 'I confirm that no authors have competing interests' checkbox instead of uploading a declaration file. Ignored when declaration_file is provided.
+no_competing_interests: 
+
+# Figure files (filelist, optional)
+#   Optional. One figure file per line as 'path | label' (label optional and unused at upload). Each is uploaded as a separate 'Figure' optional item.
+figure_files: |
+  
+
+# LaTeX source files (file, optional)
+#   Optional. Path to the LaTeX source (a single .tex file or a .zip bundle of sources), uploaded as the 'LaTeX source files' optional item.
+latex_source: 
+
+# Supplementary material (filelist, optional)
+#   Optional. One supplementary file per line as 'path | label' (label optional and unused at upload). Each is uploaded as a separate 'Supplementary material' optional item.
+supplementary_files: |
+  
+
+# Research data statement (choice, REQUIRED)
+#   The research-data answer on the portal's 'Do you want to share data?' step. The runner selects 'No' and picks this statement from the dropdown. Sharing data in a repository is not automated; do that step by hand if it applies.
+#   options: No data was used for the research described in the article. | The data that has been used is confidential. | The authors do not have permission to share data. | The authors are unable or have chosen not to specify which data has been used.
+data_statement: 
+
+# Final submission declarations confirmed (boolean, REQUIRED)
+#   Confirms the portal's final declarations (ethics-in-publishing policy, copyright terms, and that all sources/conflicts are mentioned). The runner ticks these boxes only when this is yes.
+declarations_confirmed: 
+
+# vim: set filetype=yaml :

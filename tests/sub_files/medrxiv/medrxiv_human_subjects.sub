@@ -1,0 +1,116 @@
+# paperpush submission file for medrxiv  -*- mode: yaml -*-
+# medRxiv - The Preprint Server for Health Sciences
+#
+# Edit the values below, then run:  paperpush submit medrxiv.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: medrxiv
+# submission guide: https://www.medrxiv.org/submit-a-manuscript
+
+# Subject category (choice, REQUIRED)
+#   Select the single medRxiv subject area that best describes the manuscript.
+#   options: Addiction Medicine | Allergy and Immunology | Anesthesia | Cardiovascular Medicine | Dentistry and Oral Medicine | Dermatology | Emergency Medicine | Endocrinology (including Diabetes Mellitus and Metabolic Disease) | Epidemiology | Forensic Medicine | Gastroenterology | Genetic and Genomic Medicine | Geriatric Medicine | Health Economics | Health Informatics | Health Policy | Health Systems and Quality Improvement | Hematology | HIV/AIDS | Infectious Diseases | Intensive Care and Critical Care Medicine | Medical Education | Medical Ethics | Nephrology | Neurology | Nursing | Nutrition | Obstetrics and Gynecology | Occupational and Environmental Health | Oncology | Ophthalmology | Orthopedics | Otolaryngology | Pain Medicine | Palliative Medicine | Pathology | Pediatrics | Pharmacology and Therapeutics | Primary Care Research | Psychiatry and Clinical Psychology | Public and Global Health | Radiology and Imaging | Rehabilitation Medicine and Physical Therapy | Respiratory Medicine | Rheumatology | Sexual and Reproductive Health | Sports Medicine | Surgery | Toxicology | Transplantation | Urology
+subject_category: Epidemiology
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript.
+title: Title goes here
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract as it should appear on the bioRxiv abstract page.
+abstract: |
+  Abstract goes here. It's a really good abstract.
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). Mark exactly one author as the corresponding author.
+authors: |
+  Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no
+  Joseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript. Accepted formats: PDF, Word (.docx), or a LaTeX source bundle.
+manuscript_file: tests/manuscript_files/medrxiv/manuscript.pdf
+
+# Figure / image files (filelist, optional)
+#   Optional. One file per line as 'path | label' (label optional). Uploaded to the figure dropzone.
+figure_files: |
+  
+
+# Supplementary files (filelist, optional)
+#   Optional. One file per line as 'path | type | linktext' (these are the only three fields; type and linktext optional). type is the bioRxiv supplemental file-type and must be one of: avi, csv, doc, docx, gif, gz, html, jpg, mov, mp4, mpg, pdf, ppt, pptx, tif, tsv, txt, wmv, xls, xlsx, zip. linktext is the displayed link text. Uploaded to the supplemental dropzone.
+#   file types: avi | csv | doc | docx | gif | gz | html | jpg | mov | mp4 | mpg | pdf | ppt | pptx | tif | tsv | txt | wmv | xls | xlsx | zip
+supplementary_files: |
+  
+
+# License / reuse terms (choice, REQUIRED)
+#   Distribution license under which the preprint is posted.
+#   options: CC-BY | CC-BY-NC | CC-BY-ND | CC-BY-NC-ND | CC0 | No reuse without permission
+license: CC-BY-NC-ND
+
+# Competing interest statement (textarea, REQUIRED)
+#   Declare any competing interests. Enter 'The authors have declared no competing interest.' if none.
+competing_interest: |
+  The authors have declared no competing interest.
+
+# Funding statement (textarea, optional)
+#   Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match a FundRef funder, since bioRxiv requires picking an autocomplete suggestion.
+funding: |
+  
+
+# Data availability links (textarea, optional)
+#   Optional. One URL per line for external datasets or supplementary material at other repositories. On medRxiv the same links populate both the external-dataset and clinical-trial protocol link sections. They are shown to readers once the preprint posts (e.g. https://www.example.com). Each line must be a valid URL.
+#   each non-blank line must be a valid http/https URL
+data_availability_links: |
+  https://github.com/example/repo
+
+# Is this a revision of an existing medRxiv preprint? (boolean, optional)
+#   Set to yes if submitting a revised version of a preprint already on medRxiv.
+is_revision: no
+
+# DOI of the existing preprint (if a revision) (text, optional)
+#   Only needed when is_revision is yes.
+previous_doi: 
+
+# Forward to a venue via M2J on posting? (boolean, optional)
+#   medRxiv-to-Venue (M2J): offer to forward the manuscript to a participating venue.
+transfer_to_venue: no
+
+# Destination venue for B2J (text, optional)
+#   Only needed when transfer_to_venue is yes.
+venue_destination: 
+
+# All authors consent to deposit and to the chosen license (boolean, REQUIRED)
+#   Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.
+author_consent: yes
+
+# Data availability statement (textarea, optional)
+#   Free-text description of data availability shown on the medRxiv declarations page.
+data_availability: |
+  All data produced in the present study are available upon reasonable request to the authors.
+
+# Does the study use human data, samples, or involve human subjects? (choice, REQUIRED)
+#   medRxiv screening question. Answer 'Yes' if the work uses human data/samples or involves human subjects (including public datasets, surveys, patient records, or clinical protocols); otherwise 'No'.
+#   options: Yes | No
+human_subjects: Yes
+
+# Did this work use ONLY simulated data or ONLY openly public data? (choice, optional)
+#   Only used when human_subjects is 'Yes'. Answer 'Yes' if the work used ONLY simulated data or ONLY data that were openly available to the public before the study began; answer 'No' if any data required application, screening, or registration for access, or otherwise involved human subjects requiring ethics oversight.
+#   options: Yes | No
+public_data_only: No
+
+# Source of the openly available data (textarea, optional)
+#   Only used when human_subjects is 'Yes' and public_data_only is 'Yes'. State where the openly available data were originally located (with links, if applicable), e.g. 'The study used ONLY openly available human data that were originally located at: <URL>'.
+public_data_source: |
+  
+
+# Ethics oversight / approval statement (textarea, optional)
+#   Only used when human_subjects is 'Yes' and public_data_only is 'No'. State the full, non-abbreviated institutional affiliation and name of the ethics oversight body, and whether ethical approval was granted or waived, e.g. 'Ethics committee/IRB of <Full Institution name> gave ethical approval for this work'.
+ethics_statement: |
+  Ethics committee/IRB of the California Institute of Technology gave ethical approval for this work.
+
+# Is this manuscript reporting a clinical trial? (choice, REQUIRED)
+#   medRxiv screening question. Select 'Yes' for a registered clinical trial, 'No' for a non-trial study, or 'Not applicable'.
+#   options: Yes | No | Not applicable
+clinical_trial: Not applicable
+
+# vim: set filetype=yaml :

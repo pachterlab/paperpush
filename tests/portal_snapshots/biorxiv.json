@@ -1,0 +1,24 @@
+{
+  "login": {
+    "buttons": [
+      "Log in with ORCiD",
+      "Sign in"
+    ],
+    "fields": [
+      "MSTRServlet.emailAddr",
+      "MSTRServlet.password",
+      "login",
+      "remember_me",
+      "system_area"
+    ],
+    "headings": [],
+    "labels": [
+      "Email:",
+      "Enter the Affiliate Area to:",
+      "Enter the Author Area to:",
+      "Enter the Personal Info Area to:",
+      "Password:",
+      "remember my email address"
+    ]
+  }
+}

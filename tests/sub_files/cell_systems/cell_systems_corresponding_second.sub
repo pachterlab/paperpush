@@ -1,0 +1,92 @@
+# paperpush submission file for cell_systems  -*- mode: yaml -*-
+# Cell Systems (Cell Press)
+#
+# Edit the values below, then run:  paperpush submit cell_systems.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: cell_systems
+# submission guide: https://www.cell.com/cell-systems/authors
+
+# Article type (choice, REQUIRED)
+#   The Editorial Manager 'Select Article Type' value. Pick the label that matches your submission; if the runner cannot match the label it falls back to the article-type drop-down's first option.
+#   options: Research Article | Resource | Short Article | Matters Arising | Correspondence | Review | Perspective
+article_type: Research Article
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript, typed into the Editorial Manager rich-text title editor.
+#   at most 150 characters
+title: Title goes here
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract, typed into the Editorial Manager rich-text abstract editor.
+#   at most 150 words
+abstract: |
+  Abstract goes here. It's a really good abstract.
+
+# Keywords (text, optional)
+#   Semicolon-separated list of keywords (e.g. 'keyword1;keyword2'), typed into the Editorial Manager keywords box.
+keywords: keyword1;keyword2
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name | email | institution | country | corresponding(yes/no). Write the name as 'First Last'; the Editorial Manager 'Add Author' form splits it into given/family name on the last space. The author marked corresponding=yes must be the submitting account holder (Editorial Manager pre-fills that author); their pre-filled row is edited to fill in any missing details. Every other line is added through the '+Add Another Author' form. Country is mapped to the Editorial Manager country drop-down (e.g. USA/US/United States all map to 'us').
+authors: |
+  Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | no
+  Joseph Rich | jmrich@usc.edu | University of Southern California | USA | yes
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript, uploaded as the main document on the Editorial Manager 'Attach Files' step.
+manuscript_file: tests/manuscript_files/cell_systems/manuscript.pdf
+
+# Cover letter (file, REQUIRED)
+#   Path to the cover letter, uploaded with the 'Cover Letter' item type on the Editorial Manager 'Attach Files' step.
+cover_letter: tests/manuscript_files/cell_systems/cover_letter.pdf
+
+# Declaration of Interests file (file, REQUIRED)
+#   Path to a Declaration of Interests document, uploaded with the 'Declaration of Interests' item type on the Editorial Manager 'Attach Files' step.
+declaration_file: tests/manuscript_files/cell_systems/declaration_of_interest.pdf
+
+# Figure / image files (filelist, optional)
+#   Optional. One figure file per line as 'path | label' (label optional and unused at upload). Each is uploaded as a separate attachment with the 'Figure' item type on the Editorial Manager 'Attach Files' step.
+figure_files: |
+  
+
+# Related work in press or under consideration elsewhere? (choice, REQUIRED)
+#   Cell asks whether you or any co-author has work related to this manuscript in press or under consideration elsewhere. Answer 'Yes' or 'No'.
+#   options: Yes | No
+related_work: No
+
+# Does the manuscript report original code? (boolean, REQUIRED)
+#   Cell asks whether the manuscript reports original computer code, algorithms, or computational models. Set to yes to declare original code (then fill in code_url).
+original_code: no
+
+# Original code repository URL (text, optional)
+#   Only used when original_code is yes. URL of the repository where the original code is available (e.g. a GitHub link).
+code_url: 
+
+# Alternate contact email (text, REQUIRED)
+#   Optional. An alternate contact email Cell can use if the corresponding author is unavailable.
+#   at most 200 characters
+alternate_contact: josephrich98@gmail.com
+
+# Funding statement (textarea, optional)
+#   Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match an Editorial Manager funder, since the funder box only accepts a picked autocomplete suggestion. Leave empty to mark funding information as not available.
+funding: |
+  
+
+# Suggested / opposed reviewers (textarea, optional)
+#   Optional. One reviewer per line. Format: name | email | institution | stance | reason. stance is 'suggested' or 'opposed' (case-insensitive, default 'suggested'); email, institution, and reason are optional. Write the name as 'First Last'; the Editorial Manager reviewer form splits it into given/family name on the last space. Each line is added through the '+Add Suggested Reviewer' or '+Add Opposed Reviewer' form, which mirrors the author form.
+reviewers: |
+  Sally Reviewer | sally@gmail.com | Caltech | suggested | I like her
+  Xavier Reviewer | xavier@gmail.com | Caltech | suggested | I like him
+  John Reviewer | john@gmail.com | Caltech | opposed | No no no
+
+# Submission declarations confirmed (boolean, REQUIRED)
+#   Confirms the standard Cell submission declarations (the paper conforms to all requirements, all contributors are listed, all authors have seen the manuscript, and status updates will be shared). The runner checks these boxes only when this is yes.
+declarations_confirmed: yes
+
+# Open access (choice, optional)
+#   On the Publishing Options step shown after 'Build PDF for Approval', Cell Systems offers an open-access publishing model that carries an article-publishing charge. Choose 'Yes' to select open access or 'No' to keep the standard (subscription) model. The runner opens the Publishing Options popup and applies this choice best-effort.
+#   options: Yes | No
+open_access: 
+
+# vim: set filetype=yaml :

@@ -1,0 +1,101 @@
+# paperpush submission file for biorxiv  -*- mode: yaml -*-
+# bioRxiv - The Preprint Server for Biology
+#
+# Edit the values below, then run:  paperpush submit biorxiv.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: biorxiv
+# submission guide: https://www.biorxiv.org/submit-a-manuscript
+
+# Type of result (choice, REQUIRED)
+#   bioRxiv categorizes manuscripts by how the results relate to prior work.
+#   options: New Results | Confirmatory Results | Contradictory Results
+result_type: New Results
+
+# Is your manuscript better suited for bioRxiv or medRxiv? (choice, REQUIRED)
+#   openRxiv routes manuscripts to bioRxiv (biology) or medRxiv (clinical/health). Pick the category that best describes your content.
+#   options: Diagnostic tools or medical equipment tested in humans | Epidemiological and/or public health study in humans | Clinical treatment claims | Studies linking human gene(s) variant(s) with disease(s) (including small GWAS and UK Biobank n=1) | Biological research
+server_suitability: Biological research
+
+# Is your article within scope for bioRxiv? (choice, REQUIRED)
+#   bioRxiv verifies that your article type is in scope for the preprint server. Select the option that best describes it.
+#   options: Announcements/Application notes without analyses/data | Perspectives article | Proposal/Guidelines | Narrative review | Research article with data
+article_scope: Research article with data
+
+# Subject category / collection (choice, REQUIRED)
+#   Select the single category that best describes your findings.
+#   options: Animal Behavior and Cognition | Biochemistry | Bioengineering | Bioinformatics | Biophysics | Cancer Biology | Cell Biology | Clinical Trials | Developmental Biology | Ecology | Epidemiology | Evolutionary Biology | Genetics | Genomics | Immunology | Microbiology | Molecular Biology | Neuroscience | Paleontology | Pathology | Pharmacology and Toxicology | Physiology | Plant Biology | Scientific Communication and Education | Synthetic Biology | Systems Biology | Zoology
+subject_category: Bioinformatics
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript.
+title: Title goes here
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract as it should appear on the bioRxiv abstract page.
+abstract: |
+  Abstract goes here. It's a really good abstract.
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). Mark exactly one author as the corresponding author.
+authors: |
+  Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no
+  Joseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript. Accepted formats: PDF, Word (.docx), or a LaTeX source bundle.
+manuscript_file: tests/manuscript_files/biorxiv/manuscript.pdf
+
+# Figure / image files (filelist, optional)
+#   Optional. One file per line as 'path | label' (label optional). Uploaded to the figure dropzone.
+figure_files: |
+  
+
+# Supplementary files (filelist, optional)
+#   Optional. One file per line as 'path | type | linktext' (these are the only three fields; type and linktext optional). type is the bioRxiv supplemental file-type and must be one of: avi, csv, doc, docx, gif, gz, html, jpg, mov, mp4, mpg, pdf, ppt, pptx, tif, tsv, txt, wmv, xls, xlsx, zip. linktext is the displayed link text. Uploaded to the supplemental dropzone.
+#   file types: avi | csv | doc | docx | gif | gz | html | jpg | mov | mp4 | mpg | pdf | ppt | pptx | tif | tsv | txt | wmv | xls | xlsx | zip
+supplementary_files: |
+  
+
+# License / reuse terms (choice, REQUIRED)
+#   Distribution license under which the preprint is posted.
+#   options: CC-BY | CC-BY-NC | CC-BY-ND | CC-BY-NC-ND | CC0 | No reuse without permission
+license: CC-BY-NC-ND
+
+# Competing interest statement (textarea, REQUIRED)
+#   Declare any competing interests. Enter 'The authors have declared no competing interest.' if none.
+competing_interest: |
+  The authors have declared no competing interest.
+
+# Funding statement (textarea, optional)
+#   Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match a FundRef funder, since bioRxiv requires picking an autocomplete suggestion.
+funding: |
+  
+
+# Data availability links (textarea, optional)
+#   Optional. One URL per line for external datasets or supplementary material at other repositories that pertain to this manuscript. These links are shown to readers once the submission is posted online (e.g. https://www.example.com). Each line must be a valid URL.
+#   each non-blank line must be a valid http/https URL
+data_availability_links: |
+  
+
+# Is this a revision of an existing bioRxiv preprint? (boolean, optional)
+#   Set to yes if submitting a revised version of a preprint already on bioRxiv.
+is_revision: no
+
+# DOI of the existing preprint (if a revision) (text, optional)
+#   Only needed when is_revision is yes.
+previous_doi: 
+
+# Forward to a venue via B2J on posting? (boolean, optional)
+#   bioRxiv-to-Venue (B2J): offer to forward the manuscript to a participating venue.
+transfer_to_venue: no
+
+# Destination venue for B2J (text, optional)
+#   Only needed when transfer_to_venue is yes.
+venue_destination: 
+
+# All authors consent to deposit and to the chosen license (boolean, REQUIRED)
+#   Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.
+author_consent: yes
+
+# vim: set filetype=yaml :

@@ -1,0 +1,80 @@
+# paperpush submission file for arxiv  -*- mode: yaml -*-
+# arXiv - Open-access archive for scholarly articles
+#
+# Edit the values below, then run:  paperpush submit arxiv.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: arxiv
+# submission guide: https://info.arxiv.org/help/submit/index.html
+
+# Primary archive (choice, REQUIRED)
+#   The top-level arXiv archive your work belongs to. This is the value of the submission form's archive drop-down (#select_arch), so use the archive code (e.g. 'cs' for Computer Science, 'q-bio' for Quantitative Biology, 'stat' for Statistics).
+#   options: astro-ph | cond-mat | cs | econ | eess | gr-qc | hep-ex | hep-lat | hep-ph | hep-th | math | math-ph | nlin | nucl-ex | nucl-th | physics | q-bio | q-fin | quant-ph | stat
+primary_archive: 
+
+# Primary subject category (text, REQUIRED)
+#   The specific subject class within the primary archive, as the value of the form's subject-class drop-down (#select_sc). Use the full category code, e.g. 'cs.AI' (Artificial Intelligence), 'q-bio.GN' (Genomics), or 'stat.ML' (Machine Learning). It must belong to the chosen primary_archive. See https://arxiv.org/category_taxonomy for the full list.
+#   options: run 'paperpush options arxiv.primary_category' to list the choices
+primary_category: 
+
+# Cross-list archives (multichoice, optional)
+#   Optional. Additional top-level archives to cross-list the paper under, comma-separated (e.g. 'cs, stat'). Same archive codes as primary_archive, with no limit on how many. Each entry is paired positionally with the matching entry in crosslist_categories and added on the metadata step after the primary category.
+#   select 0-any, comma-separated
+#   options: astro-ph | cond-mat | cs | econ | eess | gr-qc | hep-ex | hep-lat | hep-ph | hep-th | math | math-ph | nlin | nucl-ex | nucl-th | physics | q-bio | q-fin | quant-ph | stat
+crosslist_archives: 
+
+# Cross-list categories (multichoice, optional)
+#   Optional. Additional subject categories to cross-list the paper under, comma-separated (e.g. 'cs.LG, stat.ML'). Same category codes as primary_category, with no limit on how many. Each entry is paired positionally with the matching entry in crosslist_archives and added on the metadata step after the primary category.
+#   select 0-any, comma-separated
+#   options: run 'paperpush options arxiv.crosslist_categories' to list the choices
+crosslist_categories: 
+
+# License (choice, REQUIRED)
+#   Distribution license for the submission. The arXiv perpetual, non-exclusive license is the minimum arXiv requires; the Creative Commons options grant broader reuse. Note: the runner currently selects the license radio captured in the recording (the first option); full license-by-name selection is pending, so confirm the license in the browser before the final submit.
+#   options: arXiv.org perpetual, non-exclusive license 1.0 | CC BY 4.0 | CC BY-SA 4.0 | CC BY-NC-SA 4.0 | CC BY-NC-ND 4.0 | CC0 1.0
+license: 
+
+# Title (text, REQUIRED)
+#   The full title of the article.
+title: 
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). arXiv records authors as a single comma-separated list of names, so only the Name column is used for the metadata field; mark exactly one corresponding author (the account submitting). Use the form 'Firstname Lastname' for each name.
+authors: |
+  
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract as it should appear on the arXiv abstract page.
+abstract: |
+  
+
+# Manuscript file (file, REQUIRED)
+#   Path to the submission. arXiv prefers a LaTeX source bundle (a .zip or .tar.gz of the .tex, figures, and .bbl); a single PDF is accepted for PDF-only submissions. The file is uploaded, processed, and confirmed on the Files step.
+manuscript_file: 
+
+# Comments (textarea, optional)
+#   Optional. Free-text comments shown on the abstract page, conventionally the page/figure count and notes (e.g. '10 pages, 4 figures; submitted to JOSS').
+comments: |
+  
+
+# Report number (text, optional)
+#   Optional. Author-assigned report or preprint number, if any.
+report_number: 
+
+# Journal reference (text, optional)
+#   Optional. Full bibliographic reference once the article has been published in a journal.
+journal_reference: 
+
+# ACM classification (text, optional)
+#   Optional. ACM Computing Classification System code(s), semicolon-separated (e.g. 'F.2.2; I.2.7'). Relevant mainly for cs submissions.
+acm_class: 
+
+# MSC classification (text, optional)
+#   Optional. Mathematics Subject Classification code(s), comma-separated (e.g. '14J60, 14F05'). Relevant mainly for math submissions.
+msc_class: 
+
+# DOI (text, optional)
+#   Optional. DOI of a published version of this article, if one exists.
+doi: 
+
+# vim: set filetype=yaml :

@@ -1,0 +1,155 @@
+# paperpush submission file for nucleic_acids_research  -*- mode: yaml -*-
+# Nucleic Acids Research (Oxford University Press)
+#
+# Edit the values below, then run:  paperpush submit nucleic_acids_research.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: nucleic_acids_research
+# submission guide: https://academic.oup.com/nar/pages/General_Instructions
+
+# Manuscript type (choice, REQUIRED)
+#   The type of manuscript being submitted to Nucleic Acids Research, selected on the first submission step.
+#   options: Standard Article | Methods | Database Issue | Web Server Issue | Critical Reviews and Perspectives | Editorial | Matters Arising
+article_type: Standard Article
+
+# Manuscript title (text, REQUIRED)
+#   Full title of the manuscript. For Applications Notes, the name of the application must be included in the title.
+title: Title goes here
+
+# Abstract (textarea, REQUIRED)
+#   Original Papers use a structured abstract with the headings 'Motivation:', 'Results:', 'Availability and implementation:', 'Contact:', and (optional) 'Supplementary information:'.
+#   at most 250 words
+abstract: |
+  Abstract goes here. It's a really good abstract.
+
+# Keywords (multichoice, REQUIRED)
+#   Required. Provide 3 to 5 free keywords describing the manuscript, comma-separated. Entered on the ScholarOne keywords step; any term is accepted.
+#   select 3-5, comma-separated
+keywords: Sequence alignment, Algorithms, Bayesian
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: email | prefix | name | institution | country/region | city | corresponding(yes/no). Each author is added on ScholarOne by email lookup, so an email is required for every author. If the email is already registered the remaining columns are ignored; if it is not, the author is created from the prefix, name, institution, country/region, and city. Mark exactly one corresponding author. Prefix must be one of: Dr, Prof., Mx . Institution and country/region are picked from ScholarOne drop-down lists, so spell them as they appear there.
+authors: |
+  jmrich@caltech.edu | Dr | Joseph Richie | California Institute of Technology | United States | Pasadena | no
+  jmrich@usc.edu | Prof. | Joseph Rich | University of Southern California | United States | Los Angeles | yes
+
+# Cover letter (file, REQUIRED)
+#   Mandatory; submissions without a cover letter may be editorially rejected. Must explain the paper's suitability, disclose any related preprints, dissertations, or manuscripts and how this work differs, and declare conflicts of interest and any generative AI/LLM use.
+#   at most 32768 characters
+cover_letter: tests/manuscript_files/bioinformatics/cover_letter.pdf
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript. A PDF is typically uploaded for review; Word (.docx) or LaTeX source is required for the final accepted manuscript. The page and word limits depend on the article type: Original Paper up to 7 pages (approx. 5,000 words), Letter to the Editor up to 2 pages (approx. 1,300 words), Applications Note up to 4 pages (approx. 2,600 words), and Review up to 8 pages (approx. 3,000-6,000 words). These are encoded in max_pages_by, keyed on the article_type field.
+manuscript_file: tests/manuscript_files/bioinformatics/manuscript.pdf
+
+# Figures (filelist, optional)
+#   Optional. One path per line. Provide high-resolution figure files. Each uploads with the 'Figure' file type.
+figures: |
+  
+
+# Tables (filelist, optional)
+#   Optional. One path per line. Tables uploaded as separate files, each with the 'Table' file type.
+tables: |
+  
+
+# Supplementary materials (file, optional)
+#   Optional. Supplementary materials should be combined into a single file and cannot be altered or replaced after acceptance.
+supplementary_file: 
+
+# Data availability statement (textarea, REQUIRED)
+#   Required. Paste the data availability statement from the manuscript text, including any accession numbers, login details, or reviewer tokens.
+data_availability: |
+  All data and source code are available at https://github.com/example/repo.
+
+# Conflict of interest statement (textarea, REQUIRED)
+#   Disclose any conflict of interest for you or your co-authors. Leave empty or enter 'None declared.' if there are none; any other text answers the conflict-of-interest question 'Yes' and is provided as the details.
+conflict_of_interest: |
+  The authors declare no conflict of interest.
+
+# Funding (textarea, optional)
+#   Optional. One funder per line, formatted 'funder | grant id' (the grant id optional). Drives the 'Add Funder' step on the declarations page; leave empty to declare no funding.
+funding: |
+  
+
+# Referees (textarea, REQUIRED)
+#   One referee per line. Format: name | email | stance | reason. stance must be 'recommended' or 'opposed' (case-insensitive); a reason is required for every referee. At least 6 recommended referees are required; at most 3 opposed referees are allowed (opposed referees do not count toward the minimum). Each referee is added through the ScholarOne 'Add Referee' form, which splits the name into first/last on the last space, so write the name as 'First Last'.
+#   provide 6-any item(s), one per line
+reviewers: |
+  Alice Reviewer | alice.reviewer@example.com | recommended | Expert in nucleic acid chemistry.
+  Bob Referee | bob.referee@example.com | recommended | Works on RNA-protein complexes.
+  Carol Editor | carol.editor@example.org | recommended | Authority on nucleic acid enzymes.
+  Dan Scholar | dan.scholar@example.net | recommended | Specialist in genome integrity and repair.
+  Erin Researcher | erin.researcher@example.com | recommended | Studies synthetic biology and bioengineering.
+  Frank Analyst | frank.analyst@example.org | recommended | Expert in computational biology of nucleic acids.
+  Grace Opposer | grace.opposer@example.net | opposed | Direct competitor on the same method.
+
+# Key Points (textarea, REQUIRED)
+#   Exactly 3 bullet points summarizing the manuscript's contribution to the field, one per line, 100 characters maximum per point. Entered in the Key Points box on page 1, after the abstract.
+#   provide 3-3 item(s), one per line
+key_points: |
+  A novel method for nucleic acid sequence analysis.
+  Outperforms existing tools on benchmark datasets.
+  Freely available as open-source software.
+
+# Manuscript category (choice, REQUIRED)
+#   Select the Nucleic Acids Research manuscript category on the declarations step. Category descriptions are linked from the submission form.
+#   options: Chemical Biology and Nucleic Acid Chemistry | Computational Biology | Critical Reviews and Perspectives | Data Resources and Analyses | Database Issue | Gene regulation, Chromatin and Epigenetics | Genome integrity, repair and replication | Genomics | Methods | Molecular and Structural Biology | Nucleic Acid Enzymes | Nucleic Acid Therapeutics | RNA and RNA-protein complexes | Synthetic Biology and Bioengineering | Web Server Issue | Matters Arising | Editorial
+category: Computational Biology
+
+# Is this manuscript a resubmission of previous work? (boolean, REQUIRED)
+#   Set to yes if this manuscript is a resubmission of previous work.
+is_resubmission: no
+
+# Manuscript ID of the previous submission (if a resubmission) (text, optional)
+#   Only needed when is_resubmission is yes: the manuscript ID of the previous submission.
+resubmission_id: 
+
+# If this is a resubmission or revision, has the author list been altered? (choice, REQUIRED)
+#   For a resubmission or revision, whether the author list has been altered. Use 'Not Applicable' for a new submission.
+#   options: Yes | No | Not Applicable
+author_list_altered: Not Applicable
+
+# If the author list has been altered, please provide details (textarea, optional)
+#   Only needed when author_list_altered is 'Yes': describe how the author list changed.
+author_list_change_details: |
+  
+
+# Should this manuscript be published back-to-back with another? (boolean, REQUIRED)
+#   Set to yes if this manuscript should be published back-to-back with another manuscript.
+back_to_back: no
+
+# First three authors of the accompanying manuscript (if back-to-back) (textarea, optional)
+#   Only needed when back_to_back is yes: list the first three authors of the accompanying manuscript.
+back_to_back_authors: |
+  
+
+# Does the manuscript contain a Novel Method? (boolean, REQUIRED)
+#   Set to yes if the manuscript contains a novel method.
+novel_method: no
+
+# Brief description of the novel method (if any) (textarea, optional)
+#   Only needed when novel_method is yes: briefly describe the novel method.
+novel_method_description: |
+  
+
+# Is this manuscript accompanied by supplementary material for publication online only? (boolean, REQUIRED)
+#   Set to yes if the manuscript is accompanied by supplementary material intended for online-only publication.
+supplementary_online: no
+
+# Source of funding for publication charges (textarea, REQUIRED)
+#   Required. State the source of funding for your publication charges (Nucleic Acids Research is a fully open access venue).
+publication_charge_funding: |
+  Publication charges covered by the corresponding author's institutional open access fund.
+
+# Institution verification status (choice, REQUIRED)
+#   On the authors step, OUP asks you to confirm your institution. Choose 'verified' if you confirm your institution is verified, 'not in list' if you have an institution but it is not available in the list, or 'N/A entered' if you do not have an institution and have entered 'N/A'.
+#   options: verified | not in list | N/A entered
+institution_verification: verified
+
+# Data deposition: which of the following does the manuscript use or report? (multichoice, optional)
+#   Select every listed data type the manuscript uses or reports; access to such data must be given at submission. Selected types are answered 'Yes' and the rest 'No'. Comma-separated; leave empty if none apply.
+#   select 0-any, comma-separated
+#   options: New genome expression or sequencing data (ChIP-seq, RNA-seq) | New genome-wide binding/interaction data or genome-wide mutation data | Novel nucleic acid sequences | Illumina-type genome sequencing data | Novel protein sequences | Novel molecular structures (X-ray, NMR, CryoEM/EM) | Novel molecular models (SAXS, computational modeling) | Molecular behaviour studies (biological NMR spectroscopy data) | Novel nucleic acids structure | Structures of nucleosides, nucleotides, other small molecules | Mass spectrometry proteomics | Microarray data | Quantitative PCR | Synthetic nucleic acid oligonucleotides including siRNAs or shRNAs | Software and source codes | Gel images, micrographs, graphs, and tables
+data_deposition_types: 
+
+# vim: set filetype=yaml :

@@ -1,0 +1,74 @@
+# paperpush submission file for aaai_2027  -*- mode: yaml -*-
+# The Association for the Advancement of Artificial Intelligence
+#
+# Edit the values below, then run:  paperpush submit aaai_2027.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: aaai_2027
+# submission guide: https://aaai.org/conference/aaai/aaai-27/
+
+# Title (text, REQUIRED)
+#   The full title of the paper.
+title: 
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Open Review ID | Name | Email suffixes | Reciprocal Reviewer(yes/no). If Open Review ID is added, then name and email suffixes are optional. Each author is added to the OpenReview author page by a profile search on the Name column, so the name must match the author's OpenReview profile. Email suffixes should be comma-separated, in decreasing order of likelihood of association with the author. At least one author is required.
+authors: |
+  
+
+# TL;DR (text, optional)
+#   Optional. A one-sentence summary of the paper ("too long; didn't read").
+tldr: 
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract of the paper.
+abstract: |
+  
+
+# Primary topic (choice, REQUIRED)
+#   Exactly one primary topic, chosen from the AAAI 2027 topic list (_assets/aaai_2027_topics.txt). Use the full topic label as it appears in the dropdown.
+#   options: run 'paperpush options aaai_2027.primary_topic' to list the choices
+primary_topic: 
+
+# Secondary topics (textarea, optional)
+#   Zero to five secondary topics, one per line, each chosen from the AAAI 2027 topic list (_assets/aaai_2027_topics.txt). Use the full topic label as it appears in the dropdown. (One-per-line rather than comma-separated because many topic labels contain commas.)
+#   provide 0-5 item(s), one per line
+#   options: run 'paperpush options aaai_2027.secondary_topics' to list the choices
+secondary_topics: |
+  
+
+# Countries of institutions (multichoice, REQUIRED)
+#   The countries of the authors' institutions, chosen from the AAAI 2027 country list (_assets/aaai_2027_countries.txt). Provide one or more, comma-separated; each is selected in turn from the dropdown.
+#   select 1-any, comma-separated
+#   options: run 'paperpush options aaai_2027.country' to list the choices
+country: 
+
+# PDF (file, optional)
+#   Optional. The paper PDF.
+pdf_file: 
+
+# Reproducibility checklist (file, optional)
+#   Optional. The completed AAAI reproducibility checklist (see the AAAI 2027 Author's Kit).
+reproducibility_checklist: 
+
+# Technical supplement (file, optional)
+#   Optional. Technical appendix / supplementary material. Maximum 10 MB.
+#   each file at most 10 MB
+technical_supplement: 
+
+# Media supplement (file, optional)
+#   Optional. Media (video / audio / images) supplement. Maximum 50 MB.
+#   each file at most 50 MB
+media_supplement: 
+
+# Code and data supplement (file, optional)
+#   Optional. Code and/or data supplement. Maximum 50 MB.
+#   each file at most 50 MB
+code_data_supplement: 
+
+# Self-declared conflicts of interest (authorlist, optional)
+#   Optional. Self-declared conflicts of interest, one per line, in the same format as Authors: Open Review ID | Name | Email suffixes | Reciprocal Reviewer. Leave the Reciprocal Reviewer column blank -- it is not used for conflicts. If Open Review ID is added, then name and email suffixes are optional; otherwise the name is searched against OpenReview and must match a profile. Each conflict must NOT be one of the submission's authors. A profile that OpenReview's search does not return is warned about and skipped.
+conflicts: |
+  
+
+# vim: set filetype=yaml :

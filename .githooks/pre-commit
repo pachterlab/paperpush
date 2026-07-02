@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+#
+# Pre-commit security hook. Runs two best-effort scanners on staged content;
+# each is skipped (with a notice) when its tool is not installed.
+#
+#   gitleaks -- secret detection by pattern over ALL staged files (any type:
+#               .py, .env, .yaml, .json...). Catches API keys, tokens, private
+#               keys, and high-entropy strings that bandit's name-based checks
+#               miss.
+#
+#   bandit   -- static analysis of staged Python source. Blocks on:
+#                 * hardcoded passwords / secrets  (B105, B106, B107)
+#                 * any medium+ severity AND medium+ confidence issue
+#                   (SQL injection B608, shell injection, unsafe
+#                   deserialization) -- the bug classes that matter for a
+#                   public, SQL-backed web service.
+#
+# Escape hatches:
+#   * gitleaks: add an inline  gitleaks:allow  comment on an audited line,
+#     or register the finding in a .gitleaksignore file
+#   * bandit:   annotate an audited false positive with a trailing  # nosec
+#   * either:   bypass the whole hook with  git commit --no-verify
+#
+set -uo pipefail
+
+status=0
+
+# ---------------------------------------------------------------------------
+# gitleaks: secret scan over staged content.
+# ---------------------------------------------------------------------------
+if command -v gitleaks >/dev/null 2>&1; then
+    # The staged-scan subcommand was renamed from `protect` to `git` in
+    # gitleaks 8.18; prefer the newer form and fall back for older binaries.
+    if gitleaks git --help >/dev/null 2>&1; then
+        gitleaks_cmd=(gitleaks git --staged)
+    else
+        gitleaks_cmd=(gitleaks protect --staged)
+    fi
+    if ! "${gitleaks_cmd[@]}" --no-banner --redact --verbose; then
+        echo >&2
+        echo "pre-commit: gitleaks found a possible secret (see above)." >&2
+        status=1
+    fi
+else
+    echo "pre-commit: gitleaks not installed; skipping secret scan." >&2
+    echo "            install from https://github.com/gitleaks/gitleaks/releases" >&2
+fi
+
+# ---------------------------------------------------------------------------
+# bandit: static analysis of staged Python source.
+# ---------------------------------------------------------------------------
+if command -v bandit >/dev/null 2>&1; then
+    # Staged Python files (Added/Copied/Modified; skip deletions), excluding
+    # non-source / generated trees and test fixtures (which may carry
+    # intentional fake credentials).
+    # Keep only paths still present in the working tree. A `while read` loop is
+    # used instead of `mapfile` so the hook runs on macOS's stock bash 3.2,
+    # which predates the `mapfile` builtin.
+    present=()
+    while IFS= read -r f; do
+        [ -n "$f" ] && [ -f "$f" ] && present+=("$f")
+    done < <(git diff --cached --name-only --diff-filter=ACM -z \
+        | tr '\0' '\n' \
+        | grep -E '\.py$' \
+        | grep -Ev '^(tests|build|notebooks|trash|data|geo_search\.egg-info)/' || true)
+
+    if [ "${#present[@]}" -gt 0 ]; then
+        # Pass 1: hardcoded passwords / secrets (LOW severity, but in scope).
+        if ! bandit -q -t B105,B106,B107 "${present[@]}"; then
+            echo >&2
+            echo "pre-commit: bandit found a possible hardcoded secret (see above)." >&2
+            status=1
+        fi
+        # Pass 2: medium+ severity AND medium+ confidence findings.
+        if ! bandit -q -ll -ii "${present[@]}"; then
+            echo >&2
+            echo "pre-commit: bandit found a medium+ severity security issue (see above)." >&2
+            status=1
+        fi
+    fi
+else
+    echo "pre-commit: bandit not installed; skipping Python security scan." >&2
+    echo "            install it with  pip install -e \".[dev]\"" >&2
+fi
+
+if [ "$status" -ne 0 ]; then
+    echo >&2
+    echo "Commit aborted by the security hook. Fix the issue, annotate an audited" >&2
+    echo "false positive (gitleaks:allow / # nosec), or bypass with --no-verify." >&2
+fi
+
+# ---------------------------------------------------------------------------
+# Keep artifacts generated from venues.json in sync with the database.
+# Both blocks below only run when venues.json is part of this commit, and
+# re-stage whatever they regenerate so the committed tree never drifts.
+# ---------------------------------------------------------------------------
+if git diff --cached --name-only --diff-filter=ACM -z \
+    | tr '\0' '\n' | grep -qx 'paperpush/venues.json'; then
+    # README.md's supported-venues table (and venues.md).
+    if python scripts/gen_readme_venues.py; then
+        if ! git diff --quiet -- README.md; then
+            git add README.md
+            echo "pre-commit: regenerated README.md venues table and re-staged it."
+        fi
+    else
+        echo "pre-commit: failed to regenerate README.md venues table." >&2
+        status=1
+    fi
+
+    # The checked-in .sub templates, one per supported venue. Every venue
+    # is regenerated (not just changed entries) because inheritance means one
+    # base edit can affect several inheriting venues; re-stage any that moved.
+    if python scripts/gen_subfile_templates.py; then
+        if ! git diff --quiet -- paperpush/subfile_templates; then
+            git add paperpush/subfile_templates
+            echo "pre-commit: regenerated .sub templates and re-staged them."
+        fi
+    else
+        echo "pre-commit: failed to regenerate .sub templates." >&2
+        status=1
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Keep the generated test fixtures in sync with sample_subfiles.json. Only
+# runs when the JSON is part of this commit; re-stages the regenerated sample
+# .sub files and their input assets so the committed tree never drifts.
+# ---------------------------------------------------------------------------
+if git diff --cached --name-only --diff-filter=ACM -z \
+    | tr '\0' '\n' | grep -qx 'tests/sample_subfiles.json'; then
+    if python tests/sample_subfiles.py; then
+        if ! git diff --quiet -- tests/sub_files tests/manuscript_files; then
+            git add tests/sub_files tests/manuscript_files
+            echo "pre-commit: regenerated sample .sub fixtures and re-staged them."
+        fi
+    else
+        echo "pre-commit: failed to regenerate sample .sub fixtures." >&2
+        status=1
+    fi
+fi
+
+exit "$status"

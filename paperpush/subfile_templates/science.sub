@@ -1,0 +1,92 @@
+# paperpush submission file for science  -*- mode: yaml -*-
+# Science - American Association for the Advancement of Science (AAAS)
+#
+# Edit the values below, then run:  paperpush submit science.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: science
+# submission guide: https://www.science.org/content/page/science-information-authors
+
+# Publication (choice, REQUIRED)
+#   The AAAS venue to submit to, chosen from the first drop-down on the New Submission screen. Matched to the portal's menu by name; when blank or unmatched the menu's first selectable option is left in place. The article-type drop-down that follows is specific to the chosen publication.
+#   options: Science | Science Advances | Science Immunology | Science Robotics | Science Signaling | Science Translational Medicine
+publication: 
+
+# Article type (choice, REQUIRED)
+#   The submission type selected from the second drop-down on the New Submission screen, after the publication. Matched to the portal's menu by name; when blank or unmatched the first selectable option is left in place. Common Science types are listed; the live menu is authoritative.
+#   options: Research Article | Review | Perspective | Policy Forum | Letter | Book or Media Review | Policy Article | Analytical Review | Research Resource | Editorial | Focus | Viewpoint | Editors' Choice
+article_type: 
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript, typed into the title box on the manuscript-information step.
+#   at most 135 characters
+title: 
+
+# Manuscript short title (text, optional)
+#   Short title.
+#   at most 80 characters
+short_title: 
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract, typed into the abstract box on the manuscript-information step.
+#   at most 150 words
+abstract: |
+  
+
+# Funding sources (textarea, optional)
+#   Optional. One funding source per line as 'funder name | award number | investigator full name'. On the manuscript-information step each line opens a funding row: the funder name is matched against the Crossref Funder Registry (http://www.crossref.org/fundref/) and the first suggestion is taken, the award/grant number is typed, and the investigator is chosen from the author drop-down. The award number and investigator are optional.
+funders: |
+  
+
+# Subject areas (multichoice, REQUIRED)
+#   One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.
+#   select 1-2, comma-separated
+#   options: Agriculture | Anthropology | Applied ecology | Applied physics | Astronomy | Atmospheric science | Biochemistry | Biophysics | Cancer | Cell biology | Cellular neuroscience | Chemical physics | Chemistry | Climatology | Cognitive neuroscience | Computer science | Condensed matter physics | Developmental biology | Developmental neuroscience | Diseases and disorders | Ecology | Economics | Electrochemistry | Engineering | Epidemiology | Evolutionary biology | Genetics | Geology | Geophysics | Health and medicine | Human genetics | Immunology | Materials science | Mathematics | Microbiology | Molecular biology | Network science | Neurophysiology | Oceanography | Optics | Organic chemistry | Organismal biology | Paleontology | Physics | Physiology | Planetary science | Plant sciences | Psychological Science | Research methods | Science policy | Scientific community | Signal transduction | Social sciences | Structural biology | Surface chemistry | Synthetic biology | Systems biology | Virology
+subject_areas: 
+
+# Additional datasets (textarea, optional)
+#   Optional. Data deposited in an external repository, one per line as 'repository | dataset URI'. On the manuscript-information step each line opens a dataset row: the repository is chosen from the drop-down and the URI is typed, then 'Add' files it. Repository options: Zenodo | GitHub | Dataverse | Figshare | Other.
+additional_datasets: |
+  
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: first name | last name | email | ringgold_id | ror_id | first author(yes/no) | corresponding(yes/no) | contributed equally(yes/no) | submitter(yes/no).
+authors: |
+  
+
+# Manuscript file (Word/source) (file, REQUIRED)
+#   Path to the Word (.docx) manuscript, uploaded as the first file on the file-upload step. Word files facilitate data extraction that speeds submission and may be used for editing if the manuscript proceeds to revision. Only upload a PDF here if your source file is .tex and you do not have a .docx file; LaTeX users upload their source files in a later section.
+manuscript_file: 
+
+# Combined PDF (file, REQUIRED)
+#   Path to a combined PDF that includes the complete main manuscript, figures, and supplementary materials, uploaded as the second file on the file-upload step. The combined PDF is used for the evaluation process and is provided to reviewers.
+combined_pdf: 
+
+# Cover letter (file, optional)
+#   Optional. Path to the cover letter, uploaded as the 'Cover Letter' on the file-upload step. doc, docx, or pdf.
+cover_letter: 
+
+# Supplementary Material (file, optional)
+#   Optional. one document that includes any supplementary materials and methods, figures, and single page tables, combined into a single file. References cited in the supplementary material should be included in the reference list found in the main text. doc, docx, or pdf.
+supplementary_material: 
+
+# Agree to submission terms (boolean, REQUIRED)
+#   Confirmation of the Science submission terms and conditions, checked on the terms step. Must be 'yes' to submit.
+agree_terms: 
+
+# Suggested reviewers (textarea, optional)
+#   Optional. Reviewers you suggest, one per line as 'first name | last name | email | institution | department'. The institution and department are optional. On the reviewers step each line opens a suggested-reviewer form filled with these values and saved; left blank skips it.
+suggested_reviewers: |
+  
+
+# Excluded reviewers (textarea, optional)
+#   Optional. Reviewers to exclude, one per line as 'first name | last name | email | institution | reason'. The institution and reason are optional; the reason is typed into the form's free-text box. On the reviewers step each line opens an excluded-reviewer form filled with these values and saved; left blank skips it.
+excluded_reviewers: |
+  
+
+# Comments to the editor (textarea, optional)
+#   Optional. Additional information for the editor, typed into the comments box when that step is present.
+comments_to_editor: |
+  
+
+# vim: set filetype=yaml :

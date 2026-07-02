@@ -1,0 +1,108 @@
+# paperpush submission file for nature_methods  -*- mode: yaml -*-
+# Nature Methods
+#
+# Edit the values below, then run:  paperpush submit nature_methods.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: nature_methods
+# submission guide: https://www.nature.com/nmeth/submission-guidelines
+
+# Manuscript type (choice, REQUIRED)
+#   The submission category, selected on the opening eJournalPress manuscript-type page. Choose one of the listed options exactly.
+#   options: Article | Brief Communication | Presubmission Enquiry | Correspondence | Review Article | Perspective | Comment | Analysis | Resource | News & Views | Matters Arising | Registered Reports
+manuscript_type: 
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript, typed into the eJournalPress title box.
+title: 
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract, typed into the eJournalPress abstract box.
+abstract: |
+  
+
+# Subject categories (textarea, REQUIRED)
+#   Nature subject classification, chosen from the dependent menus on the eJournalPress subjects step. The category tree is not a fixed depth: every branch has a level 1 and level 2, and some continue deeper, to as many as six levels. Format each category as its level names joined by ' | ' (subject_level_1 | subject_level_2 | ...), giving as many levels as the chosen branch offers; level 1 and level 2 are required and the deeper levels are optional. Provide between two and five categories in total, each on its own line. Each part must match a category name exactly. List the valid values from the command line with python -m paperpush.venues.nature_methods: run it with no arguments for the level-1 categories, then add the chosen names one at a time (a quoted level-1 name for its level-2 categories, a quoted level-1 and level-2 pair for its level-3 categories, a level-1/level-2/level-3 triple for its level-4 categories) to drill deeper. Example: python -m paperpush.venues.nature_methods 'Biological sciences | Biochemistry | Proteomics'.
+subject_level: |
+  
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: title | first name | last name | email | institution | country/region | city | corresponding(yes/no). The title is the name prefix selected in the eJournalPress drop-down (e.g. Mr, Ms, Dr, Professor). City is optional. The author marked corresponding=yes fills the corresponding-author sub-form; the boxes that the signed-in account already pre-filled (typically first name, last name, email) are left untouched. Country/region is matched to the eJournalPress drop-down by name (US/USA map to 'United States', UK to 'United Kingdom').
+authors: |
+  
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript, uploaded as the 'Article File' on the eJournalPress upload step.
+manuscript_file: 
+
+# Cover letter (file, optional)
+#   Optional. Path to the cover letter, uploaded as the 'Author Cover Letter' on the eJournalPress upload step.
+cover_letter: 
+
+# Figure files (filelist, optional)
+#   Optional. Main figures, one per line as 'path | title | color'. Every column after the path is optional. Each file uploads on the eJournalPress step with the 'Figure' file type. The title names the figure on the per-object metadata step (e.g. 'Figure 1', 'Figure 2A'), falling back to the file name when blank. The color is the per-figure color choice ('color' or 'bw', defaulting to 'color'). Example: 'figs/fig1.eps | Figure 1 | color'.
+figure_files: |
+  
+
+# Table files (filelist, optional)
+#   Optional. Main tables uploaded as separate files, one per line as 'path | title' (the title is optional). Each file uploads with the 'Table' file type. Example: 'tables/table1.xlsx | Table 1'.
+table_files: |
+  
+
+# Supplementary information files (filelist, optional)
+#   Optional. Supplementary information files, one per line as 'path | title | description'. Every column after the path is optional. Each file uploads with the 'Supplementary and Additional Material' file type. eJournalPress has no distinct supplementary-figure type, so supplementary figures belong here. The title names the object on the per-object metadata step; the description is optional. Example: 'supp/supp_methods.pdf | Supplementary Information | Extended methods'.
+#   each file at most 100 MB
+supplementary_files: |
+  
+
+# Supplementary table files (filelist, optional)
+#   Optional. Supplementary tables, one per line as 'path | title | description'. Every column after the path is optional. Each file uploads with the 'Supplementary Table' file type. The title names the object on the per-object metadata step; the description is optional. Example: 'supp/supp_table1.xlsx | Supplementary Table 1 | Source measurements'.
+supplementary_tables: |
+  
+
+# Other files (filelist, optional)
+#   Optional. Any further eJournalPress files that are not main figures, main tables, supplementary information, or supplementary tables (use the dedicated fields above for those). One per line as 'path | type | title | extra'; every column after the path is optional. The type must be one of the listed file types; when omitted the eJournalPress default is left in place. The title names a figure or supplementary object on the per-object metadata step; the extra column is a figure's color ('color' or 'bw') or a supplementary file's description. Example: 'data/source_fig1.zip | Source Data |  | Raw gels'.
+#   file types: Response to Referees Letter | Extended Data | Supplementary Video/Audio | Related Manuscript File | Source Data
+additional_files: |
+  
+
+# Are you the corresponding author? (boolean, REQUIRED)
+#   Whether you (the submitting account holder) are the corresponding author. Answer yes or no.
+are_you_corresponding: 
+
+# Gender of corresponding author (choice, optional)
+#   Optional. Your gender, asked by eJournalPress only when you (the submitting account holder) are the corresponding author (are_you_corresponding: yes). Choose one of the listed options, or leave blank to skip. Ignored when are_you_corresponding is no.
+#   options: Man | Woman | Non-binary or gender diverse | Prefer not to disclose
+corresponding_gender: 
+
+# Competing interests (choice, REQUIRED)
+#   Nature Portfolio requires every submission to declare competing financial and/or non-financial interests. Answer 'no' if the authors have no competing interests, or 'yes' if they do (in which case list them in 'competing_interests_statement' and in a paragraph at the end of the manuscript).
+#   options: no | yes
+competing_interests: 
+
+# Competing interests statement (textarea, optional)
+#   Optional. Used only when 'competing_interests' is 'yes': the paragraph describing the competing interests, typed into the eJournalPress statement box.
+competing_interests_statement: |
+  
+
+# Published or under consideration elsewhere (choice, optional)
+#   Whether any of the results/data/figures in this manuscript have been published, or are under consideration for publication, elsewhere. Answer 'no' (the default) or 'yes'; if 'yes', explain in 'dual_publication_statement' why it is not dual publication.
+#   options: no | yes
+dual_publication: 
+
+# Prior/concurrent publication statement (textarea, optional)
+#   Optional. Used only when 'dual_publication' is 'yes': identify the results/data/figures taken from other published or pending manuscripts and explain why this does not constitute dual publication.
+dual_publication_statement: |
+  
+
+# Peer-review anonymization (choice, optional)
+#   Optional. Whether author information is shown to reviewers. 'single-anonymized' shows author information to reviewers (the default); 'double-anonymized' hides it, in which case all identifying information must be removed from the files and placed in the cover letter (see https://www.nature.com/documents/nr-double-blind-peer-review.pdf). Left at the form default when blank.
+#   options: single-anonymized | double-anonymized
+peer_review: 
+
+# Comments to the editor (textarea, optional)
+#   Optional. Additional information for the editor, typed into the eJournalPress comments box: previous manuscript numbers for earlier versions, suggested or excluded referees, or (for a presubmission enquiry) the references used.
+comments_to_editor: |
+  
+
+# vim: set filetype=yaml :
