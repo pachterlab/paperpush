@@ -140,7 +140,7 @@ by the `restore-portal-sessions` composite action (see each workflow's header).
   `venues.md` / `README.md` and `venues.schema.json` are in sync with their
   generators.
 
-**Scheduled (live portals)**
+**Scheduled (live portals, in a private fork)**
 
 - `submit.yml` (every 2 months) — Drives each venue with a
   session secret through the real submission wizard headless (stopping before the
