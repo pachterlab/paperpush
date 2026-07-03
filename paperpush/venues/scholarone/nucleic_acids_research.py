@@ -18,10 +18,16 @@ from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
 
 from ...database import get_venue
+from ...manuscript import manuscript_text
+from ...validate import parse_authors
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
                       hold_open, open_run_context)
+from ..common import session_path as _session_path
 # Reuse the shared ScholarOne platform engine (author/keyword/reviewer/parse
 # helpers). Sign-in is inherited from ScholarOneVenue.
 from . import main as scholarone
@@ -129,8 +135,6 @@ _NONE_DECLARED = {"", "none", "none declared", "none declared.", "n/a", "na", "n
 
 def session_path():
     """Path to the saved Nucleic Acids Research session (Playwright storage_state)."""
-    from ..common import session_path as _session_path
-
     return _session_path(_SLUG)
 
 
@@ -159,10 +163,6 @@ def _cover_letter_text(values: dict) -> str:
     read via :func:`manuscript_text` (falling back to a plain read). Returns "" when
     no path is given or its text cannot be extracted.
     """
-    from pathlib import Path
-
-    from ...manuscript import manuscript_text
-
     raw = values.get("cover_letter", "").strip()
     if not raw:
         return ""
@@ -352,10 +352,6 @@ def run_nucleic_acids_research(values: dict, headless: bool = False, debug: bool
     the Inspector. The run stops on the declarations page and leaves the browser
     open via :func:`hold_open` (it never clicks the final submit).
     """
-    from playwright.sync_api import sync_playwright
-
-    from ...validate import parse_authors
-
     # The Inspector needs a visible browser; debugging headless makes no sense.
     if debug:
         headless = False

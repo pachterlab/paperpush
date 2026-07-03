@@ -44,7 +44,10 @@ from __future__ import annotations
 import logging
 import re
 
+from playwright.sync_api import sync_playwright
+
 from ...database import get_venue
+from ...validate import _truthy_bool, parse_authors
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
                       hold_open, open_run_context)
@@ -107,8 +110,6 @@ def _parse_authors(value: str) -> list[dict]:
     Each dict has ``open_review_id`` and ``name`` (trimmed strings), ``suffixes``
     (the ordered ``email_suffixes`` list) and ``reciprocal_reviewer`` (a bool).
     """
-    from ...validate import _truthy_bool, parse_authors
-
     author_field = next((f for f in get_venue("aaai_2027").fields if f.type == "authorlist"), None)
     parsed = parse_authors(value, author_field.fields if author_field else None)
     authors: list[dict] = []
@@ -284,8 +285,6 @@ class AAAI2027Venue(Venue):
         conflicts) are looped. The run stops before the final submit and leaves the
         browser open for review.
         """
-        from playwright.sync_api import sync_playwright
-
         if debug:
             headless = False  # the Inspector needs a visible browser
 

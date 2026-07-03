@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 import re
 
+from playwright.sync_api import TimeoutError as PWTimeout
+
 from ..base import Venue
 from ..login import VenueLoginError, fill_login_form
 
@@ -183,8 +185,6 @@ def _add_author(page, author: dict) -> None:
     whether the "First (Given) Name" box appears), which :func:`_create_author`
     fills. The corresponding-author role is assigned later by :func:`_add_authors`.
     """
-    from playwright.sync_api import TimeoutError as PWTimeout
-
     email = author["email"].strip()
     logger.info("Adding author %s <%s>", author.get("name", ""), email)
 

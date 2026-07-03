@@ -12,7 +12,10 @@ from __future__ import annotations
 
 import logging
 
+from playwright.sync_api import sync_playwright
+
 from ...database import get_venue
+from ...validate import parse_authors
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
                       hold_open, open_run_context)
@@ -168,8 +171,6 @@ def _fill_first(page, selectors, value: str, what: str) -> bool:
 
 def _parse_authors(value: str) -> list[dict]:
     """Parse the author block using the Science ``authorlist`` column set from the database."""
-    from ...validate import parse_authors
-
     author_field = next((f for f in ScienceVenue._VENUE.fields if f.type == "authorlist"), None)
     return parse_authors(value, author_field.fields if author_field else None)
 
@@ -595,8 +596,6 @@ def run_science(values: dict, headless: bool = False, debug: bool = False, new_s
     is best-effort; the run stops before the final submit and leaves the browser
     open via :func:`hold_open`.
     """
-    from playwright.sync_api import sync_playwright
-
     # The Inspector needs a visible browser; debugging headless makes no sense.
     if debug:
         headless = False

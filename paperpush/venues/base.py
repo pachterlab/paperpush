@@ -43,8 +43,15 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Callable
 
-from .common import DEFAULT_TIMEOUT_SECONDS
+from playwright.sync_api import sync_playwright
+
+from .. import credentials
+from ..database import get_venue
+from .common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
+                     save_storage)
 from .common import session_path as _slug_session_path
+from .common import wait_for_human
+from .login import VenueLoginError, first_visible
 
 logger = logging.getLogger(__name__)
 
@@ -120,8 +127,6 @@ class Venue(ABC):
     @property
     def portal_url(self) -> str:
         """Dashboard URL used to check for a live session. Overridable."""
-        from ..database import get_venue
-
         return get_venue(self.slug).submission_url
 
     @property
@@ -132,8 +137,6 @@ class Venue(ABC):
     @property
     def display_name(self) -> str:
         """Human-readable venue name used in log and console messages."""
-        from ..database import get_venue
-
         return get_venue(self.slug).name
 
     def _manual_signin_url(self, prefill_email: str | None) -> str:
@@ -167,8 +170,6 @@ class Venue(ABC):
         opposite polarity. A venue with an irreducibly custom check may still
         override this method.
         """
-        from .login import first_visible
-
         if timeout_ms is None:
             timeout_ms = self.logged_in_timeout_ms
         present = first_visible(self._login_root(page), self.logged_in_role, self.logged_in_names, timeout_ms) is not None
@@ -190,10 +191,6 @@ class Venue(ABC):
         debug mode's manual path, where the caller's ``page.pause()`` lets you sign
         in by hand in the Inspector.
         """
-        from .. import credentials
-        from .common import save_storage, wait_for_human
-        from .login import VenueLoginError
-
         session = self.session_path()
         name = self.display_name
 
@@ -257,10 +254,6 @@ class Venue(ABC):
         """
         if not self.supports_session_capture:
             raise NotImplementedError(f"{self.slug} does not support capturing a session by hand")
-
-        from playwright.sync_api import sync_playwright
-
-        from .common import apply_default_timeouts
 
         path = self.session_path()
         path.parent.mkdir(parents=True, exist_ok=True)

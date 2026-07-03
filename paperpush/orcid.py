@@ -43,6 +43,8 @@ import urllib.request
 import webbrowser
 from dataclasses import dataclass
 
+from .validate import parse_authors
+
 logger = logging.getLogger(__name__)
 
 HTTP_TIMEOUT = 15  # seconds for any ORCID API call
@@ -395,9 +397,6 @@ def fill_author_block(block_text: str, profile: OrcidProfile) -> tuple[str, str 
     Returns ``(new_block_text, matched_name)`` where ``matched_name`` is None if
     no author line could be matched.
     """
-    # Local import avoids a circular import at module load time.
-    from .validate import parse_authors
-
     authors = parse_authors(block_text)
     if not authors:
         return block_text, None

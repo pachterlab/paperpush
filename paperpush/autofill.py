@@ -34,6 +34,7 @@ deterministic core works without it.
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -41,6 +42,7 @@ from dataclasses import field as _dc_field
 from pathlib import Path
 
 from .database import Field, Venue
+from .manuscript import docx_to_text
 from .subfile import _MULTILINE_TYPES, parse, replace_block, replace_scalar
 from .validate import Issue, validate
 
@@ -364,8 +366,6 @@ def _docx_text(path: Path) -> str:
     turns its ``None`` failure into an :class:`AutofillApiError` so the API engine
     surfaces an unreadable document instead of sending the model empty text.
     """
-    from .manuscript import docx_to_text
-
     text = docx_to_text(path)
     if text is None:
         raise AutofillApiError(f"could not read {path.name}")
@@ -476,8 +476,6 @@ _SYSTEM = "You prepare academic venue submissions. Read the attached manuscript 
 
 
 def _build_prompt(venue: Venue, documents: list[DocumentInput], file_listing: list[str]) -> tuple[str, list[dict], dict, list[str]]:
-    import json
-
     brief, field_ids = _field_brief(venue)
     content = _document_blocks(documents)
     instructions = f"Target venue: {venue.full_name or venue.name} " f"(slug: {venue.slug}).\n\n" "Files available in the manuscript directory (use these relative paths " "for 'filemap' fields):\n" + "\n".join(f"  {p}" for p in file_listing) + "\n\nFields to fill (JSON):\n" + json.dumps(brief, indent=2) + "\n\nReturn the extraction now."
@@ -523,8 +521,6 @@ def extract_via_api(
 
     if response.stop_reason == "refusal":
         raise AutofillApiError("the model declined to process this request " f"({getattr(response.stop_details, 'category', None) or 'refusal'}).")
-
-    import json
 
     text = next((b.text for b in response.content if b.type == "text"), "")
     try:

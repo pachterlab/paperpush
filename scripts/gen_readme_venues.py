@@ -36,8 +36,8 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from paperpush.database import list_venues  # noqa: E402
 from paperpush.venues import SLUG_TO_MODULE, submission_base  # noqa: E402
-from tests.submit_walkthrough_status import (STATUS_PATH,  # noqa: E402
-                                             WALKTHROUGH_TEST, load_status)
+from tests.submit_walkthrough_status import STATUS_PATH  # noqa: E402
+from tests.submit_walkthrough_status import WALKTHROUGH_TEST, load_status
 
 README_PATH = REPO_ROOT / "README.md"
 VENUES_PATH = REPO_ROOT / "venues.md"

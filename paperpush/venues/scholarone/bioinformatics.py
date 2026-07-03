@@ -17,9 +17,13 @@ from __future__ import annotations
 
 import logging
 
+from playwright.sync_api import sync_playwright
+
 from ...database import get_venue
+from ...validate import parse_authors
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
                       hold_open, open_run_context)
+from ..common import session_path as _session_path
 # Reuse the shared ScholarOne platform engine (author/keyword/reviewer/parse
 # helpers). Sign-in is inherited from ScholarOneVenue.
 from . import main as scholarone
@@ -189,8 +193,6 @@ def _upload_files(page, files: list[tuple[str, str]]) -> None:
 
 def session_path():
     """Path to the saved Bioinformatics session (Playwright storage_state)."""
-    from ..common import session_path as _session_path
-
     return _session_path("bioinformatics")
 
 
@@ -202,8 +204,6 @@ def run_bioinformatics(values: dict, headless: bool = False, debug: bool = False
     session first and ``debug=True`` forces a headed browser and opens the
     Playwright Inspector at the first wizard action.
     """
-    from playwright.sync_api import sync_playwright
-
     # The Inspector needs a visible browser; debugging headless makes no sense.
     if debug:
         headless = False
@@ -221,8 +221,6 @@ def run_bioinformatics(values: dict, headless: bool = False, debug: bool = False
 
     # Authors, parsed with the Bioinformatics column order declared in venues.json
     # (email | prefix | name | institution | country | city | corresponding).
-    from ...validate import parse_authors
-
     author_field = next((f for f in _VENUE.fields if f.type == "authorlist"), None)
     authors = parse_authors(values.get("authors", ""), author_field.fields if author_field else None)
 

@@ -20,9 +20,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from playwright.sync_api import TimeoutError as PWTimeout
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import expect, sync_playwright
 
+from ... import credentials
 from ...database import get_venue
+from ...validate import parse_authors
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
                       hold_open, open_run_context)
@@ -194,8 +198,6 @@ def _pick_funder(cf, value: str) -> None:
 
 def _parse_authors(value: str, cfg: Variant = _DEFAULT) -> list[dict]:
     """Parse the author block into dicts using the venue's author column set."""
-    from ...validate import parse_authors
-
     author_field = next((f for f in cfg.venue.fields if f.type == "authorlist"), None)
     return parse_authors(value, author_field.fields if author_field else None)
 
@@ -253,9 +255,6 @@ def _split_reviewers(raw: str) -> list[dict]:
 def _login_available(page, timeout_ms: int = 4000) -> bool:
     """True when a sign-in control is shown (Cell sometimes lands already
     signed in, offering none)."""
-    from playwright.sync_api import TimeoutError as PWTimeout
-    from playwright.sync_api import expect
-
     cf = _content(page)
     for locator in (
         cf.get_by_role("button", name="Log In"),
@@ -308,8 +307,6 @@ def _login_form(page, timeout_ms: int):
     field; ``None`` if neither shows one within ``timeout_ms`` (likely still
     behind an unclicked splash "Log In" button).
     """
-    from playwright.sync_api import TimeoutError as PWTimeout
-
     cf = _content(page)
     for frame in (cf, cf.frame_locator(LOGIN_FRAME)):
         try:
@@ -349,8 +346,9 @@ def _attach_files(page, cf, manuscript_file: str, cover_letter: str, declaration
 
     # close the "generated with AI" popup
     try:
+        page.wait_for_timeout(2000)
         page.get_by_role("button", name="Close").click(timeout=4000)
-    except TimeoutError:  # Button didn't appear, continue
+    except:  # Button didn't appear, continue
         pass
 
     _upload(page, cf, manuscript_file)
@@ -888,8 +886,6 @@ def editorialmanager_run(values: dict, headless: bool = False, debug: bool = Fal
     session; ``debug`` forces a headed browser and an Inspector pause. Leaves the
     browser open via :func:`hold_open` without clicking the final submit.
     """
-    from playwright.sync_api import sync_playwright
-
     if debug:
         headless = False
 
@@ -1026,8 +1022,6 @@ class EditorialManagerVenue(Venue):
         "Log In" reveal button first if needed, submits it, and raises
         :class:`EditorialManagerLoginError` if the author area never loads.
         """
-        from playwright.sync_api import TimeoutError as PWTimeout
-
         cfg = self.variant
         login_url = cfg.login_url
         logger.debug("Filling the %s (Editorial Manager) sign-in form at %s", cfg.name, login_url)
@@ -1059,8 +1053,6 @@ class EditorialManagerVenue(Venue):
         portal (the content frame is slow to populate), and the
         :func:`_login_available` shortcut for when Cell lands already signed in.
         """
-        from ... import credentials
-
         cfg = self.variant
         session = self.session_path()
 

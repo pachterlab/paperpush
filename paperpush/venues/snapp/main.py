@@ -21,10 +21,15 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from ...database import get_venue
+from playwright.sync_api import TimeoutError as PWTimeout
+from playwright.sync_api import sync_playwright
+
+from ...database import _load_options_file, get_venue
+from ...validate import parse_authors
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
                       hold_open, open_run_context)
+from ..common import session_path as _session_path
 from ..common import split_name_first_last as _split_name
 from ..login import VenueLoginError
 
@@ -117,8 +122,6 @@ class SnappLoginError(VenueLoginError):
 
 def session_path(cfg: Variant = _DEFAULT):
     """Path to the saved session (Playwright storage_state)."""
-    from ..common import session_path as _session_path
-
     return _session_path(cfg.slug)
 
 
@@ -146,8 +149,6 @@ def _try(fn, what: str) -> bool:
 
 def _parse_authors(value: str, cfg: Variant = _DEFAULT) -> list[dict]:
     """Parse the author block into dicts using the venue's author column set."""
-    from ...validate import parse_authors
-
     author_field = next((f for f in cfg.venue.fields if f.type == "authorlist"), None)
     return parse_authors(value, author_field.fields if author_field else None)
 
@@ -202,8 +203,6 @@ def _load_allowed_countries(options_file: str | None) -> list[str]:
     """
     if not options_file:
         return []
-    from ...database import _load_options_file
-
     return [c for c in _load_options_file(options_file) if not c.lower().startswith("select country")]
 
 
@@ -270,8 +269,6 @@ def _submit_credentials(page, username: str, password: str, timeout_ms: int) -> 
     password and submits. Raises :class:`SnappLoginError` if the password field
     never appears (unrecognized email, or an inserted CAPTCHA / two-factor step).
     """
-    from playwright.sync_api import TimeoutError as PWTimeout
-
     email = page.get_by_role("textbox", name="Email address")
     email.fill(username)
     page.get_by_role("button", name="Continue").first.click()
@@ -299,8 +296,6 @@ def login(venue, headless: bool = False, new_session: bool = False) -> None:
 
     ``new_session=True`` discards any saved session first, forcing a fresh sign-in.
     """
-    from playwright.sync_api import sync_playwright
-
     session = venue.session_path()
     if new_session and session.exists():
         logger.info("Discarding the saved %s session at %s", venue.display_name, session)
@@ -525,8 +520,6 @@ def run(values: dict, headless: bool = False, debug: bool = False, new_session: 
     ``venue.ensure_signed_in``; ``new_session=True`` discards any saved session,
     ``debug=True`` forces a headed browser and opens the Inspector at the first action.
     """
-    from playwright.sync_api import sync_playwright
-
     # The Inspector needs a visible browser; debugging headless makes no sense.
     if debug:
         headless = False
@@ -656,8 +649,6 @@ class SnappVenue(Venue):
         times). Raises :class:`SnappLoginError` on failure so :meth:`ensure_signed_in`
         can fall back to a manual sign-in.
         """
-        from playwright.sync_api import TimeoutError as PWTimeout
-
         cfg = self.variant
         login_url = cfg.auto_login_url
         logger.debug("Signing in to %s via the Springer Nature IDP", cfg.name)

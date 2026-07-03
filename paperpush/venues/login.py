@@ -14,6 +14,10 @@ from __future__ import annotations
 
 import logging
 
+from playwright.sync_api import TimeoutError as PWTimeout
+from playwright.sync_api import sync_playwright
+
+from . import submission_base, try_get_venue_impl
 from .common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
                      save_storage, session_path, wait_for_human)
 
@@ -53,8 +57,6 @@ def _login_supported(slug: str):
     cannot be imported (e.g. Playwright is absent), so the caller can skip
     verification gracefully.
     """
-    from . import submission_base, try_get_venue_impl
-
     impl = try_get_venue_impl(submission_base(slug))
     if impl is None:
         logger.debug("No verifiable login venue for %s", slug)
@@ -87,13 +89,6 @@ def verify_login(
     module = _login_supported(slug)
     if module is None:
         raise LoginVerificationError(f"{slug} has no automated sign-in to verify against")
-
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:
-        raise LoginVerificationError("Playwright is not installed, so the sign-in could not be checked " "(pip install playwright && python -m playwright install chromium)") from exc
-
-    from . import submission_base
 
     base_slug = submission_base(slug)
 
@@ -143,8 +138,6 @@ def first_present(locators, timeout_ms: int):
     Shared by the base class's login-state check and the eJP/Nature sign-in form
     field lookup, which both need "first of several candidate locators to appear".
     """
-    from playwright.sync_api import TimeoutError as PWTimeout
-
     for locator in locators:
         try:
             if locator.first.is_visible():
@@ -196,8 +189,6 @@ def fill_login_form(
     Raises :class:`VenueLoginError` if a field never appears (the form changed);
     the caller may let that propagate or re-raise its own portal error type.
     """
-    from playwright.sync_api import TimeoutError as PWTimeout
-
     userid = page.locator(userid_sel)
     pwd = page.locator(password_sel)
     try:

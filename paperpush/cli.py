@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import logging
 import os
 import sys
@@ -32,10 +33,17 @@ from pathlib import Path
 from pydantic import ConfigDict, validate_call
 
 from . import __version__, credentials
+from . import orcid as orcid_mod
+from . import venues
 from ._logging import configure_logging
+from .autofill import (AutofillApiError, DocumentInput, autofill,
+                       extract_via_api, field_schema, parse_extraction)
 from .database import get_venue, list_venues
-from .subfile import default_filename, write_template
+from .subfile import (default_filename, find_block, load, parse,
+                      render_template, replace_block, write_template)
+from .validate import validate
 from .venues.common import DEFAULT_TIMEOUT_SECONDS
+from .venues.login import LoginVerificationError, verify_login
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +193,6 @@ def _cmd_login(args: argparse.Namespace) -> int:
     # shares that base venue's account, so its credentials live under the base
     # slug. Redirect to the base so storage, status, and logout all act on the one
     # shared login. (Schema inheritance is separate -- see submission_base.)
-    from . import venues
 
     sub_base = venues.submission_base(venue.slug)
     if sub_base != venue.slug:
@@ -256,7 +263,6 @@ def _cmd_login(args: argparse.Namespace) -> int:
     # them, so a typo is caught now rather than at submit time. --no-verify skips
     # this (and the browser launch it needs).
     if not getattr(args, "no_verify", False):
-        from .venues.login import LoginVerificationError, verify_login
 
         print(f"Checking the credentials by signing in to {venue.slug}…")
         try:
@@ -290,7 +296,6 @@ def _login_orcid(venue, args: argparse.Namespace) -> int:
     record for the supplied iD. With ``--into`` the authenticated author's
     ORCID (and any blank email/affiliation) is written back into a .sub file.
     """
-    from . import orcid as orcid_mod
 
     orcid_id = orcid_mod.normalize_id(args.orcid_id) if args.orcid_id else ""
     name = ""
@@ -364,8 +369,6 @@ def _login_orcid(venue, args: argparse.Namespace) -> int:
 
 def _populate_orcid_into(sub_path: str, venue, profile) -> None:
     """Fill the authenticated author's ORCID details into a .sub author block."""
-    from . import orcid as orcid_mod
-    from .subfile import find_block, replace_block
 
     author_field = next((f for f in venue.fields if f.type == "authorlist"), None)
     if author_field is None:
@@ -407,7 +410,6 @@ def _report_validation(subfile, venue_def, subfile_path: str) -> list:
     Shared by ``submit`` (the gate before submission) and the standalone
     ``validate`` command.
     """
-    from .validate import validate
 
     issues = validate(subfile, venue_def)
     errors = [i for i in issues if i.is_error]
@@ -434,7 +436,6 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     bad option, and malformed value. Exits 0 when the file is ready to submit, 1
     when it has errors, and 2 when the venue is unknown.
     """
-    from .subfile import load
 
     logger.debug("validate: subfile=%r", args.subfile)
     try:
@@ -472,8 +473,6 @@ def _cmd_submit(args: argparse.Namespace) -> int:
     then clicks through the wizard typing in the field values from the file. It
     stops before the final submit so you can review.
     """
-    from . import venues
-    from .subfile import load
 
     logger.debug("submit: subfile=%r headless=%s debug=%s new_session=%s", args.subfile, args.headless, args.debug, args.new_session)
     try:
@@ -550,10 +549,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
     ``--values`` JSON file (this is the path the Claude skill drives); the
     ``api`` engine extracts them with the Anthropic API.
     """
-    import json
 
-    from .autofill import autofill, parse_extraction
-    from .subfile import parse, render_template
 
     logger.debug("autofill: subfile=%r dir=%r engine=%s values=%r " "min_confidence=%s dry_run=%s output=%r", args.subfile, args.directory, args.engine, args.values, args.min_confidence, args.dry_run, args.output)
 
@@ -716,7 +712,6 @@ def _extract_with_api(venue, manuscript_dir: Path, args: argparse.Namespace):
     Returns an Extraction, or None after printing an error (so the caller can
     exit nonzero).
     """
-    from .autofill import AutofillApiError, DocumentInput, extract_via_api
 
     manuscript = _find_document(manuscript_dir, args.manuscript, ("manuscript", "paper", "ms", "main"))
     if manuscript is None or not manuscript.is_file():
@@ -748,9 +743,7 @@ def _cmd_schema(args: argparse.Namespace) -> int:
     learn which fields to extract, classify, map to files, or leave alone,
     without duplicating that knowledge outside ``venues.json``.
     """
-    import json
 
-    from .autofill import field_schema
 
     try:
         venue = get_venue(args.venue)
@@ -787,7 +780,6 @@ def _cmd_options(args: argparse.Namespace) -> int:
     time. Then trailing ``PATH`` args drill into the tree
     (``paperpush options nature.subject_level "Biological sciences"``).
     """
-    from . import venues
 
     target = args.field
     venue_slug, _, field_id = target.partition(".")

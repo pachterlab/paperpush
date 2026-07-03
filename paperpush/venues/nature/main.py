@@ -18,10 +18,16 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from playwright.sync_api import TimeoutError as PWTimeout
+from playwright.sync_api import sync_playwright
+
 from ...database import get_venue
+from ...validate import parse_authors
+from .. import get_venue_impl
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
                       hold_open, open_run_context)
+from ..common import session_path as _session_path
 from ..common import split_name_first_last as _split_name
 from ..login import VenueLoginError
 
@@ -365,8 +371,6 @@ class NatureLoginError(VenueLoginError):
 
 def session_path(cfg: Variant = _DEFAULT):
     """Path to the saved browser session (Playwright storage_state)."""
-    from ..common import session_path as _session_path
-
     return _session_path(cfg.slug)
 
 
@@ -377,8 +381,6 @@ def _first_present(locators, timeout_ms: int):
     loaded. Slow pass (nothing visible yet, e.g. a navigation in flight): wait on
     each in turn, splitting ``timeout_ms`` so the total stays bounded.
     """
-    from playwright.sync_api import TimeoutError as PWTimeout
-
     for locator in locators:
         try:
             if locator.first.is_visible():
@@ -440,8 +442,6 @@ def _venue(cfg: Variant):
     """The :class:`Venue` instance for a variant, so the module-level entry points
     can reuse the base class's shared sign-in orchestration and login-state check.
     """
-    from .. import get_venue_impl
-
     return get_venue_impl(cfg.slug)
 
 
@@ -468,8 +468,6 @@ def login_nature(headless: bool = False, new_session: bool = False, cfg: Variant
     ``new_session=True`` discards any saved session first (use after switching
     accounts).
     """
-    from playwright.sync_api import sync_playwright
-
     session = session_path(cfg)
     if new_session and session.exists():
         logger.info("Discarding the saved %s session at %s", cfg.name, session)
@@ -524,8 +522,6 @@ def _parse_authors(value: str, cfg: Variant = _DEFAULT) -> list[dict]:
     country | city | corresponding``) differ from the package default, so they
     are read from the database rather than assumed.
     """
-    from ...validate import parse_authors
-
     author_field = next((f for f in cfg.venue.fields if f.type == "authorlist"), None)
     return parse_authors(value, author_field.fields if author_field else None)
 
@@ -1144,8 +1140,6 @@ def run_nature(values: dict, headless: bool = False, debug: bool = False, new_se
     The run stops after the declarations step and leaves the browser open via
     :func:`hold_open`; it never clicks a final submit, so the rest is done by hand.
     """
-    from playwright.sync_api import sync_playwright
-
     # The Inspector needs a visible browser; debugging headless makes no sense.
     if debug:
         headless = False
@@ -1286,8 +1280,6 @@ def check_categories(headless: bool = True, manuscript: str | None = None, disca
     throwaway PDF is generated unless ``manuscript`` names a real file. Intended
     for the monthly GitHub Actions check. Returns a report; never raises.
     """
-    from playwright.sync_api import sync_playwright
-
     session = session_path(cfg)
     if not session.exists():
         return CategoryCheckReport(

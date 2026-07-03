@@ -29,6 +29,7 @@ from typing import Annotated, Any, Literal, Optional
 from pydantic import (AfterValidator, BeforeValidator, ConfigDict,
                       ValidationError, create_model)
 
+from . import manuscript, venues
 from .database import Field, Venue, options_command
 from .subfile import SubFile
 
@@ -263,8 +264,6 @@ def _model_for(venue: Venue):
         # Lazy import to avoid a module-load cycle (a venue runner imports this
         # module for parse_authors). Venue-specific field validators extend the
         # generic schema with rules the field metadata cannot express.
-        from . import venues
-
         validators = venues.get_field_validators(venue.slug)
         logger.debug(
             "Building validation model for %s (%d fields, %d custom validator(s))",
@@ -506,8 +505,6 @@ def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> 
     if not path.is_file():
         # A missing/!regular file is already reported by _check_file_field.
         return []
-
-    from . import manuscript
 
     issues: list[Issue] = []
     # (limit, counter, scope phrase). An empty scope means the whole document.

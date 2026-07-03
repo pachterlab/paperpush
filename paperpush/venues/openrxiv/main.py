@@ -11,9 +11,13 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
+
+from playwright.sync_api import TimeoutError as PWTimeout
+from playwright.sync_api import expect, sync_playwright
 
 from ...database import get_venue
+from ...validate import parse_authors
 from ..base import Venue
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts
 from ..common import \
@@ -21,6 +25,7 @@ from ..common import \
 from ..common import hold_open, open_run_context
 from ..common import parse_pipe_file_list as _parse_file_list
 from ..common import parse_pipe_funders as _parse_funders
+from ..common import session_path as _session_path
 from ..common import split_name_first_middle_last as _split_name
 from ..login import VenueLoginError
 
@@ -223,8 +228,6 @@ def _queues_url(email: str | None = None, cfg: Variant = _DEFAULT) -> str:
     base = cfg.queues_url
     if not email:
         return base
-    from urllib.parse import quote
-
     return f"{base}?MSTRServlet.emailAddr={quote(email)}"
 
 
@@ -393,10 +396,6 @@ def run_biorxiv(values: dict, headless: bool = False, debug: bool = False, new_s
     ``debug=True`` forces a headed browser and opens the Inspector at the first
     action via ``page.pause()``.
     """
-    from playwright.sync_api import sync_playwright
-
-    from ...validate import parse_authors
-
     # The Inspector needs a visible browser; debugging headless makes no sense.
     if debug:
         headless = False
@@ -549,8 +548,6 @@ def run_biorxiv(values: dict, headless: bool = False, debug: bool = False, new_s
 
 def session_path(cfg: Variant = _DEFAULT):
     """Path to the saved browser session (Playwright storage_state) for ``cfg``."""
-    from ..common import session_path as _session_path
-
     return _session_path(cfg.slug)
 
 
@@ -607,8 +604,6 @@ class OpenRxivVenue(Venue):
         signed-in queue never loads, so :meth:`ensure_signed_in` can fall back to
         a manual sign-in.
         """
-        from playwright.sync_api import TimeoutError as PWTimeout
-
         cfg = self.variant
         logger.debug("Filling the %s sign-in form at %s", cfg.name, cfg.login_url)
         page.goto(cfg.login_url)
@@ -740,9 +735,6 @@ def check_biorxiv(headless: bool = True, timeout_ms: int = 8000, discard: bool =
     queue; ``discard=True`` attempts a best-effort cleanup (see
     :func:`_discard_draft`), reported in ``CheckReport.discarded``.
     """
-    from playwright.sync_api import TimeoutError as PWTimeout
-    from playwright.sync_api import sync_playwright
-
     path = session_path(cfg)
     if not path.exists():
         logger.warning("check_%s: no saved session at %s", cfg.slug, path)
@@ -763,8 +755,6 @@ def check_biorxiv(headless: bool = True, timeout_ms: int = 8000, discard: bool =
         False so the caller can stop the walk -- once a step's control is gone we
         can't reliably reach the steps after it.
         """
-        from playwright.sync_api import expect
-
         try:
             expect(locator).to_be_visible(timeout=timeout_ms)
         except (AssertionError, PWTimeout) as exc:
@@ -789,8 +779,6 @@ def check_biorxiv(headless: bool = True, timeout_ms: int = 8000, discard: bool =
             # never appears, treat it as an expired session rather than a UI
             # change, so a stale cookie doesn't masquerade as a false alarm.
             submit_link = page.get_by_role("link", name=BTN_SUBMIT_NEW)
-            from playwright.sync_api import expect
-
             try:
                 expect(submit_link).to_be_visible(timeout=timeout_ms)
             except (AssertionError, PWTimeout):

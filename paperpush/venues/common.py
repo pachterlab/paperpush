@@ -27,6 +27,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from ..credentials import config_dir
+
 logger = logging.getLogger(__name__)
 
 # Default cap, in seconds, on how long Playwright waits for any single action or
@@ -87,8 +89,6 @@ def hold_open() -> None:
 
 def session_path(slug: str) -> Path:
     """Path to a venue's saved browser session (Playwright storage_state)."""
-    from ..credentials import config_dir
-
     return config_dir() / f"{slug}_session.json"
 
 
