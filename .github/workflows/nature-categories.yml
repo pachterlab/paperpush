@@ -30,7 +30,7 @@ name: Nature subject-category refresh
 
 on:
   schedule:
-    - cron: "0 3 1 */6 *"   # 03:00 UTC on the 1st of each 6 months
+    - cron: "0 9 1 */6 *"   # 09:00 UTC on the 1st of each 6 months
   workflow_dispatch: {}    # allow manual runs from the Actions tab
 
 permissions:
