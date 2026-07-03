@@ -1,0 +1,25 @@
+# Read the Docs configuration for PaperPush.
+# https://docs.readthedocs.io/en/stable/config-file/v2.html
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.12"
+
+sphinx:
+  configuration: docs/conf.py
+  # Fail the build on any warning so broken references don't ship silently.
+  fail_on_warning: true
+
+# Build downloadable HTMLzip in addition to the hosted HTML.
+formats:
+  - htmlzip
+
+python:
+  install:
+    # Install the package itself so autodoc can import paperpush. Playwright and
+    # anthropic are mocked in conf.py, so their browsers/keys aren't needed here.
+    - method: pip
+      path: .
+    - requirements: docs/requirements.txt

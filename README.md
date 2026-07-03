@@ -19,7 +19,7 @@ playwright install
 Prepare my manuscript in PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.
 ```
 
-The claude skill `/paperpush-prepare-submission` helps with this. 
+The Claude skill `/paperpush-prepare-submission` helps with this. 
 
 See [`docs/example-session.md`](docs/example-session.md) for a full worked example of this flow.
 
@@ -27,7 +27,7 @@ See [`docs/example-session.md`](docs/example-session.md) for a full worked examp
 1. `paperpush subfile VENUE`: creates a file VENUE.sub that is a template for the VENUE submission.
 2. **fill out VENUE.sub - 3 options:**
   a. *fill out manually*
-  b. *Ask an LLM*: Use claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
+  b. *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
   c. `paperpush autofill -d MANUSCRIPT_DIR --engine api VENUE.sub`: Use an LLM API. Requires an API key.
 3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`.
 4. `paperpush login VENUE`: log in to the VENUE submission system
@@ -48,7 +48,7 @@ See `python scripts/paperpush_pipeline.py --help` for the full list of options, 
 <!-- BEGIN SUPPORTED VENUES -->
 **Preprint servers:** [arXiv](https://arxiv.org), [bioRxiv](https://www.biorxiv.org), [medRxiv](https://www.medrxiv.org)
 
-**Venues:** [Bioinformatics](https://academic.oup.com/bioinformatics), [BMC Bioinformatics](https://link.springer.com/venue/12859), [Cell](https://www.cell.com/cell/home), [Cell Genomics](https://www.cell.com/cell-genomics/home), [Cell Systems](https://www.cell.com/cell-systems/home), [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics), [Genome Biology](https://genomebiology.biomedcentral.com), [Nature](https://www.nature.com), [Nature Biotechnology](https://www.nature.com/nbt), [Nature Methods](https://www.nature.com/nmeth), [Nucleic Acids Research](https://academic.oup.com/nar), [PLOS Computational Biology](https://venues.plos.org/ploscompbiol/), [Science](https://www.science.org/journal/science), [Science Advances](https://www.science.org/journal/sciadv), [Science Immunology](https://www.science.org/journal/sciimmunol), [Science Robotics](https://www.science.org/journal/scirobotics), [Science Signaling](https://www.science.org/journal/signaling), [Science Translational Medicine](https://www.science.org/journal/stm)
+**Journals:** [Bioinformatics](https://academic.oup.com/bioinformatics), [BMC Bioinformatics](https://link.springer.com/venue/12859), [Cell](https://www.cell.com/cell/home), [Cell Genomics](https://www.cell.com/cell-genomics/home), [Cell Systems](https://www.cell.com/cell-systems/home), [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics), [Genome Biology](https://genomebiology.biomedcentral.com), [Nature](https://www.nature.com), [Nature Biotechnology](https://www.nature.com/nbt), [Nature Methods](https://www.nature.com/nmeth), [Nucleic Acids Research](https://academic.oup.com/nar), [PLOS Computational Biology](https://venues.plos.org/ploscompbiol/), [Science](https://www.science.org/journal/science), [Science Advances](https://www.science.org/journal/sciadv), [Science Immunology](https://www.science.org/journal/sciimmunol), [Science Robotics](https://www.science.org/journal/scirobotics), [Science Signaling](https://www.science.org/journal/signaling), [Science Translational Medicine](https://www.science.org/journal/stm)
 
 **Conferences:** [AAAI 2027](https://aaai.org/conference/aaai/aaai-27/)
 <!-- END SUPPORTED VENUES -->

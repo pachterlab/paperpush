@@ -9,7 +9,7 @@ Two artifacts are kept in sync with the database:
       <!-- END SUPPORTED VENUES -->
 
 * the short "Supported venues" summary in ``README.md``, grouped by
-  ``venue_type`` (preprint servers / venues / conferences), between
+  ``venue_type`` (preprint servers / journals / conferences), between
 
       <!-- BEGIN SUPPORTED VENUES -->
       <!-- END SUPPORTED VENUES -->
@@ -51,7 +51,7 @@ END_VENUES = "<!-- END SUPPORTED VENUES -->"
 # visible.
 VENUE_GROUPS = [
     ("preprint", "Preprint servers"),
-    ("venue", "Venues"),
+    ("journal", "Journals"),
     ("conference", "Conferences"),
 ]
 

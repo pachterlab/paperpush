@@ -716,10 +716,10 @@
           "type": "string"
         },
         "venue_type": {
-          "description": "Kind of venue: a preprint server, a venue, or a conference.",
+          "description": "Kind of venue: a preprint server, a journal, or a conference.",
           "enum": [
             "preprint",
-            "venue",
+            "journal",
             "conference"
           ],
           "type": "string"

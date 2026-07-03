@@ -1,0 +1,5 @@
+# Documentation build dependencies.
+#   pip install -r docs/requirements.txt
+sphinx>=7.0
+myst-parser>=2.0
+sphinx-rtd-theme>=2.0

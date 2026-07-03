@@ -50,7 +50,7 @@ _validate = validate_call(config=ConfigDict(arbitrary_types_allowed=True))
 # visible.
 _VENUE_GROUPS = [
     ("preprint", "Preprint servers"),
-    ("venue", "Venues"),
+    ("journal", "Journals"),
     ("conference", "Conferences"),
 ]
 

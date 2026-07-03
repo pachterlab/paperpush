@@ -121,7 +121,7 @@ def test_venues_lists_supported_venues(capsys):
 
     assert rc == 0
     # Venues are listed under their venue_type group headings (see cli._VENUE_GROUPS).
-    assert "Preprint servers:" in out and "Venues:" in out
+    assert "Preprint servers:" in out and "Journals:" in out
     # Every configured venue slug shows up in the listing.
     for venue in list_venues():
         assert venue.slug in out.lower()

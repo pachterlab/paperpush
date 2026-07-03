@@ -351,9 +351,9 @@ class Venue:
     full_name: Annotated[str, PField(description="Full, unabbreviated venue name.")] = ""
     submission_url: Annotated[str, PField(description="Submission/portal URL.")] = ""
     venue_type: Annotated[
-        Literal["preprint", "venue", "conference"],
-        PField(description="Kind of venue: a preprint server, a venue, or a conference."),
-    ] = "venue"
+        Literal["preprint", "journal", "conference"],
+        PField(description="Kind of venue: a preprint server, a journal, or a conference."),
+    ] = "journal"
     site_url: Annotated[str, PField(description="Public homepage URL.")] = ""
     submission_guide: Annotated[str, PField(description="URL of the author/submission guide.")] = ""
     description: Annotated[str, PField(description="Short description of the venue.")] = ""
@@ -407,7 +407,7 @@ class Venue:
             name=data.get("name", slug),
             full_name=data.get("full_name", ""),
             submission_url=data.get("submission_url", ""),
-            venue_type=data.get("venue_type", "venue"),
+            venue_type=data.get("venue_type", "journal"),
             site_url=data.get("site_url", ""),
             submission_guide=data.get("submission_guide", ""),
             description=data.get("description", ""),

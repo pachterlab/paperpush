@@ -421,7 +421,7 @@
     ]
   },
   "bioinformatics": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "name": "Bioinformatics",
     "full_name": "Bioinformatics (Oxford University Press)",
     "submission_url": "https://mc.manuscriptcentral.com/bioinformatics",
@@ -894,7 +894,7 @@
     ]
   },
   "nucleic_acids_research": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "inherits": "bioinformatics",
     "name": "Nucleic Acids Research",
     "full_name": "Nucleic Acids Research (Oxford University Press)",
@@ -1392,7 +1392,7 @@
     ]
   },
   "nature": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "name": "Nature",
     "full_name": "Nature - International weekly venue of science",
     "submission_url": "https://mts-nature.nature.com/cgi-bin/main.plex",
@@ -1640,7 +1640,7 @@
     ]
   },
   "nature_biotech": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "name": "Nature Biotechnology",
     "full_name": "Nature Biotechnology",
     "submission_url": "https://mts-nbt.nature.com/cgi-bin/main.plex",
@@ -1675,7 +1675,7 @@
     ]
   },
   "nature_methods": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "name": "Nature Methods",
     "full_name": "Nature Methods",
     "submission_url": "https://mts-nmeth.nature.com/cgi-bin/main.plex",
@@ -1721,7 +1721,7 @@
     ]
   },
   "cell": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "name": "Cell",
     "full_name": "Cell (Cell Press)",
     "submission_url": "https://www.editorialmanager.com/cell/default.aspx",
@@ -1926,7 +1926,7 @@
     ]
   },
   "cell_systems": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "inherits": "cell",
     "name": "Cell Systems",
     "full_name": "Cell Systems (Cell Press)",
@@ -1942,7 +1942,7 @@
     ]
   },
   "cell_genomics": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "inherits": "cell",
     "name": "Cell Genomics",
     "full_name": "Cell Genomics (Cell Press)",
@@ -1955,7 +1955,7 @@
     ]
   },
   "plos_compbio": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "inherits": "cell",
     "name": "PLOS Computational Biology",
     "full_name": "PLOS Computational Biology (PLOS)",
@@ -2103,7 +2103,7 @@
     ]
   },
   "genome_biology": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "name": "Genome Biology",
     "full_name": "Genome Biology",
     "submission_url": "https://submission.springernature.com/",
@@ -2268,7 +2268,7 @@
     ]
   },
   "bmc_bioinformatics": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "inherits": "genome_biology",
     "name": "BMC Bioinformatics",
     "full_name": "BMC Bioinformatics",
@@ -2298,7 +2298,7 @@
     ]
   },
   "science": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "name": "Science",
     "full_name": "Science - American Association for the Advancement of Science (AAAS)",
     "submission_url": "https://cts.sciencemag.org/scc/",
@@ -2580,7 +2580,7 @@
     ]
   },
   "science_advances": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "inherits": "science",
     "site_url": "https://www.science.org/journal/sciadv",
     "name": "Science Advances",
@@ -2594,7 +2594,7 @@
     ]
   },
   "science_immunology": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "inherits": "science",
     "site_url": "https://www.science.org/journal/sciimmunol",
     "name": "Science Immunology",
@@ -2608,7 +2608,7 @@
     ]
   },
   "science_robotics": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "inherits": "science",
     "site_url": "https://www.science.org/journal/scirobotics",
     "name": "Science Robotics",
@@ -2622,7 +2622,7 @@
     ]
   },
   "science_signaling": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "inherits": "science",
     "site_url": "https://www.science.org/journal/signaling",
     "name": "Science Signaling",
@@ -2636,7 +2636,7 @@
     ]
   },
   "science_translational_medicine": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "inherits": "science",
     "site_url": "https://www.science.org/journal/stm",
     "name": "Science Translational Medicine",
@@ -2801,7 +2801,7 @@
     ]
   },
   "discrete_mathematics": {
-    "venue_type": "venue",
+    "venue_type": "journal",
     "name": "Discrete Mathematics",
     "full_name": "Discrete Mathematics (Elsevier)",
     "submission_url": "https://submit.elsevier.com/DISCM/submissions",

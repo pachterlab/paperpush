@@ -22,9 +22,15 @@ dependencies = [
     "pypdf>=6.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/pachterlab/paperpush"
+Repository = "https://github.com/pachterlab/paperpush"
+Documentation = "https://github.com/pachterlab/paperpush#readme"
+Issues = "https://github.com/pachterlab/paperpush/issues"
+
 [project.optional-dependencies]
 autofill = ["anthropic>=0.40"]
-dev = ["pytest>=7.0", "bandit", "Pillow", "black", "chromium", "jsonschema>=4.18"]
+dev = ["pytest>=7.0", "bandit", "Pillow", "black", "chromium", "jsonschema>=4.18", "sphinx", "isort"]
 
 [project.scripts]
 paperpush = "paperpush.cli:main"

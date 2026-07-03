@@ -3,6 +3,7 @@
 import logging as _logging
 
 __version__ = "0.1.0"
+__url__ = "https://github.com/pachterlab/paperpush"
 
 # Standard-library convention: a library should not configure logging output.
 # The NullHandler keeps importing paperpush silent until the embedding
@@ -20,6 +21,7 @@ from .subfile import SubFile, load, parse, render_template, write_template
 
 __all__ = [
     "__version__",
+    "__url__",
     "configure_logging",
     "Field",
     "Venue",
