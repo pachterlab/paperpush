@@ -18,22 +18,21 @@ name: Submit walkthrough
 # its ✅/❌ status and just advanced its date. If any venue flips ✅<->❌, the PR
 # is left open for manual review, with the failed venues named in a comment.
 #
-# SETUP (one time, per venue you want checked): save a signed-in session and
-# store it as a <SLUG>_SESSION_B64 repo secret. That is all -- the restore step
-# is registry-driven and picks up any venue whose secret exists, so no workflow
-# edit is needed to add a venue.
+# SETUP (one time): sign in to each venue you want checked, then bundle all the
+# saved sessions into ONE secret, PAPERPUSH_SESSIONS_B64. The restore step picks
+# up whichever venues are in the bundle -- no workflow edit is needed to add one.
 #
-#   1. Locally sign in and save a session, e.g. for bioRxiv:
+#   1. Locally sign in and save a session for each venue, e.g.:
 #        paperpush login biorxiv
-#   2. Base64-encode the saved session:
-#        base64 -i ~/.config/paperpush/biorxiv_session.json | pbcopy
-#   3. Repo -> Settings -> Secrets and variables -> Actions -> New secret,
-#      named <SLUG>_SESSION_B64 (the venue slug upper-cased), e.g.:
-#        name:  BIORXIV_SESSION_B64       value: (paste)
+#        paperpush login bioinformatics
+#   2. Bundle every saved session into one base64 blob:
+#        tar -C ~/.config/paperpush -czf - *_session.json | base64 | pbcopy
+#   3. Store it as a secret visible to this repo (an org or environment secret if
+#      it lives in paperpush-private), named PAPERPUSH_SESSIONS_B64.
 #
 # Sessions expire periodically; when a venue stops passing (walkthrough.log
-# shows "auth_required"/"session looks expired"), redo steps 1-3 to refresh that
-# secret.
+# shows "auth_required"/"session looks expired"), redo steps 1-2 to refresh the
+# bundle.
 #
 # Security note: each secret is a live session to a real venue account. Safe in
 # a PRIVATE repo only -- anyone who can edit a workflow could exfiltrate it.
@@ -66,45 +65,23 @@ jobs:
 
       - name: Restore saved portal sessions
         id: sessions
-        # Registry-driven: for every venue in the database, look for a secret
-        # named <SLUG>_SESSION_B64 (slug upper-cased) and, if present, restore
-        # it and add the venue to the walkthrough. Adding a venue needs no edit
-        # here -- just create its <SLUG>_SESSION_B64 secret. `toJSON(secrets)`
-        # hands the whole secret set to the step so the lookup can be dynamic
-        # (Actions cannot expand `secrets.<name>` from a variable).
-        env:
-          ALL_SECRETS: ${{ toJSON(secrets) }}
+        # Registry-driven restore, shared with fingerprint.yml. For every venue
+        # in the database it looks for a <SLUG>_SESSION_B64 secret and restores
+        # any that are set, emitting the matching `--venue` flags. Adding a venue
+        # needs no edit here -- just create its secret.
+        uses: ./.github/actions/restore-portal-sessions
+        with:
+          all_secrets: ${{ toJSON(secrets) }}
+
+      - name: Require at least one restored session
+        # The walkthrough drives real portals, so unlike fingerprint.yml (whose
+        # login-page checks need no session) it has nothing to do with zero
+        # sessions -- fail early and clearly rather than run an empty pytest.
         run: |
-          mkdir -p "${HOME}/.config/paperpush"
-          # Emit "venues=--venue a --venue b ..." to $GITHUB_OUTPUT for the
-          # walkthrough step, restoring one session file per venue whose secret
-          # is set. Fail only when no venue has a session at all.
-          python - <<'PY'
-          import base64, json, os, pathlib
-
-          from paperpush.database import list_venues
-
-          secrets = json.loads(os.environ["ALL_SECRETS"])
-          cfg = pathlib.Path.home() / ".config" / "paperpush"
-          cfg.mkdir(parents=True, exist_ok=True)
-
-          venues = []
-          for venue in list_venues():
-              b64 = secrets.get(f"{venue.slug.upper()}_SESSION_B64")
-              if not b64:
-                  print(f"::notice::{venue.slug.upper()}_SESSION_B64 unset; skipping {venue.slug}.")
-                  continue
-              (cfg / f"{venue.slug}_session.json").write_bytes(base64.b64decode(b64))
-              venues.append(venue.slug)
-              print(f"Restored {venue.slug} session.")
-
-          if not venues:
-              raise SystemExit("::error::No <SLUG>_SESSION_B64 secrets set; nothing to check.")
-
-          flags = " ".join(f"--venue {slug}" for slug in venues)
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
-              fh.write(f"venues={flags}\n")
-          PY
+          if [ -z "${{ steps.sessions.outputs.venues }}" ]; then
+            echo "::error::No <SLUG>_SESSION_B64 secrets set; nothing to walk."
+            exit 1
+          fi
 
       - name: Run submit walkthroughs (headless) and record outcomes
         env:

@@ -717,6 +717,7 @@ def run_science(values: dict, headless: bool = False, debug: bool = False, new_s
 
         # Reviewers step: add the suggested reviewers, then the excluded ones.
         _add_reviewers(page, suggested_reviewers, BTN_ADD_SUGGESTED_REVIEWER, "suggested reviewer")
+        page.wait_for_timeout(1000)
         _add_reviewers(page, excluded_reviewers, BTN_ADD_EXCLUDED_REVIEWER, "excluded reviewer", extra_in_textarea=True)
 
         logger.info("Reached the reviewers step; leaving the browser open " "for review (the remaining steps and the final submit are left to you)")

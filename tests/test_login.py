@@ -32,24 +32,6 @@ _PASSWORD = "s3cret-token"
 # --- username/password login -----------------------------------------------
 
 
-def test_login_biorxiv_runs(monkeypatch, capsys):
-    # Supply username/password through the environment so nothing prompts.
-    # --no-verify keeps this storage smoke test off the network.
-    monkeypatch.setenv("PAPERPUSH_USERNAME", "researcher@example.edu")
-    monkeypatch.setenv("PAPERPUSH_PASSWORD", "s3cret-token")
-
-    rc = main(["login", "biorxiv", "--no-verify"])
-    out = capsys.readouterr().out
-
-    assert rc == 0
-    assert "biorxiv" in out
-
-    cred = credentials.get_credential("biorxiv")
-    assert cred is not None
-    assert cred.username == "researcher@example.edu"
-    assert cred.password == "s3cret-token"
-
-
 def test_login_status_runs(monkeypatch, capsys):
     # --status should run cleanly whether or not a credential is stored.
     rc = main(["login", "biorxiv", "--status"])
@@ -175,6 +157,7 @@ def test_login_command_for_each_venue(venue, monkeypatch, capsys):
     cred = credentials.get_credential(base)
     assert cred is not None, f"no credential stored for {venue.slug} (base {base})"
     assert cred.username == _USERNAME
+    assert cred.password == _PASSWORD  # username/password round-trip through CLI storage
 
 
 # --- ORCID sign-in ---------------------------------------------------------

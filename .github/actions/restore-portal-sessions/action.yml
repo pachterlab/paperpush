@@ -1,0 +1,65 @@
+name: Restore portal sessions
+description: >-
+  Restore every venue's saved Playwright session from the single
+  PAPERPUSH_SESSIONS_B64 secret -- a base64-encoded tar.gz of the
+  ~/.config/paperpush/*_session.json files -- and emit the matching `--venue`
+  flags. Shared by submit.yml, fingerprint.yml, and nature-categories.yml so the
+  restore logic lives in one place. The caller must `pip install` paperpush
+  before using this action (it filters restored files against the venue registry)
+  and decide what to do when nothing is restored -- this action does NOT fail on
+  an empty bundle, so fingerprint.yml's network-only login checks can still run
+  with no secret set.
+inputs:
+  sessions_b64:
+    description: >-
+      base64 of a tar.gz over the session files, produced locally with:
+        tar -C ~/.config/paperpush -czf - *_session.json | base64
+      Empty or unset is allowed (nothing is restored, empty `venues` output).
+    required: false
+    default: ""
+outputs:
+  venues:
+    description: >-
+      Space-separated `--venue <slug>` flags for every restored session that
+      maps to a known venue (empty when the bundle was empty).
+    value: ${{ steps.restore.outputs.venues }}
+runs:
+  using: composite
+  steps:
+    - id: restore
+      shell: bash
+      env:
+        SESSIONS_B64: ${{ inputs.sessions_b64 }}
+      run: |
+        set -o pipefail
+        mkdir -p "${HOME}/.config/paperpush"
+        if [ -z "${SESSIONS_B64}" ]; then
+          echo "::notice::PAPERPUSH_SESSIONS_B64 is empty; no sessions restored."
+          echo "venues=" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+        # Decode the bundle into the config dir; each entry is <slug>_session.json.
+        echo "${SESSIONS_B64}" | base64 --decode | tar -C "${HOME}/.config/paperpush" -xzf -
+        # Emit "--venue <slug>" for each restored session that maps to a known
+        # venue, so a stray file cannot inject an unknown slug into pytest's
+        # --venue filter (which validates slugs against the registry).
+        python - <<'PY'
+        import os, pathlib
+
+        from paperpush.database import list_venues
+
+        known = {v.slug for v in list_venues()}
+        cfg = pathlib.Path.home() / ".config" / "paperpush"
+        slugs = []
+        for path in sorted(cfg.glob("*_session.json")):
+            slug = path.name[: -len("_session.json")]
+            if slug in known:
+                slugs.append(slug)
+                print(f"Restored {slug} session.")
+            else:
+                print(f"::notice::restored session {path.name} is not a known venue; ignoring.")
+
+        flags = " ".join(f"--venue {slug}" for slug in slugs)
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+            fh.write(f"venues={flags}\n")
+        PY

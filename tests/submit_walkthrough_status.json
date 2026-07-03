@@ -5,5 +5,17 @@
   "biorxiv": "2026-07-02",
   "bmc_bioinformatics": "2026-07-01",
   "cell": "2026-07-02",
-  "cell_systems": "2026-07-02"
+  "cell_genomics": "2026-07-02",
+  "cell_systems": "2026-07-02",
+  "discrete_mathematics": "2026-07-02",
+  "genome_biology": "2026-07-02",
+  "medrxiv": "2026-07-02",
+  "nature": "2026-07-02",
+  "nature_biotech": "2026-07-02",
+  "nature_methods": "2026-07-02",
+  "nucleic_acids_research": "2026-07-02",
+  "science": "2026-07-02",
+  "science_advances": "2026-07-02",
+  "science_immunology": "2026-07-02",
+  "science_robotics": "2026-07-02"
 }

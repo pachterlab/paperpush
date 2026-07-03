@@ -2302,7 +2302,7 @@
     "name": "Science",
     "full_name": "Science - American Association for the Advancement of Science (AAAS)",
     "submission_url": "https://cts.sciencemag.org/scc/",
-    "site_url": "https://www.science.org",
+    "site_url": "https://www.science.org/journal/science",
     "submission_guide": "https://www.science.org/content/page/science-information-authors",
     "max_upload_mb": 50,
     "description": "Peer-reviewed flagship venue of the American Association for the Advancement of Science (AAAS), publishing significant original research across all scientific disciplines along with news and commentary.",
@@ -2582,6 +2582,7 @@
   "science_advances": {
     "venue_type": "venue",
     "inherits": "science",
+    "site_url": "https://www.science.org/journal/sciadv",
     "name": "Science Advances",
     "full_name": "Science Advances - American Association for the Advancement of Science (AAAS)",
     "description": "AAAS open-access multidisciplinary venue publishing peer-reviewed original research across the physical, life, social, and computer sciences and engineering.",
@@ -2595,6 +2596,7 @@
   "science_immunology": {
     "venue_type": "venue",
     "inherits": "science",
+    "site_url": "https://www.science.org/journal/sciimmunol",
     "name": "Science Immunology",
     "full_name": "Science Immunology - American Association for the Advancement of Science (AAAS)",
     "description": "AAAS venue publishing peer-reviewed original research across immunology in all organisms and model systems, spanning molecular, cellular, and translational immunology.",
@@ -2608,6 +2610,7 @@
   "science_robotics": {
     "venue_type": "venue",
     "inherits": "science",
+    "site_url": "https://www.science.org/journal/scirobotics",
     "name": "Science Robotics",
     "full_name": "Science Robotics - American Association for the Advancement of Science (AAAS)",
     "description": "AAAS venue publishing peer-reviewed original research on advances in robotics and related disciplines, including robot design, control, autonomy, and applications.",
@@ -2621,6 +2624,7 @@
   "science_signaling": {
     "venue_type": "venue",
     "inherits": "science",
+    "site_url": "https://www.science.org/journal/signaling",
     "name": "Science Signaling",
     "full_name": "Science Signaling - American Association for the Advancement of Science (AAAS)",
     "description": "AAAS venue publishing peer-reviewed original research on cellular signaling and regulatory networks, including signal transduction, systems biology, and relevance to disease.",
@@ -2634,6 +2638,7 @@
   "science_translational_medicine": {
     "venue_type": "venue",
     "inherits": "science",
+    "site_url": "https://www.science.org/journal/stm",
     "name": "Science Translational Medicine",
     "full_name": "Science Translational Medicine - American Association for the Advancement of Science (AAAS)",
     "description": "AAAS venue publishing peer-reviewed original research that bridges basic science and clinical medicine to advance human health.",

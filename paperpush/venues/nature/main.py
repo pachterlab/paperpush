@@ -1070,6 +1070,12 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
                 )
         _click_button(page, BTN_SAVE_CONTINUE)
 
+    # Include all files in merged PDF (Nature only; other family venues omit this).
+    if cfg.slug == "nature":
+        checkboxes = page.locator('input[name="include_object[]"]')
+        for i in range(checkboxes.count()):
+            checkboxes.nth(i).check()
+
     # Confirm the uploaded files.
     _try(lambda: page.locator(SEL_VERIFIED).check(), "verify uploaded files")
     _click_button(page, BTN_SAVE_CONTINUE)

@@ -344,12 +344,13 @@ def _attach_files(page, cf, manuscript_file: str, cover_letter: str, declaration
     """
     logger.info("Uploading manuscript %s", manuscript_file)
 
-    # close the "generated with AI" popup
-    try:
-        page.wait_for_timeout(2000)
-        page.get_by_role("button", name="Close").click(timeout=4000)
-    except:  # Button didn't appear, continue
-        pass
+    # close popups - one for the "generated with AI" popup, and another for the writing workshop popup
+    for _ in range(2):
+        try:
+            page.wait_for_timeout(2000)
+            page.get_by_role("button", name="Close").click(timeout=4000)
+        except:  # Button didn't appear, continue
+            pass
 
     _upload(page, cf, manuscript_file)
     page.wait_for_timeout(2000)

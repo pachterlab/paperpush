@@ -91,7 +91,7 @@ pytest --run-portal
 pytest --run-portal --venue nature
 ```
 
-Including browser-based portal tests (requires a browser and login credentials):
+Specifically run browser-based portal tests (requires a browser and login credentials):
 
 ```bash
 # All venues
@@ -114,7 +114,7 @@ pytest tests/test_portal_drift.py --run-portal --update-snapshots
 pytest tests/test_portal_drift.py --run-portal --update-snapshots --venue nature
 ```
 
-Update venues.md checklist (included automatically in pre-commit hook and bi-monthly CI job):
+Update venues.md checklist after running `pytest tests/test_submit.py --run-portal` (included automatically in pre-commit hook and bi-monthly CI job):
 
 ```bash
 python scripts/gen_readme_venues.py
