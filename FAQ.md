@@ -1,6 +1,8 @@
 *How does PaperPush work?*
 Information on supported venues is in `paperpush/venues.json`. `paperpush subfile` generates a file from this for the specified venue. The file can be filled out manually, or with the help of an LLM via `paperpush autofill`. The submission portal for a selected venue is filled out with the information from this file with a `paperpush submit`. This runs a Playwright script that is written specifically for each supported venue.
 
+*The repository says that 
+
 *I do not see my venue in the supported list. Is it possible to add a venue?*
 Yes! See [`CONTRIBUTING.md`](CONTRIBUTING.md) if you would like to add a journal yourself, and feel free to ask any questions in the Discussion forum. The recommended process involves running `Playwright codegen`, walking through all options for your journal of interest, replacing values with variables, encoding these variables in venues.json, and creating sample files for unit testing in `sample_subfiles.json`.
 

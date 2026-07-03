@@ -14,13 +14,8 @@ from __future__ import annotations
 
 import logging
 
-from .common import (
-    DEFAULT_TIMEOUT_SECONDS,
-    apply_default_timeouts,
-    save_storage,
-    session_path,
-    wait_for_human,
-)
+from .common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
+                     save_storage, session_path, wait_for_human)
 
 logger = logging.getLogger(__name__)
 

@@ -31,12 +31,11 @@ from pathlib import Path
 
 from pydantic import ConfigDict, validate_call
 
-from . import __version__
-from . import credentials
+from . import __version__, credentials
 from ._logging import configure_logging
 from .database import get_venue, list_venues
-from .venues.common import DEFAULT_TIMEOUT_SECONDS
 from .subfile import default_filename, write_template
+from .venues.common import DEFAULT_TIMEOUT_SECONDS
 
 logger = logging.getLogger(__name__)
 

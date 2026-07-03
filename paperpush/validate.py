@@ -26,13 +26,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional
 
-from pydantic import (
-    AfterValidator,
-    BeforeValidator,
-    ConfigDict,
-    ValidationError,
-    create_model,
-)
+from pydantic import (AfterValidator, BeforeValidator, ConfigDict,
+                      ValidationError, create_model)
 
 from .database import Field, Venue, options_command
 from .subfile import SubFile

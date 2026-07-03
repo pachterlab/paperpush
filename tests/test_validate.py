@@ -15,21 +15,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import sample_subfiles
+from sample_subfiles import REPO_ROOT, scenarios
 
 import paperpush.validate as validate_mod
-import sample_subfiles
 from paperpush import subfile
 from paperpush.cli import main
 from paperpush.database import Field, Venue, get_venue
 from paperpush.subfile import SubFile
-from paperpush.validate import (
-    ERROR,
-    WARNING,
-    Issue,
-    parse_authors,
-    validate,
-)
-from sample_subfiles import REPO_ROOT, scenarios
+from paperpush.validate import ERROR, WARNING, Issue, parse_authors, validate
 
 
 @pytest.fixture(autouse=True)

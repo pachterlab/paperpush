@@ -10,24 +10,11 @@ __version__ = "0.1.0"
 _logging.getLogger(__name__).addHandler(_logging.NullHandler())
 
 from ._logging import configure_logging
-from .credentials import (
-    Credential,
-    delete_credential,
-    get_credential,
-    save_credential,
-)
-from .autofill import (
-    AutofillApiError,
-    AutofillResult,
-    DocumentInput,
-    Extraction,
-    Proposal,
-    autofill,
-    effective_role,
-    extract_via_api,
-    field_schema,
-    parse_extraction,
-)
+from .autofill import (AutofillApiError, AutofillResult, DocumentInput,
+                       Extraction, Proposal, autofill, effective_role,
+                       extract_via_api, field_schema, parse_extraction)
+from .credentials import (Credential, delete_credential, get_credential,
+                          save_credential)
 from .database import Field, Venue, get_venue, list_venues
 from .subfile import SubFile, load, parse, render_template, write_template
 

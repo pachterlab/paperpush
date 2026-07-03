@@ -24,16 +24,12 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from ...database import get_venue
 from ..base import Venue
-from ..common import (
-    DEFAULT_TIMEOUT_SECONDS,
-    apply_default_timeouts,
-    hold_open,
-    open_run_context,
-    save_storage,
-    wait_for_human,
-    split_name_first_last as _split_name,
-    parse_pipe_funders as _parse_funders,
-)
+from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
+                      hold_open, open_run_context)
+from ..common import parse_pipe_funders as _parse_funders
+from ..common import save_storage
+from ..common import split_name_first_last as _split_name
+from ..common import wait_for_human
 from ..login import VenueLoginError
 
 logger = logging.getLogger(__name__)
@@ -257,7 +253,8 @@ def _split_reviewers(raw: str) -> list[dict]:
 def _login_available(page, timeout_ms: int = 4000) -> bool:
     """True when a sign-in control is shown (Cell sometimes lands already
     signed in, offering none)."""
-    from playwright.sync_api import expect, TimeoutError as PWTimeout
+    from playwright.sync_api import TimeoutError as PWTimeout
+    from playwright.sync_api import expect
 
     cf = _content(page)
     for locator in (
@@ -349,6 +346,13 @@ def _attach_files(page, cf, manuscript_file: str, cover_letter: str, declaration
     is filled into the Description field first.
     """
     logger.info("Uploading manuscript %s", manuscript_file)
+
+    # close the "generated with AI" popup
+    try:
+        page.get_by_role("button", name="Close").click(timeout=4000)
+    except TimeoutError:  # Button didn't appear, continue
+        pass
+
     _upload(page, cf, manuscript_file)
     page.wait_for_timeout(2000)
     if cfg.annotate_manuscript_manually:

@@ -36,16 +36,12 @@ from __future__ import annotations
 import base64
 import logging
 import os
-from dataclasses import dataclass, field as _dc_field
+from dataclasses import dataclass
+from dataclasses import field as _dc_field
 from pathlib import Path
 
 from .database import Field, Venue
-from .subfile import (
-    _MULTILINE_TYPES,
-    parse,
-    replace_block,
-    replace_scalar,
-)
+from .subfile import _MULTILINE_TYPES, parse, replace_block, replace_scalar
 from .validate import Issue, validate
 
 logger = logging.getLogger(__name__)

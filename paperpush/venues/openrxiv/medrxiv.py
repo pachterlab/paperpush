@@ -10,12 +10,11 @@ implementation.
 from __future__ import annotations
 
 from . import main
-from .main import (  # noqa: F401 -- re-exported as this module's public API
-    CheckReport,
-    OpenRxivLoginError as MedrxivLoginError,
-    StepResult,
-    Variant,
-)
+from .main import CheckReport
+from .main import \
+    OpenRxivLoginError as \
+    MedrxivLoginError  # noqa: F401 -- re-exported as this module's public API
+from .main import StepResult, Variant
 
 
 class MedrxivVenue(main.OpenRxivVenue):

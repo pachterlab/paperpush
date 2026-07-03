@@ -23,7 +23,9 @@ from dataclasses import dataclass
 
 from ...database import get_venue
 from ..base import Venue
-from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, open_run_context, split_name_first_last as _split_name
+from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
+                      hold_open, open_run_context)
+from ..common import split_name_first_last as _split_name
 from ..login import VenueLoginError
 
 logger = logging.getLogger(__name__)

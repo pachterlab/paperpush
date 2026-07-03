@@ -1,41 +1,52 @@
-name: Monthly submission
+name: Submit walkthrough
 
-# Runs the real `paperpush submit` click-through once a month. The wizard
-# fills the venue portal from a committed .sub file and stops before the final
-# submit (see _cmd_submit in paperpush/cli.py), so an unattended run drives
-# the portal without irreversibly submitting.
+# The single live-portal job. On a schedule (and on demand) it drives each
+# venue's REAL submission portal headless -- validation, sign-in, wizard,
+# stopping before the final submit, exactly like the manual `paperpush submit`
+# walkthrough -- to prove the flow still works, and records the outcome into
+# tests/submit_walkthrough_status.json. It then regenerates the venue tables and
+# opens a pull request so the ✅ / ❌ "Submit walkthrough" column in
+# venues.md / README.md stays current without a hand-run.
 #
-# This is deliberately NOT part of the per-push CI (ci.yml runs `pytest`, which
-# skips submit tests). Submission is outward-facing, so it is gated to a monthly
-# schedule and manual dispatch only.
+# Pass/fail is the portal signal: a venue that completes the walkthrough is
+# stamped with today's date (✅); one that fails every attempt is dropped from
+# the status file so it renders ❌. The walkthrough retries each venue up to 3
+# times (baked into the test) so a flaky portal does not flip a venue to ❌ on a
+# one-off hiccup.
 #
-# SETUP (one time): a saved portal session, same as check-portal.yml.
-#   1. Locally sign in and save a session:
-#        paperpush check-portal --login
-#   2. Base64-encode it:
+# The PR auto-merges when the only change is date bumps -- i.e. every venue kept
+# its ✅/❌ status and just advanced its date. If any venue flips ✅<->❌, the PR
+# is left open for manual review, with the failed venues named in a comment.
+#
+# SETUP (one time, per venue you want checked): save a signed-in session and
+# store it as a <SLUG>_SESSION_B64 repo secret, then add one `restore` line to
+# the "Restore saved portal sessions" step below.
+#
+#   1. Locally sign in and save a session, e.g. for bioRxiv:
+#        paperpush login biorxiv
+#   2. Base64-encode the saved session:
 #        base64 -i ~/.config/paperpush/biorxiv_session.json | pbcopy
 #   3. Repo -> Settings -> Secrets and variables -> Actions -> New secret:
-#        name:  Pancake2    value: (paste)
+#        name:  BIORXIV_SESSION_B64       value: (paste)
 #
-# The .sub file to submit defaults to tests/sub_files/biorxiv/biorxiv.sub. Override it per repo
-# under Settings -> Secrets and variables -> Actions -> Variables as SUBFILE,
-# or per run via the workflow_dispatch input below.
+# Sessions expire periodically; when a venue stops passing (walkthrough.log
+# shows "auth_required"/"session looks expired"), redo steps 1-3 to refresh that
+# secret.
 #
-# Security note: BIORXIV_SESSION_B64 is a live session to a real account. Keep
-# this repo PRIVATE -- anyone who can edit a workflow could exfiltrate it.
+# Security note: each secret is a live session to a real venue account. Safe in
+# a PRIVATE repo only -- anyone who can edit a workflow could exfiltrate it.
 
 on:
   schedule:
-    - cron: "0 3 1 */2 *"   # 03:00 UTC on the 1st of every 2 months
-  workflow_dispatch:
-    inputs:
-      subfile:
-        description: "Path to the .sub file to submit"
-        required: false
-        default: ""
+    - cron: "0 3 1 */2 *"   # 03:00 UTC on the 1st of each 2 months
+  workflow_dispatch: {}    # allow manual runs from the Actions tab
+
+permissions:
+  contents: write        # push the refresh branch
+  pull-requests: write   # open the PR
 
 jobs:
-  submit:
+  walkthrough:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,45 +56,134 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install paperpush + Playwright
+      - name: Install paperpush (with dev extras) + Playwright
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
+          pip install -e ".[dev]"
           python -m playwright install --with-deps chromium
 
-      - name: Restore portal session
+      - name: Restore saved portal sessions
+        id: sessions
         env:
-          SESSION_B64: ${{ secrets.BIORXIV_SESSION_B64 }}
+          # Add one line per venue: <SLUG>_SESSION_B64: ${{ secrets.<SLUG>_SESSION_B64 }}
+          BIORXIV_SESSION_B64: ${{ secrets.BIORXIV_SESSION_B64 }}
+          BIOINFORMATICS_SESSION_B64: ${{ secrets.BIOINFORMATICS_SESSION_B64 }}
         run: |
-          if [ -z "${SESSION_B64}" ]; then
-            echo "::error::BIORXIV_SESSION_B64 secret is not set. See the setup notes in this workflow file."
-            exit 1
-          fi
           mkdir -p "${HOME}/.config/paperpush"
-          echo "${SESSION_B64}" | base64 --decode > "${HOME}/.config/paperpush/biorxiv_session.json"
-
-      - name: Resolve .sub file
-        id: resolve
-        env:
-          INPUT_SUBFILE: ${{ inputs.subfile }}
-          VAR_SUBFILE: ${{ vars.SUBFILE }}
-        run: |
-          subfile="${INPUT_SUBFILE:-${VAR_SUBFILE:-tests/sub_files/biorxiv/biorxiv.sub}}"
-          if [ ! -f "${subfile}" ]; then
-            echo "::error::.sub file not found: ${subfile}"
+          venues=""
+          # restore <slug> <base64-secret-value>: write the session file the
+          # walkthrough will reuse, and add the slug to the --venue list. An
+          # unset secret is skipped so the workflow still runs for the rest.
+          restore() {
+            local slug="$1" b64="$2"
+            if [ -n "$b64" ]; then
+              echo "$b64" | base64 --decode > "${HOME}/.config/paperpush/${slug}_session.json"
+              venues="${venues} --venue ${slug}"
+              echo "Restored ${slug} session."
+            else
+              echo "::notice::${slug}_SESSION_B64 unset; skipping ${slug}."
+            fi
+          }
+          restore biorxiv "${BIORXIV_SESSION_B64}"
+          restore bioinformatics "${BIOINFORMATICS_SESSION_B64}"
+          # Add one line per new venue: restore <slug> "${<SLUG>_SESSION_B64}"
+          if [ -z "${venues}" ]; then
+            echo "::error::No *_SESSION_B64 secrets set; nothing to check."
             exit 1
           fi
-          echo "subfile=${subfile}" >> "${GITHUB_OUTPUT}"
+          echo "venues=${venues}" >> "${GITHUB_OUTPUT}"
 
-      - name: Run submission
+      - name: Run submit walkthroughs (headless) and record outcomes
+        env:
+          PAPERPUSH_WALKTHROUGH_HEADLESS: "1"
         run: |
           set -o pipefail
-          paperpush submit "${{ steps.resolve.outputs.subfile }}" --headless | tee submit.log
+          # A per-venue failure must not abort the run -- pytest tests each venue
+          # independently, and the test itself retries up to 3x then records the
+          # outcome (✅ via record_success on a clean exit, ❌ via record_failure
+          # after all attempts fail). So `|| true` keeps the step green
+          # regardless; the status JSON is the real signal. `set -o pipefail`
+          # still lets `tee` capture the full log.
+          pytest -v -p no:cacheprovider --run-portal \
+            "tests/test_submit.py::test_submit_walkthrough" \
+            ${{ steps.sessions.outputs.venues }} \
+            2>&1 | tee walkthrough.log || true
 
-      - name: Upload submission log
+      - name: Regenerate venue tables from the new outcomes
+        run: python scripts/gen_readme_venues.py
+
+      - name: Open a PR (auto-merge when only dates changed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- tests/submit_walkthrough_status.json venues.md README.md; then
+            echo "No checkmark changes this run; not opening a PR."
+            exit 0
+          fi
+
+          # Did any venue flip ✅<->❌, or did only dates advance? A slug present
+          # in the status file is ✅ and absent is ❌, so an unchanged *set* of
+          # slugs means every checkmark kept its status and only dates moved --
+          # safe to auto-merge. Compare the committed (HEAD) file to the new one.
+          old_keys=$(git show HEAD:tests/submit_walkthrough_status.json 2>/dev/null \
+            | python -c "import json,sys; print(chr(10).join(sorted(json.load(sys.stdin))))" || true)
+          new_keys=$(python -c "import json; print(chr(10).join(sorted(json.load(open('tests/submit_walkthrough_status.json')))))")
+          if [ "${old_keys}" = "${new_keys}" ]; then only_dates=yes; else only_dates=no; fi
+          echo "only_dates=${only_dates}"
+
+          month="$(date -u +%Y-%m)"
+          branch="checkmarks/refresh-${month}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${branch}"
+          git add tests/submit_walkthrough_status.json venues.md README.md
+          git commit -m "chore: refresh submit-walkthrough checkmarks (${month})"
+          # Force so a re-run in the same month updates the existing branch.
+          git push --force origin "${branch}"
+
+          if [ "${only_dates}" = "yes" ]; then
+            body="Automated refresh: only ✅ dates advanced -- no venue changed status. Auto-merging."
+          else
+            body="Automated refresh: **a venue's ✅/❌ status changed this run** -- review before merging. See the \`walkthrough-log\` artifact for which venue(s) failed."
+          fi
+          # Create the PR, or (if one already exists for this branch) just note
+          # that the push updated it.
+          gh pr create \
+            --title "Refresh submit-walkthrough checkmarks (${month})" \
+            --body "${body}" \
+            --head "${branch}" \
+            --base "${{ github.ref_name }}" \
+          || echo "::notice::PR for ${branch} already exists; pushed the update to it."
+
+          # Name the venues whose walkthrough failed this run, straight from the
+          # "recorded submit walkthrough FAILURE for <slug>" lines the test
+          # prints. Posting them as a PR comment means a status-flip PR says
+          # which portal broke without opening the walkthrough-log artifact.
+          # Done before the merge below so the branch still exists to comment on.
+          if [ -f walkthrough.log ]; then
+            failed=$(grep -oE 'recorded submit walkthrough FAILURE for [a-z0-9_]+' walkthrough.log \
+              | awk '{print $NF}' | sort -u || true)
+            if [ -n "${failed}" ]; then
+              list=$(echo "${failed}" | sed 's/^/- /')
+              gh pr comment "${branch}" --body "$(printf '⚠️ The following venue walkthrough(s) failed this run and are now ❌:\n\n%s\n\nSee the **walkthrough-log** artifact for the full output.' "${list}")" \
+                || echo "::warning::Could not post the failed-venue comment."
+            fi
+          fi
+
+          # Auto-merge only when no venue flipped status; a flip means a portal
+          # newly broke (or recovered), which deserves a human look.
+          if [ "${only_dates}" = "yes" ]; then
+            echo "Only date bumps -> auto-merging."
+            gh pr merge "${branch}" --squash --delete-branch --auto \
+              || echo "::warning::Could not enable auto-merge. Turn on 'Allow auto-merge' under Settings -> General -> Pull Requests, or merge the PR manually."
+          else
+            echo "::notice::A venue flipped ✅<->❌ this run; leaving the PR open for manual review."
+          fi
+
+      - name: Upload walkthrough log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: submit-log
-          path: submit.log
+          name: walkthrough-log
+          path: walkthrough.log
           if-no-files-found: ignore

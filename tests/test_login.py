@@ -17,7 +17,7 @@ Credential storage is kept off the real keychain/config by the autouse
 
 import pytest
 
-from paperpush import credentials, venues, orcid, subfile
+from paperpush import credentials, orcid, subfile, venues
 from paperpush.cli import main
 from paperpush.database import get_venue, list_venues
 from paperpush.validate import parse_authors

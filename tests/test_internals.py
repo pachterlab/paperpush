@@ -27,7 +27,6 @@ from paperpush import manuscript as m
 from paperpush.database import DATABASE_PATH, Field
 from paperpush.schema_models import build_schema
 from paperpush.validate import _check_file_field
-
 # Reuse the same low-level builders the sample fixtures use.
 from tests.conftest import _build_docx, _build_pdf
 

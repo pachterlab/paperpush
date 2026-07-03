@@ -9,9 +9,7 @@ from __future__ import annotations
 
 from . import main
 from .main import (  # noqa: F401 -- re-exported as this module's public API
-    EditorialManagerLoginError,
-    Variant,
-)
+    EditorialManagerLoginError, Variant)
 
 
 class PlosCompbioVenue(main.EditorialManagerVenue):

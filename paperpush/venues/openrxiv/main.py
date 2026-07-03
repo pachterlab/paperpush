@@ -15,16 +15,13 @@ from urllib.parse import urlsplit
 
 from ...database import get_venue
 from ..base import Venue
-from ..common import (
-    DEFAULT_TIMEOUT_SECONDS,
-    apply_default_timeouts,
-    hold_open,
-    open_run_context,
-    split_name_first_middle_last as _split_name,
-    parse_pipe_file_list as _parse_file_list,
-    parse_pipe_funders as _parse_funders,
-    declares_no_competing_interest as _declares_no_competing_interest,
-)
+from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts
+from ..common import \
+    declares_no_competing_interest as _declares_no_competing_interest
+from ..common import hold_open, open_run_context
+from ..common import parse_pipe_file_list as _parse_file_list
+from ..common import parse_pipe_funders as _parse_funders
+from ..common import split_name_first_middle_last as _split_name
 from ..login import VenueLoginError
 
 logger = logging.getLogger(__name__)
@@ -743,7 +740,8 @@ def check_biorxiv(headless: bool = True, timeout_ms: int = 8000, discard: bool =
     queue; ``discard=True`` attempts a best-effort cleanup (see
     :func:`_discard_draft`), reported in ``CheckReport.discarded``.
     """
-    from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    from playwright.sync_api import TimeoutError as PWTimeout
+    from playwright.sync_api import sync_playwright
 
     path = session_path(cfg)
     if not path.exists():

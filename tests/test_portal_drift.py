@@ -47,9 +47,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 import drift
+import pytest
 
 from paperpush.database import list_venues
 from paperpush.venues import common
@@ -300,7 +299,8 @@ def _sign_in_or_skip_if_blocked(spec, page, slug, username, password):
 
 def _assert_contract(items):
     """Fail with the list of every missing selector, not just the first."""
-    from playwright.sync_api import expect, TimeoutError as PWTimeout
+    from playwright.sync_api import TimeoutError as PWTimeout
+    from playwright.sync_api import expect
 
     missing = []
     for desc, locator in items:

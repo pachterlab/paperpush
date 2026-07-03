@@ -10,7 +10,8 @@ from __future__ import annotations
 import copy
 import json
 import logging
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional

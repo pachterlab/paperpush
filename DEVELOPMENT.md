@@ -140,19 +140,14 @@ from the Actions tab, and the portal-facing ones need a saved session stored as 
 
 **Scheduled (live portals)**
 
-- `submit.yml` (every 2 months) — runs the real `paperpush submit` click-through for a
-  `.sub` file, stopping before the final submit, to prove the flow still works.
-- `refresh-checkmarks.yml` (every 2 months) — runs the submit walkthrough
-  headless for each venue with a session secret, records ✅ (pass) / ❌ (fail)
-  into `tests/submit_walkthrough_status.json`, regenerates the venue tables, and
-  opens a PR: it auto-merges when only dates changed and stays open (with the
-  failed venues listed in a comment) when a venue flips status.
-- `check-portal.yml` (every 2 months) — walks the bioRxiv wizard with dummy data
-  and fails if a selector we rely on disappeared.
-- `portal-drift.yml` (every 2 months) — compares each portal's sign-in and first
-  wizard step against the committed fingerprints in `tests/portal_snapshots`.
+- `submit.yml` (every 2 months) — Drives each venue with a
+  session secret through the real submission wizard headless (stopping before the
+  final submit, retrying up to 3× per venue), records ✅ (pass) / ❌ (fail) into
+  `tests/submit_walkthrough_status.json`, regenerates the venue tables, and opens
+  a PR: it auto-merges when only dates changed and stays open — with the failed
+  venues named in a comment — when a venue flips ✅↔❌.
 - `nature-categories.yml` (every 6 months) — re-scrapes Nature's subject-category
   tree from the live wizard and opens a PR if it drifted.
 
-A failed scheduled run emails the repo watchers, so a portal change surfaces here
-rather than during a real submission.
+The submit walkthrough's pass/fail is the portal-health signal: a portal change
+that breaks submission flips the venue to ❌ (and the PR stays open for review).

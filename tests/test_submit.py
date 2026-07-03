@@ -27,9 +27,9 @@ import os
 from pathlib import Path
 
 import pytest
-
 import sample_subfiles
 from sample_subfiles import REPO_ROOT, scenarios
+
 from paperpush import credentials, subfile, venues
 from paperpush.cli import main
 from paperpush.subfile import SubFile
@@ -53,9 +53,9 @@ def _stub_submit(monkeypatch):
     short-circuits the Playwright path. Returns a list the runner appends to
     when it is invoked, so a test can assert the submission actually ran.
     """
-    import paperpush.venues as venues
     import paperpush.subfile as subfile
     import paperpush.validate as validate_mod
+    import paperpush.venues as venues
 
     ran: list = []
     monkeypatch.setattr(subfile, "load", lambda path: SubFile(venue="biorxiv", values={}))
@@ -292,35 +292,55 @@ def test_submit_walkthrough(slug, sub_path, capsys):
     """
     sub = sub_path
     # Headed by default (matching launch.json), so a developer can watch and
-    # sign in. An unattended runner (the monthly refresh-checkmarks workflow)
-    # has no display, so PAPERPUSH_WALKTHROUGH_HEADLESS=1 switches to headless.
+    # sign in. An unattended runner (the submit.yml workflow) has no display,
+    # so PAPERPUSH_WALKTHROUGH_HEADLESS=1 switches to headless.
     # Either way, without -s pytest's captured stdin makes hold_open's input()
     # raise OSError, which hold_open swallows and returns -- so reaching
     # hold_open counts as success. With -s it instead waits for Ctrl+D/Ctrl+C.
     argv = ["submit", str(sub)]
     if os.environ.get("PAPERPUSH_WALKTHROUGH_HEADLESS") == "1":
         argv.append("--headless")
+    # Portals fail intermittently (a flaky network hop, a slow page, a transient
+    # 5xx), so give each venue up to three attempts before believing it is broken
+    # -- only a venue that fails all three flips to ❌. An attempt fails if
+    # ``submit`` exits non-zero or raises; the first clean exit wins and stops the
+    # retries.
+    max_attempts = 3
+
     # Print outside pytest's capture so it is visible even without -s; with -s
     # (required for hold_open) it simply lands inline before the browser opens.
     #
     # Record the outcome either way so the README's "Submit walkthrough" column
-    # tracks reality: a clean run stamps today's date (✅), while a non-zero exit
-    # or a crash drops the venue (❌). Recording happens before the assert so a
+    # tracks reality: a clean run stamps today's date (✅), while failing every
+    # attempt drops the venue (❌). Recording happens before the assert so a
     # failing run still flips the venue to ❌; the README is regenerated
     # separately via scripts/gen_readme_venues.py, which reads this status file.
     with capsys.disabled():
         print(f"\n=== submit {slug}: {sub} ===")
         print("    (the browser holds open at the end; press Ctrl+D to go on)")
-        try:
-            rc = main(argv)
-        except Exception:
-            record_failure(slug)
-            print(f"    recorded submit walkthrough FAILURE for {slug} (❌)")
-            raise
+        rc = None
+        last_error = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                rc = main(argv)
+            except Exception as exc:  # a crash is a failed attempt, not yet fatal
+                rc, last_error = None, exc
+                print(f"    attempt {attempt}/{max_attempts} for {slug} crashed: {exc!r}")
+            else:
+                if rc == 0:
+                    break
+                last_error = None
+                print(f"    attempt {attempt}/{max_attempts} for {slug} exited {rc}")
+            if attempt < max_attempts:
+                print(f"    retrying {slug} ...")
         if rc == 0:
             date = record_success(slug)
             print(f"    recorded submit walkthrough for {slug}: {date} (✅)")
         else:
             record_failure(slug)
-            print(f"    recorded submit walkthrough FAILURE for {slug}: exit {rc} (❌)")
-    assert rc == 0, f"submit {slug} exited {rc}"
+            print(f"    recorded submit walkthrough FAILURE for {slug} after {max_attempts} attempts (❌)")
+    if rc != 0:
+        msg = f"submit {slug} failed all {max_attempts} attempts"
+        if last_error is not None:
+            raise AssertionError(f"{msg}; last error: {last_error!r}") from last_error
+        raise AssertionError(msg)

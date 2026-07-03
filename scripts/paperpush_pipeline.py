@@ -52,13 +52,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from paperpush._logging import configure_logging  # noqa: E402
-from paperpush.cli import (  # noqa: E402
-    _cmd_autofill,
-    _cmd_login,
-    _cmd_submit,
-    _cmd_subfile,
-    _cmd_validate,
-)
+from paperpush.cli import (_cmd_autofill, _cmd_login,  # noqa: E402
+                           _cmd_subfile, _cmd_submit, _cmd_validate)
 from paperpush.database import get_venue  # noqa: E402
 from paperpush.subfile import default_filename  # noqa: E402
 

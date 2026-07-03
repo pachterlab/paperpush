@@ -30,7 +30,8 @@ import dataclasses
 import json
 import sys
 from pathlib import Path
-from typing import Annotated, Any, Literal, Union, get_args, get_origin, get_type_hints
+from typing import (Annotated, Any, Literal, Union, get_args, get_origin,
+                    get_type_hints)
 
 # Import the package directly from the repo without requiring an install.
 REPO_ROOT = Path(__file__).resolve().parent.parent

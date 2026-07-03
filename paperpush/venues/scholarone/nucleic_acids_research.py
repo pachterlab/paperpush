@@ -20,22 +20,14 @@ import logging
 import re
 
 from ...database import get_venue
-from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, open_run_context
-
+from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
+                      hold_open, open_run_context)
 # Reuse the shared ScholarOne platform engine (author/keyword/reviewer/parse
 # helpers). Sign-in is inherited from ScholarOneVenue.
 from . import main as scholarone
 from .main import (  # noqa: F401 -- re-exported as this module's public API
-    ScholarOneLoginError,
-    _add_authors,
-    _add_keywords,
-    _add_reviewers,
-    _answer_sanctions,
-    _split_figures,
-    _split_keywords,
-    _split_reviewers,
-    _yes,
-)
+    ScholarOneLoginError, _add_authors, _add_keywords, _add_reviewers,
+    _answer_sanctions, _split_figures, _split_keywords, _split_reviewers, _yes)
 
 logger = logging.getLogger(__name__)
 

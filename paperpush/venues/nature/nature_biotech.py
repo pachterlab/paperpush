@@ -9,14 +9,9 @@ from __future__ import annotations
 
 from . import main
 from .main import (  # noqa: F401 -- re-exported as this module's public API
-    CategoryCheckReport,
-    FIELD_OPTION_LISTERS,
-    FIELD_VALIDATORS,
-    NatureLoginError,
-    Variant,
-    convert_scraped_categories,
-    list_nature_categories,
-)
+    FIELD_OPTION_LISTERS, FIELD_VALIDATORS, CategoryCheckReport,
+    NatureLoginError, Variant, convert_scraped_categories,
+    list_nature_categories)
 
 
 class NatureBiotechVenue(main.EJPVenue):

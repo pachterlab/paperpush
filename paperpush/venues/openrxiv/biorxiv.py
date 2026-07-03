@@ -10,11 +10,7 @@ from __future__ import annotations
 
 from . import main
 from .main import (  # noqa: F401 -- re-exported as this module's public API
-    CheckReport,
-    OpenRxivLoginError,
-    StepResult,
-    Variant,
-)
+    CheckReport, OpenRxivLoginError, StepResult, Variant)
 
 
 class BiorxivVenue(main.OpenRxivVenue):

@@ -24,9 +24,9 @@ fixture in ``conftest.py``.
 from __future__ import annotations
 
 import pytest
-
 import sample_subfiles
 from sample_subfiles import REPO_ROOT, scenarios
+
 from paperpush import subfile, venues
 from paperpush.cli import main
 from paperpush.database import get_venue, list_venues
