@@ -20,18 +20,18 @@ name: Portal fingerprint check
 #   * test_login_page_drift  -- network only; runs for every venue with a drift
 #                               spec, no session needed.
 #   * test_first_step_drift  -- needs a signed-in session per venue, restored
-#                               from the <SLUG>_SESSION_B64 secrets. A venue
-#                               whose secret is unset simply skips its first-step
-#                               check; the login-page check still runs. So this
-#                               workflow does something useful even with no
-#                               secrets set.
+#                               from the shared PAPERPUSH_SESSIONS_B64 bundle. A
+#                               venue not in the bundle simply skips its
+#                               first-step check; the login-page check still
+#                               runs. So this workflow does something useful even
+#                               with no secret set.
 #
 # A failed run emails the repo watchers (GitHub's default notification) and
 # uploads a screenshot + HTML of the changed page (the portal-fingerprint
 # artifact) so the drift can be diagnosed offline. If the change is intended,
 # refresh the baselines with `pytest --run-portal --update-snapshots` and commit.
 #
-# SETUP: none beyond submit.yml's -- the same <SLUG>_SESSION_B64 secrets are
+# SETUP: none beyond submit.yml's -- the same PAPERPUSH_SESSIONS_B64 bundle is
 # reused through the shared restore action, so a venue checked by the walkthrough
 # is checked here too.
 #
@@ -64,7 +64,7 @@ jobs:
         id: sessions
         uses: ./.github/actions/restore-portal-sessions
         with:
-          all_secrets: ${{ toJSON(secrets) }}
+          sessions_b64: ${{ secrets.PAPERPUSH_SESSIONS_B64 }}
 
       - name: Check portals for structural drift
         run: |

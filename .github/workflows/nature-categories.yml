@@ -13,18 +13,18 @@ name: Nature subject-category refresh
 # NOT SUBMIT") and best-effort deletes it; if the delete control isn't found, the
 # job log says so and you can remove it by hand.
 #
-# SETUP (one time):
+# SETUP: none of its own -- this reuses the shared PAPERPUSH_SESSIONS_B64 bundle
+# (see submit.yml), which must include a Nature session:
 #   1. Locally sign in and save a Nature session:
 #        paperpush session nature
-#   2. Base64-encode it:
-#        base64 -i ~/.config/paperpush/nature_session.json | pbcopy
-#   3. Repo -> Settings -> Secrets and variables -> Actions -> New secret:
-#        NATURE_SESSION_B64
+#   2. Rebuild the bundle so it contains nature_session.json:
+#        ( cd ~/.config/paperpush && tar -czf - *_session.json ) | base64 | pbcopy
+#   3. Update the PAPERPUSH_SESSIONS_B64 secret with the new value.
 #
 # The session expires periodically; when the job reports "session looks expired",
-# redo steps 1-3 to refresh the secret.
+# redo steps 1-3 to refresh the bundle.
 #
-# Security note: the secret is a live session to a real Nature account. Safe in a
+# Security note: the bundle carries live sessions to real accounts. Safe in a
 # PRIVATE repo; reconsider before making the repo public, since anyone who can
 # edit a workflow could exfiltrate it.
 
@@ -53,17 +53,19 @@ jobs:
           pip install -e ".[dev]"
           python -m playwright install --with-deps chromium
 
-      - name: Restore saved Nature session
-        env:
-          NATURE_SESSION_B64: ${{ secrets.NATURE_SESSION_B64 }}
+      - name: Restore saved portal sessions
+        uses: ./.github/actions/restore-portal-sessions
+        with:
+          sessions_b64: ${{ secrets.PAPERPUSH_SESSIONS_B64 }}
+
+      - name: Require a Nature session
+        # Unlike the walkthrough/fingerprint jobs, this one needs one specific
+        # session -- fail clearly if the bundle did not carry it.
         run: |
-          if [ -z "${NATURE_SESSION_B64}" ]; then
-            echo "::error::NATURE_SESSION_B64 is unset; cannot run the category check."
+          if [ ! -f "${HOME}/.config/paperpush/nature_session.json" ]; then
+            echo "::error::PAPERPUSH_SESSIONS_B64 has no nature_session.json; cannot run the category check."
             exit 1
           fi
-          mkdir -p "${HOME}/.config/paperpush"
-          echo "${NATURE_SESSION_B64}" | base64 --decode > "${HOME}/.config/paperpush/nature_session.json"
-          echo "Restored Nature session."
 
       - name: Refresh subject categories
         run: |

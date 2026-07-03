@@ -129,8 +129,10 @@ black . -l 99999
 ## CI/CD
 
 GitHub Actions (`.github/workflows/`). All scheduled jobs also allow manual runs
-from the Actions tab, and the portal-facing ones need a saved session stored as a
-`<SLUG>_SESSION_B64` secret (see each workflow's header).
+from the Actions tab. The portal-facing ones share one secret,
+`PAPERPUSH_SESSIONS_B64` — a base64 tar.gz of the saved `*_session.json` files
+(`( cd ~/.config/paperpush && tar -czf - *_session.json ) | base64`) — restored
+by the `restore-portal-sessions` composite action (see each workflow's header).
 
 **On every push / PR**
 
@@ -146,6 +148,10 @@ from the Actions tab, and the portal-facing ones need a saved session stored as 
   `tests/submit_walkthrough_status.json`, regenerates the venue tables, and opens
   a PR: it auto-merges when only dates changed and stays open — with the failed
   venues named in a comment — when a venue flips ✅↔❌.
+- `fingerprint.yml` (every 2 months) — the complementary signal to the
+  walkthrough: diffs each portal's login page and first wizard step against the
+  committed fingerprint in `tests/portal_snapshots` and fails loudly if the
+  structure changed, catching a portal that drifted *without* breaking submission.
 - `nature-categories.yml` (every 6 months) — re-scrapes Nature's subject-category
   tree from the live wizard and opens a PR if it drifted.
 

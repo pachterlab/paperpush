@@ -26,7 +26,7 @@ name: Submit walkthrough
 #        paperpush login biorxiv
 #        paperpush login bioinformatics
 #   2. Bundle every saved session into one base64 blob:
-#        tar -C ~/.config/paperpush -czf - *_session.json | base64 | pbcopy
+#        ( cd ~/.config/paperpush && tar -czf - *_session.json ) | base64 | pbcopy
 #   3. Store it as a secret visible to this repo (an org or environment secret if
 #      it lives in paperpush-private), named PAPERPUSH_SESSIONS_B64.
 #
@@ -65,13 +65,13 @@ jobs:
 
       - name: Restore saved portal sessions
         id: sessions
-        # Registry-driven restore, shared with fingerprint.yml. For every venue
-        # in the database it looks for a <SLUG>_SESSION_B64 secret and restores
-        # any that are set, emitting the matching `--venue` flags. Adding a venue
-        # needs no edit here -- just create its secret.
+        # Shared restore, also used by fingerprint.yml and nature-categories.yml.
+        # Decodes the PAPERPUSH_SESSIONS_B64 bundle and emits a `--venue` flag for
+        # each restored venue. Adding a venue needs no edit here -- just include
+        # its session in the bundle.
         uses: ./.github/actions/restore-portal-sessions
         with:
-          all_secrets: ${{ toJSON(secrets) }}
+          sessions_b64: ${{ secrets.PAPERPUSH_SESSIONS_B64 }}
 
       - name: Require at least one restored session
         # The walkthrough drives real portals, so unlike fingerprint.yml (whose
@@ -79,7 +79,7 @@ jobs:
         # sessions -- fail early and clearly rather than run an empty pytest.
         run: |
           if [ -z "${{ steps.sessions.outputs.venues }}" ]; then
-            echo "::error::No <SLUG>_SESSION_B64 secrets set; nothing to walk."
+            echo "::error::PAPERPUSH_SESSIONS_B64 is empty or unset; nothing to walk."
             exit 1
           fi
 

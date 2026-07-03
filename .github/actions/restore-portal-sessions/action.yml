@@ -13,7 +13,7 @@ inputs:
   sessions_b64:
     description: >-
       base64 of a tar.gz over the session files, produced locally with:
-        tar -C ~/.config/paperpush -czf - *_session.json | base64
+        ( cd ~/.config/paperpush && tar -czf - *_session.json ) | base64
       Empty or unset is allowed (nothing is restored, empty `venues` output).
     required: false
     default: ""
