@@ -127,7 +127,8 @@ PLATFORMS = {
 }
 
 # Submit-walkthrough verification status is no longer hand-maintained here.
-# It is recorded automatically by ``tests/test_submit_walkthrough.py`` into
+# It is recorded automatically by the ``test_submit_walkthrough`` case in
+# ``tests/test_submit.py`` into
 # ``tests/submit_walkthrough_status.json`` (keyed by slug -> ISO date of the
 # last successful live-portal run) and loaded below. Re-running the walkthrough
 # test for a venue refreshes its date; this generator simply reflects it.
@@ -139,7 +140,7 @@ def walkthrough_cell(slug: str) -> str:
 
     The cell text is the last successful run date (``✅ YYYY-MM-DD``) when the
     walkthrough test has recorded one for this slug, or ``❌`` otherwise. Either
-    way it links to ``tests/test_submit_walkthrough.py`` so a reader can jump
+    way it links to ``tests/test_submit.py`` so a reader can jump
     straight to the test that produces the result.
     """
     date = WALKTHROUGH.get(slug)

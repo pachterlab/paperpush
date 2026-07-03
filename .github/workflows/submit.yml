@@ -15,7 +15,7 @@ name: Monthly submission
 #   2. Base64-encode it:
 #        base64 -i ~/.config/paperpush/biorxiv_session.json | pbcopy
 #   3. Repo -> Settings -> Secrets and variables -> Actions -> New secret:
-#        name:  BIORXIV_SESSION_B64    value: (paste)
+#        name:  Pancake2    value: (paste)
 #
 # The .sub file to submit defaults to tests/sub_files/biorxiv/biorxiv.sub. Override it per repo
 # under Settings -> Secrets and variables -> Actions -> Variables as SUBFILE,
@@ -26,7 +26,7 @@ name: Monthly submission
 
 on:
   schedule:
-    - cron: "0 9 1 * *"   # 09:00 UTC on the 1st of every month
+    - cron: "0 3 1 */2 *"   # 03:00 UTC on the 1st of every 2 months
   workflow_dispatch:
     inputs:
       subfile:

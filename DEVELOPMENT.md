@@ -114,6 +114,12 @@ pytest tests/test_portal_drift.py --run-portal --update-snapshots
 pytest tests/test_portal_drift.py --run-portal --update-snapshots --venue nature
 ```
 
+Update venues.md checklist (included automatically in pre-commit hook and bi-monthly CI job):
+
+```bash
+python scripts/gen_readme_venues.py
+```
+
 ## Formatting
 
 ```bash
@@ -122,4 +128,31 @@ black . -l 99999
 
 ## CI/CD
 
-A monthly job checks that each submission flow still works and that the venue portals have not changed.
+GitHub Actions (`.github/workflows/`). All scheduled jobs also allow manual runs
+from the Actions tab, and the portal-facing ones need a saved session stored as a
+`<SLUG>_SESSION_B64` secret (see each workflow's header).
+
+**On every push / PR**
+
+- `ci.yml` — runs `pytest` (real-portal tests are skipped) and checks that
+  `venues.md` / `README.md` and `venues.schema.json` are in sync with their
+  generators.
+
+**Scheduled (live portals)**
+
+- `submit.yml` (every 2 months) — runs the real `paperpush submit` click-through for a
+  `.sub` file, stopping before the final submit, to prove the flow still works.
+- `refresh-checkmarks.yml` (every 2 months) — runs the submit walkthrough
+  headless for each venue with a session secret, records ✅ (pass) / ❌ (fail)
+  into `tests/submit_walkthrough_status.json`, regenerates the venue tables, and
+  opens a PR: it auto-merges when only dates changed and stays open (with the
+  failed venues listed in a comment) when a venue flips status.
+- `check-portal.yml` (every 2 months) — walks the bioRxiv wizard with dummy data
+  and fails if a selector we rely on disappeared.
+- `portal-drift.yml` (every 2 months) — compares each portal's sign-in and first
+  wizard step against the committed fingerprints in `tests/portal_snapshots`.
+- `nature-categories.yml` (every 6 months) — re-scrapes Nature's subject-category
+  tree from the live wizard and opens a PR if it drifted.
+
+A failed scheduled run emails the repo watchers, so a portal change surfaces here
+rather than during a real submission.

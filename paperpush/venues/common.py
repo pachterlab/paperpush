@@ -72,7 +72,16 @@ def hold_open() -> None:
     try:
         while True:
             input()
-    except (EOFError, KeyboardInterrupt):
+    except (EOFError, KeyboardInterrupt, OSError):
+        # Reaching this point means the run already succeeded -- hold_open is
+        # only ever called after a runner finishes the wizard, and its sole job
+        # is to pause for a human. So any inability to read a keypress means
+        # "no human to wait for; just return cleanly" rather than fail the run:
+        #   EOFError        -- stdin is /dev/null (attended `-s` run, EOF)
+        #   KeyboardInterrupt-- the human pressed Ctrl+C
+        #   OSError         -- stdin is captured by pytest (a bare `pytest
+        #                      --run-portal` status check, or the headless CI
+        #                      refresh), whose fake stdin raises rather than EOFs
         pass
 
 

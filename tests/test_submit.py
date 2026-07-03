@@ -33,7 +33,7 @@ from sample_subfiles import REPO_ROOT, scenarios
 from paperpush import credentials, subfile, venues
 from paperpush.cli import main
 from paperpush.subfile import SubFile
-from tests.submit_walkthrough_status import record_success
+from tests.submit_walkthrough_status import record_failure, record_success
 
 # Sample submission files, base files first; shared by the offline sweep tests.
 SCENARIOS = scenarios()
@@ -291,17 +291,36 @@ def test_submit_walkthrough(slug, sub_path, capsys):
     venue's canonical ``<slug>/<slug>.sub`` unless overridden with ``--subfile``.
     """
     sub = sub_path
+    # Headed by default (matching launch.json), so a developer can watch and
+    # sign in. An unattended runner (the monthly refresh-checkmarks workflow)
+    # has no display, so PAPERPUSH_WALKTHROUGH_HEADLESS=1 switches to headless.
+    # Either way, without -s pytest's captured stdin makes hold_open's input()
+    # raise OSError, which hold_open swallows and returns -- so reaching
+    # hold_open counts as success. With -s it instead waits for Ctrl+D/Ctrl+C.
+    argv = ["submit", str(sub)]
+    if os.environ.get("PAPERPUSH_WALKTHROUGH_HEADLESS") == "1":
+        argv.append("--headless")
     # Print outside pytest's capture so it is visible even without -s; with -s
     # (required for hold_open) it simply lands inline before the browser opens.
+    #
+    # Record the outcome either way so the README's "Submit walkthrough" column
+    # tracks reality: a clean run stamps today's date (✅), while a non-zero exit
+    # or a crash drops the venue (❌). Recording happens before the assert so a
+    # failing run still flips the venue to ❌; the README is regenerated
+    # separately via scripts/gen_readme_venues.py, which reads this status file.
     with capsys.disabled():
         print(f"\n=== submit {slug}: {sub} ===")
         print("    (the browser holds open at the end; press Ctrl+D to go on)")
-        rc = main(["submit", str(sub)])
+        try:
+            rc = main(argv)
+        except Exception:
+            record_failure(slug)
+            print(f"    recorded submit walkthrough FAILURE for {slug} (❌)")
+            raise
+        if rc == 0:
+            date = record_success(slug)
+            print(f"    recorded submit walkthrough for {slug}: {date} (✅)")
+        else:
+            record_failure(slug)
+            print(f"    recorded submit walkthrough FAILURE for {slug}: exit {rc} (❌)")
     assert rc == 0, f"submit {slug} exited {rc}"
-    # The walkthrough drove the live portal successfully: stamp today's date so
-    # the README's "Submit walkthrough" column reflects this run. The README is
-    # regenerated separately via scripts/gen_readme_venues.py, which reads the
-    # status file this writes.
-    with capsys.disabled():
-        date = record_success(slug)
-        print(f"    recorded submit walkthrough for {slug}: {date}")

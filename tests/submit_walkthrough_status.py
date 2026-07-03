@@ -1,12 +1,14 @@
 """Persisted record of when each venue's submit walkthrough last succeeded.
 
-The submit walkthrough (``tests/test_submit_walkthrough.py``) drives a venue's
-live portal and stops before the final submit. When it succeeds for a venue it
+The submit walkthrough (``test_submit_walkthrough`` in ``tests/test_submit.py``)
+drives a venue's live portal and stops before the final submit. When it succeeds
+for a venue it
 calls :func:`record_success` here, which stamps that venue's slug with the
-current date in ``submit_walkthrough_status.json``. The README generator
+current date in ``submit_walkthrough_status.json``; when it fails it calls
+:func:`record_failure`, which drops the slug. The README generator
 (``scripts/gen_readme_venues.py``) reads the same file via :func:`load_status`
-to render the "Submit walkthrough" column, so the date shown next to each
-venue is exactly the date its walkthrough test last passed.
+to render the "Submit walkthrough" column: a slug with a date shows
+``✅ <date>`` (the day its walkthrough last passed) and an absent slug shows ❌.
 
 Keeping the path and (de)serialization in one module means the test (writer) and
 the generator (reader) cannot drift apart on format or location.
@@ -22,9 +24,10 @@ from pathlib import Path
 TESTS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TESTS_DIR.parent
 
-# The JSON record, ``{slug: "YYYY-MM-DD"}``, and the test that maintains it.
+# The JSON record, ``{slug: "YYYY-MM-DD"}``, and the test that maintains it
+# (the ``test_submit_walkthrough`` case lives in ``tests/test_submit.py``).
 STATUS_PATH = TESTS_DIR / "submit_walkthrough_status.json"
-WALKTHROUGH_TEST = TESTS_DIR / "test_submit_walkthrough.py"
+WALKTHROUGH_TEST = TESTS_DIR / "test_submit.py"
 
 
 def load_status(path: Path = STATUS_PATH) -> dict[str, str]:
@@ -47,3 +50,21 @@ def record_success(slug: str, *, path: Path = STATUS_PATH, today: datetime.date 
     status[slug] = date
     path.write_text(json.dumps(dict(sorted(status.items())), indent=2) + "\n", encoding="utf-8")
     return date
+
+
+def record_failure(slug: str, *, path: Path = STATUS_PATH) -> bool:
+    """Drop ``slug`` from the status file so its walkthrough renders as ❌.
+
+    The inverse of :func:`record_success`: called when a venue's live
+    walkthrough fails, it removes any recorded success date. A slug absent from
+    the file is exactly how the README generator renders a red X, so a venue
+    that stops passing flips from ✅ back to ❌ on the next run. The file is kept
+    sorted and pretty-printed to match :func:`record_success`.
+
+    Returns True if a recorded date was removed, False if the slug was already
+    absent (already ❌).
+    """
+    status = load_status(path)
+    existed = status.pop(slug, None) is not None
+    path.write_text(json.dumps(dict(sorted(status.items())), indent=2) + "\n", encoding="utf-8")
+    return existed

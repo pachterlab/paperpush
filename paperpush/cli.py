@@ -10,6 +10,7 @@ Implemented so far:
                                       fill a .sub from a manuscript directory
     paperpush validate <subfile>  run the pre-submission checks on a .sub
     paperpush login <venue>     store credentials for a venue
+    paperpush login --list        list the venues you are logged in to
     paperpush login --orcid <j>   sign in with ORCID (Sign in with ORCID)
     paperpush submit <subfile>    open bioRxiv and run the submission
 
@@ -133,6 +134,7 @@ def _login_args(venue_slug: str) -> argparse.Namespace:
         into=None,
         status=False,
         logout=False,
+        list=False,
         # submit drives its own browser sign-in next, so don't open a second
         # verification browser here.
         no_verify=True,
@@ -141,8 +143,36 @@ def _login_args(venue_slug: str) -> argparse.Namespace:
     )
 
 
+def _list_logins() -> int:
+    """Print every venue with stored credentials, and who they belong to."""
+    creds = credentials.list_credentials()
+    if not creds:
+        print("Not logged in to any venues.")
+        return 0
+    print("Logged in to:")
+    for cred in creds:
+        location = credentials.credential_location(cred.venue)
+        store = "OS keyring" if location == "keyring" else "config file"
+        if cred.method == "orcid":
+            who = f"ORCID iD {cred.orcid}"
+            if cred.display_name:
+                who += f" ({cred.display_name})"
+        else:
+            who = cred.username
+        print(f"  {cred.venue}: {who} (stored in {store})")
+    return 0
+
+
 @_validate
 def _cmd_login(args: argparse.Namespace) -> int:
+    if getattr(args, "list", False):
+        return _list_logins()
+
+    if not args.venue:
+        print("error: a venue is required (or use --list)", file=sys.stderr)
+        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        return 2
+
     logger.debug("login: venue=%r orcid=%s status=%s logout=%s", args.venue, bool(args.orcid or args.orcid_id), args.status, args.logout)
     try:
         venue = get_venue(args.venue)
@@ -856,7 +886,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_validate.set_defaults(func=_cmd_validate)
 
     p_login = sub.add_parser("login", parents=[verbosity], help="store credentials for a venue submission system")
-    p_login.add_argument("venue", help="venue slug, e.g. biorxiv")
+    p_login.add_argument("venue", nargs="?", help="venue slug, e.g. biorxiv (omit with --list)")
+    p_login.add_argument("--list", action="store_true", help="list the venues you are logged in to with usernames, then exit")
     p_login.add_argument("-u", "--username", help="username or email (otherwise you are prompted or it looks " "for the PAPERPUSH_USERNAME environment variable)")
     p_login.add_argument("--password", help="password (otherwise you are prompted or it looks for the " "PAPERPUSH_PASSWORD environment variable). WARNING: exposes " "the password as plain text in the process list and shell history")
     p_login.add_argument("--orcid", action="store_true", help="sign in with ORCID instead of a username/password")

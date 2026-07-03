@@ -38,22 +38,17 @@ markers = [
     "portal: test hits a real submission portal; skipped unless --run-portal (or PAPERPUSH_RUN_PORTAL=1) is given",
 ]
 
-[tool.setuptools]
-packages = [
-    "paperpush",
-    "paperpush.venues",
-    "paperpush.venues.arxiv",
-    "paperpush.venues.biorxiv",
-    "paperpush.venues.editorialmanager",
-    "paperpush.venues.snapp",
-    "paperpush.venues.scholarone",
-    "paperpush.venues.nature",
-    "paperpush.venues.science",
-]
+# Discover every paperpush subpackage automatically. An explicit list silently
+# drops any venue package that isn't added here, which breaks non-editable
+# installs (the missing module imports fine in an editable checkout but is
+# absent from the built wheel).
+[tool.setuptools.packages.find]
+include = ["paperpush*"]
 
 [tool.setuptools.package-data]
+# "_assets/*" (not "*.json") so the .txt category/keyword files ship too.
 paperpush = ["venues.json", "venues.schema.json", "subfile_templates/*.sub"]
-"paperpush.venues" = ["_assets/*.json"]
+"paperpush.venues" = ["_assets/*"]
 
 [tool.black]
 target-version = ["py310", "py311", "py312"]

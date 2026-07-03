@@ -53,8 +53,8 @@ import drift
 
 from paperpush.database import list_venues
 from paperpush.venues import common
-from paperpush.venues.biorxiv import main as biorxiv
-from paperpush.venues.biorxiv.biorxiv import VENUE as biorxiv_venue
+from paperpush.venues.openrxiv import main as biorxiv
+from paperpush.venues.openrxiv.biorxiv import VENUE as biorxiv_venue
 from paperpush.venues.scholarone import bioinformatics
 
 pytestmark = pytest.mark.portal

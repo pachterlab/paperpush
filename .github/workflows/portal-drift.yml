@@ -32,7 +32,7 @@ name: Portal drift check
 
 on:
   schedule:
-    - cron: "0 9 * * 1"   # Mondays 09:00 UTC
+    - cron: "0 3 1 */2 *"   # 03:00 UTC on the 1st of each 2 months
   workflow_dispatch: {}    # allow manual runs from the Actions tab
 
 jobs:

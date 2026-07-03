@@ -81,9 +81,25 @@ def _nullable(prop: dict[str, Any]) -> dict[str, Any]:
     return p
 
 
+def _strip_model_description(schema: dict[str, Any]) -> dict[str, Any]:
+    """Drop the model-level ``description`` pydantic derives from a class docstring.
+
+    Whether a dataclass docstring is propagated to the top-level ``description``
+    of its JSON Schema varies by pydantic version (older releases omit it, newer
+    ones emit it), which would make the committed schema drift purely on the
+    pydantic version CI happens to install. Those class docstrings document the
+    Python implementation, not the ``venues.json`` shape, so we drop them to keep
+    the generated schema deterministic. The per-attribute ``Field(description=...)``
+    descriptions -- the useful editor docs -- live under ``properties`` and are
+    left untouched.
+    """
+    schema.pop("description", None)
+    return schema
+
+
 def _field_schema() -> dict[str, Any]:
     """Full field definition (standalone venues): id, label, type required."""
-    schema = _clean(TypeAdapter(Field).json_schema())
+    schema = _strip_model_description(_clean(TypeAdapter(Field).json_schema()))
     schema["additionalProperties"] = False
     return schema
 
@@ -105,7 +121,7 @@ def _venue_common_schema() -> dict[str, Any]:
     is not stored on the resolved venue). ``fields`` is pointed at the override
     item schema by default; the standalone case tightens it below.
     """
-    schema = _clean(TypeAdapter(Venue).json_schema())
+    schema = _strip_model_description(_clean(TypeAdapter(Venue).json_schema()))
     # TypeAdapter inlines the nested Field model under $defs and points
     # `fields.items` at it; we supply our own field/fieldOverride defs instead.
     schema.pop("$defs", None)
@@ -142,6 +158,8 @@ def build_schema() -> dict[str, Any]:
     # top level so the references resolve, and drop the per-field duplicates (the
     # override is a deep copy of the field, so it carries the same ones).
     nested_defs = field.pop("$defs", {})
+    for nested in nested_defs.values():
+        _strip_model_description(nested)
     field_override.pop("$defs", None)
 
     venue = {

@@ -23,7 +23,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for tips on using playwright, debugging, an
 ## Before opening a pull request
 
 - Run `python tests/sample_subfiles.py` to generate sample subfiles for the new venue.
-- Run `pytest --run-portal --venue VENUE` and make sure that no new failures are introduced. (Requires a browser and login credentials for the venue.)
+- Run `pytest --run-portal -s --venue VENUE` and make sure that no new failures are introduced. (Requires a browser and login credentials for the venue.)
   - If you modify submission scripts that affect other venues, run `pytest --run-portal` to check all venues. (Requires a browser and login credentials for all venues.)
 - Format with `black . -l 99999`
 

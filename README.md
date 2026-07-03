@@ -1,4 +1,4 @@
-# PaperPush: Automated manuscript submission to venues, conferences, and preprint servers
+# PaperPush: Automated manuscript submission to journals, conferences, and preprint servers
 
 Prepare manuscripts for submission to preprint servers, venues, and conferences with just a few commands. No need to spend hours filling out forms manually. Just provide a manuscript directory and submission venue of interest, and `paperpush` will fill out the submission portal for you.
 
@@ -6,6 +6,12 @@ Prepare manuscripts for submission to preprint servers, venues, and conferences 
 
 ```bash
 pip install paperpush
+```
+
+To install the playwright dependency and the required browsers, run:
+
+```bash
+playwright install
 ```
 
 ## Use with AI

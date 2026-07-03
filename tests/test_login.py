@@ -66,6 +66,37 @@ def test_login_status_runs(monkeypatch, capsys):
     assert "Logged in" in capsys.readouterr().out
 
 
+def test_login_list_empty(capsys):
+    # --list with nothing stored reports no logins and exits cleanly.
+    rc = main(["login", "--list"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "Not logged in" in out
+
+
+def test_login_list_shows_venues_and_usernames(monkeypatch, capsys):
+    monkeypatch.setenv("PAPERPUSH_PASSWORD", "s3cret-token")
+    monkeypatch.setenv("PAPERPUSH_USERNAME", "alice@example.edu")
+    assert main(["login", "biorxiv", "--no-verify"]) == 0
+    monkeypatch.setenv("PAPERPUSH_USERNAME", "bob@example.edu")
+    assert main(["login", "arxiv", "--no-verify"]) == 0
+    capsys.readouterr()
+
+    rc = main(["login", "--list"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    # Both venues appear, each paired with the username used to log in.
+    assert "biorxiv: alice@example.edu" in out
+    assert "arxiv: bob@example.edu" in out
+
+
+def test_login_without_venue_or_list_errors(capsys):
+    rc = main(["login"])
+    err = capsys.readouterr().err
+    assert rc == 2
+    assert "venue is required" in err
+
+
 def test_login_verifies_before_storing(monkeypatch, capsys):
     # By default, login confirms the credentials by signing in. A confirmed
     # sign-in stores the credentials.

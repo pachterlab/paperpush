@@ -13,7 +13,6 @@
   },
   "$defs": {
     "fieldOverride": {
-      "description": "A single field a venue asks for during submission.\n\nThe per-attribute descriptions below are attached with\n``Annotated[..., pydantic.Field(description=...)]`` so they serve double duty:\ndocumentation for readers of this class and the field descriptions in the\ngenerated ``venues.schema.json`` (see :mod:`paperpush.schema_models`).\nThe annotations are inert at runtime -- this is a plain stdlib dataclass and\nperforms no validation.",
       "properties": {
         "id": {
           "description": "Stable identifier, unique within the venue; the key used in the .sub file and for inheritance merges.",
@@ -379,7 +378,6 @@
       "additionalProperties": false
     },
     "field": {
-      "description": "A single field a venue asks for during submission.\n\nThe per-attribute descriptions below are attached with\n``Annotated[..., pydantic.Field(description=...)]`` so they serve double duty:\ndocumentation for readers of this class and the field descriptions in the\ngenerated ``venues.schema.json`` (see :mod:`paperpush.schema_models`).\nThe annotations are inert at runtime -- this is a plain stdlib dataclass and\nperforms no validation.",
       "properties": {
         "id": {
           "description": "Stable identifier, unique within the venue; the key used in the .sub file and for inheritance merges.",
@@ -698,7 +696,6 @@
       "additionalProperties": false
     },
     "venueCommon": {
-      "description": "A supported venue and the fields it requires.",
       "properties": {
         "name": {
           "description": "Display name. Defaults to the slug when omitted.",
@@ -825,7 +822,6 @@
       ]
     },
     "ConditionalLimit": {
-      "description": "A length limit whose value depends on a sibling field's value.\n\nSome venues set a manuscript's page or word cap by article type -- e.g.\nBioinformatics allows up to 7 pages for an Original Paper but 4 for an\nApplications Note. ``field`` names the sibling field that selects the limit\n(``article_type``), ``values`` maps each of that field's values to the limit\nthat applies, and ``default`` is the limit used when the selected value is\nnot in the map. Used as the ``*_by`` companion to a scalar ``max_*`` limit on\na manuscript ``file`` field (see :class:`Field`); the scalar acts as the\nfallback when no conditional limit resolves.",
       "properties": {
         "field": {
           "description": "Id of the sibling field whose value selects the limit.",

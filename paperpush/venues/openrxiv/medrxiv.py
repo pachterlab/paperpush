@@ -1,7 +1,7 @@
 """medRxiv submission runner (Playwright).
 
 Thin binding for the medRxiv venue on the openRxiv platform: it selects the
-medRxiv :class:`~paperpush.venues.biorxiv.main.Variant` and exposes the
+medRxiv :class:`~paperpush.venues.openrxiv.main.Variant` and exposes the
 uniform ``VENUE`` object plus the ``check_medrxiv`` interface checker. medRxiv
 keeps its own portal host, credentials, and session. See ``main.py`` for the
 implementation.

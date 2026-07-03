@@ -1,7 +1,7 @@
 """bioRxiv submission runner (Playwright).
 
 Thin binding for the bioRxiv venue on the openRxiv platform: it selects the
-default :class:`~paperpush.venues.biorxiv.main.Variant` and exposes the
+default :class:`~paperpush.venues.openrxiv.main.Variant` and exposes the
 uniform ``VENUE`` object plus the ``check_biorxiv`` interface checker. See
 ``main.py`` for the implementation.
 """

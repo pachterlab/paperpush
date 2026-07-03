@@ -562,7 +562,7 @@ def _add_reviewers(page, reviewers: list[dict], add_button: str, what: str, extr
             else:
                 _try(lambda v=extra: page.locator(SEL_REVIEWER_OPTIONAL).nth(1).fill(v), f"{what} department")
         _try(lambda: _click(page, BTN_SAVE), f"save {what}")
-    
+
     _try(lambda: _click(page, BTN_PROCEED), f"proceed with Reviewers")
 
 

@@ -1,6 +1,6 @@
 """Structural fingerprints of a portal page, for change detection.
 
-The per-venue runners (:mod:`paperpush.venues.biorxiv.main`,
+The per-venue runners (:mod:`paperpush.venues.openrxiv.main`,
 :mod:`paperpush.venues.scholarone.bioinformatics`) bet on a fixed set of
 selectors. A
 contract check (does each selector our code uses still resolve?) catches a break

@@ -249,6 +249,23 @@ def get_credential(slug: str) -> Credential | None:
     return None
 
 
+def list_credentials() -> list[Credential]:
+    """Return the stored credential for every venue, sorted by venue slug.
+
+    The file store records which venues have a login (even keyring-backed ones,
+    whose secret lives in the OS store), so it is the source of truth for the
+    set of logged-in venues. Each slug is resolved through
+    :func:`get_credential` so keyring-backed passwords/tokens are filled in;
+    entries that no longer resolve to a usable credential are skipped.
+    """
+    creds: list[Credential] = []
+    for slug in sorted(_read_file_store()):
+        cred = get_credential(slug)
+        if cred is not None:
+            creds.append(cred)
+    return creds
+
+
 def credential_location(slug: str) -> str | None:
     """Where ``slug``'s credential actually lives: 'keyring', 'file', or None."""
     slug = slug.lower()
