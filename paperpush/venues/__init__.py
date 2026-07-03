@@ -111,6 +111,19 @@ def submission_base(slug: str) -> str:
     return _SUBMISSION_BASE.get(key, key)
 
 
+def submission_aliases(slug: str) -> list[str]:
+    """Slugs that submit through ``slug``'s portal, sharing its one login.
+
+    Returns the other venues whose :func:`submission_base` is ``slug`` (e.g. the
+    AAAS siblings that all sign in as ``science``), sorted, excluding ``slug``
+    itself. Empty for a venue that no others submit through. Callers that report a
+    stored credential can list these alongside it so a whole family reads as
+    separately-logged-in journals even though the credential is stored once.
+    """
+    key = slug.lower()
+    return sorted(alias for alias, base in _SUBMISSION_BASE.items() if base == key and alias != key)
+
+
 def import_venue(slug: str):
     """Import and return the module implementing ``slug``'s runner.
 

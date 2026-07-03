@@ -35,7 +35,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from paperpush.database import list_venues  # noqa: E402
-from paperpush.venues import SLUG_TO_MODULE, submission_base  # noqa: E402
 from tests.submit_walkthrough_status import STATUS_PATH  # noqa: E402
 from tests.submit_walkthrough_status import WALKTHROUGH_TEST, load_status
 
@@ -60,49 +59,19 @@ VENUE_GROUPS = [
 # walkthrough" cell links to.
 WALKTHROUGH_TEST_LINK = WALKTHROUGH_TEST.relative_to(REPO_ROOT).as_posix()
 
-# Publisher/portal "family" each venue belongs to, keyed by the venue's own
-# slug. Family is intentionally tracked independently of database inheritance:
-# the AAAS siblings happen to inherit from ``science`` today and the Nature/Cell
-# siblings are standalone, but every venue is listed explicitly here so the two
-# concepts can diverge -- a venue could move to a different submission process
-# (changing or dropping its inheritance) while keeping its publisher family, or
-# vice versa, without this table going wrong. This mapping is deliberately kept
-# here rather than in ``venues.json`` -- it is README presentation, not part of
-# a venue's submission requirements. Add every new venue's slug here;
-# ``family_of`` falls back to the inherited base, then the display name, so an
-# unmapped venue still renders sensibly.
-FAMILIES = {
-    "arxiv": "arXiv",
-    "biorxiv": "openRxiv",
-    "medrxiv": "openRxiv",
-    "bioinformatics": "Oxford University Press",
-    "nature": "Nature",
-    "nature_biotech": "Nature",
-    "nature_methods": "Nature",
-    "cell": "Cell Press",
-    "cell_systems": "Cell Press",
-    "cell_genomics": "Cell Press",
-    "plos_compbio": "PLOS",
-    "genome_biology": "BMC",
-    "science": "AAAS",
-    "science_advances": "AAAS",
-    "science_immunology": "AAAS",
-    "science_robotics": "AAAS",
-    "science_signaling": "AAAS",
-    "science_translational_medicine": "AAAS",
-}
-
 # Submission platform (the manuscript-submission system the runner drives) each
-# venue uses, keyed by slug. Like ``FAMILIES`` above this is README
-# presentation kept out of ``venues.json``: it describes the third-party portal
-# (Editorial Manager, ScholarOne, ...) the venue happens to run on, which is
-# independent of both the publisher family and the database inheritance. The
+# venue uses, keyed by slug. This is README presentation kept out of
+# ``venues.json``: it describes the third-party portal (Editorial Manager,
+# ScholarOne, ...) the venue happens to run on, which is independent of the
+# database inheritance. The
 # names match the platforms identified in each runner's module docstring (e.g.
 # ``paperpush/venues/editorialmanager/cell.py`` -> Editorial Manager,
 # ``science/science.py`` -> the
 # AAAS Contributor Tracking System). Lookup falls back to the inherited base
 # slug, then to a dash, so an unmapped venue still renders sensibly.
 PLATFORMS = {
+    "aaai_2027": "OpenReview",
+    "discrete_mathematics": "Editorial Manager",
     "arxiv": "arXiv (native)",
     "biorxiv": "openRxiv",
     "medrxiv": "openRxiv",
@@ -150,18 +119,6 @@ def _cell(text: str) -> str:
     return (text or "").replace("|", "\\|").replace("\n", " ").strip()
 
 
-def family_of(venue) -> str:
-    """Return the publisher/portal family label for a venue.
-
-    Each venue -- including the ones that inherit from another (e.g. the AAAS
-    family inheriting from Science) -- gets its own row, but rows are labeled with
-    the family they belong to so siblings are easy to spot. Lookup prefers the
-    venue's own slug, then the slug it inherits from (``inherits``), then falls
-    back to the display name for any venue not yet mapped in ``FAMILIES``.
-    """
-    return FAMILIES.get(venue.slug) or FAMILIES.get(venue.inherits) or venue.name
-
-
 def platform_of(venue) -> str:
     """Return the submission-platform label for a venue.
 
@@ -170,26 +127,6 @@ def platform_of(venue) -> str:
     ``PLATFORMS``.
     """
     return PLATFORMS.get(venue.slug) or PLATFORMS.get(venue.inherits) or "—"
-
-
-def runner_module_of(venue) -> str:
-    """Return the source file of the runner that submits ``venue``, as a link.
-
-    This is the greppable half of :data:`paperpush.venues.SLUG_TO_MODULE`
-    (itself discovered from the ``<portal>/<slug>.py`` layout): the table is the
-    checked-in, ``--check``-verified manifest of which venue's code lives where.
-    A venue that submits through another's portal (the AAAS family through
-    Science) resolves via :func:`~paperpush.venues.submission_base` and is
-    tagged ``(via <base>)``; a venue with no runner yet renders as a dash.
-    """
-    base = submission_base(venue.slug)
-    dotted = SLUG_TO_MODULE.get(base)
-    if dotted is None:
-        return "—"
-    portal, _, stem = dotted.partition(".")
-    path = f"paperpush/venues/{portal}/{stem}.py"
-    cell = f"[`{path}`]({path})"
-    return f"{cell} (via `{base}`)" if base != venue.slug else cell
 
 
 def _linked_name(venue) -> str:
@@ -209,11 +146,11 @@ def build_table() -> str:
     lines = [
         f"_{len(venues)} supported venue" + ("s" if len(venues) != 1 else "") + " (auto-generated from `paperpush/venues.json`)._",
         "",
-        "| Venue | Slug | Venue type | Family | Submission platform | Runner module | Description | Submit walkthrough |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Slug | Venue | Venue type | Submission platform | Description | Submit walkthrough |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for j in venues:
-        lines.append(f"| {_linked_name(j)} | `{j.slug}` | {_cell(j.venue_type.capitalize())} | {_cell(family_of(j))} | {_cell(platform_of(j))} | {runner_module_of(j)} | {_cell(j.description)} | {walkthrough_cell(j.slug)} |")
+        lines.append(f"| `{j.slug}` | {_linked_name(j)} | {_cell(j.venue_type.capitalize())} | {_cell(platform_of(j))} | {_cell(j.description)} | {walkthrough_cell(j.slug)} |")
     return "\n".join(lines)
 
 

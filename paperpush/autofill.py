@@ -42,7 +42,6 @@ from dataclasses import field as _dc_field
 from pathlib import Path
 
 from .database import Field, Venue
-from .manuscript import docx_to_text
 from .subfile import _MULTILINE_TYPES, parse, replace_block, replace_scalar
 from .validate import Issue, validate
 
@@ -366,6 +365,8 @@ def _docx_text(path: Path) -> str:
     turns its ``None`` failure into an :class:`AutofillApiError` so the API engine
     surfaces an unreadable document instead of sending the model empty text.
     """
+    from .manuscript import docx_to_text
+
     text = docx_to_text(path)
     if text is None:
         raise AutofillApiError(f"could not read {path.name}")

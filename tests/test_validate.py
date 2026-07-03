@@ -18,14 +18,12 @@ import pytest
 import sample_subfiles
 from sample_subfiles import REPO_ROOT, scenarios
 
-import paperpush.cli as cli
 import paperpush.validate as validate_mod
 from paperpush import subfile
 from paperpush.cli import main
-from paperpush.database import ConditionalLimit, Field, Venue, get_venue
+from paperpush.database import Field, Venue, get_venue
 from paperpush.subfile import SubFile
 from paperpush.validate import ERROR, WARNING, Issue, parse_authors, validate
-from tests.conftest import _build_docx, _build_pdf
 
 
 @pytest.fixture(autouse=True)
@@ -439,6 +437,7 @@ def test_require_url_blank_value_is_not_flagged():
 
 
 def _pdf_manuscript(tmp_path, *, pages=1, title="Body", body_lines=None) -> Path:
+    from tests.conftest import _build_pdf
 
     path = tmp_path / "manuscript.pdf"
     path.write_bytes(_build_pdf(pages=pages, title=title, body_lines=body_lines))
@@ -474,6 +473,7 @@ def test_manuscript_page_count_over_limit_is_error(tmp_path):
 
 
 def test_manuscript_page_count_non_pdf_warns(tmp_path):
+    from tests.conftest import _build_docx
 
     docx = tmp_path / "manuscript.docx"
     _build_docx(docx, ["body text"])
@@ -498,6 +498,7 @@ def test_manuscript_total_word_count_over_limit_is_error(tmp_path):
 
 
 def test_manuscript_total_page_count_docx_unsupported_warns(tmp_path):
+    from tests.conftest import _build_docx
 
     docx = tmp_path / "manuscript.docx"
     _build_docx(docx, ["body text"])  # no cached page count
@@ -508,6 +509,7 @@ def test_manuscript_total_page_count_docx_unsupported_warns(tmp_path):
 
 def _bioinformatics_like(**kwargs) -> Venue:
     """A venue whose manuscript page cap varies with an article_type field."""
+    from paperpush.database import ConditionalLimit
 
     by = ConditionalLimit(field="article_type", values={"Original Paper": 7, "Applications Note": 4})
     return _venue(
@@ -536,6 +538,7 @@ def test_conditional_limit_unmatched_value_falls_back_to_scalar(tmp_path):
 
 
 def test_conditional_limit_uses_default_when_value_absent(tmp_path):
+    from paperpush.database import ConditionalLimit
 
     ms = _pdf_manuscript(tmp_path, pages=5, title="Doc")
     by = ConditionalLimit(field="article_type", values={"Original Paper": 7}, default=2)
@@ -850,6 +853,7 @@ def _write_sub(path: Path, body: str) -> Path:
 def test_cli_validate_passing_file(tmp_path, manuscript_pdf, monkeypatch, capsys):
     # Stub the venue lookup so the CLI validates against a known schema.
     j = _venue(Field(id="ms", label="Manuscript", type="file", required=True), slug="biorxiv")
+    import paperpush.cli as cli
 
     monkeypatch.setattr(cli, "get_venue", lambda slug: j)
     sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nms: {manuscript_pdf}\n")
@@ -863,6 +867,7 @@ def test_cli_validate_passing_file(tmp_path, manuscript_pdf, monkeypatch, capsys
 
 def test_cli_validate_reports_errors(tmp_path, monkeypatch, capsys):
     j = _venue(Field(id="ms", label="Manuscript", type="file", required=True), slug="biorxiv")
+    import paperpush.cli as cli
 
     monkeypatch.setattr(cli, "get_venue", lambda slug: j)
     sub = _write_sub(tmp_path / "biorxiv.sub", "@venue: biorxiv\nms:\n")

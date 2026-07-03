@@ -45,13 +45,10 @@ first time (or after an intended portal change) regenerate them with
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import drift
 import pytest
-from playwright.sync_api import TimeoutError as PWTimeout
-from playwright.sync_api import expect, sync_playwright
 
 from paperpush.database import list_venues
 from paperpush.venues import common
@@ -302,6 +299,8 @@ def _sign_in_or_skip_if_blocked(spec, page, slug, username, password):
 
 def _assert_contract(items):
     """Fail with the list of every missing selector, not just the first."""
+    from playwright.sync_api import TimeoutError as PWTimeout
+    from playwright.sync_api import expect
 
     missing = []
     for desc, locator in items:
@@ -390,6 +389,7 @@ def test_login_page_drift(slug, update_snapshots):
     Parametrized over every venue in the registry; venues without a drift
     spec yet are skipped (see :func:`_spec_or_skip`).
     """
+    from playwright.sync_api import sync_playwright
 
     spec = _spec_or_skip(slug)
     with sync_playwright() as pw:
@@ -420,7 +420,9 @@ def test_first_step_drift(slug, update_snapshots):
     portal. Parametrized over every venue in the registry; venues without a
     drift spec yet are skipped (see :func:`_spec_or_skip`).
     """
+    import os
 
+    from playwright.sync_api import sync_playwright
 
     spec = _spec_or_skip(slug)
     session = _saved_session(spec)

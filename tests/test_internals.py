@@ -28,7 +28,7 @@ from paperpush.database import DATABASE_PATH, Field
 from paperpush.schema_models import build_schema
 from paperpush.validate import _check_file_field
 # Reuse the same low-level builders the sample fixtures use.
-from tests.conftest import _CONTENT_TYPES, _RELS, _build_docx, _build_pdf
+from tests.conftest import _build_docx, _build_pdf
 
 # ===========================================================================
 # venues.schema.json
@@ -303,6 +303,8 @@ def test_total_pages_counts_full_pdf(tmp_path):
 
 
 def test_total_pages_uses_docx_cached_count(tmp_path):
+    from tests.conftest import _CONTENT_TYPES, _RELS
+
     path = tmp_path / "ms.docx"
     app_xml = '<?xml version="1.0"?><Properties><Pages>5</Pages></Properties>'
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:

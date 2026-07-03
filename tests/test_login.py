@@ -21,7 +21,6 @@ from paperpush import credentials, orcid, subfile, venues
 from paperpush.cli import main
 from paperpush.database import get_venue, list_venues
 from paperpush.validate import parse_authors
-from paperpush.venues import login as venues_login
 
 VENUES = list_venues()
 SLUGS = [j.slug for j in VENUES]
@@ -91,6 +90,23 @@ def test_login_list_shows_venues_and_usernames(monkeypatch, capsys):
     assert "arxiv: bob@example.edu" in out
 
 
+def test_login_list_shows_shared_family_as_separate_venues(monkeypatch, capsys):
+    # The AAAS siblings share Science's one login, so --list shows each on its
+    # own line as if separately logged in -- the user thinks in journals, even
+    # though the credential is stored once under the science base slug.
+    monkeypatch.setenv("PAPERPUSH_PASSWORD", "s3cret-token")
+    monkeypatch.setenv("PAPERPUSH_USERNAME", "alice@example.edu")
+    assert main(["login", "science", "--no-verify"]) == 0
+    capsys.readouterr()
+
+    rc = main(["login", "--list"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "science: alice@example.edu" in out
+    assert "science_advances: alice@example.edu" in out
+    assert "science_immunology: alice@example.edu" in out
+
+
 def test_login_without_venue_or_list_errors(capsys):
     rc = main(["login"])
     err = capsys.readouterr().err
@@ -101,8 +117,10 @@ def test_login_without_venue_or_list_errors(capsys):
 def test_login_verifies_before_storing(monkeypatch, capsys):
     # By default, login confirms the credentials by signing in. A confirmed
     # sign-in stores the credentials.
+    from paperpush.venues import login as venues_login
+
     calls = []
-    monkeypatch.setattr("paperpush.cli.verify_login", lambda slug, u, p, **k: calls.append((slug, u, p)))
+    monkeypatch.setattr(venues_login, "verify_login", lambda slug, u, p, **k: calls.append((slug, u, p)))
     monkeypatch.setenv("PAPERPUSH_USERNAME", "researcher@example.edu")
     monkeypatch.setenv("PAPERPUSH_PASSWORD", "s3cret-token")
 
@@ -117,10 +135,12 @@ def test_login_verifies_before_storing(monkeypatch, capsys):
 
 def test_login_does_not_store_when_verification_fails(monkeypatch, capsys):
     # A failed sign-in check leaves the bad credentials unstored and exits non-zero.
+    from paperpush.venues import login as venues_login
+
     def _boom(slug, u, p, **k):
         raise venues_login.LoginVerificationError("the username or password may be wrong")
 
-    monkeypatch.setattr("paperpush.cli.verify_login", _boom)
+    monkeypatch.setattr(venues_login, "verify_login", _boom)
     monkeypatch.setenv("PAPERPUSH_USERNAME", "researcher@example.edu")
     monkeypatch.setenv("PAPERPUSH_PASSWORD", "wrong-token")
 

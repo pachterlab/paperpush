@@ -53,10 +53,14 @@ def _stub_submit(monkeypatch):
     short-circuits the Playwright path. Returns a list the runner appends to
     when it is invoked, so a test can assert the submission actually ran.
     """
+    import paperpush.subfile as subfile
+    import paperpush.validate as validate_mod
+    import paperpush.venues as venues
+
     ran: list = []
-    monkeypatch.setattr("paperpush.cli.load", lambda path: SubFile(venue="biorxiv", values={}))
-    monkeypatch.setattr("paperpush.cli.validate", lambda sub, venue: [])
-    monkeypatch.setattr("paperpush.venues.get_runner", lambda venue: (lambda *a, **k: ran.append((a, k))))
+    monkeypatch.setattr(subfile, "load", lambda path: SubFile(venue="biorxiv", values={}))
+    monkeypatch.setattr(validate_mod, "validate", lambda sub, venue: [])
+    monkeypatch.setattr(venues, "get_runner", lambda venue: (lambda *a, **k: ran.append((a, k))))
     return ran
 
 

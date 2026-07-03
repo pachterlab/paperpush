@@ -622,3 +622,119 @@ def test_schema_command_prints_roles(in_tmp, capsys):
 
 def test_schema_unknown_venue_errors(in_tmp):
     assert main(["schema", "nonsense"]) == 2
+
+
+# ===========================================================================
+# Generic per-venue engine coverage
+#
+# The tests above pin the gates to bioRxiv's concrete field set, which reads as
+# a precise, human-checkable spec. These re-run the same gate logic against
+# *every* venue's own fields, so a venue whose roles are misconfigured -- a
+# policy field not marked ``never``, a choice field that does not ``classify`` --
+# is caught without a bespoke test. Each test discovers a representative field of
+# the role it needs from the venue's schema and skips the venue if it has none.
+# Assertions are on the :class:`Outcome` action, which the gates compute from
+# role + confidence independent of the field's widget, so they hold for any
+# venue regardless of how a given field is written into the template.
+# ===========================================================================
+
+
+_ALL_VENUES = list_venues()
+_VENUE_IDS = [v.slug for v in _ALL_VENUES]
+
+
+def _fields_with_role(venue, role):
+    return [f for f in venue.fields if af.effective_role(f) == role]
+
+
+def _defaults_skeleton(venue) -> str:
+    return render_template(venue, fill_defaults=True)
+
+
+def _outcome_for(result, field_id):
+    return next(o for o in result.outcomes if o.id == field_id)
+
+
+@pytest.mark.parametrize("venue", _ALL_VENUES, ids=_VENUE_IDS)
+def test_never_fields_are_never_written_for_any_venue(venue):
+    """Every ``never``-role field is left at its default on any venue."""
+    never = _fields_with_role(venue, af.NEVER)
+    if not never:
+        pytest.skip(f"{venue.slug} has no never-role fields")
+    skeleton = _defaults_skeleton(venue)
+    before = parse(skeleton).values
+    result = af.autofill(
+        skeleton,
+        venue,
+        _extract(*[{"id": f.id, "value": "PROPOSED", "confidence": "high"} for f in never]),
+    )
+    values = parse(result.text).values
+    actions = {o.id: o.action for o in result.outcomes}
+    for f in never:
+        assert actions[f.id] == af.SKIPPED_POLICY
+        # The proposal is ignored; the template default stands unchanged.
+        assert values.get(f.id) == before.get(f.id)
+
+
+@pytest.mark.parametrize("venue", _ALL_VENUES, ids=_VENUE_IDS)
+def test_high_confidence_extract_is_filled_for_any_venue(venue):
+    """A high-confidence ``extract`` proposal is filled (not flagged) on any venue."""
+    extract = _fields_with_role(venue, af.EXTRACT)
+    if not extract:
+        pytest.skip(f"{venue.slug} has no extract-role fields")
+    field = extract[0]
+    result = af.autofill(
+        _defaults_skeleton(venue),
+        venue,
+        _extract({"id": field.id, "value": "A New Value", "confidence": "high"}),
+    )
+    assert _outcome_for(result, field.id).action == af.FILLED
+
+
+@pytest.mark.parametrize("venue", _ALL_VENUES, ids=_VENUE_IDS)
+def test_classify_is_flagged_for_review_for_any_venue(venue):
+    """A ``classify`` proposal is written but flagged for review on any venue."""
+    classify = _fields_with_role(venue, af.CLASSIFY)
+    if not classify:
+        pytest.skip(f"{venue.slug} has no classify-role fields")
+    field = classify[0]
+    # Use a real option when the field has a closed set, so the write is valid.
+    value = field.options[0] if field.options else "Some Category"
+    result = af.autofill(
+        _defaults_skeleton(venue),
+        venue,
+        _extract({"id": field.id, "value": value, "confidence": "high"}),
+    )
+    assert _outcome_for(result, field.id).action == af.REVIEW
+
+
+@pytest.mark.parametrize("venue", _ALL_VENUES, ids=_VENUE_IDS)
+def test_below_threshold_extract_is_not_written_for_any_venue(venue):
+    """A proposal under the confidence floor is skipped, not written, on any venue."""
+    extract = _fields_with_role(venue, af.EXTRACT)
+    if not extract:
+        pytest.skip(f"{venue.slug} has no extract-role fields")
+    field = extract[0]
+    result = af.autofill(
+        _defaults_skeleton(venue),
+        venue,
+        _extract({"id": field.id, "value": "Tentative", "confidence": "low"}),
+        min_confidence="high",
+    )
+    assert _outcome_for(result, field.id).action == af.SKIPPED_LOW
+
+
+@pytest.mark.parametrize("venue", _ALL_VENUES, ids=_VENUE_IDS)
+def test_field_brief_partitions_by_role_for_any_venue(venue):
+    """The API brief offers exactly the non-``never`` fields on any venue.
+
+    The brief is what an extractor is shown, so a ``never`` field leaking into
+    it (or a fillable field missing from it) is a real bug regardless of venue.
+    """
+    _brief, ids = api._field_brief(venue)
+    ids = set(ids)
+    for f in venue.fields:
+        if af.effective_role(f) == af.NEVER:
+            assert f.id not in ids, f"never-field {f.id!r} leaked into {venue.slug} brief"
+        else:
+            assert f.id in ids, f"fillable field {f.id!r} missing from {venue.slug} brief"
