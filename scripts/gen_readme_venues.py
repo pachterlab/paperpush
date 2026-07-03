@@ -36,7 +36,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from paperpush.database import list_venues  # noqa: E402
 from tests.submit_walkthrough_status import STATUS_PATH  # noqa: E402
-from tests.submit_walkthrough_status import WALKTHROUGH_TEST, load_status
+from tests.submit_walkthrough_status import load_status
 
 README_PATH = REPO_ROOT / "README.md"
 VENUES_PATH = REPO_ROOT / "venues.md"
@@ -54,10 +54,6 @@ VENUE_GROUPS = [
     ("journal", "Journals"),
     ("conference", "Conferences"),
 ]
-
-# Path, relative to the README, of the walkthrough test that each "Submit
-# walkthrough" cell links to.
-WALKTHROUGH_TEST_LINK = WALKTHROUGH_TEST.relative_to(REPO_ROOT).as_posix()
 
 # Submission platform (the manuscript-submission system the runner drives) each
 # venue uses, keyed by slug. This is README presentation kept out of
@@ -102,16 +98,13 @@ WALKTHROUGH = load_status(STATUS_PATH)
 
 
 def walkthrough_cell(slug: str) -> str:
-    """Render the submit-walkthrough status cell, linked to the walkthrough test.
+    """Render the submit-walkthrough status cell as plain text.
 
     The cell text is the last successful run date (``✅ YYYY-MM-DD``) when the
-    walkthrough test has recorded one for this slug, or ``❌`` otherwise. Either
-    way it links to ``tests/test_submit.py`` so a reader can jump
-    straight to the test that produces the result.
+    walkthrough test has recorded one for this slug, or ``❌`` otherwise.
     """
     date = WALKTHROUGH.get(slug)
-    label = f"✅ {date}" if date else "❌"
-    return f"[{label}]({WALKTHROUGH_TEST_LINK})"
+    return f"✅ {date}" if date else "❌"
 
 
 def _cell(text: str) -> str:

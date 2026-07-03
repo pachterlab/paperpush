@@ -18,7 +18,7 @@ playwright install
 
 ## Use with AI
 ```LLM
-Prepare my manuscript in PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.
+Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.
 ```
 
 The Claude skill `/paperpush-prepare-submission` helps with this. 
@@ -28,11 +28,11 @@ See [`docs/example-session.md`](docs/example-session.md) for a full worked examp
 ## Quickstart
 1. `paperpush subfile VENUE`: creates a file VENUE.sub that is a template for the VENUE submission.
 2. **fill out VENUE.sub - 3 options:**
-  a. *fill out manually*
-  b. *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
-  c. `paperpush autofill -d MANUSCRIPT_DIR --engine api VENUE.sub`: Use an LLM API. Requires an API key.
+   - **a.** *fill out manually*
+   - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
+   - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE.sub`: Use an LLM API. Requires an API key.
 3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`.
-4. `paperpush login VENUE`: log in to the VENUE submission system
+4. `paperpush login VENUE`: log in to the VENUE submission portal
 5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
 
 ## Run the whole pipeline at once
