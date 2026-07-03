@@ -28,10 +28,10 @@ abstract: |
 keywords: keyword1;keyword2
 
 # Authors (authorlist, REQUIRED)
-#   One author per line, in order. Format: Name | email | institution | country | corresponding(yes/no). Write the name as 'First Last'; the Editorial Manager 'Add Author' form splits it into given/family name on the last space. The author marked corresponding=yes must be the submitting account holder (Editorial Manager pre-fills that author); their pre-filled row is edited to fill in any missing details. Every other line is added through the '+Add Another Author' form. Country is mapped to the Editorial Manager country drop-down (e.g. USA/US/United States all map to 'us').
+#   One author per line, in order. Format: Name | email | institution | department | zip code | country | corresponding(yes/no). Write the name as 'First Last'; the Editorial Manager 'Add Author' form splits it into given/family name on the last space. The author marked corresponding=yes must be the submitting account holder (Editorial Manager pre-fills that author); their pre-filled row is edited to fill in any missing details. Every other line is added through the '+Add Another Author' form. Country is mapped to the Editorial Manager country drop-down (e.g. USA/US/United States all map to 'us').
 authors: |
-  Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes
-  Joseph Rich | jmrich@usc.edu | University of Southern California | USA | no
+  Joseph Richie | jmrich@caltech.edu | California Institute of Technology | Biology | 91125 | USA | yes
+  Joseph Rich | jmrich@usc.edu | University of Southern California | Radiology | 90033 | USA | no
 
 # Manuscript file (file, REQUIRED)
 #   Path to the manuscript, uploaded as the main document on the Editorial Manager 'Attach Files' step.

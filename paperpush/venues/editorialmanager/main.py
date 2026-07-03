@@ -49,8 +49,9 @@ class Variant:
     (``"radio_textbox"`` / ``"textbox"`` / ``"single_field"``),
     ``has_comments_page``, ``open_access_only``, ``has_section_classifications``
     (PLOS Section/Category + Classifications step), ``annotate_manuscript_manually``,
-    and ``plos_declarations`` (PLOS's separate ``QR23_1_Q*`` question set, driving
-    :func:`_answer_declarations_plos` instead of :func:`_answer_declarations`).
+    ``plos_declarations`` (PLOS's separate ``QR23_1_Q*`` question set, driving
+    :func:`_answer_declarations_plos` instead of :func:`_answer_declarations`), and
+    ``no_funding_label`` (the checkbox label used to declare no funding).
     """
 
     slug: str
@@ -65,6 +66,7 @@ class Variant:
     has_section_classifications: bool = False
     annotate_manuscript_manually: bool = False
     plos_declarations: bool = False
+    no_funding_label: str = "Funding information is not"
 
     @property
     def venue(self):
@@ -110,6 +112,7 @@ VARIANTS = {
         annotate_manuscript_manually=True,
         has_section_classifications=True,
         plos_declarations=True,
+        no_funding_label="The author(s) received no",
     ),
 }
 
@@ -803,17 +806,18 @@ def _enter_reviewers(page, cf, reviewers: list[dict]) -> None:
     cf.get_by_role("button", name=" Proceed").click()
 
 
-def _enter_funding(page, cf, funders: list[dict]) -> None:
+def _enter_funding(page, cf, funders: list[dict], cfg: Variant = _DEFAULT) -> None:
     """Fill the Funding Information step, or mark it not available.
 
     Each funder is added via "+Add a Funding Source" (see :func:`_pick_funder`),
-    then the optional award number. With no funders, the "Funding information is
-    not available" box is checked instead.
+    then the optional award number. With no funders, the no-funding declaration
+    box is checked instead; its label drifts between deployments (see
+    ``cfg.no_funding_label``).
     """
     _try(lambda: cf.get_by_role("tab", name="Funding Information").click(), "open Funding Information tab")
 
     if not funders:
-        _try(lambda: cf.get_by_role("checkbox", name="Funding information is not").check(), "no-funding declaration")
+        _try(lambda: cf.get_by_role("checkbox", name=cfg.no_funding_label).check(), "no-funding declaration")
         return
 
     def click_visible_tool(cf, toolname: str):
@@ -967,7 +971,7 @@ def editorialmanager_run(values: dict, headless: bool = False, debug: bool = Fal
             _enter_comments(page, cf, values.get("comments", ""))
         _enter_metadata(cf, title, abstract, keywords)
         _enter_authors(page, cf, authors)
-        _enter_funding(page, cf, funders)
+        _enter_funding(page, cf, funders, cfg=cfg)
 
         # "Save & Submit Later" is avoided here: it erases entered manuscript data.
         _try(lambda: cf.get_by_role("button", name="Build PDF for Approval").click(), "Build PDF for Approval")

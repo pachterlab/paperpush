@@ -610,7 +610,7 @@
       "title": "Title goes here",
       "abstract": "Abstract goes here. It's a really good abstract.",
       "keywords": "keyword1;keyword2",
-      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | USA | no\n",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | Biology | 91125 | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | Radiology | 90033 | USA | no\n",
       "manuscript_file": "tests/manuscript_files/cell/manuscript.pdf",
       "cover_letter": "tests/manuscript_files/cell/cover_letter.pdf",
       "declaration_file": "tests/manuscript_files/cell/declaration_of_interest.pdf",

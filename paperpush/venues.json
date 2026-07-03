@@ -2099,6 +2099,23 @@
         "default": "No",
         "options": ["Yes", "No"],
         "help": "PLOS asks whether the study involved human participants, data, specimens, or tissue. Answer 'No' (the default) or 'Yes'. When 'Yes', the runner selects the affirmative option and checks the three human-subjects confirmation boxes on the declarations page."
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: Name | email | institution | department | zip code | country | corresponding(yes/no). Write the name as 'First Last'; the Editorial Manager 'Add Author' form splits it into given/family name on the last space. The author marked corresponding=yes must be the submitting account holder (Editorial Manager pre-fills that author); their pre-filled row is edited to fill in any missing details. Every other line is added through the '+Add Another Author' form. Country is mapped to the Editorial Manager country drop-down (e.g. USA/US/United States all map to 'us').",
+        "fields": [
+          "name",
+          "email",
+          "institution",
+          "department",
+          "zip_code",
+          "country",
+          "corresponding"
+        ]
       }
     ]
   },

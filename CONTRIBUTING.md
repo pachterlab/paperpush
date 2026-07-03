@@ -25,6 +25,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for tips on using playwright, debugging, an
 - Run `python tests/sample_subfiles.py` to generate sample subfiles for the new venue.
 - Run `pytest --run-portal -s --venue VENUE` and make sure that no new failures are introduced. (Requires a browser and login credentials for the venue.)
   - If you modify submission scripts that affect other venues, run `pytest --run-portal` to check all venues. (Requires a browser and login credentials for all venues.)
+- Optionally, add "VENUE": "DATE" to `tests/submit_walkthrough_status.json`, and run `python scripts/gen_readme_venues.py` to reflect that it works in `venues.md`
 - Format with `black . -l 99999`
 
 Thank you for helping make venue submission a single click.
