@@ -236,21 +236,21 @@
         "help": "Only needed when is_revision is yes."
       },
       {
-        "id": "transfer_to_venue",
+        "id": "transfer_to_journal",
         "autofill": "never",
-        "label": "Forward to a venue via B2J on posting?",
+        "label": "Forward to a journal via B2J on posting?",
         "type": "boolean",
         "required": false,
-        "help": "bioRxiv-to-Venue (B2J): offer to forward the manuscript to a participating venue.",
+        "help": "bioRxiv-to-Journal (B2J): offer to forward the manuscript to a participating journal.",
         "default": false
       },
       {
-        "id": "venue_destination",
+        "id": "journal_destination",
         "autofill": "never",
-        "label": "Destination venue for B2J",
+        "label": "Destination journal for B2J",
         "type": "text",
         "required": false,
-        "help": "Only needed when transfer_to_venue is yes."
+        "help": "Only needed when transfer_to_journal is yes."
       },
       {
         "id": "author_consent",
@@ -414,9 +414,9 @@
         "help": "Set to yes if submitting a revised version of a preprint already on medRxiv."
       },
       {
-        "id": "transfer_to_venue",
-        "label": "Forward to a venue via M2J on posting?",
-        "help": "medRxiv-to-Venue (M2J): offer to forward the manuscript to a participating venue."
+        "id": "transfer_to_journal",
+        "label": "Forward to a journal via M2J on posting?",
+        "help": "medRxiv-to-Journal (M2J): offer to forward the manuscript to a participating journal."
       }
     ]
   },
@@ -445,7 +445,7 @@
         "label": "Manuscript type",
         "type": "choice",
         "required": true,
-        "help": "Original Paper: up to 7 pages (approx. 5,000 words, excluding figures); original papers describing new research developments in computational molecular biology, for example new models, algorithms, software involving new methods, biological databases and networks, information services, and their impact on molecular biology or computer science; biological data, as opposed to purely simulated data, must be used. Letter to the Editor: up to 2 pages (approx. 1,300 words, or 1,000 words plus one figure); letters on the broad range of topics covered by the venue, including political, technical, and scientific analyses of issues related to bioinformatics and computational biology, and may include discussion of papers published by the venue. Applications Note: up to 4 pages (approx. 2,600 words, or 2,000 words plus one figure); short descriptions of novel software or new algorithm implementations, databases, and network services (web servers and interfaces); software or data must be freely available to non-commercial users, availability and implementation must be clearly stated in the article, and the name of the application should be included in the title. Review: 3-8 pages (approx. 3,000-6,000 words, excluding figures); most reviews are commissioned, although the editors welcome suggestions from prospective authors, who should in the first instance email a draft or abstract/summary no longer than a page to the editorial office.",
+        "help": "Original Paper: up to 7 pages (approx. 5,000 words, excluding figures); original papers describing new research developments in computational molecular biology, for example new models, algorithms, software involving new methods, biological databases and networks, information services, and their impact on molecular biology or computer science; biological data, as opposed to purely simulated data, must be used. Letter to the Editor: up to 2 pages (approx. 1,300 words, or 1,000 words plus one figure); letters on the broad range of topics covered by the journal, including political, technical, and scientific analyses of issues related to bioinformatics and computational biology, and may include discussion of papers published by the journal. Applications Note: up to 4 pages (approx. 2,600 words, or 2,000 words plus one figure); short descriptions of novel software or new algorithm implementations, databases, and network services (web servers and interfaces); software or data must be freely available to non-commercial users, availability and implementation must be clearly stated in the article, and the name of the application should be included in the title. Review: 3-8 pages (approx. 3,000-6,000 words, excluding figures); most reviews are commissioned, although the editors welcome suggestions from prospective authors, who should in the first instance email a draft or abstract/summary no longer than a page to the editorial office.",
         "options": [
           "Original Paper",
           "Letter to the Editor",
@@ -880,7 +880,7 @@
         "label": "Is this manuscript posted as a preprint?",
         "type": "boolean",
         "required": false,
-        "help": "Set to yes if a version is posted on a preprint server such as bioRxiv. The manuscript must not be under consideration at more than one venue simultaneously.",
+        "help": "Set to yes if a version is posted on a preprint server such as bioRxiv. The manuscript must not be under consideration at more than one journal simultaneously.",
         "default": false
       },
       {
@@ -1137,7 +1137,7 @@
         "label": "Source of funding for publication charges",
         "type": "textarea",
         "required": true,
-        "help": "Required. State the source of funding for your publication charges (Nucleic Acids Research is a fully open access venue)."
+        "help": "Required. State the source of funding for your publication charges (Nucleic Acids Research is a fully open access journal)."
       },
       {
         "id": "institution_verification",
@@ -1394,12 +1394,12 @@
   "nature": {
     "venue_type": "journal",
     "name": "Nature",
-    "full_name": "Nature - International weekly venue of science",
+    "full_name": "Nature - International weekly journal of science",
     "submission_url": "https://mts-nature.nature.com/cgi-bin/main.plex",
     "site_url": "https://www.nature.com",
     "submission_guide": "https://www.nature.com/nature/for-authors/initial-submission",
     "max_upload_mb": 30,
-    "description": "Weekly multidisciplinary venue publishing peer-reviewed research of outstanding significance across all fields of science and technology, alongside news and commentary.",
+    "description": "Weekly multidisciplinary journal publishing peer-reviewed research of outstanding significance across all fields of science and technology, alongside news and commentary.",
     "fields": [
       {
         "id": "manuscript_type",
@@ -1727,7 +1727,7 @@
     "submission_url": "https://www.editorialmanager.com/cell/default.aspx",
     "site_url": "https://www.cell.com/cell/home",
     "submission_guide": "https://www.cell.com/cell/authors",
-    "description": "Cell Press flagship venue publishing high-impact peer-reviewed research across the full breadth of the life sciences.",
+    "description": "Cell Press flagship journal publishing high-impact peer-reviewed research across the full breadth of the life sciences.",
     "max_upload_mb": 20,
     "fields": [
       {
@@ -1930,7 +1930,7 @@
     "inherits": "cell",
     "name": "Cell Systems",
     "full_name": "Cell Systems (Cell Press)",
-    "description": "Cell Press venue publishing research in systems biology, including quantitative, computational, and theoretical approaches to understanding biological systems across scales.",
+    "description": "Cell Press journal publishing research in systems biology, including quantitative, computational, and theoretical approaches to understanding biological systems across scales.",
     "site_url": "https://www.cell.com/cell-systems/home",
     "submission_guide": "https://www.cell.com/cell-systems/authors",
     "submission_url": "https://www.editorialmanager.com/cell-systems/default.aspx",
@@ -1946,7 +1946,7 @@
     "inherits": "cell",
     "name": "Cell Genomics",
     "full_name": "Cell Genomics (Cell Press)",
-    "description": "Open-access Cell Press venue publishing research across genetics and genomics, including functional, evolutionary, and computational genomics and their applications to health and disease.",
+    "description": "Open-access Cell Press journal publishing research across genetics and genomics, including functional, evolutionary, and computational genomics and their applications to health and disease.",
     "site_url": "https://www.cell.com/cell-genomics/home",
     "submission_guide": "https://www.cell.com/cell-genomics/authors",
     "submission_url": "https://www.editorialmanager.com/cell-genomics/default.aspx",
@@ -1960,9 +1960,9 @@
     "name": "PLOS Computational Biology",
     "full_name": "PLOS Computational Biology (PLOS)",
     "submission_url": "https://www.editorialmanager.com/pcompbiol/default.aspx",
-    "site_url": "https://venues.plos.org/ploscompbiol/",
-    "submission_guide": "https://venues.plos.org/ploscompbiol/s/submission-guidelines",
-    "description": "Open-access venue publishing research that applies computational methods to understand living systems across all scales, from molecules to ecosystems.",
+    "site_url": "https://journal.plos.org/ploscompbiol/",
+    "submission_guide": "https://journal.plos.org/ploscompbiol/s/submission-guidelines",
+    "description": "Open-access journal publishing research that applies computational methods to understand living systems across all scales, from molecules to ecosystems.",
     "removed_fields": [
         "declaration_file"
     ],
@@ -2109,7 +2109,7 @@
     "submission_url": "https://submission.springernature.com/",
     "site_url": "https://genomebiology.biomedcentral.com",
     "submission_guide": "https://genomebiology.biomedcentral.com/submission-guidelines",
-    "description": "Open-access venue publishing peer-reviewed research and methods across all areas of biology and biomedicine studied from a genomic and post-genomic perspective.",
+    "description": "Open-access journal publishing peer-reviewed research and methods across all areas of biology and biomedicine studied from a genomic and post-genomic perspective.",
     "file_type_options": [
       "Manuscript",
       "Figure",
@@ -2272,9 +2272,9 @@
     "inherits": "genome_biology",
     "name": "BMC Bioinformatics",
     "full_name": "BMC Bioinformatics",
-    "description": "BMC Bioinformatics is an open access, peer-reviewed venue that considers articles describing novel computational algorithms and software, models and tools, including statistical methods, machine learning and artificial intelligence, for the modelling and analysis of all kinds of biological data, as well as systems biology.",
-    "site_url": "https://link.springer.com/venue/12859",
-    "submission_guide": "https://link.springer.com/venue/12859/submission-guidelines",
+    "description": "BMC Bioinformatics is an open access, peer-reviewed journal that considers articles describing novel computational algorithms and software, models and tools, including statistical methods, machine learning and artificial intelligence, for the modelling and analysis of all kinds of biological data, as well as systems biology.",
+    "site_url": "https://link.springer.com/journal/12859",
+    "submission_guide": "https://link.springer.com/journal/12859/submission-guidelines",
     "submission_url": "https://submission.springernature.com/",
     "fields": [
       {
@@ -2305,7 +2305,7 @@
     "site_url": "https://www.science.org/journal/science",
     "submission_guide": "https://www.science.org/content/page/science-information-authors",
     "max_upload_mb": 50,
-    "description": "Peer-reviewed flagship venue of the American Association for the Advancement of Science (AAAS), publishing significant original research across all scientific disciplines along with news and commentary.",
+    "description": "Peer-reviewed flagship journal of the American Association for the Advancement of Science (AAAS), publishing significant original research across all scientific disciplines along with news and commentary.",
     "file_type_options": [
       "Main Manuscript",
       "Cover Letter",
@@ -2322,7 +2322,7 @@
         "label": "Publication",
         "type": "choice",
         "required": true,
-        "help": "The AAAS venue to submit to, chosen from the first drop-down on the New Submission screen. Matched to the portal's menu by name; when blank or unmatched the menu's first selectable option is left in place. The article-type drop-down that follows is specific to the chosen publication.",
+        "help": "The AAAS journal to submit to, chosen from the first drop-down on the New Submission screen. Matched to the portal's menu by name; when blank or unmatched the menu's first selectable option is left in place. The article-type drop-down that follows is specific to the chosen publication.",
         "options": [
           "Science",
           "Science Advances",
@@ -2400,66 +2400,7 @@
         "min_count": 1,
         "max_count": 2,
         "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
-        "options": [
-          "Agriculture",
-          "Anthropology",
-          "Applied ecology",
-          "Applied physics",
-          "Astronomy",
-          "Atmospheric science",
-          "Biochemistry",
-          "Biophysics",
-          "Cancer",
-          "Cell biology",
-          "Cellular neuroscience",
-          "Chemical physics",
-          "Chemistry",
-          "Climatology",
-          "Cognitive neuroscience",
-          "Computer science",
-          "Condensed matter physics",
-          "Developmental biology",
-          "Developmental neuroscience",
-          "Diseases and disorders",
-          "Ecology",
-          "Economics",
-          "Electrochemistry",
-          "Engineering",
-          "Epidemiology",
-          "Evolutionary biology",
-          "Genetics",
-          "Geology",
-          "Geophysics",
-          "Health and medicine",
-          "Human genetics",
-          "Immunology",
-          "Materials science",
-          "Mathematics",
-          "Microbiology",
-          "Molecular biology",
-          "Network science",
-          "Neurophysiology",
-          "Oceanography",
-          "Optics",
-          "Organic chemistry",
-          "Organismal biology",
-          "Paleontology",
-          "Physics",
-          "Physiology",
-          "Planetary science",
-          "Plant sciences",
-          "Psychological Science",
-          "Research methods",
-          "Science policy",
-          "Scientific community",
-          "Signal transduction",
-          "Social sciences",
-          "Structural biology",
-          "Surface chemistry",
-          "Synthetic biology",
-          "Systems biology",
-          "Virology"
-        ]
+        "options_file": "science_subjects.txt"
       },
       {
         "id": "additional_datasets",
@@ -2585,11 +2526,22 @@
     "site_url": "https://www.science.org/journal/sciadv",
     "name": "Science Advances",
     "full_name": "Science Advances - American Association for the Advancement of Science (AAAS)",
-    "description": "AAAS open-access multidisciplinary venue publishing peer-reviewed original research across the physical, life, social, and computer sciences and engineering.",
+    "description": "AAAS open-access multidisciplinary journal publishing peer-reviewed original research across the physical, life, social, and computer sciences and engineering.",
     "fields": [
       {
         "id": "publication",
         "default": "Science Advances"
+      },
+      {
+        "id": "subject_areas",
+        "autofill": "classify",
+        "label": "Subject areas",
+        "type": "multichoice",
+        "required": true,
+        "min_count": 1,
+        "max_count": 2,
+        "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
+        "options_file": "science_advances_subjects.txt"
       }
     ]
   },
@@ -2599,11 +2551,22 @@
     "site_url": "https://www.science.org/journal/sciimmunol",
     "name": "Science Immunology",
     "full_name": "Science Immunology - American Association for the Advancement of Science (AAAS)",
-    "description": "AAAS venue publishing peer-reviewed original research across immunology in all organisms and model systems, spanning molecular, cellular, and translational immunology.",
+    "description": "AAAS journal publishing peer-reviewed original research across immunology in all organisms and model systems, spanning molecular, cellular, and translational immunology.",
     "fields": [
       {
         "id": "publication",
         "default": "Science Immunology"
+      },
+      {
+        "id": "subject_areas",
+        "autofill": "classify",
+        "label": "Subject areas",
+        "type": "multichoice",
+        "required": true,
+        "min_count": 1,
+        "max_count": 2,
+        "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
+        "options_file": "science_immunology_subjects.txt"
       }
     ]
   },
@@ -2613,11 +2576,22 @@
     "site_url": "https://www.science.org/journal/scirobotics",
     "name": "Science Robotics",
     "full_name": "Science Robotics - American Association for the Advancement of Science (AAAS)",
-    "description": "AAAS venue publishing peer-reviewed original research on advances in robotics and related disciplines, including robot design, control, autonomy, and applications.",
+    "description": "AAAS journal publishing peer-reviewed original research on advances in robotics and related disciplines, including robot design, control, autonomy, and applications.",
     "fields": [
       {
         "id": "publication",
         "default": "Science Robotics"
+      },
+      {
+        "id": "subject_areas",
+        "autofill": "classify",
+        "label": "Subject areas",
+        "type": "multichoice",
+        "required": true,
+        "min_count": 1,
+        "max_count": 2,
+        "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
+        "options_file": "science_robotics_subjects.txt"
       }
     ]
   },
@@ -2627,11 +2601,22 @@
     "site_url": "https://www.science.org/journal/signaling",
     "name": "Science Signaling",
     "full_name": "Science Signaling - American Association for the Advancement of Science (AAAS)",
-    "description": "AAAS venue publishing peer-reviewed original research on cellular signaling and regulatory networks, including signal transduction, systems biology, and relevance to disease.",
+    "description": "AAAS journal publishing peer-reviewed original research on cellular signaling and regulatory networks, including signal transduction, systems biology, and relevance to disease.",
     "fields": [
       {
         "id": "publication",
         "default": "Science Signaling"
+      },
+      {
+        "id": "subject_areas",
+        "autofill": "classify",
+        "label": "Subject areas",
+        "type": "multichoice",
+        "required": true,
+        "min_count": 1,
+        "max_count": 2,
+        "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
+        "options_file": "science_signaling_subjects.txt"
       }
     ]
   },
@@ -2641,11 +2626,22 @@
     "site_url": "https://www.science.org/journal/stm",
     "name": "Science Translational Medicine",
     "full_name": "Science Translational Medicine - American Association for the Advancement of Science (AAAS)",
-    "description": "AAAS venue publishing peer-reviewed original research that bridges basic science and clinical medicine to advance human health.",
+    "description": "AAAS journal publishing peer-reviewed original research that bridges basic science and clinical medicine to advance human health.",
     "fields": [
       {
         "id": "publication",
         "default": "Science Translational Medicine"
+      },
+      {
+        "id": "subject_areas",
+        "autofill": "classify",
+        "label": "Subject areas",
+        "type": "multichoice",
+        "required": true,
+        "min_count": 1,
+        "max_count": 2,
+        "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
+        "options_file": "science_translational_medicine_subjects.txt"
       }
     ]
   },

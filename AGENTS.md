@@ -1,8 +1,8 @@
 # AGENTS.md
 
 Guidance for any AI agent (Codex, Claude, or otherwise) that decides to use
-`paperpush` to submit a manuscript to a venue or preprint server on a
-user's behalf.
+`paperpush` to submit a manuscript to a venue - a journal, preprint server, or conference -
+on a user's behalf.
 
 ## The one rule: you are the extractor
 

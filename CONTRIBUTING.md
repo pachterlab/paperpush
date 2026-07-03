@@ -2,7 +2,7 @@
 
 ## Adding a submission venue
 
-To add support for a venue or preprint server, provide the following three components:
+To add support for a venue (journal, preprint server, conference, or other), provide the following three components:
 
 1. Login and submit scripts: a `Venue` subclass in `paperpush/venues/<portal>/<venue>.py`, exposing one module-level `VENUE` instance.
 2. Venue data: an entry in `paperpush/venues.json` with the submission fields and constraints.

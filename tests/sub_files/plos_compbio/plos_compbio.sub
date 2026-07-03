@@ -5,7 +5,7 @@
 # Lines starting with '#' are comments and are ignored.
 
 @venue: plos_compbio
-# submission guide: https://venues.plos.org/ploscompbiol/s/submission-guidelines
+# submission guide: https://journal.plos.org/ploscompbiol/s/submission-guidelines
 
 # Article type (choice, REQUIRED)
 #   The Editorial Manager 'Select Article Type' value. Pick the label that matches your submission; if the runner cannot match the label it falls back to the article-type drop-down's first option.

@@ -72,13 +72,13 @@ is_revision: no
 #   Only needed when is_revision is yes.
 previous_doi: 
 
-# Forward to a venue via M2J on posting? (boolean, optional)
-#   medRxiv-to-Venue (M2J): offer to forward the manuscript to a participating venue.
-transfer_to_venue: no
+# Forward to a journal via M2J on posting? (boolean, optional)
+#   medRxiv-to-Journal (M2J): offer to forward the manuscript to a participating journal.
+transfer_to_journal: no
 
-# Destination venue for B2J (text, optional)
-#   Only needed when transfer_to_venue is yes.
-venue_destination: 
+# Destination journal for B2J (text, optional)
+#   Only needed when transfer_to_journal is yes.
+journal_destination: 
 
 # All authors consent to deposit and to the chosen license (boolean, REQUIRED)
 #   Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.

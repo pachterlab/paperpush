@@ -18,7 +18,12 @@ import pytest
 import sample_subfiles
 from sample_subfiles import REPO_ROOT, scenarios
 
-import paperpush.validate as validate_mod
+import importlib
+
+# ``paperpush.validate`` the attribute is the public ``validate()`` function
+# (it shadows the submodule of the same name); grab the actual module from the
+# import system so we can reach its internals (e.g. the ``_MODELS`` cache).
+validate_mod = importlib.import_module("paperpush.validate")
 from paperpush import subfile
 from paperpush.cli import main
 from paperpush.database import Field, Venue, get_venue

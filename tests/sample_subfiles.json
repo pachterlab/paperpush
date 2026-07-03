@@ -13,7 +13,7 @@
       "license": "CC-BY-NC-ND",
       "competing_interest": "The authors have declared no competing interest.",
       "is_revision": "no",
-      "transfer_to_venue": "no",
+      "transfer_to_journal": "no",
       "author_consent": "yes"
     }
   },
@@ -31,7 +31,7 @@
       "license": "CC-BY-NC-ND",
       "competing_interest": "The authors have declared no competing interest.",
       "is_revision": "no",
-      "transfer_to_venue": "no",
+      "transfer_to_journal": "no",
       "author_consent": "yes",
       "figure_files": "tests/manuscript_files/biorxiv/figures/fig1.png | Figure 1\ntests/manuscript_files/biorxiv/figures/fig2.png | Figure 2"
     }
@@ -50,7 +50,7 @@
       "license": "CC-BY-NC-ND",
       "competing_interest": "The authors have declared no competing interest.",
       "is_revision": "no",
-      "transfer_to_venue": "no",
+      "transfer_to_journal": "no",
       "author_consent": "yes",
       "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
     }
@@ -69,7 +69,7 @@
       "license": "CC-BY-NC-ND",
       "competing_interest": "The authors have declared no competing interest.",
       "is_revision": "no",
-      "transfer_to_venue": "no",
+      "transfer_to_journal": "no",
       "author_consent": "yes",
       "supplementary_files": "tests/manuscript_files/biorxiv/supplement.pdf | pdf | Supplementary Text"
     }
@@ -89,7 +89,7 @@
       "human_subjects": "No",
       "clinical_trial": "Not applicable",
       "is_revision": "no",
-      "transfer_to_venue": "no",
+      "transfer_to_journal": "no",
       "author_consent": "yes"
     }
   },
@@ -108,7 +108,7 @@
       "human_subjects": "No",
       "clinical_trial": "Not applicable",
       "is_revision": "no",
-      "transfer_to_venue": "no",
+      "transfer_to_journal": "no",
       "author_consent": "yes",
       "figure_files": "tests/manuscript_files/medrxiv/figures/fig1.png | Figure 1\ntests/manuscript_files/medrxiv/figures/fig2.png | Figure 2"
     }
@@ -128,7 +128,7 @@
       "human_subjects": "No",
       "clinical_trial": "Not applicable",
       "is_revision": "no",
-      "transfer_to_venue": "no",
+      "transfer_to_journal": "no",
       "author_consent": "yes",
       "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
     }
@@ -148,7 +148,7 @@
       "human_subjects": "No",
       "clinical_trial": "Not applicable",
       "is_revision": "no",
-      "transfer_to_venue": "no",
+      "transfer_to_journal": "no",
       "author_consent": "yes",
       "supplementary_files": "tests/manuscript_files/medrxiv/supplement.pdf | pdf | Supplementary Text"
     }
@@ -168,7 +168,7 @@
       "human_subjects": "Yes",
       "clinical_trial": "Not applicable",
       "is_revision": "no",
-      "transfer_to_venue": "no",
+      "transfer_to_journal": "no",
       "author_consent": "yes",
       "public_data_only": "No",
       "ethics_statement": "Ethics committee/IRB of the California Institute of Technology gave ethical approval for this work."

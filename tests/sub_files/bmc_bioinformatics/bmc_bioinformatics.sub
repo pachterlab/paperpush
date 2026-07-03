@@ -5,7 +5,7 @@
 # Lines starting with '#' are comments and are ignored.
 
 @venue: bmc_bioinformatics
-# submission guide: https://link.springer.com/venue/12859/submission-guidelines
+# submission guide: https://link.springer.com/journal/12859/submission-guidelines
 
 # Article type (choice, REQUIRED)
 #   The article type selected from the 'Article type:' drop-down on the first step of the Springer Nature wizard. Matched to the menu by its option value; defaults to 'research' when blank.

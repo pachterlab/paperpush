@@ -2,8 +2,11 @@ API reference
 =============
 
 PaperPush is primarily a command-line tool, but its core is a plain Python
-package you can import and drive directly. Everything documented here is part of
-the public API — the names exported from :mod:`paperpush` (its ``__all__``).
+package you can import and drive directly.
+
+The public API is deliberately small — the names exported from :mod:`paperpush`
+(its ``__all__``): the two data models, the submission-file toolkit, and the two
+workflow operations that have a library-level entry point.
 
 .. code-block:: python
 
@@ -11,6 +14,21 @@ the public API — the names exported from :mod:`paperpush` (its ``__all__``).
 
    venue = paperpush.get_venue("biorxiv")
    sub = paperpush.load("biorxiv.sub")
+   issues = paperpush.validate(sub, venue)
+
+.. note::
+
+   **The** ``login`` **and** ``submit`` **steps are exposed only as CLI
+   commands** — :doc:`paperpush login <commands/login>` and
+   :doc:`paperpush submit <commands/submit>` — not as importable functions.
+   They drive a real browser and orchestrate interactive sign-in, so they live
+   in the CLI rather than the library API.
+
+   Lower-level helpers (autofill extraction internals, credential storage,
+   logging setup) are intentionally **not** part of the public API. They remain
+   importable from their submodules if you need them
+   (e.g. ``from paperpush import credentials``), but are not covered by
+   compatibility guarantees.
 
 Package metadata
 ----------------
@@ -61,61 +79,15 @@ Read, write, and render ``.sub`` files.
 Autofill
 --------
 
-Extract submission field values from a manuscript and apply them to a
-``.sub`` file. See :doc:`commands/autofill` for the CLI equivalent.
+Apply extracted submission field values to a ``.sub`` file. See
+:doc:`commands/autofill` for the CLI equivalent.
 
 .. autofunction:: paperpush.autofill
 
-.. autofunction:: paperpush.parse_extraction
+Validate
+--------
 
-.. autofunction:: paperpush.effective_role
+Run the pre-submission checks against a loaded ``.sub`` file and its venue. See
+:doc:`commands/validate` for the CLI equivalent.
 
-.. autofunction:: paperpush.field_schema
-
-.. autofunction:: paperpush.extract_via_api
-
-.. autoclass:: paperpush.AutofillResult
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. autoclass:: paperpush.Extraction
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. autoclass:: paperpush.Proposal
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. autoclass:: paperpush.DocumentInput
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. autoexception:: paperpush.AutofillApiError
-   :members:
-   :show-inheritance:
-
-Credentials
------------
-
-Store and retrieve venue credentials from the OS keyring. See
-:doc:`commands/login` for the CLI equivalent.
-
-.. autofunction:: paperpush.save_credential
-
-.. autofunction:: paperpush.get_credential
-
-.. autofunction:: paperpush.delete_credential
-
-.. autoclass:: paperpush.Credential
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Logging
--------
-
-.. autofunction:: paperpush.configure_logging
+.. autofunction:: paperpush.validate

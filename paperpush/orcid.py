@@ -1,4 +1,4 @@
-"""ORCID-based sign-in for venue submission systems.
+"""ORCID-based sign-in for journal submission systems.
 
 Many editorial managers (Editorial Manager, ScholarOne, eJournalPress, and the
 target system here) offer a "Sign in with ORCID" button instead of a separate

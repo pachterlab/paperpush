@@ -137,7 +137,7 @@ novel_method_description: |
 supplementary_online: no
 
 # Source of funding for publication charges (textarea, REQUIRED)
-#   Required. State the source of funding for your publication charges (Nucleic Acids Research is a fully open access venue).
+#   Required. State the source of funding for your publication charges (Nucleic Acids Research is a fully open access journal).
 publication_charge_funding: |
   Publication charges covered by the corresponding author's institutional open access fund.
 

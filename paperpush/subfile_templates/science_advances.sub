@@ -8,7 +8,7 @@
 # submission guide: https://www.science.org/content/page/science-information-authors
 
 # Publication (choice, REQUIRED)
-#   The AAAS venue to submit to, chosen from the first drop-down on the New Submission screen. Matched to the portal's menu by name; when blank or unmatched the menu's first selectable option is left in place. The article-type drop-down that follows is specific to the chosen publication.
+#   The AAAS journal to submit to, chosen from the first drop-down on the New Submission screen. Matched to the portal's menu by name; when blank or unmatched the menu's first selectable option is left in place. The article-type drop-down that follows is specific to the chosen publication.
 #   options: Science | Science Advances | Science Immunology | Science Robotics | Science Signaling | Science Translational Medicine
 publication: 
 
@@ -41,7 +41,7 @@ funders: |
 # Subject areas (multichoice, REQUIRED)
 #   One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.
 #   select 1-2, comma-separated
-#   options: Agriculture | Anthropology | Applied ecology | Applied physics | Astronomy | Atmospheric science | Biochemistry | Biophysics | Cancer | Cell biology | Cellular neuroscience | Chemical physics | Chemistry | Climatology | Cognitive neuroscience | Computer science | Condensed matter physics | Developmental biology | Developmental neuroscience | Diseases and disorders | Ecology | Economics | Electrochemistry | Engineering | Epidemiology | Evolutionary biology | Genetics | Geology | Geophysics | Health and medicine | Human genetics | Immunology | Materials science | Mathematics | Microbiology | Molecular biology | Network science | Neurophysiology | Oceanography | Optics | Organic chemistry | Organismal biology | Paleontology | Physics | Physiology | Planetary science | Plant sciences | Psychological Science | Research methods | Science policy | Scientific community | Signal transduction | Social sciences | Structural biology | Surface chemistry | Synthetic biology | Systems biology | Virology
+#   options: run 'paperpush options science_advances.subject_areas' to list the choices
 subject_areas: 
 
 # Additional datasets (textarea, optional)

@@ -53,9 +53,14 @@ def _stub_submit(monkeypatch):
     short-circuits the Playwright path. Returns a list the runner appends to
     when it is invoked, so a test can assert the submission actually ran.
     """
+    import importlib
+
     import paperpush.subfile as subfile
-    import paperpush.validate as validate_mod
     import paperpush.venues as venues
+
+    # ``paperpush.validate`` the attribute is the public ``validate()`` function
+    # (it shadows the submodule); fetch the real module to monkeypatch it.
+    validate_mod = importlib.import_module("paperpush.validate")
 
     ran: list = []
     monkeypatch.setattr(subfile, "load", lambda path: SubFile(venue="biorxiv", values={}))
