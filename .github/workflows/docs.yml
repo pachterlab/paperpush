@@ -47,6 +47,15 @@ jobs:
       - name: Build HTML (warnings as errors)
         run: python -m sphinx -b html -W --keep-going docs docs/_build/html
 
+      - name: Configure Pages
+        # enablement: true turns GitHub Pages on for the repo the first time this
+        # runs, so no manual toggle in repo Settings is needed after the repo goes
+        # public. (On a free org plan, Pages only serves once the repo is public.)
+        if: github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Upload Pages artifact
         # Only need the artifact for the deploy job, which runs on main.
         if: github.ref == 'refs/heads/main'

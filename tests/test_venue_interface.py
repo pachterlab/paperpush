@@ -3,7 +3,7 @@
 Every submittable venue exposes a single :class:`~paperpush.venues.base.Venue`
 named ``VENUE`` -- the object the dispatch, login check, and validation layer
 resolve by slug. These tests pin that contract so a new venue that forgets its
-``VENUE`` (or ships one missing ``run`` / ``login``) fails here rather than deep
+``VENUE`` (or ships one missing ``submit`` / ``login``) fails here rather than deep
 in a submission run.
 
 ``paperpush.venues.SLUG_TO_MODULE`` is the registry of venues that have a
@@ -64,23 +64,23 @@ def test_module_exposes_a_venue_object(slug):
 
 @pytest.mark.parametrize("slug", SUBMITTABLE, ids=SUBMITTABLE)
 def test_venue_implements_the_required_operations(slug):
-    """Every submittable venue -- base or alias -- has run/login/is_logged_in.
+    """Every submittable venue -- base or alias -- has submit/login/is_logged_in.
 
-    ``run`` and ``login`` are the venue-specific abstract methods; ``is_logged_in``
+    ``submit`` and ``login`` are the venue-specific abstract methods; ``is_logged_in``
     is supplied by the base class from the ``logged_in_*`` attributes, so it is
     always present too.
     """
     impl = venues.get_venue_impl(venues.submission_base(slug))
     assert isinstance(impl, Venue)
-    for op in ("run", "login", "is_logged_in"):
+    for op in ("submit", "login", "is_logged_in"):
         assert callable(getattr(impl, op)), f"{slug}.{op} is not callable"
 
 
 @pytest.mark.parametrize("slug", SUBMITTABLE, ids=SUBMITTABLE)
 def test_get_runner_returns_the_venue_run(slug):
-    """`submit`'s dispatch resolves to the venue's own ``run`` (aliases included)."""
+    """`submit`'s dispatch resolves to the venue's own ``submit`` (aliases included)."""
     impl = venues.get_venue_impl(venues.submission_base(slug))
-    assert venues.get_runner(slug) == impl.run
+    assert venues.get_runner(slug) == impl.submit
 
 
 def test_field_validators_come_from_the_venue():
@@ -96,8 +96,8 @@ def test_incomplete_subclass_cannot_be_instantiated():
     """The ABC enforces the contract: omitting an operation fails at construction.
 
     This is what lets the rest of the package treat every ``VENUE`` as complete
-    instead of probing for loosely-agreed function names. ``run`` and ``login`` are
-    the abstract methods; a subclass that defines only ``run`` (here) is missing
+    instead of probing for loosely-agreed function names. ``submit`` and ``login`` are
+    the abstract methods; a subclass that defines only ``submit`` (here) is missing
     ``login`` and cannot be instantiated.
     """
 
@@ -105,7 +105,7 @@ def test_incomplete_subclass_cannot_be_instantiated():
         slug = "broken"
         logged_in_names = ("Sign out",)
 
-        def run(self, values, **kwargs): ...
+        def submit(self, values, **kwargs): ...
 
     with pytest.raises(TypeError):
         MissingLogin()

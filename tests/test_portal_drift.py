@@ -132,7 +132,7 @@ def _bioinformatics_reach_first_step(page):
             reject.click()
     except Exception:
         pass
-    # Mirror run_bioinformatics' opening navigation (bioinformatics.py). These
+    # Mirror submit_bioinformatics' opening navigation (bioinformatics.py). These
     # labels are inline literals there; keep them in sync.
     page.get_by_role("link", name=bioinformatics.AUTHOR_LINK).click()
     page.get_by_role("link", name=" Start New Submission").click()

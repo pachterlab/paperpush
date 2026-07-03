@@ -4,7 +4,7 @@ NAR (Oxford University Press) submits through the same ScholarOne family as
 Bioinformatics but at its own portal (``mc.manuscriptcentral.com/nar``) with a
 different wizard. It reuses the shared ScholarOne engine (sign-in, author,
 keyword, reviewer, and parse helpers) and supplies its own
-:func:`run_nucleic_acids_research` for the pages that differ, most notably the
+:func:`submit_nucleic_acids_research` for the pages that differ, most notably the
 declarations page. NAR keeps its own credentials and saved session under the
 ``nucleic_acids_research`` slug (its own portal).
 
@@ -340,7 +340,7 @@ def _add_funders(page, funders: list[tuple[str, str]]) -> None:
             logger.warning("nucleic_acids_research: could not add funder %r via the modal (%s); " "leaving it to be finished by hand", funder, exc)
 
 
-def run_nucleic_acids_research(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
     """Open Nucleic Acids Research (ScholarOne) and drive the submission wizard.
 
     ``values`` is the parsed ``.sub`` field map. The wizard runs across six pages:
@@ -493,7 +493,7 @@ class NucleicAcidsResearchVenue(scholarone.ScholarOneVenue):
     slug = "nucleic_acids_research"
     field_validators = FIELD_VALIDATORS
 
-    def run(
+    def submit(
         self,
         values: dict,
         *,
@@ -502,7 +502,7 @@ class NucleicAcidsResearchVenue(scholarone.ScholarOneVenue):
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
-        run_nucleic_acids_research(
+        submit_nucleic_acids_research(
             values,
             headless=headless,
             debug=debug,

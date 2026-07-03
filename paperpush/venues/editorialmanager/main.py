@@ -998,7 +998,7 @@ class EditorialManagerVenue(Venue):
 
     # display_name is inherited: the base returns get_venue(slug).name == variant.name.
 
-    def run(
+    def submit(
         self,
         values: dict,
         *,

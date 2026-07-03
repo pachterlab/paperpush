@@ -333,7 +333,7 @@ def _add_reviewers(
 class ScholarOneVenue(Venue):
     """A venue on the ScholarOne Manuscripts platform.
 
-    Shares sign-in and the author/keyword/reviewer helpers; each journal's ``run``
+    Shares sign-in and the author/keyword/reviewer helpers; each journal's ``submit``
     lives in its per-journal subclass. The login-state check keys on the " Author"
     dashboard link (:attr:`logged_in_names`) and the portal/login URL is the
     venue's ``submission_url``. ScholarOne cannot script a fresh session capture,

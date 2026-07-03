@@ -12,11 +12,11 @@ Each `Venue` subclass must implement the following:
 - set `slug`: its key in `venues.json`
 - set `logged_in_names`: a tuple of accessible names of a control that shows only when signed in
 - implement **`login()`**: drive the login process
-- implement **`run()`**: drive the submission wizard, stopping before the final submit.
+- implement **`submit()`**: drive the submission wizard, stopping before the final submit.
 
 See `paperpush/venues/template.py` for a copy-ready starting point.
 
-It is easiest to fill out these forms by making an account for the venue of interest (if you do not have one already), running `playwright codegen <login_url>`, clicking through the submission portal, then copying the generated code into `run()`. You can then replace hard-coded values with values and conditions that can be derived from the venues.json fields.
+It is easiest to fill out these forms by making an account for the venue of interest (if you do not have one already), running `playwright codegen <login_url>`, clicking through the submission portal, then copying the generated code into `submit()`. You can then replace hard-coded values with values and conditions that can be derived from the venues.json fields.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for tips on using playwright, debugging, and running unit tests.
 

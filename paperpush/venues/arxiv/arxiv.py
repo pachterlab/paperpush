@@ -51,7 +51,7 @@ class ArxivVenue(Venue):
                 raise VenueLoginError("submitted the credentials but the signed-in arXiv dashboard did " "not load -- the username or password may be wrong, or arXiv " "added a step (CAPTCHA / two-factor) that can't be automated")
 
     # * run
-    def run(
+    def submit(
         self,
         values: dict,
         headless: bool = False,

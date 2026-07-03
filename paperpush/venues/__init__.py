@@ -155,7 +155,7 @@ def get_venue_impl(slug: str):
     """Return the :class:`~paperpush.venues.base.Venue` for ``slug``.
 
     Resolves through :data:`SLUG_TO_MODULE` to the venue module, then returns its
-    single ``VENUE`` instance -- the object exposing ``run``/``auto_login``/
+    single ``VENUE`` instance -- the object exposing ``submit``/``login``/
     ``is_logged_in`` that the dispatch, login check, and validation layer share.
 
     Raises :class:`KeyError` for an unknown slug, or :class:`ImportError` if the
@@ -179,7 +179,7 @@ def try_get_venue_impl(slug: str):
 
 
 def get_runner(slug: str) -> Callable:
-    """Return the ``run`` callable for ``slug`` (case-insensitive).
+    """Return the ``submit`` callable for ``slug`` (case-insensitive).
 
     A venue that submits through another's portal (e.g. the AAAS family that all
     submit through Science's CTS wizard) resolves to that base venue's runner
@@ -188,7 +188,7 @@ def get_runner(slug: str) -> Callable:
 
     Raises :class:`KeyError` if no runner is registered for the venue.
     """
-    return get_venue_impl(submission_base(slug)).run
+    return get_venue_impl(submission_base(slug)).submit
 
 
 def get_field_validators(slug: str) -> dict[str, Callable[[str], str]]:

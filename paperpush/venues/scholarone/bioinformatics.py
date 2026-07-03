@@ -3,7 +3,7 @@
 Bioinformatics (Oxford University Press) submits through ScholarOne
 (``mc.manuscriptcentral.com/bioinformatics``). The shared platform machinery
 lives in :mod:`paperpush.venues.scholarone`; this module keeps only the
-Bioinformatics-specific pieces: :func:`run_bioinformatics`, the upload step's
+Bioinformatics-specific pieces: :func:`submit_bioinformatics`, the upload step's
 file-type labels, and the reproducibility checklist. Sign-in is inherited from
 :class:`ScholarOneVenue`.
 
@@ -196,7 +196,7 @@ def session_path():
     return _session_path("bioinformatics")
 
 
-def run_bioinformatics(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def submit_bioinformatics(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
     """Open Bioinformatics (ScholarOne) and drive the submission wizard.
 
     ``values`` is the parsed ``.sub`` field map. Sign-in is handled by the
@@ -335,7 +335,7 @@ class BioinformaticsVenue(scholarone.ScholarOneVenue):
 
     slug = "bioinformatics"
 
-    def run(
+    def submit(
         self,
         values: dict,
         *,
@@ -344,7 +344,7 @@ class BioinformaticsVenue(scholarone.ScholarOneVenue):
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
-        run_bioinformatics(
+        submit_bioinformatics(
             values,
             headless=headless,
             debug=debug,

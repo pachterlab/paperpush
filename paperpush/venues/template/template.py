@@ -32,8 +32,8 @@ class TemplateVenue(Venue):
             if not self.is_logged_in(page, timeout_ms=timeout_ms):
                 raise VenueLoginError("submitted the credentials but the signed-in template dashboard did " "not load -- the username or password may be wrong, or template " "added a step (CAPTCHA / two-factor) that can't be automated")
 
-    # * run
-    def run(
+    # * submit
+    def submit(
         self,
         values: dict,
         headless: bool = False,
@@ -62,7 +62,7 @@ class TemplateVenue(Venue):
             if debug:
                 page.pause()
 
-            #!!! write the run script here
+            #!!! write the submission script here
 
             logger.info("Completed the recorded steps; leaving the browser open " "for review (cross-list categories, license, and the final " "submit are left to you)")
 

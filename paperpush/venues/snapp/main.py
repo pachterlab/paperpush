@@ -511,7 +511,7 @@ def _enter_declarations(page, values: dict) -> None:
         _try(lambda: page.get_by_text("No, this research did not").click(), "research funding = No")
 
 
-def run(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def submit_snapp(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
     """Open the portal, sign in, then drive the Springer Nature wizard from ``values``.
 
     Clicks through the recorded steps (article type + files, details, authors,
@@ -593,8 +593,8 @@ def run(values: dict, headless: bool = False, debug: bool = False, new_session: 
         hold_open()
 
 
-# Engine entry point, aliased so the Venue subclass's ``run`` method does not shadow it.
-_ENGINE_RUN = run
+# Engine entry point, aliased for the Venue subclass's ``submit`` method to call.
+_ENGINE_RUN = submit_snapp
 
 
 class SnappVenue(Venue):
@@ -620,7 +620,7 @@ class SnappVenue(Venue):
         # Where the manual-sign-in fallback opens (IDP gateway, or the portal).
         return self.variant.manual_login_url
 
-    def run(
+    def submit(
         self,
         values: dict,
         *,

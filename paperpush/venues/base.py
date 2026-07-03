@@ -4,7 +4,7 @@ A venue is a small object exposing the operations the rest of the package drives
 submission portal through. Only two are venue-specific and abstract, so a new
 journal is as little work as possible:
 
-* :meth:`~Venue.run` -- fill and drive the submission wizard from a ``.sub``.
+* :meth:`~Venue.submit` -- fill and drive the submission wizard from a ``.sub``.
 * :meth:`~Venue.login` -- fill and submit the sign-in form.
 
 Everything else is provided by this base class and steered by a handful of class
@@ -19,7 +19,7 @@ attributes:
 * :meth:`~Venue.session_path` / :meth:`~Venue.save_session` locate and capture the
   saved Playwright session; :attr:`~Venue.field_validators` defaults to empty.
 
-``run`` and ``login`` are abstract, so a subclass that omits one fails to
+``submit`` and ``login`` are abstract, so a subclass that omits one fails to
 instantiate rather than only breaking deep in a run; that is what lets the
 dispatch in :mod:`paperpush.venues` and the login check in
 :mod:`paperpush.venues.login` treat every venue uniformly.
@@ -60,7 +60,7 @@ class Venue(ABC):
     """Uniform interface a submission venue exposes to the rest of the package.
 
     Subclasses set :attr:`slug`, declare the ``logged_in_*`` login-state
-    attributes, and implement :meth:`run` and :meth:`login`; the base supplies
+    attributes, and implement :meth:`submit` and :meth:`login`; the base supplies
     :meth:`is_logged_in`, :meth:`ensure_signed_in`, :meth:`session_path`, and
     :meth:`save_session`. A portal whose sign-in form or dashboard lives at a URL
     other than the venue's ``submission_url`` overrides :attr:`portal_url` /
@@ -100,7 +100,7 @@ class Venue(ABC):
     # -- The two venue-specific operations (required) --------------------------
 
     @abstractmethod
-    def run(
+    def submit(
         self,
         values: dict,
         *,

@@ -190,7 +190,7 @@ class DiscreteMathematicsVenue(Venue):
             return False
 
     # * run
-    def run(
+    def submit(
         self,
         values: dict,
         headless: bool = False,

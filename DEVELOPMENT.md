@@ -38,13 +38,13 @@ You only fill in two methods and a few attributes; the base `Venue` class suppli
   as needed — see the template's comments).
 - **`login`** — for a standard `#user` / `#password` / submit-button form this is one
   call to `paperpush.venues.login.fill_login_form` plus an `is_logged_in` check.
-- **`run`** — record the portal flow, then adapt it into the wizard steps:
+- **`submit`** — record the portal flow, then adapt it into the wizard steps:
 
   ```bash
   playwright codegen VENUE_LOGIN_URL
   ```
 
-  Click through the submission pages and copy the generated steps into the `run`
+  Click through the submission pages and copy the generated steps into the `submit`
   method (the template has the launch / `ensure_signed_in` / `hold_open` scaffolding
   already). Use `page.pause()` to add a breakpoint in code, and stop before the final
   submit control.

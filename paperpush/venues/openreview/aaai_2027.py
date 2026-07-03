@@ -4,7 +4,7 @@ AAAI 2027 is submitted through OpenReview (https://openreview.net). This module
 is a faithful port of a ``playwright codegen`` recording of the AAAI 2027
 submission wizard, reshaped to the per-venue runner layout: a single
 :class:`AAAI2027Venue` exposing :meth:`~AAAI2027Venue.login` and
-:meth:`~AAAI2027Venue.run`, with the recording's hard-coded values replaced by
+:meth:`~AAAI2027Venue.submit`, with the recording's hard-coded values replaced by
 the parsed ``.sub`` field values and its repeated author / topic / reviewer /
 conflict steps turned into loops.
 
@@ -269,7 +269,7 @@ class AAAI2027Venue(Venue):
 
         page.locator("div[class*='searchResultRow']").nth(index).get_by_role("button", name="plus").click()
 
-    def run(
+    def submit(
         self,
         values: dict,
         *,

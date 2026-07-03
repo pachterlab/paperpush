@@ -584,7 +584,7 @@ def _enter_manuscript_info(
     _try(lambda: _click(page, BTN_PROCEED), "proceed")
 
 
-def run_science(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def submit_science(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
     """Open Science, sign in, then drive the CTS submission wizard from a ``.sub``.
 
     Signs in via ``venue.ensure_signed_in``, then clicks through the captured CTS
@@ -744,7 +744,7 @@ class ScienceVenue(Venue):
     def login_url(self) -> str:
         return self.LOGIN_URL
 
-    def run(
+    def submit(
         self,
         values: dict,
         *,
@@ -753,7 +753,7 @@ class ScienceVenue(Venue):
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
-        run_science(
+        submit_science(
             values,
             headless=headless,
             debug=debug,

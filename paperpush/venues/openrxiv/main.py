@@ -385,7 +385,7 @@ def _answer_health_declarations(page, human_subjects: str, public_data_only: str
         _fill_url_list(page, "fixed_clinical_protocols_arr", "a.cp_add_button", data_availability_links)
 
 
-def run_biorxiv(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def submit_biorxiv(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
     """Open the openRxiv portal, sign in, then drive the submission wizard.
 
     Sign-in is handled by ``venue.ensure_signed_in`` (reuse a saved session, else
@@ -541,7 +541,7 @@ def run_biorxiv(values: dict, headless: bool = False, debug: bool = False, new_s
 
 
 # --- interface checker ----------------------------------------------------
-# Walks the wizard with dummy data, asserting each selector run_biorxiv relies
+# Walks the wizard with dummy data, asserting each selector submit_biorxiv relies
 # on is present and stopping before the file upload, so a portal UI change shows
 # up as a failed check rather than a failed submission.
 
@@ -579,7 +579,7 @@ class OpenRxivVenue(Venue):
         # openRxiv's sign-in form prefills the email from a query parameter.
         return _queues_url(prefill_email, cfg=self.variant)
 
-    def run(
+    def submit(
         self,
         values: dict,
         *,
@@ -588,7 +588,7 @@ class OpenRxivVenue(Venue):
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
-        run_biorxiv(
+        submit_biorxiv(
             values,
             headless=headless,
             debug=debug,
@@ -729,7 +729,7 @@ def check_biorxiv(headless: bool = True, timeout_ms: int = 8000, discard: bool =
     """Walk the openRxiv wizard with dummy data and report any missing selectors.
 
     Loads the saved session and steps through the wizard, asserting each selector
-    :func:`run_biorxiv` depends on is visible before using it, stopping at the
+    :func:`submit_biorxiv` depends on is visible before using it, stopping at the
     Files page. A missing selector is recorded (not raised) so the walk reports
     as much as it can in one pass. Completing the walk leaves a dummy draft in the
     queue; ``discard=True`` attempts a best-effort cleanup (see
@@ -825,7 +825,7 @@ def check_biorxiv(headless: bool = True, timeout_ms: int = 8000, discard: bool =
             ok = ok and check(f'button "{BTN_SAVE_CONTINUE}" (abstract)', page.get_by_role("button", name=BTN_SAVE_CONTINUE), lambda: page.get_by_role("button", name=BTN_SAVE_CONTINUE).click())
 
             # Author step: check the Add Author button, then fill one dummy
-            # author through the same path run_biorxiv uses.
+            # author through the same path submit_biorxiv uses.
             ok = ok and check(f'button "{BTN_ADD_AUTHOR}"', page.get_by_role("button", name=BTN_ADD_AUTHOR))
             if ok:
                 # Each author subfield is its own selector worth checking.

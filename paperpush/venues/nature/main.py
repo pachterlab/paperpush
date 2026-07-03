@@ -986,7 +986,7 @@ def _enter_declarations(page, values: dict, cfg: Variant = _DEFAULT) -> None:
 def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     """Drive the eJP wizard from the dashboard to the subject-category step.
 
-    Shared by :func:`run_nature` and :func:`check_categories` so the monthly
+    Shared by :func:`submit_nature` and :func:`check_categories` so the monthly
     category check walks the same path a real submission does. Starts a new
     manuscript and clicks through the upload, file-confirmation, data-policy,
     title/abstract, and author steps, leaving the page on the subject tab. The
@@ -1135,7 +1135,7 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     _click_button(page, BTN_SAVE_CONTINUE)
 
 
-def run_nature(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def submit_nature(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
     """Open Nature, sign in, then drive the eJP submission wizard from a ``.sub``.
 
     Signs in via ``ensure_signed_in``, then clicks through the captured eJP steps
@@ -1350,7 +1350,7 @@ class EJPVenue(Venue):
     #: Log-out control marking an authenticated eJP dashboard (see is_logged_in).
     logged_in_names = LOGOUT_LINK_NAMES
 
-    def run(
+    def submit(
         self,
         values: dict,
         *,
@@ -1359,7 +1359,7 @@ class EJPVenue(Venue):
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
-        run_nature(
+        submit_nature(
             values,
             headless=headless,
             debug=debug,

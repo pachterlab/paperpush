@@ -43,7 +43,7 @@ funders: |
 #   One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.
 #   select 1-2, comma-separated
 #   options: run 'paperpush options science_immunology.subject_areas' to list the choices
-subject_areas: Molecular biology, Genetics
+subject_areas: Autoimmunity, Infectious disease
 
 # Additional datasets (textarea, optional)
 #   Optional. Data deposited in an external repository, one per line as 'repository | dataset URI'. On the manuscript-information step each line opens a dataset row: the repository is chosen from the drop-down and the URI is typed, then 'Add' files it. Repository options: Zenodo | GitHub | Dataverse | Figshare | Other.
