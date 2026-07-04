@@ -824,6 +824,97 @@ def test_authorlist_split_name_columns():
     assert any("missing a name" in i.message for i in _errors(_validate(j, {"authors": bad})))
 
 
+# --- required / optional sub-fields ('?' marker) ---------------------------
+
+
+def _gb_field() -> Field:
+    """A Genome-Biology-style author list: department is optional, the rest
+    required for every author."""
+    return Field(
+        id="authors",
+        label="Authors",
+        type="authorlist",
+        fields=["name", "email", "institution", "city", "country", "department?", "corresponding"],
+    )
+
+
+def test_authorlist_required_subfield_missing_is_error():
+    j = _venue(_gb_field())
+    # Second author is missing institution and country (required columns).
+    block = "Ada | ada@x.org | Caltech | LA | USA | Bio | yes\n" "Alan | alan@x.org |  | Cambridge |  | | no"
+    errs = _errors(_validate(j, {"authors": block}))
+    msgs = " ".join(i.message for i in errs)
+    assert "author 'Alan' is missing institution" in msgs
+    assert "author 'Alan' is missing country" in msgs
+
+
+def test_authorlist_optional_subfield_missing_is_ok():
+    j = _venue(_gb_field())
+    # Department (marked optional with '?') is blank on both lines -> no error.
+    block = "Ada | ada@x.org | Caltech | LA | USA | | yes\n" "Alan | alan@x.org | MIT | Cambridge | USA | | no"
+    assert _errors(_validate(j, {"authors": block})) == []
+
+
+def test_authorlist_email_required_for_every_author():
+    # 'email' is a required column here, so a co-author without an email fails
+    # even though they are not the corresponding author.
+    j = _venue(_gb_field())
+    block = "Ada | ada@x.org | Caltech | LA | USA | | yes\n" "Alan |  | MIT | Cambridge | USA | | no"
+    errs = _errors(_validate(j, {"authors": block}))
+    assert any("author 'Alan' is missing email" in i.message for i in errs)
+
+
+def test_authorlist_optional_email_only_required_for_corresponding():
+    # When 'email' is optional ('email?'), only the corresponding author needs
+    # one -- the historical rule (also the DEFAULT_AUTHOR_FIELDS behaviour).
+    field = Field(
+        id="authors",
+        label="Authors",
+        type="authorlist",
+        fields=["name", "email?", "affiliation?", "corresponding"],
+    )
+    j = _venue(field)
+    # Non-corresponding author without email: fine.
+    ok = "Ada | ada@x.org | Caltech | yes\nAlan | | MIT | no"
+    assert _errors(_validate(j, {"authors": ok})) == []
+    # Corresponding author without email: still an error.
+    bad = "Ada | | Caltech | yes"
+    assert any("has no email" in i.message for i in _errors(_validate(j, {"authors": bad})))
+
+
+# --- structured textarea sub-fields ----------------------------------------
+
+
+def _funding_field() -> Field:
+    return Field(
+        id="funding",
+        label="Funding",
+        type="textarea",
+        fields=["funder_name", "awards?"],
+    )
+
+
+def test_textarea_required_subfield_missing_is_error():
+    j = _venue(_funding_field())
+    # Line 2 has no funder name (the required first column).
+    block = "NIH | award1\n | award2"
+    errs = _errors(_validate(j, {"funding": block}))
+    assert any("Funding: line 2 is missing funder name" in i.message for i in errs)
+
+
+def test_textarea_optional_subfield_missing_is_ok():
+    j = _venue(_funding_field())
+    # Awards (optional) omitted on both lines -> no error.
+    block = "NIH\nWellcome Trust"
+    assert _errors(_validate(j, {"funding": block})) == []
+
+
+def test_textarea_without_fields_is_not_column_checked():
+    # A plain textarea (no 'fields') is never split into columns.
+    j = _venue(Field(id="note", label="Note", type="textarea"))
+    assert _errors(_validate(j, {"note": " | | "})) == []
+
+
 # --- unknown fields --------------------------------------------------------
 
 

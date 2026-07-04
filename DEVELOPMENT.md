@@ -8,70 +8,17 @@ cd paperpush
 pip install -e .[dev]
 ```
 
-## Adding a new venue
+## Debugging
 
-### 1. Fields
-
-Scaffold the venue's fields in `paperpush/venues.json`:
-
-```bash
-python3 scripts/add_venue.py
-```
-
-Follow the prompts.
-
-To deprecate a venue, add the field `deprecated:true` to its entry in `paperpush/venues.json`.
-
-### 2. Venue class
-
-Copy `paperpush/venues/template.py` to `paperpush/venues/<portal>/<venue>.py`
-and register the slug in `SLUG_TO_MODULE` in `paperpush/venues/__init__.py`. (A
-portal shared by several venues — Editorial Manager, Nature, ScholarOne, SNAPP,
-openRxiv — keeps its Playwright engine in that subpackage's `main` module; each
-venue is a thin subclass that sets `slug` + `variant`.)
-
-You only fill in two methods and a few attributes; the base `Venue` class supplies
-`is_logged_in`, `ensure_signed_in`, `save_session`, and `session_path`:
-
-- Set `slug` and the login-state markers (`logged_in_names`, plus `logged_in_role` /
-  `logged_in_present_means_in` / `login_frame_selector` / `supports_session_capture`
-  as needed — see the template's comments).
-- **`login`** — for a standard `#user` / `#password` / submit-button form this is one
-  call to `paperpush.venues.login.fill_login_form` plus an `is_logged_in` check.
-- **`submit`** — record the portal flow, then adapt it into the wizard steps:
-
-  ```bash
-  playwright codegen VENUE_LOGIN_URL
-  ```
-
-  Click through the submission pages and copy the generated steps into the `submit`
-  method (the template has the launch / `ensure_signed_in` / `hold_open` scaffolding
-  already). Use `page.pause()` to add a breakpoint in code, and stop before the final
-  submit control.
+Use `page.pause()` to add a breakpoint in code, and stop before the final
+submit control during `playwright codegen`.
 
 For iterating on the script, the VS Code debugger is recommended:
 
 - Add a debug configuration in `.vscode/launch.json`
-- Set breakpoints in the code (breakpoint() or IDE breakpoints)
+- Set breakpoints in the code (`breakpoint()` or IDE breakpoints)
 - Run the debugger
 
-### 3. Tests
-
-Add unit tests, and add at least one sample submission for the venue to
-`tests/sample_subfiles.json` (keyed by filename, with the venue slug under
-`journal` and the filled-in values under `fields`), then regenerate the
-committed fixtures from it:
-
-```bash
-python tests/sample_subfiles.py
-```
-
-This regenerates the `.sub` files under `tests/sub_files/` **and** builds the
-input files each sample references (manuscript, figures, cover letter, ...)
-under `tests/manuscript_files/`. Those are produced from the shared
-`SampleFiles` factory in `tests/conftest.py` by mapping each referenced
-filename to a builder (see `_ASSET_BUILDERS` in `tests/sample_subfiles.py`); you
-only touch that map if a sample references a genuinely new kind of file.
 
 ## Testing
 
@@ -157,3 +104,5 @@ by the `restore-portal-sessions` composite action (see each workflow's header).
 
 The submit walkthrough's pass/fail is the portal-health signal: a portal change
 that breaks submission flips the venue to ❌ (and the PR stays open for review).
+
+To deprecate a venue, add the field `deprecated:true` to its entry in `paperpush/venues.json`.

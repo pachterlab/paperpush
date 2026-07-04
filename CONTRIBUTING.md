@@ -6,7 +6,7 @@ To add support for a venue (journal, preprint server, conference, or other), pro
 
 1. Login and submit scripts: a `Venue` subclass in `paperpush/venues/<portal>/<venue>.py`, exposing one module-level `VENUE` instance.
 2. Venue data: an entry in `paperpush/venues.json` with the submission fields and constraints.
-3. Unit test(s): at least one entry in `tests/sample_subfiles.json` to generate sample submission files for unit testing.
+3. Unit test(s): an entry named <slug> in `tests/sample_subfiles.json` to generate a sample submission file for unit testing. Optionally, more subfiles can be created for additional unit testing.
 
 Each `Venue` subclass must implement the following:
 - set `slug`: its key in `venues.json`
@@ -16,7 +16,7 @@ Each `Venue` subclass must implement the following:
 
 See `paperpush/venues/template.py` for a copy-ready starting point.
 
-It is easiest to fill out these forms by making an account for the venue of interest (if you do not have one already), running `playwright codegen <login_url>`, clicking through the submission portal, then copying the generated code into `submit()`. You can then replace hard-coded values with values and conditions that can be derived from the venues.json fields.
+It is easiest to fill out these forms by making an account for the venue of interest (if you do not have one already), running `playwright codegen <login_url>`, clicking through the submission portal, then copying the generated code into `login()` and `submit()`. You can then replace hard-coded values with values and conditions that can be derived from the venues.json fields.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for tips on using playwright, debugging, and running unit tests.
 

@@ -119,7 +119,7 @@
           "name",
           "email",
           "affiliation",
-          "orcid",
+          "orcid?",
           "corresponding"
         ]
       },
@@ -207,7 +207,11 @@
         "label": "Funding statement",
         "type": "textarea",
         "required": false,
-        "help": "Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match a FundRef funder, since bioRxiv requires picking an autocomplete suggestion."
+        "help": "Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match a FundRef funder, since bioRxiv requires picking an autocomplete suggestion.",
+        "fields": [
+          "funder_name",
+          "awards?"
+        ]
       },
       {
         "id": "data_availability_links",
@@ -542,11 +546,11 @@
         "help": "One author per line, in order. Format: email | prefix | name | institution | country/region | city | corresponding(yes/no). Each author is added on ScholarOne by email lookup, so an email is required for every author. If the email is already registered the remaining columns are ignored; if it is not, the author is created from the prefix, name, institution, country/region, and city. Mark exactly one corresponding author. Prefix must be one of: Dr., Miss, Mr., Mrs., Ms., Prof., Mx. Institution and country/region are picked from ScholarOne drop-down lists, so spell them as they appear there.",
         "fields": [
           "email",
-          "prefix",
+          "prefix?",
           "name",
-          "institution",
-          "country",
-          "city",
+          "institution?",
+          "country?",
+          "city?",
           "corresponding"
         ]
       },
@@ -713,7 +717,13 @@
         "type": "textarea",
         "required": true,
         "min_count": 4,
-        "help": "One reviewer per line. Format: name | email | stance | reason. stance must be 'recommended' or 'opposed' (case-insensitive); reason is optional (a free-text justification shown to the editor). At least 4 recommended reviewers are required; opposed reviewers do not count toward that minimum. Each reviewer is added through the ScholarOne 'Add Reviewer' form, which splits the name into first/last on the last space, so write the name as 'First Last'."
+        "help": "One reviewer per line. Format: name | email | stance | reason. stance must be 'recommended' or 'opposed' (case-insensitive); reason is optional (a free-text justification shown to the editor). At least 4 recommended reviewers are required; opposed reviewers do not count toward that minimum. Each reviewer is added through the ScholarOne 'Add Reviewer' form, which splits the name into first/last on the last space, so write the name as 'First Last'.",
+        "fields": [
+          "name",
+          "email",
+          "stance",
+          "reason?"
+        ]
       },
       {
         "id": "funding_to_report",
@@ -998,11 +1008,11 @@
         "help": "One author per line, in order. Format: email | prefix | name | institution | country/region | city | corresponding(yes/no). Each author is added on ScholarOne by email lookup, so an email is required for every author. If the email is already registered the remaining columns are ignored; if it is not, the author is created from the prefix, name, institution, country/region, and city. Mark exactly one corresponding author. Prefix must be one of: Dr, Prof., Mx . Institution and country/region are picked from ScholarOne drop-down lists, so spell them as they appear there.",
         "fields": [
           "email",
-          "prefix",
+          "prefix?",
           "name",
-          "institution",
-          "country",
-          "city",
+          "institution?",
+          "country?",
+          "city?",
           "corresponding"
         ]
       },
@@ -1311,9 +1321,9 @@
         "help": "One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). arXiv records authors as a single comma-separated list of names, so only the Name column is used for the metadata field; mark exactly one corresponding author (the account submitting). Use the form 'Firstname Lastname' for each name.",
         "fields": [
           "name",
-          "email",
-          "affiliation",
-          "orcid",
+          "email?",
+          "affiliation?",
+          "orcid?",
           "corresponding"
         ]
       },
@@ -1455,13 +1465,13 @@
         "required": true,
         "help": "One author per line, in order. Format: title | first name | last name | email | institution | country/region | city | corresponding(yes/no). The title is the name prefix selected in the eJournalPress drop-down (e.g. Mr, Ms, Dr, Professor). City is optional. The author marked corresponding=yes fills the corresponding-author sub-form; the boxes that the signed-in account already pre-filled (typically first name, last name, email) are left untouched. Country/region is matched to the eJournalPress drop-down by name (US/USA map to 'United States', UK to 'United Kingdom').",
         "fields": [
-          "title",
+          "title?",
           "first_name",
           "last_name",
           "email",
           "institution",
           "country",
-          "city",
+          "city?",
           "corresponding"
         ]
       },
@@ -1890,7 +1900,11 @@
         "label": "Funding statement",
         "type": "textarea",
         "required": false,
-        "help": "Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match an Editorial Manager funder, since the funder box only accepts a picked autocomplete suggestion. Leave empty to mark funding information as not available."
+        "help": "Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match an Editorial Manager funder, since the funder box only accepts a picked autocomplete suggestion. Leave empty to mark funding information as not available.",
+        "fields": [
+          "funder_name",
+          "awards?"
+        ]
       },
       {
         "id": "reviewers",
@@ -1898,7 +1912,14 @@
         "label": "Suggested / opposed reviewers",
         "type": "textarea",
         "required": false,
-        "help": "Optional. One reviewer per line. Format: name | email | institution | stance | reason. stance is 'suggested' or 'opposed' (case-insensitive, default 'suggested'); email, institution, and reason are optional. Write the name as 'First Last'; the Editorial Manager reviewer form splits it into given/family name on the last space. Each line is added through the '+Add Suggested Reviewer' or '+Add Opposed Reviewer' form, which mirrors the author form."
+        "help": "Optional. One reviewer per line. Format: name | email | institution | stance | reason. stance is 'suggested' or 'opposed' (case-insensitive, default 'suggested'); email, institution, and reason are optional. Write the name as 'First Last'; the Editorial Manager reviewer form splits it into given/family name on the last space. Each line is added through the '+Add Suggested Reviewer' or '+Add Opposed Reviewer' form, which mirrors the author form.",
+        "fields": [
+          "name",
+          "email?",
+          "institution?",
+          "stance?",
+          "reason?"
+        ]
       },
       {
         "id": "declarations_confirmed",
@@ -2030,7 +2051,14 @@
         "type": "textarea",
         "required": true,
         "min_count": 2,
-        "help": "Optional. One reviewer per line. Format: name | email | institution | stance | reason. stance is 'suggested' or 'opposed' (case-insensitive, default 'suggested'); email, institution, and reason are optional. Write the name as 'First Last'; the Editorial Manager reviewer form splits it into given/family name on the last space. Each line is added through the '+Add Suggested Reviewer' or '+Add Opposed Reviewer' form, which mirrors the author form."
+        "help": "Optional. One reviewer per line. Format: name | email | institution | stance | reason. stance is 'suggested' or 'opposed' (case-insensitive, default 'suggested'); email, institution, and reason are optional. Write the name as 'First Last'; the Editorial Manager reviewer form splits it into given/family name on the last space. Each line is added through the '+Add Suggested Reviewer' or '+Add Opposed Reviewer' form, which mirrors the author form.",
+        "fields": [
+          "name",
+          "email?",
+          "institution?",
+          "stance?",
+          "reason?"
+        ]
       },
       {
         "id": "competing_interests",
@@ -2220,7 +2248,7 @@
           "institution",
           "city",
           "country",
-          "department",
+          "department?",
           "corresponding"
         ]
       },
@@ -2280,7 +2308,11 @@
         "label": "Funding sources",
         "type": "textarea",
         "required": false,
-        "help": "Optional. One funder per line as 'funder name | grant id' (the grant id optional). On the declarations step each line opens a funding row attributed to the first author: the funder name and grant id are typed and the row is saved. Providing any funder implies research funding = yes."
+        "help": "Optional. One funder per line as 'funder name | grant id' (the grant id optional). On the declarations step each line opens a funding row attributed to the first author: the funder name and grant id are typed and the row is saved. Providing any funder implies research funding = yes.",
+        "fields": [
+          "funder_name",
+          "grant_id?"
+        ]
       }
     ]
   },
@@ -2406,7 +2438,12 @@
         "label": "Funding sources",
         "type": "textarea",
         "required": false,
-        "help": "Optional. One funding source per line as 'funder name | award number | investigator full name'. On the manuscript-information step each line opens a funding row: the funder name is matched against the Crossref Funder Registry (http://www.crossref.org/fundref/) and the first suggestion is taken, the award/grant number is typed, and the investigator is chosen from the author drop-down. The award number and investigator are optional."
+        "help": "Optional. One funding source per line as 'funder name | award number | investigator full name'. On the manuscript-information step each line opens a funding row: the funder name is matched against the Crossref Funder Registry (http://www.crossref.org/fundref/) and the first suggestion is taken, the award/grant number is typed, and the investigator is chosen from the author drop-down. The award number and investigator are optional.",
+        "fields": [
+          "funder_name",
+          "award_number?",
+          "investigator?"
+        ]
       },
       {
         "id": "subject_areas",
@@ -2425,7 +2462,11 @@
         "label": "Additional datasets",
         "type": "textarea",
         "required": false,
-        "help": "Optional. Data deposited in an external repository, one per line as 'repository | dataset URI'. On the manuscript-information step each line opens a dataset row: the repository is chosen from the drop-down and the URI is typed, then 'Add' files it. Repository options: Zenodo | GitHub | Dataverse | Figshare | Other."
+        "help": "Optional. Data deposited in an external repository, one per line as 'repository | dataset URI'. On the manuscript-information step each line opens a dataset row: the repository is chosen from the drop-down and the URI is typed, then 'Add' files it. Repository options: Zenodo | GitHub | Dataverse | Figshare | Other.",
+        "fields": [
+          "repository",
+          "dataset_uri"
+        ]
       },
       {
         "id": "authors",
@@ -2438,12 +2479,12 @@
           "first_name",
           "last_name",
           "email",
-          "ringgold_id",
-          "ror_id",
-          "first_author",
+          "ringgold_id?",
+          "ror_id?",
+          "first_author?",
           "corresponding",
-          "contributed_equally",
-          "submitter"
+          "contributed_equally?",
+          "submitter?"
         ]
       },
       {
@@ -2517,7 +2558,14 @@
         "label": "Suggested reviewers",
         "type": "textarea",
         "required": false,
-        "help": "Optional. Reviewers you suggest, one per line as 'first name | last name | email | institution | department'. The institution and department are optional. On the reviewers step each line opens a suggested-reviewer form filled with these values and saved; left blank skips it."
+        "help": "Optional. Reviewers you suggest, one per line as 'first name | last name | email | institution | department'. The institution and department are optional. On the reviewers step each line opens a suggested-reviewer form filled with these values and saved; left blank skips it.",
+        "fields": [
+          "first_name",
+          "last_name",
+          "email",
+          "institution?",
+          "department?"
+        ]
       },
       {
         "id": "excluded_reviewers",
@@ -2525,7 +2573,14 @@
         "label": "Excluded reviewers",
         "type": "textarea",
         "required": false,
-        "help": "Optional. Reviewers to exclude, one per line as 'first name | last name | email | institution | reason'. The institution and reason are optional; the reason is typed into the form's free-text box. On the reviewers step each line opens an excluded-reviewer form filled with these values and saved; left blank skips it."
+        "help": "Optional. Reviewers to exclude, one per line as 'first name | last name | email | institution | reason'. The institution and reason are optional; the reason is typed into the form's free-text box. On the reviewers step each line opens an excluded-reviewer form filled with these values and saved; left blank skips it.",
+        "fields": [
+          "first_name",
+          "last_name",
+          "email",
+          "institution?",
+          "reason?"
+        ]
       },
       {
         "id": "comments_to_editor",
@@ -2687,10 +2742,10 @@
         "required": true,
         "help": "One author per line, in order. Format: Open Review ID | Name | Email suffixes | Reciprocal Reviewer(yes/no). If Open Review ID is added, then name and email suffixes are optional. Each author is added to the OpenReview author page by a profile search on the Name column, so the name must match the author's OpenReview profile. Email suffixes should be comma-separated, in decreasing order of likelihood of association with the author. At least one author is required.",
         "fields": [
-          "open_review_id",
+          "open_review_id?",
           "name",
-          "email_suffixes",
-          "reciprocal_reviewer"
+          "email_suffixes?",
+          "reciprocal_reviewer?"
         ]
       },
       {
@@ -2805,10 +2860,10 @@
         "required": false,
         "help": "Optional. Self-declared conflicts of interest, one per line, in the same format as Authors: Open Review ID | Name | Email suffixes | Reciprocal Reviewer. Leave the Reciprocal Reviewer column blank -- it is not used for conflicts. If Open Review ID is added, then name and email suffixes are optional; otherwise the name is searched against OpenReview and must match a profile. Each conflict must NOT be one of the submission's authors. A profile that OpenReview's search does not return is warned about and skipped.",
         "fields": [
-          "open_review_id",
+          "open_review_id?",
           "name",
-          "email_suffixes",
-          "reciprocal_reviewer"
+          "email_suffixes?",
+          "reciprocal_reviewer?"
         ]
       }
     ]

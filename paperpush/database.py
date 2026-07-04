@@ -162,7 +162,7 @@ class Field:
     ] = None
     fields: Annotated[
         Optional[list[str]],
-        PField(description="Sub-field names for a structured field such as " "`authorlist`."),
+        PField(description="Sub-field (column) names for a structured multi-item " "field such as an `authorlist` or a pipe-delimited `textarea` (funding, " "suggested reviewers). Each item line is `|`-delimited in this order. A " "trailing `?` marks an optional column (e.g. `department?`); every other " "column is required -- validation flags an item whose required column is " "blank. Author name and the `corresponding` flag have their own checks and " "are always effectively required regardless of marker."),
     ] = None
     type_options: Annotated[
         Optional[list[str]],

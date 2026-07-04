@@ -71,8 +71,29 @@ def _falsey_bool(value: str) -> bool:
 
 # The legacy author column order, used by venues that don't declare their own
 # ``fields`` list. Most venues follow this; Bioinformatics (ScholarOne) is the
-# exception and declares its own order in venues.json.
-DEFAULT_AUTHOR_FIELDS = ["name", "email", "affiliation", "orcid", "corresponding"]
+# exception and declares its own order in venues.json. The ``?`` suffixes mark
+# the optional columns (see ``_subfield_specs``): only a name is strictly
+# required, matching the historical behaviour for venues that omit ``fields``.
+DEFAULT_AUTHOR_FIELDS = ["name", "email?", "affiliation?", "orcid?", "corresponding"]
+
+
+def _subfield_specs(fields: list[str]) -> list[tuple[str, bool]]:
+    """Split a structured field's column list into ``(name, required)`` pairs.
+
+    A trailing ``?`` on a column name marks it optional; every other column is
+    required -- it must be present and non-empty on each item line. The marker
+    is stripped from the returned name, so callers always work with the clean
+    column name (``"department?"`` -> ``("department", False)``). This is the
+    single place the ``?`` convention is interpreted, shared by ``parse_authors``
+    (which only needs the names), ``_check_authors``, and ``_check_subfields``.
+    """
+    specs: list[tuple[str, bool]] = []
+    for col in fields:
+        if col.endswith("?"):
+            specs.append((col[:-1], False))
+        else:
+            specs.append((col, True))
+    return specs
 
 
 def parse_authors(value: str, fields: list[str] | None = None) -> list[dict]:
@@ -84,18 +105,22 @@ def parse_authors(value: str, fields: list[str] | None = None) -> list[dict]:
     can use a different column set -- Bioinformatics, for instance, is
     ``email | prefix | name | institution | country | city | corresponding``.
     Missing trailing columns are tolerated. The ``corresponding`` column is
-    coerced to a bool; every other column is kept as its trimmed string.
+    coerced to a bool; every other column is kept as its trimmed string. A
+    ``?`` suffix on a column name (an optional-column marker, see
+    ``_subfield_specs``) is stripped, so the returned dict keys are always the
+    clean names.
     """
     if fields is None:
         fields = DEFAULT_AUTHOR_FIELDS
+    names = [name for name, _ in _subfield_specs(fields)]
     authors: list[dict] = []
     for line in value.splitlines():
         line = line.strip()
         if not line:
             continue
         parts = [p.strip() for p in line.split("|")]
-        parts += [""] * (len(fields) - len(parts))
-        authors.append({name: (_truthy_bool(parts[i]) if name == "corresponding" else parts[i]) for i, name in enumerate(fields)})
+        parts += [""] * (len(names) - len(parts))
+        authors.append({name: (_truthy_bool(parts[i]) if name == "corresponding" else parts[i]) for i, name in enumerate(names)})
     return authors
 
 
@@ -680,6 +705,10 @@ def validate(subfile: SubFile, venue: Venue) -> list[Issue]:
 
         if field.type == "authorlist":
             issues.extend(_check_authors(field, raw))
+        elif field.type == "textarea" and field.fields:
+            # A pipe-delimited structured textarea (funding, suggested
+            # reviewers, ...): enforce its required columns per line.
+            issues.extend(_check_subfields(field, raw))
 
     errors = sum(1 for i in issues if i.is_error)
     logger.debug(
@@ -706,18 +735,26 @@ def _author_name(author: dict) -> str:
     return " ".join(p for p in parts if p)
 
 
+# Author columns covered by dedicated checks, so the generic per-column
+# presence check below skips them: the name identifier (handled by the
+# name-or-OpenReview-ID check) and the ``corresponding`` flag (a yes/no marker
+# whose empty value means "no", never "missing").
+_AUTHOR_SPECIAL = {"name", "first_name", "last_name", "open_review_id", "corresponding"}
+
+
 def _check_authors(field: Field, raw: str) -> list[Issue]:
     issues: list[Issue] = []
     authors = parse_authors(raw, field.fields)
     if not authors:
         issues.append(Issue(ERROR, field.id, "at least one author is required"))
         return issues
+    specs = _subfield_specs(field.fields or DEFAULT_AUTHOR_FIELDS)
     # Most venues carry a "corresponding" (and "email") column, but some author
     # column sets do not -- AAAI 2027's OpenReview list is
     # ``open_review_id | name | email_suffixes | reciprocal_reviewer`` with no
     # corresponding author. Only apply the corresponding-author checks when the
     # column is actually present so those venues don't KeyError here.
-    columns = field.fields or DEFAULT_AUTHOR_FIELDS
+    columns = [name for name, _ in specs]
     has_corresponding = "corresponding" in columns
     if has_corresponding:
         corresponding = [a for a in authors if a["corresponding"]]
@@ -738,17 +775,61 @@ def _check_authors(field: Field, raw: str) -> list[Issue]:
                     f"{len(corresponding)} corresponding authors marked: {names} " "(mark exactly one)",
                 )
             )
+    # Columns required (unmarked, no ``?``) on every author line, minus the ones
+    # with their own dedicated checks. When ``email`` is one of them, every
+    # author needs an email; otherwise only the corresponding author does (the
+    # historical rule), enforced in the fallback below.
+    required_cols = [name for name, required in specs if required and name not in _AUTHOR_SPECIAL]
+    email_required_all = "email" in required_cols
     for a in authors:
         # A name identifies the author, unless the column set offers an
         # OpenReview ID and this line supplies one instead.
-        if not _author_name(a) and not a.get("open_review_id", "").strip():
+        name_present = bool(_author_name(a)) or bool(a.get("open_review_id", "").strip())
+        if not name_present:
             issues.append(Issue(ERROR, field.id, "an author line is missing a name"))
-        if has_corresponding and a["corresponding"] and not a.get("email"):
-            issues.append(
-                Issue(
-                    ERROR,
-                    field.id,
-                    f"corresponding author '{_author_name(a)}' has no email",
+        who = _author_name(a) or "an author"
+        for col in required_cols:
+            if not str(a.get(col, "")).strip():
+                issues.append(Issue(ERROR, field.id, f"author '{who}' is missing {col.replace('_', ' ')}"))
+    if has_corresponding and not email_required_all and "email" in columns:
+        for a in authors:
+            if a["corresponding"] and not a.get("email"):
+                issues.append(
+                    Issue(
+                        ERROR,
+                        field.id,
+                        f"corresponding author '{_author_name(a)}' has no email",
+                    )
                 )
-            )
+    return issues
+
+
+def _check_subfields(field: Field, raw: str) -> list[Issue]:
+    """Presence check for the required columns of a pipe-delimited multi-item
+    field (funding, suggested reviewers, ...).
+
+    Each non-empty line is split on ``|`` into the columns named by
+    ``field.fields``; a required (unmarked) column left blank is an error. This
+    is the generic counterpart to :func:`_check_authors`, used for every
+    structured field except ``authorlist`` (which has its own richer, author-
+    specific checks). Only columns before the first optional-or-missing one
+    matter to the portal, but we report each required column independently so
+    the message names exactly what is missing.
+    """
+    specs = _subfield_specs(field.fields or [])
+    required = [(pos, name) for pos, (name, req) in enumerate(specs) if req]
+    if not required:
+        return []
+    issues: list[Issue] = []
+    line_no = 0
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        line_no += 1
+        cells = [c.strip() for c in line.split("|")]
+        for pos, name in required:
+            value = cells[pos] if pos < len(cells) else ""
+            if not value:
+                issues.append(Issue(ERROR, field.id, f"{field.label}: line {line_no} is missing {name.replace('_', ' ')}"))
     return issues
