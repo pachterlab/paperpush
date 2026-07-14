@@ -64,7 +64,7 @@ def _stub_submit(monkeypatch):
 
     ran: list = []
     monkeypatch.setattr(subfile, "load", lambda path: SubFile(venue="biorxiv", values={}))
-    monkeypatch.setattr(validate_mod, "validate", lambda sub, venue: [])
+    monkeypatch.setattr(validate_mod, "validate", lambda sub, venue, **kwargs: [])
     monkeypatch.setattr(venues, "get_runner", lambda venue: (lambda *a, **k: ran.append((a, k))))
     return ran
 

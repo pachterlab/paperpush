@@ -26,8 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional
 
-from pydantic import (AfterValidator, BeforeValidator, ConfigDict,
-                      ValidationError, create_model)
+from pydantic import AfterValidator, BeforeValidator, ConfigDict, ValidationError, create_model
 
 from .database import Field, Venue, options_command
 from .subfile import SubFile
@@ -587,18 +586,131 @@ def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> 
     return issues
 
 
-def validate(subfile: SubFile, venue: Venue) -> list[Issue]:
+def _findings_to_issues(findings) -> list[Issue]:
+    """Turn scanner :class:`~paperpush.sensitive.Finding` objects into WARNINGs.
+
+    A file-scoped finding names its file in the message (``... (in main.tex)``);
+    a submission-level one (``where == "submission"``) is shown as-is.
+    """
+    issues: list[Issue] = []
+    for finding in findings:
+        if finding.where and finding.where != "submission":
+            issues.append(Issue(WARNING, "", f"{finding.detail} (in {finding.where})"))
+        else:
+            issues.append(Issue(WARNING, "", finding.detail))
+    return issues
+
+
+def _link_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
+    """Flag URLs in the manuscript files that an anonymous reader can't reach.
+
+    Scans the referenced upload files (and archive/PDF text) for http(s) links
+    and reports the ones that are definitively broken -- a 404/gone page, or a
+    still-private GitHub repository. Runs by default (disable with
+    ``--dont-check-links``) and makes network requests; unreachable-but-
+    inconclusive links (timeouts, bot blocks) are left unreported.
+    """
+    from . import sensitive
+
+    paths = list(_iter_upload_paths(venue, values))
+    logger.info("Checking %d upload file(s) for unreachable links (%s)", len(paths), venue.slug)
+    return _findings_to_issues(sensitive.scan_links(paths))
+
+
+def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
+    """Scan every referenced upload for information not meant to be public.
+
+    Runs the :mod:`paperpush.sensitive` scanner over each ``file``/``filelist``
+    path (and, for LaTeX/source bundles, their archive members): pasted API keys
+    and passwords, private keys, GPS coordinates in figure photos, editable
+    Google-Docs links, and LaTeX ``%`` comments. It also nudges when the
+    manuscript links no public code repository, and -- for an arXiv submission
+    whose LaTeX source still carries comments/junk -- reminds the author to run
+    ``arxiv_latex_cleaner``. (Reachability of the links it *does* cite is a
+    separate, on-by-default check; see :func:`_link_issues`.)
+
+    Findings are advisory (WARNING) -- they surface what would become public
+    alongside the paper so the author can act, but they never block a
+    submission. This is opt-in because reading and text-extracting every
+    attachment is more work than the generic field checks.
+    """
+    from . import sensitive
+
+    paths = list(_iter_upload_paths(venue, values))
+    logger.info("Scanning %d upload file(s) for sensitive information (%s)", len(paths), venue.slug)
+    findings = sensitive.scan_paths(paths)
+    findings.extend(sensitive.scan_missing_code_link(paths))
+
+    issues = _findings_to_issues(findings)
+    issues.extend(_arxiv_cleaner_reminder(venue, findings))
+    return issues
+
+
+# Scan categories that mean an arXiv source bundle still carries author-only
+# content -- i.e. arxiv_latex_cleaner (or an equivalent) has not been run.
+_UNCLEANED_LATEX = {"LaTeX comments", "LaTeX note comment", "unnecessary file"}
+
+
+def _arxiv_cleaner_reminder(venue: Venue, findings) -> list[Issue]:
+    """Remind an arXiv submitter to sanitise their LaTeX source, if it looks unclean.
+
+    arXiv publishes the uploaded source, so leftover comments and build/VCS junk
+    become public. When the venue is arXiv (or an arXiv-based alias) and the scan
+    turned up any of those, emit one reminder to run ``arxiv_latex_cleaner``.
+    Their absence is treated as "already cleaned", so a sanitised submission
+    stays quiet.
+    """
+    from . import venues
+
+    try:
+        base = venues.submission_base(venue.slug)
+    except Exception:
+        logger.debug("Could not resolve submission base for %s; using slug as-is", venue.slug, exc_info=True)
+        base = venue.slug
+    if base != "arxiv":
+        return []
+    if not any(f.category in _UNCLEANED_LATEX for f in findings):
+        return []
+    return [
+        Issue(
+            WARNING,
+            "",
+            "arXiv publishes your uploaded LaTeX source publicly; run arxiv_latex_cleaner on " "your source to strip the comments and unneeded files above before submitting",
+        )
+    ]
+
+
+def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, check_links: bool = True) -> list[Issue]:
     """Return all issues found in ``subfile`` against ``venue``.
 
     Combines schema-level checks (allowed options, file types, booleans, and
     stray fields, via pydantic) with required-field, file-existence, and
     author-list checks. Every problem is reported, so the author can fix them
     in one pass.
+
+    When ``check_sensitive`` is set (the default), the referenced upload files
+    are scanned for information that was never meant to be shared -- secrets, GPS
+    metadata, editable-document links, and LaTeX source comments (see
+    :func:`_sensitive_issues`) -- and reported as advisory WARNINGs. When
+    ``check_links`` is set (also the default), the URLs those files cite are
+    probed and any that are unreachable (404/gone, including a still-private
+    GitHub repo) are likewise flagged; this makes network requests.
     """
+    logger.info(
+        "Validating %s: %d field(s) (sensitive-scan=%s, link-check=%s)",
+        venue.slug,
+        len(venue.fields),
+        check_sensitive,
+        check_links,
+    )
     issues: list[Issue] = list(_schema_issues(venue, subfile.values))
     values = subfile.values
 
     issues.extend(_upload_size_issues(venue, values))
+    if check_links:
+        issues.extend(_link_issues(venue, values))
+    if check_sensitive:
+        issues.extend(_sensitive_issues(venue, values))
 
     for field in venue.fields:
         raw = values.get(field.id, "")
@@ -711,7 +823,7 @@ def validate(subfile: SubFile, venue: Venue) -> list[Issue]:
             issues.extend(_check_subfields(field, raw))
 
     errors = sum(1 for i in issues if i.is_error)
-    logger.debug(
+    logger.info(
         "Validated %s subfile: %d issue(s) (%d error(s), %d warning(s))",
         venue.slug,
         len(issues),

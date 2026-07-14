@@ -1083,11 +1083,13 @@ class EditorialManagerVenue(Venue):
                 print(f"Signing in to {cfg.name} with your stored credentials…")
                 self.login(page, cred.username, cred.password)
                 save_storage(context, session)
+                logger.info("Signed in to %s; saved the session for reuse", cfg.name)
                 print("Signed in; saved the session for next time.")
                 return True
             except EditorialManagerLoginError as exc:
                 logger.warning("Automatic %s sign-in failed: %s", cfg.name, exc)
                 print(f"Automatic sign-in failed: {exc}")
+                logger.info("Falling back to a manual %s sign-in", cfg.name)
                 print("Falling back to a manual sign-in.")
 
         # Manual fallback: reached when there are no usable credentials or the auto

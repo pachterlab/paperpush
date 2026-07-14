@@ -976,6 +976,126 @@ def test_cli_validate_reports_errors(tmp_path, monkeypatch, capsys):
     assert "paperpush validate" in err
 
 
+def test_cli_validate_checks_sensitive_by_default(tmp_path, monkeypatch, capsys):
+    # A LaTeX source referenced by the .sub carries a pasted key and a comment;
+    # validate surfaces them as advisory warnings by default (no flag needed)
+    # without blocking submission (rc stays 0).
+    j = _venue(Field(id="src", label="Source", type="file", required=True), slug="biorxiv")
+    import paperpush.cli as cli
+
+    monkeypatch.setattr(cli, "get_venue", lambda slug: j)
+    tex = tmp_path / "main.tex"
+    tex.write_text("% TODO remove before submit\nkey = AKIAIOSFODNN7EXAMPLE\n", encoding="utf-8")
+    sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {tex}\n")
+
+    rc = main(["validate", str(sub)])
+    captured = capsys.readouterr()
+
+    assert rc == 0
+    assert "AWS access key" in captured.err
+    assert "LaTeX" in captured.err
+    # The raw secret must not be echoed to the terminal.
+    assert "AKIAIOSFODNN7EXAMPLE" not in captured.err
+
+
+def test_cli_validate_dont_check_sensitive_skips_scan(tmp_path, monkeypatch, capsys):
+    j = _venue(Field(id="src", label="Source", type="file", required=True), slug="biorxiv")
+    import paperpush.cli as cli
+
+    monkeypatch.setattr(cli, "get_venue", lambda slug: j)
+    tex = tmp_path / "main.tex"
+    tex.write_text("key = AKIAIOSFODNN7EXAMPLE\n", encoding="utf-8")
+    sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {tex}\n")
+
+    rc = main(["validate", str(sub), "--dont-check-for-sensitive-info"])
+    captured = capsys.readouterr()
+
+    assert rc == 0
+    assert "AWS access key" not in captured.err
+
+
+def test_cli_validate_checks_links_by_default(tmp_path, monkeypatch, capsys):
+    # Link checking is on by default: a broken URL in the manuscript is warned
+    # about without --check-for-sensitive-info and without blocking (rc 0).
+    import paperpush.cli as cli
+    import paperpush.sensitive as sensitive
+
+    j = _venue(Field(id="src", label="Source", type="file", required=True), slug="biorxiv")
+    monkeypatch.setattr(cli, "get_venue", lambda slug: j)
+    monkeypatch.setattr(sensitive, "_url_is_reachable", lambda url, **k: False)
+    tex = tmp_path / "main.tex"
+    tex.write_text("Data at https://example.com/gone-page\n", encoding="utf-8")
+    sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {tex}\n")
+
+    rc = main(["validate", str(sub)])
+    err = capsys.readouterr().err
+
+    assert rc == 0
+    assert "not reachable" in err
+    assert "example.com/gone-page" in err
+
+
+def test_cli_validate_dont_check_links_skips_probes(tmp_path, monkeypatch, capsys):
+    import paperpush.cli as cli
+    import paperpush.sensitive as sensitive
+
+    j = _venue(Field(id="src", label="Source", type="file", required=True), slug="biorxiv")
+    monkeypatch.setattr(cli, "get_venue", lambda slug: j)
+    # If this were consulted the link would be reported; --dont-check-links must
+    # mean it is never called.
+    monkeypatch.setattr(sensitive, "_url_is_reachable", lambda url, **k: False)
+    tex = tmp_path / "main.tex"
+    tex.write_text("Data at https://example.com/gone-page\n", encoding="utf-8")
+    sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {tex}\n")
+
+    rc = main(["validate", str(sub), "--dont-check-links"])
+    err = capsys.readouterr().err
+
+    assert rc == 0
+    assert "example.com/gone-page" not in err
+
+
+def test_cli_validate_arxiv_reminds_to_run_cleaner(tmp_path, monkeypatch, capsys):
+    # An arXiv .sub whose LaTeX source still has comments earns a one-line
+    # reminder to run arxiv_latex_cleaner (evidence it hasn't been sanitised).
+    import paperpush.cli as cli
+    import paperpush.venues as venues
+
+    j = _venue(Field(id="manuscript_file", label="Source", type="file", required=True), slug="arxiv")
+    monkeypatch.setattr(cli, "get_venue", lambda slug: j)
+    monkeypatch.setattr(venues, "submission_base", lambda slug: "arxiv")
+
+    tex = tmp_path / "main.tex"
+    tex.write_text("% TODO tidy before arxiv\n\\documentclass{article}\n", encoding="utf-8")
+    sub = _write_sub(tmp_path / "arxiv.sub", f"@venue: arxiv\nmanuscript_file: {tex}\n")
+
+    rc = main(["validate", str(sub)])
+    err = capsys.readouterr().err
+
+    assert rc == 0
+    assert "arxiv_latex_cleaner" in err
+
+
+def test_cli_validate_arxiv_no_reminder_when_source_clean(tmp_path, monkeypatch, capsys):
+    import paperpush.cli as cli
+    import paperpush.venues as venues
+
+    j = _venue(Field(id="manuscript_file", label="Source", type="file", required=True), slug="arxiv")
+    monkeypatch.setattr(cli, "get_venue", lambda slug: j)
+    monkeypatch.setattr(venues, "submission_base", lambda slug: "arxiv")
+
+    tex = tmp_path / "main.tex"
+    # No comments, no junk -> treated as already cleaned.
+    tex.write_text("\\documentclass{article}\n\\begin{document}Hi\\end{document}\n", encoding="utf-8")
+    sub = _write_sub(tmp_path / "arxiv.sub", f"@venue: arxiv\nmanuscript_file: {tex}\n")
+
+    rc = main(["validate", str(sub)])
+    err = capsys.readouterr().err
+
+    assert rc == 0
+    assert "arxiv_latex_cleaner" not in err
+
+
 def test_cli_validate_unknown_venue(tmp_path, capsys):
     sub = _write_sub(tmp_path / "x.sub", "@venue: not_a_real_venue\n")
     rc = main(["validate", str(sub)])

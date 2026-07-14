@@ -354,6 +354,7 @@ def verify_nature_categories(page, update: bool = True, settle_ms: int = 1000, c
         logger.info("%s: no stored subject categories yet", cfg.name)
 
     if not update:
+        logger.info("%s: subject categories differ from the stored copy (not updated)", cfg.name)
         print(f"{cfg.name} subject categories differ from the stored copy (not updated).")
         return False
 

@@ -43,6 +43,21 @@ from paperpush.database import list_venues
 # Offline submit tests should stay unmarked so they run automatically.
 
 
+@pytest.fixture(autouse=True)
+def _no_network_link_checks(monkeypatch):
+    """Keep the suite offline: stub the link-reachability probe to "unknown".
+
+    ``validate`` checks cited URLs by default now, which would make network
+    requests during any test that runs it. Returning ``None`` (inconclusive)
+    means no broken-link findings are produced, so tests stay hermetic. A test
+    exercising the link check re-patches ``_url_is_reachable`` itself; that patch
+    runs after this fixture and wins for the test's duration.
+    """
+    import paperpush.sensitive as sensitive
+
+    monkeypatch.setattr(sensitive, "_url_is_reachable", lambda *a, **k: None)
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--run-portal",
@@ -54,21 +69,30 @@ def pytest_addoption(parser):
         "--update-snapshots",
         action="store_true",
         default=False,
-        help="rewrite the committed portal-page fingerprints in " "tests/portal_snapshots from the live pages instead of comparing " "against them (used with --run-portal after an intended portal change)",
+        help="rewrite the committed portal-page fingerprints in "
+        "tests/portal_snapshots from the live pages instead of comparing "
+        "against them (used with --run-portal after an intended portal change)",
     )
     parser.addoption(
         "--venue",
         action="append",
         default=None,
         metavar="SLUG",
-        help="restrict the submit walkthrough to the named venue slug " "(exact match, repeatable). Unlike ``-k`` this does not " "substring-match, so ``--venue bioinformatics`` runs only " "bioinformatics and never bmc_bioinformatics.",
+        help="restrict the submit walkthrough to the named venue slug "
+        "(exact match, repeatable). Unlike ``-k`` this does not "
+        "substring-match, so ``--venue bioinformatics`` runs only "
+        "bioinformatics and never bmc_bioinformatics.",
     )
     parser.addoption(
         "--subfile",
         action="append",
         default=None,
         metavar="PATH",
-        help="run the submit walkthrough against these specific .sub files " "instead of each venue's canonical <slug>/<slug>.sub (repeatable). " "Each file's venue is read from the file itself, so --venue still " "filters and the walkthrough records success under the right venue " "(e.g. --subfile tests/sub_files/arxiv/arxiv_tex.sub).",
+        help="run the submit walkthrough against these specific .sub files "
+        "instead of each venue's canonical <slug>/<slug>.sub (repeatable). "
+        "Each file's venue is read from the file itself, so --venue still "
+        "filters and the walkthrough records success under the right venue "
+        "(e.g. --subfile tests/sub_files/arxiv/arxiv_tex.sub).",
     )
 
 
@@ -308,9 +332,25 @@ def _title_page_lines(title: str, authors, affiliations) -> list[str]:
 
 # --- DOCX ------------------------------------------------------------------
 
-_CONTENT_TYPES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' '<Default Extension="rels" ContentType="application/vnd.openxmlformats-' 'package.relationships+xml"/>' '<Default Extension="xml" ContentType="application/xml"/>' '<Override PartName="/word/document.xml" ContentType="application/vnd.' 'openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' "</Types>"
+_CONTENT_TYPES = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-'
+    'package.relationships+xml"/>'
+    '<Default Extension="xml" ContentType="application/xml"/>'
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.'
+    'openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+    "</Types>"
+)
 
-_RELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/' 'relationships">' '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/' 'officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' "</Relationships>"
+_RELS = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
+    'relationships">'
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/'
+    'officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+    "</Relationships>"
+)
 
 
 def _xml_escape(text: str) -> str:
@@ -320,7 +360,13 @@ def _xml_escape(text: str) -> str:
 def _build_docx(path: Path, paragraphs: list[str]) -> None:
     """Write a minimal but valid Office Open XML (.docx) file."""
     paras = "".join(f'<w:p><w:r><w:t xml:space="preserve">{_xml_escape(p)}</w:t></w:r></w:p>' for p in paragraphs)
-    document = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' '<w:document xmlns:w="http://schemas.openxmlformats.org/' 'wordprocessingml/2006/main"><w:body>' f"{paras}" "<w:sectPr/></w:body></w:document>"
+    document = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/'
+        'wordprocessingml/2006/main"><w:body>'
+        f"{paras}"
+        "<w:sectPr/></w:body></w:document>"
+    )
     # Write each member with a fixed timestamp and permission bits (as
     # _build_zip does) so identical inputs yield byte-identical output;
     # plain writestr(name, data) would stamp the current time and make the
@@ -369,7 +415,17 @@ def _svg_text(size: tuple[int, int], label: str) -> str:
     w, h = size
     tag = _figure_tag(label)
     r, g, b = _figure_color(label)
-    return '<?xml version="1.0" encoding="UTF-8"?>\n' f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" ' f'viewBox="0 0 {w} {h}">\n' f'  <rect width="{w}" height="{h}" fill="rgb({r},{g},{b})"/>\n' f'  <text x="{w / 2}" y="{h / 2}" font-size="{h // 2}" ' 'font-family="sans-serif" font-weight="bold" fill="white" ' f'text-anchor="middle" dominant-baseline="central">' f"{_xml_escape(tag)}</text>\n" "</svg>\n"
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" '
+        f'viewBox="0 0 {w} {h}">\n'
+        f'  <rect width="{w}" height="{h}" fill="rgb({r},{g},{b})"/>\n'
+        f'  <text x="{w / 2}" y="{h / 2}" font-size="{h // 2}" '
+        'font-family="sans-serif" font-weight="bold" fill="white" '
+        f'text-anchor="middle" dominant-baseline="central">'
+        f"{_xml_escape(tag)}</text>\n"
+        "</svg>\n"
+    )
 
 
 def _figure_payload(ext: str, *, size: tuple[int, int], dpi: int, label: str) -> bytes:
@@ -453,12 +509,60 @@ def _latex_sources(*, title: str, authors, abstract: str, figures) -> dict[str, 
     archive byte-identical across runs.
     """
     author_tex = " \\and ".join(a for a in authors if a)
-    fig_blocks = "".join("\\begin{figure}[t]\n" "  \\centering\n" f"  \\includegraphics[width=0.6\\linewidth]{{figures/{fig}.png}}\n" f"  \\caption{{Sample figure {i}.}}\n" f"  \\label{{fig:{fig}}}\n" "\\end{figure}\n" for i, fig in enumerate(figures, start=1))
-    main_tex = "\\documentclass{paperpush}\n" "\\usepackage{graphicx}\n" f"\\title{{{title}}}\n" f"\\author{{{author_tex}}}\n" "\\begin{document}\n" "\\maketitle\n" "\\begin{abstract}\n" f"{abstract}\n" "\\end{abstract}\n" "\\section{Introduction}\n" "This sample manuscript exists to exercise the LaTeX source bundle " "path~\\cite{lovelace1843}.\n" f"{fig_blocks}" "\\bibliographystyle{paperpush}\n" "\\bibliography{ref}\n" "\\end{document}\n"
+    fig_blocks = "".join(
+        "\\begin{figure}[t]\n"
+        "  \\centering\n"
+        f"  \\includegraphics[width=0.6\\linewidth]{{figures/{fig}.png}}\n"
+        f"  \\caption{{Sample figure {i}.}}\n"
+        f"  \\label{{fig:{fig}}}\n"
+        "\\end{figure}\n"
+        for i, fig in enumerate(figures, start=1)
+    )
+    main_tex = (
+        "\\documentclass{paperpush}\n"
+        "\\usepackage{graphicx}\n"
+        f"\\title{{{title}}}\n"
+        f"\\author{{{author_tex}}}\n"
+        "\\begin{document}\n"
+        "\\maketitle\n"
+        "\\begin{abstract}\n"
+        f"{abstract}\n"
+        "\\end{abstract}\n"
+        "\\section{Introduction}\n"
+        "This sample manuscript exists to exercise the LaTeX source bundle "
+        "path~\\cite{lovelace1843}.\n"
+        f"{fig_blocks}"
+        "\\bibliographystyle{paperpush}\n"
+        "\\bibliography{ref}\n"
+        "\\end{document}\n"
+    )
     ref_bib = "@article{lovelace1843,\n" "  author  = {Ada Lovelace},\n" "  title   = {Notes on the Analytical Engine},\n" "  venue = {Taylor's Scientific Memoirs},\n" "  year    = {1843},\n" "}\n"
-    cls = "\\NeedsTeXFormat{LaTeX2e}\n" "\\ProvidesClass{paperpush}[1980/01/01 v1.0 Sample document class]\n" "\\DeclareOption*{\\PassOptionsToClass{\\CurrentOption}{article}}\n" "\\ProcessOptions\\relax\n" "\\LoadClass{article}\n"
-    bst = "% paperpush.bst -- minimal BibTeX style stub bundled so the source\n" "% archive carries a .bst file; based on the standard 'plain' style.\n" "ENTRY\n" "  { author title venue year }\n" "  {}\n" "  { label }\n" "FUNCTION {default.type} { }\n" "READ\n" "ITERATE {call.type$}\n"
-    bbl = "\\begin{thebibliography}{1}\n" "\\bibitem{lovelace1843}\n" "Ada Lovelace.\n" "\\newblock Notes on the analytical engine.\n" "\\newblock {\\em Taylor's Scientific Memoirs}, 1843.\n" "\\end{thebibliography}\n"
+    cls = (
+        "\\NeedsTeXFormat{LaTeX2e}\n"
+        "\\ProvidesClass{paperpush}[1980/01/01 v1.0 Sample document class]\n"
+        "\\DeclareOption*{\\PassOptionsToClass{\\CurrentOption}{article}}\n"
+        "\\ProcessOptions\\relax\n"
+        "\\LoadClass{article}\n"
+    )
+    bst = (
+        "% paperpush.bst -- minimal BibTeX style stub bundled so the source\n"
+        "% archive carries a .bst file; based on the standard 'plain' style.\n"
+        "ENTRY\n"
+        "  { author title venue year }\n"
+        "  {}\n"
+        "  { label }\n"
+        "FUNCTION {default.type} { }\n"
+        "READ\n"
+        "ITERATE {call.type$}\n"
+    )
+    bbl = (
+        "\\begin{thebibliography}{1}\n"
+        "\\bibitem{lovelace1843}\n"
+        "Ada Lovelace.\n"
+        "\\newblock Notes on the analytical engine.\n"
+        "\\newblock {\\em Taylor's Scientific Memoirs}, 1843.\n"
+        "\\end{thebibliography}\n"
+    )
 
     members: dict[str, bytes] = {
         "main.tex": main_tex.encode("utf-8"),
@@ -557,7 +661,9 @@ class SampleFiles:
         _build_image(path, ext, size=size, dpi=dpi, label=name)
         return path
 
-    def latex_bundle(self, name: str = "manuscript_tex_bundle", ext: str = ".zip", *, title: str = _DEFAULT_TITLE, authors=_DEFAULT_AUTHORS, abstract: str = _DEFAULT_ABSTRACT, figures=("fig1", "fig2")) -> Path:
+    def latex_bundle(
+        self, name: str = "manuscript_tex_bundle", ext: str = ".zip", *, title: str = _DEFAULT_TITLE, authors=_DEFAULT_AUTHORS, abstract: str = _DEFAULT_ABSTRACT, figures=("fig1", "fig2")
+    ) -> Path:
         """Write a LaTeX source bundle as a single ``.zip`` and return its path.
 
         The archive holds a self-consistent set of LaTeX sources -- ``main.tex``,

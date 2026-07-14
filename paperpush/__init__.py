@@ -1,6 +1,6 @@
 """paperpush: one-click manuscript submission to academic venues."""
 
-import logging as _logging
+import logging
 
 __version__ = "0.1.0"
 __url__ = "https://github.com/pachterlab/paperpush"
@@ -9,7 +9,11 @@ __url__ = "https://github.com/pachterlab/paperpush"
 # The NullHandler keeps importing paperpush silent until the embedding
 # application (or our own CLI, via paperpush._logging.configure_logging)
 # installs a real handler.
-_logging.getLogger(__name__).addHandler(_logging.NullHandler())
+#
+# Import stdlib logging under its own name -- NOT ``as _logging`` -- so it does
+# not shadow the ``paperpush._logging`` submodule as a package attribute, which
+# would make ``from paperpush import _logging`` hand back the stdlib module.
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 # Public API. Kept deliberately small: the two data models (with their
 # accessors), the subfile toolkit, and the two workflow operations that have a

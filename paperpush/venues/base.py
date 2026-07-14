@@ -214,11 +214,13 @@ class Venue(ABC):
                 print(f"Signing in to {name} with your stored credentials…")
                 self.login(page, cred.username, cred.password)
                 save_storage(context, session)
+                logger.info("Signed in to %s; saved the session for reuse", name)
                 print("Signed in; saved the session for next time.")
                 return True
             except VenueLoginError as exc:
                 logger.warning("Automatic %s sign-in failed: %s", name, exc)
                 print(f"Automatic sign-in failed: {exc}")
+                logger.info("Falling back to a manual %s sign-in", name)
                 print("Falling back to a manual sign-in.")
 
         # No usable credentials, or the auto sign-in failed: show the sign-in page,

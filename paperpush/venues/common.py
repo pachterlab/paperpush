@@ -113,6 +113,7 @@ def open_run_context(browser, session: Path, *, new_session: bool = False):
     """
     if new_session and session.exists():
         session.unlink()
+        logger.info("Discarded the saved session at %s; starting fresh", session)
         print("Starting a new browser session (discarded the saved one).")
     if session.exists():
         return browser.new_context(storage_state=str(session))

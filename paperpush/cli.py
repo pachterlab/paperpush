@@ -9,6 +9,9 @@ Implemented so far:
     paperpush autofill <subfile> -d <dir>
                                       fill a .sub from a manuscript directory
     paperpush validate <subfile>  run the pre-submission checks on a .sub
+                                      (scans referenced files for secrets, GPS
+                                      metadata, LaTeX comments, and broken links
+                                      by default; --dont-check-* to opt out)
     paperpush login <venue>     store credentials for a venue
     paperpush login --list        list the venues you are logged in to
     paperpush login --orcid <j>   sign in with ORCID (Sign in with ORCID)
@@ -402,7 +405,7 @@ def _populate_orcid_into(sub_path: str, venue, profile) -> None:
     print(f"  Updated {sub_path}: filled ORCID details for author '{matched}'.")
 
 
-def _report_validation(subfile, venue_def, subfile_path: str) -> list:
+def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive: bool = True, check_links: bool = True) -> list:
     """Validate a loaded .sub against its venue and print the findings.
 
     Runs the same checks ``submit`` performs before opening a browser --
@@ -412,10 +415,16 @@ def _report_validation(subfile, venue_def, subfile_path: str) -> list:
     objects (empty when the file passes), so the caller decides what to do next.
     Shared by ``submit`` (the gate before submission) and the standalone
     ``validate`` command.
+
+    When ``check_links`` is set (the default), the URLs cited in the referenced
+    files are probed and broken ones reported (makes network requests). When
+    ``check_sensitive`` is set, those files are additionally scanned for
+    information not meant to be published (secrets, GPS metadata,
+    editable-document links, LaTeX comments); all surface as advisory warnings.
     """
     from .validate import validate
 
-    issues = validate(subfile, venue_def)
+    issues = validate(subfile, venue_def, check_sensitive=check_sensitive, check_links=check_links)
     errors = [i for i in issues if i.is_error]
     warnings = [i for i in issues if not i.is_error]
     for issue in warnings:
@@ -461,7 +470,13 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
         return 2
 
-    errors = _report_validation(subfile, venue_def, args.subfile)
+    errors = _report_validation(
+        subfile,
+        venue_def,
+        args.subfile,
+        check_sensitive=getattr(args, "check_sensitive", True),
+        check_links=getattr(args, "check_links", True),
+    )
     if errors:
         print("\nFix the items above, then run 'paperpush validate' again.", file=sys.stderr)
         return 1
@@ -534,10 +549,21 @@ def _cmd_submit(args: argparse.Namespace) -> int:
 
     if args.debug:
         print(f"Opening {venue} in debug mode for {args.subfile}…")
-        print("The Playwright Inspector opens at the first step; use 'Step " "over' to walk the wizard line by line. If a saved session " "exists (from an earlier submit run) you start signed in; " "otherwise sign in in the browser, then resume.")
+        print(
+            "The Playwright Inspector opens at the first step; use 'Step "
+            "over' to walk the wizard line by line. If a saved session "
+            "exists (from an earlier submit run) you start signed in; "
+            "otherwise sign in in the browser, then resume."
+        )
     else:
         print(f"Opening {venue} to run the submission for {args.subfile}…")
-        print("Sign-in is automatic when possible: a saved session is reused, " f"else your 'paperpush login {venue}' credentials are " "filled in (and the session saved); otherwise sign in by hand. " "Field values come from the .sub file; the wizard stops before " "the final submit.")
+        print(
+            "Sign-in is automatic when possible: a saved session is reused, "
+            f"else your 'paperpush login {venue}' credentials are "
+            "filled in (and the session saved); otherwise sign in by hand. "
+            "Field values come from the .sub file; the wizard stops before "
+            "the final submit."
+        )
     logger.info("submit: launching %s runner (headless=%s, debug=%s, timeout=%ss)", venue, args.headless, args.debug, args.timeout)
     run(subfile.values, headless=args.headless, debug=args.debug, new_session=args.new_session, timeout=args.timeout)
     logger.info("submit: %s runner returned", venue)
@@ -559,7 +585,16 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
     from .autofill import autofill, parse_extraction
     from .subfile import parse, render_template
 
-    logger.debug("autofill: subfile=%r dir=%r engine=%s values=%r " "min_confidence=%s dry_run=%s output=%r", args.subfile, args.directory, args.engine, args.values, args.min_confidence, args.dry_run, args.output)
+    logger.debug(
+        "autofill: subfile=%r dir=%r engine=%s values=%r " "min_confidence=%s dry_run=%s output=%r",
+        args.subfile,
+        args.directory,
+        args.engine,
+        args.values,
+        args.min_confidence,
+        args.dry_run,
+        args.output,
+    )
 
     manuscript_dir = Path(args.directory)
     if not manuscript_dir.is_dir():
@@ -568,7 +603,16 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
 
     if args.engine == "manual" and not args.values:
         print(
-            "error: --values FILE is required with the manual engine.\n" "\n" "The manual engine applies field values that you extract yourself --\n" "it does not call any API. To produce them:\n" "  1. Run 'paperpush schema <venue>' to list the fields and roles.\n" "  2. Read the manuscript files and write a values.json (AGENTS.md has\n" "     the exact schema).\n" "  3. Re-run with --values values.json.\n" "Use '--engine api' instead only if ANTHROPIC_API_KEY is set and you\n" "want the Anthropic API to do the extraction.",
+            "error: --values FILE is required with the manual engine.\n"
+            "\n"
+            "The manual engine applies field values that you extract yourself --\n"
+            "it does not call any API. To produce them:\n"
+            "  1. Run 'paperpush schema <venue>' to list the fields and roles.\n"
+            "  2. Read the manuscript files and write a values.json (AGENTS.md has\n"
+            "     the exact schema).\n"
+            "  3. Re-run with --values values.json.\n"
+            "Use '--engine api' instead only if ANTHROPIC_API_KEY is set and you\n"
+            "want the Anthropic API to do the extraction.",
             file=sys.stderr,
         )
         return 1
@@ -870,7 +914,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_autofill = sub.add_parser("autofill", parents=[verbosity], help="fill a .sub file from a directory of manuscript files")
     p_autofill.add_argument("subfile", help="the .sub file to fill (created from the filename's venue slug " "if it does not exist yet), e.g. biorxiv.sub")
     p_autofill.add_argument("-d", "--directory", required=True, metavar="MANUSCRIPTDIR", help="directory holding the manuscript, figures, and other files")
-    p_autofill.add_argument("--engine", choices=["manual", "api"], default="manual", help="manual: read proposed values from --values (default; used by the " "Claude skill); api: extract them with the Anthropic API " "(not yet implemented)")
+    p_autofill.add_argument(
+        "--engine",
+        choices=["manual", "api"],
+        default="manual",
+        help="manual: read proposed values from --values (default; used by the " "Claude skill); api: extract them with the Anthropic API " "(not yet implemented)",
+    )
     p_autofill.add_argument("--values", metavar="FILE", help="JSON file of proposed field values (required for --engine manual)")
     p_autofill.add_argument("--manuscript", metavar="FILE", help="(api) the manuscript file; inferred from the directory if omitted")
     p_autofill.add_argument("--title-page", dest="title_page", metavar="FILE", help="(api) a standalone title page with author details, if separate")
@@ -884,29 +933,70 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_validate = sub.add_parser("validate", parents=[verbosity], help="run the pre-submission checks on a .sub file")
     p_validate.add_argument("subfile", help="path to the .sub file to check, e.g. biorxiv.sub")
-    p_validate.set_defaults(func=_cmd_validate)
+    p_validate.add_argument(
+        "--dont-check-links",
+        dest="check_links",
+        action="store_false",
+        help="skip checking that the URLs cited in the manuscript files are "
+        "reachable. By default validate probes them and warns about broken "
+        "links (404/gone, including still-private GitHub repos), which requires "
+        "network access.",
+    )
+    p_validate.add_argument(
+        "--dont-check-for-sensitive-info",
+        dest="check_sensitive",
+        action="store_false",
+        help="skip scanning the referenced files for information not meant to "
+        "be published. By default validate scans them for API keys, passwords, "
+        "private keys, GPS coordinates in figures, editable-document links, and "
+        "LaTeX source comments, nudges when no public code repository is linked, "
+        "and reminds arXiv submitters to run arxiv_latex_cleaner on unclean "
+        "source. Reported as advisory warnings.",
+    )
+    p_validate.set_defaults(func=_cmd_validate, check_links=True, check_sensitive=True)
 
     p_login = sub.add_parser("login", parents=[verbosity], help="store credentials for a venue submission system")
     p_login.add_argument("venue", nargs="?", help="venue slug, e.g. biorxiv (omit with --list)")
     p_login.add_argument("--list", action="store_true", help="list the venues you are logged in to with usernames, then exit")
     p_login.add_argument("-u", "--username", help="username or email (otherwise you are prompted or it looks " "for the PAPERPUSH_USERNAME environment variable)")
-    p_login.add_argument("--password", help="password (otherwise you are prompted or it looks for the " "PAPERPUSH_PASSWORD environment variable). WARNING: exposes " "the password as plain text in the process list and shell history")
+    p_login.add_argument(
+        "--password",
+        help="password (otherwise you are prompted or it looks for the "
+        "PAPERPUSH_PASSWORD environment variable). WARNING: exposes "
+        "the password as plain text in the process list and shell history",
+    )
     p_login.add_argument("--orcid", action="store_true", help="sign in with ORCID instead of a username/password")
     p_login.add_argument("--orcid-id", metavar="ID", dest="orcid_id", help="your ORCID iD (e.g. 0000-0002-1825-0097); " "implies --orcid and skips the prompt")
     p_login.add_argument("--into", metavar="SUBFILE", help="after an ORCID login, fill the matching author's " "ORCID/name/affiliation in this .sub file")
     p_login.add_argument("--status", action="store_true", help="show whether credentials are stored, then exit")
     p_login.add_argument("--logout", action="store_true", help="remove stored credentials for the venue")
-    p_login.add_argument("--no-verify", dest="no_verify", action="store_true", help="store the credentials without checking them against " "the venue's sign-in (the default opens a browser and " "verifies first)")
+    p_login.add_argument(
+        "--no-verify", dest="no_verify", action="store_true", help="store the credentials without checking them against " "the venue's sign-in (the default opens a browser and " "verifies first)"
+    )
     p_login.add_argument("--verify-headless", dest="verify_headless", action="store_true", help="run the verification browser headless (no window; " "cannot complete a CAPTCHA or two-factor prompt)")
-    p_login.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, metavar="SECONDS", help="cap how long the verification browser waits for any " "action or page load before failing (default: " f"{DEFAULT_TIMEOUT_SECONDS:g}s; 0 waits forever)")
+    p_login.add_argument(
+        "--timeout",
+        type=float,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        metavar="SECONDS",
+        help="cap how long the verification browser waits for any " "action or page load before failing (default: " f"{DEFAULT_TIMEOUT_SECONDS:g}s; 0 waits forever)",
+    )
     p_login.set_defaults(func=_cmd_login)
 
     p_submit = sub.add_parser("submit", parents=[verbosity], help="open the venue submission portal and run the submission click-through")
     p_submit.add_argument("subfile", help="path to the .sub file")
     p_submit.add_argument("--headless", action="store_true", help="run the browser headless (default: headed, so you " "can sign in and review)")
-    p_submit.add_argument("--debug", action="store_true", help="open the Playwright Inspector at the first step " "to walk the wizard line by line; reuses a saved " "session from an earlier run to skip sign-in")
+    p_submit.add_argument(
+        "--debug", action="store_true", help="open the Playwright Inspector at the first step " "to walk the wizard line by line; reuses a saved " "session from an earlier run to skip sign-in"
+    )
     p_submit.add_argument("--new-session", action="store_true", help="discard any saved browser session and sign in " "fresh (use after switching accounts)")
-    p_submit.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, metavar="SECONDS", help="cap how long the browser waits for any action or page " f"load before failing (default: {DEFAULT_TIMEOUT_SECONDS:g}s; " "0 waits forever)")
+    p_submit.add_argument(
+        "--timeout",
+        type=float,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        metavar="SECONDS",
+        help="cap how long the browser waits for any action or page " f"load before failing (default: {DEFAULT_TIMEOUT_SECONDS:g}s; " "0 waits forever)",
+    )
     p_submit.set_defaults(func=_cmd_submit)
 
     # Internal command: the autofill front-ends (the Claude skill and the API
