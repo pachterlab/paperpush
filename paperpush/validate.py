@@ -945,3 +945,4 @@ def _check_subfields(field: Field, raw: str) -> list[Issue]:
             if not value:
                 issues.append(Issue(ERROR, field.id, f"{field.label}: line {line_no} is missing {name.replace('_', ' ')}"))
     return issues
+
