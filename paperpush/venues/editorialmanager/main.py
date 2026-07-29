@@ -355,12 +355,15 @@ def _attach_files(page, cf, manuscript_file: str, cover_letter: str, declaration
         except:  # Button didn't appear, continue
             pass
 
+    
     _upload(page, cf, manuscript_file)
     page.wait_for_timeout(2000)
     if cfg.annotate_manuscript_manually:
         page.locator('iframe[name="content"]').content_frame.locator("select.submissionItemDropDown").nth(0).select_option("6")
         page.locator('iframe[name="content"]').content_frame.locator("input[id^='description_']").first.fill("Manuscript")
 
+    _try(lambda: page.get_by_role("button", name="Close").click(timeout=3000), "Close popup")
+    
     if cover_letter:
         logger.info("Uploading cover letter %s", cover_letter)
         _try(lambda: cf.get_by_label("Select Item Type").select_option(label=cfg.cover_letter_label), "cover letter item type")
@@ -383,6 +386,8 @@ def _attach_files(page, cf, manuscript_file: str, cover_letter: str, declaration
             _try(lambda: cf.get_by_role("textbox", name="Description").fill(label), "figure description")
         _upload(page, cf, figure)
         page.wait_for_timeout(2000)
+    
+    _try(lambda: page.get_by_role("button", name="Close").click(timeout=3000), "Close popup")
 
     # Proceed off the attach-files step, then past the file-order confirmation.
     cf.get_by_role("button", name=" Proceed").click()

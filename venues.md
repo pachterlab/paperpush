@@ -1,21 +1,20 @@
 ## Supported venues
 
 <!-- BEGIN SUPPORTED VENUES -->
-_22 supported venues (auto-generated from `paperpush/venues.json`)._
+_21 supported venues (auto-generated from `paperpush/venues.json`)._
 
 | Slug | Venue | Venue type | Submission platform | Description | Submit walkthrough |
 | --- | --- | --- | --- | --- | --- |
-| `aaai_2027` | [AAAI 2027](https://aaai.org/conference/aaai/aaai-27/) | Conference | OpenReview | Promote research in Artificial Intelligence (AI) and foster scientific exchange between researchers, practitioners, scientists, students, and engineers across the entirety of AI and its affiliated disciplines. | ✅ 2026-07-02 |
-| `arxiv` | [arXiv](https://arxiv.org) | Preprint | arXiv (native) | Free distribution service and open-access archive for preprints in physics, mathematics, computer science, quantitative biology, quantitative finance, statistics, and more. | ✅ 2026-07-02 |
+| `arxiv` | [arXiv](https://arxiv.org) | Preprint | arXiv (native) | Free distribution service and open-access archive for preprints in physics, mathematics, computer science, quantitative biology, quantitative finance, statistics, and more. | ✅ 2026-07-29 |
 | `bioinformatics` | [Bioinformatics](https://academic.oup.com/bioinformatics) | Journal | ScholarOne Manuscripts | Computational molecular biology covering new algorithms, software, databases, and analyses of biological data. | ✅ 2026-07-02 |
-| `biorxiv` | [bioRxiv](https://www.biorxiv.org) | Preprint | openRxiv | Free online archive and distribution service for unpublished preprints in the life sciences. | ✅ 2026-07-02 |
+| `biorxiv` | [bioRxiv](https://www.biorxiv.org) | Preprint | openRxiv | Free online archive and distribution service for unpublished preprints in the life sciences. | ✅ 2026-07-29 |
 | `bmc_bioinformatics` | [BMC Bioinformatics](https://link.springer.com/journal/12859) | Journal | Springer Nature Snapp | BMC Bioinformatics is an open access, peer-reviewed journal that considers articles describing novel computational algorithms and software, models and tools, including statistical methods, machine learning and artificial intelligence, for the modelling and analysis of all kinds of biological data, as well as systems biology. | ✅ 2026-07-01 |
 | `cell` | [Cell](https://www.cell.com/cell/home) | Journal | Editorial Manager | Cell Press flagship journal publishing high-impact peer-reviewed research across the full breadth of the life sciences. | ✅ 2026-07-02 |
 | `cell_genomics` | [Cell Genomics](https://www.cell.com/cell-genomics/home) | Journal | Editorial Manager | Open-access Cell Press journal publishing research across genetics and genomics, including functional, evolutionary, and computational genomics and their applications to health and disease. | ✅ 2026-07-02 |
 | `cell_systems` | [Cell Systems](https://www.cell.com/cell-systems/home) | Journal | Editorial Manager | Cell Press journal publishing research in systems biology, including quantitative, computational, and theoretical approaches to understanding biological systems across scales. | ✅ 2026-07-02 |
-| `discrete_mathematics` | [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics) | Journal | Editorial Manager | Elsevier journal publishing original research and survey articles across combinatorics, graph theory, and the broader field of discrete mathematics. | ✅ 2026-07-02 |
+| `discrete_mathematics` | [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics) | Journal | Editorial Manager | Elsevier journal publishing original research and survey articles across combinatorics, graph theory, and the broader field of discrete mathematics. | ❌ |
 | `genome_biology` | [Genome Biology](https://genomebiology.biomedcentral.com) | Journal | Springer Nature Snapp | Open-access journal publishing peer-reviewed research and methods across all areas of biology and biomedicine studied from a genomic and post-genomic perspective. | ✅ 2026-07-02 |
-| `medrxiv` | [medRxiv](https://www.medrxiv.org) | Preprint | openRxiv | Free online archive and distribution server for complete but unpublished manuscripts (preprints) in the medical, clinical, and related health sciences. | ✅ 2026-07-02 |
+| `medrxiv` | [medRxiv](https://www.medrxiv.org) | Preprint | openRxiv | Free online archive and distribution server for complete but unpublished manuscripts (preprints) in the medical, clinical, and related health sciences. | ✅ 2026-07-29 |
 | `nature` | [Nature](https://www.nature.com) | Journal | eJournalPress | Weekly multidisciplinary journal publishing peer-reviewed research of outstanding significance across all fields of science and technology, alongside news and commentary. | ✅ 2026-07-02 |
 | `nature_biotech` | [Nature Biotechnology](https://www.nature.com/nbt) | Journal | eJournalPress | Publishes peer-reviewed research and analysis on the science and business of biotechnology, covering the application of biological systems to therapeutics, diagnostics, agriculture, and related areas. | ✅ 2026-07-02 |
 | `nature_methods` | [Nature Methods](https://www.nature.com/nmeth) | Journal | eJournalPress | Publishes peer-reviewed novel methods and significant improvements to techniques across the life sciences, including their development, validation, and application. | ✅ 2026-07-02 |
