@@ -6,12 +6,6 @@ and a few ``data-testid`` hooks). Selectors were captured with ``playwright
 codegen``; re-capture the same way if Elsevier restyles the portal. The wizard is
 driven straight through, stops before the final submit, and leaves the browser
 open via :func:`hold_open`.
-
-Sign-in authenticates through the author's institution. The recorded flow is
-Caltech-specific (Elsevier -> "Access through your institution" -> Caltech Library
--> Duo two-factor); the Duo step can't be automated, so a failed auto sign-in
-hands back to a manual sign-in and the saved session is reused later. Point it at
-another institution by re-recording :meth:`~DiscreteMathematicsVenue.login`.
 """
 
 from __future__ import annotations
@@ -31,9 +25,8 @@ logger = logging.getLogger(__name__)
 
 _YES = {"yes", "y", "true", "1", "on"}
 
-# Sign-in institution (Caltech-specific; see the module docstring).
 INSTITUTION_ACCESS_BUTTON = "Access through your"
-INSTITUTION_LINK = "Caltech Library Sign in with"
+INSTITUTION_LINK = "Caltech Library Sign in with"  #! hard-coded for Caltech
 # The cookie banner reappears across the sign-in navigations.
 COOKIE_ACCEPT = "Accept all cookies"
 # Start-submission control on the dashboard; present only once signed in (the
@@ -333,14 +326,10 @@ class DiscreteMathematicsVenue(Venue):
 
     # * login
     def login(self, page, username: str, password: str, *, timeout_ms: int = 20000) -> None:
-        """Drive the Elsevier institutional (Caltech) sign-in from stored credentials.
+        """Drive the Elsevier sign-in from stored credentials.
 
         Walks the recorded federated flow: start a submission, enter the email,
-        choose "Access through your institution", follow the Caltech Library link,
-        and fill the username/password form. The Duo two-factor step cannot be
-        scripted, so if the signed-in dashboard does not appear this raises
-        :class:`DiscreteMathematicsLoginError`, letting ``ensure_signed_in`` fall
-        back to a manual sign-in (where the human approves Duo in the open window).
+        either use password or enter institutional information.
 
         The flow short-circuits between steps: any point at which the dashboard's
         start-submission control is visible means the session is already signed in
@@ -362,7 +351,7 @@ class DiscreteMathematicsVenue(Venue):
         if signed_in("the landing page"):
             return
 
-        _try(lambda: page.get_by_role("button", name="Start a submission").click(), "start a submission (pre-login)")
+        page.get_by_label("Start a submission").click()
         _accept_cookies(page)
         if signed_in("the start-a-submission step"):
             return
@@ -371,33 +360,36 @@ class DiscreteMathematicsVenue(Venue):
         try:
             email_box.first.wait_for(state="visible", timeout=timeout_ms)
         except Exception as exc:  # noqa: BLE001
-            if signed_in("the email step"):
-                return
             raise DiscreteMathematicsLoginError("could not find the email field on the Elsevier sign-in page " "(the portal may have changed); re-capture the selectors with " f"'playwright codegen {self.LOGIN_URL}'") from exc
-        email_box.first.fill(username)
+        email_box.first.type(username)
         _try(lambda: page.get_by_role("button", name="Continue").click(), "continue past email")
         if signed_in("the email step"):
             return
+        
+        password_box = page.get_by_role("textbox", name="Password")
+        if password_box.count() > 0:
+            password_box.first.fill(password)
+            page.get_by_label("Sign in").click()
+            if signed_in("the email step"):
+                return
+            if not self.is_logged_in(page, timeout_ms=timeout_ms):
+                raise DiscreteMathematicsLoginError("submitted the credentials but the signed-in Elsevier dashboard " "did not load -- the username or password may be wrong, or the " "sign-in needs a two-factor (Duo) approval that can't be automated")
 
-        # Institution federation: "Access through your institution" -> Caltech Library.
+        # Institution federation: "Access through your institution"
         _try(lambda: page.get_by_role("button", name=INSTITUTION_ACCESS_BUTTON).click(), "access through institution")
         _accept_cookies(page)
-        if signed_in("the institution step"):
-            return
-        _try(lambda: page.get_by_role("link", name=INSTITUTION_LINK).click(), "choose Caltech Library")
-        if signed_in("the institution step"):
-            return
+        _try(lambda: page.get_by_role("link", name=INSTITUTION_LINK).click(), "choose Institution")
 
-        # Caltech federated login form (username + password).
+        # Institution federated login form (username + password).
         user_box = page.get_by_role("textbox", name="Username")
         pwd_box = page.get_by_role("textbox", name="Password")
         try:
             user_box.first.wait_for(state="visible", timeout=timeout_ms)
         except Exception as exc:  # noqa: BLE001
-            if signed_in("the institutional sign-in form"):
-                return
-            raise DiscreteMathematicsLoginError("reached the institutional step but the Caltech username/password " "form did not load (the federated login may have changed)") from exc
-        user_box.first.fill(username)
+            raise DiscreteMathematicsLoginError("reached the institutional step but the Institution username/password " "form did not load (the federated login may have changed)") from exc
+        # get part of username before "@" symbol
+        institution_username = username.split("@")[0]
+        user_box.first.fill(institution_username)
         pwd_box.first.fill(password)
         pwd_box.first.press("Enter")
 
