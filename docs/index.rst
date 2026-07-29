@@ -13,11 +13,11 @@ The workflow is five short commands:
 
 .. code-block:: bash
 
-   paperpush subfile biorxiv          # 1. create a biorxiv.sub template
-   paperpush autofill -d MANUSCRIPT_DIR biorxiv.sub   # 2. fill it from your files
-   paperpush validate biorxiv.sub     # 3. run pre-submission checks
-   paperpush login biorxiv            # 4. store your credentials
-   paperpush submit biorxiv.sub       # 5. drive the submission portal
+   paperpush subfile VENUE                          # 1. create a VENUE.sub template
+   paperpush autofill -d MANUSCRIPT_DIR VENUE.sub   # 2. fill it from your files
+   paperpush validate VENUE.sub                     # 3. run pre-submission checks
+   paperpush login VENUE                            # 4. store your credentials
+   paperpush submit VENUE.sub                       # 5. drive the submission portal
 
 .. note::
 
