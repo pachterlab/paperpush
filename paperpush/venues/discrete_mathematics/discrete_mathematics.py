@@ -320,6 +320,11 @@ class DiscreteMathematicsVenue(Venue):
 
             # Research data: either link the deposited dataset, or decline and
             # pick a statement (an off-list one goes in the "Other" free-text box).
+            # Wait for this distinct screen before looking up its controls: a loose
+            # label lookup for "No" can otherwise resolve to an author-page element
+            # while Elsevier is still saving the previous step.
+            no_data = page.get_by_role("radio", name="No", exact=True)
+            no_data.wait_for(state="visible", timeout=60000)
             if share_data:
                 page.get_by_placeholder("Paste your data repository link here").fill(data_repository_url)
                 page.get_by_text("Select a repository", exact=True).click()
@@ -332,7 +337,7 @@ class DiscreteMathematicsVenue(Venue):
                     page.get_by_label("Reference data").check()
                 page.get_by_placeholder("Type your title here").fill(dataset_title)
             else:
-                page.get_by_label("No").check()
+                no_data.check()
                 page.get_by_text("Select an option", exact=True).click()
                 options = page.locator('[role="option"]')  # adjust selector if needed
                 texts = [t.strip() for t in options.all_inner_texts()]
