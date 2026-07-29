@@ -39,6 +39,9 @@ COOKIE_ACCEPT = "Accept all cookies"
 # Start-submission control on the dashboard; present only once signed in (the
 # logged-out landing page shows a plain "Start a submission" button instead).
 START_SUBMISSION_TESTID = "submission-start-button"
+# Budget for the between-steps "are we already signed in?" probe in login(). Short
+# on purpose: it runs at every step, and a signed-in dashboard is already rendered.
+LOGIN_PROBE_MS = 1500
 # Upload-step item-type dropdowns.
 REQUIRED_ITEMS_DROPDOWN = "#trigger-input-required-items-dropdown"
 OPTIONAL_ITEMS_DROPDOWN = "#trigger-input-optional-items-dropdown"
@@ -143,21 +146,20 @@ def _add_author(page, author: dict) -> None:
     institution = (author.get("institution") or "").strip()
     logger.info("Adding author %s %s", first, last)
 
-    page.get_by_role("button", name="Add another author").click()
-    page.get_by_role("textbox", name="First name").fill(first)
-    page.get_by_role("textbox", name="Last name").fill(last)
+    page.get_by_label("First name").fill(first)
+    page.get_by_label("Last name").fill(last)
 
     if institution:
-        page.get_by_role("combobox", name="Institution").fill(institution)
+        page.get_by_placeholder("Type at least three").fill(institution)
         page.wait_for_timeout(800)
         _pick_institution(page, institution)
 
     if email:
-        page.get_by_role("textbox", name="Email address").fill(email)
+        page.get_by_label("Email address").fill(email)
     if _is_yes(author.get("corresponding")):
-        page.get_by_role("checkbox", name="This is the corresponding").check()
+        page.get_by_label("This is the corresponding").check()
 
-    page.get_by_role("button", name="Confirm").click()
+    page.get_by_label("Confirm").click()
 
 
 class DiscreteMathematicsVenue(Venue):
@@ -234,14 +236,16 @@ class DiscreteMathematicsVenue(Venue):
                 page.pause()
 
             _accept_cookies(page)
+            label = page.get_by_label("I accept Elsevier's terms and")
+            if label.count():
+                label.check()
 
             logger.debug("Signed in; starting a new submission")
             page.get_by_test_id(START_SUBMISSION_TESTID).click()
 
             # Article type.
-            if article_type:
-                page.get_by_role("radio", name=article_type).check()
-            page.get_by_role("button", name="Save and continue").click()
+            page.get_by_label(article_type).check()
+            page.get_by_label("Save and continue").click()
 
             # File uploads: manuscript is the first required item.
             slot = 0
@@ -252,10 +256,8 @@ class DiscreteMathematicsVenue(Venue):
 
             # Competing interests: upload a declaration, or tick the "none" confirmation.
             if no_competing_interests:
-                # Custom React checkbox: it tracks state via a data-checked attribute,
-                # not the native `checked` property, so check() would wrongly report the
-                # click as ineffective. A plain click toggles it.
-                page.get_by_role("checkbox", name="I confirm that no authors of").click()
+                checkbox = page.locator("#doiCheckbox")
+                checkbox.click()
             else:
                 if not declaration_file:
                     raise ValueError("no_competing_interests is false but no declaration_file was provided")
@@ -282,34 +284,49 @@ class DiscreteMathematicsVenue(Venue):
                 slot += 1
 
             page.wait_for_timeout(2000)  # let the upload progress bars finish
-            page.get_by_test_id("submission-uploads-save-button").click()
+            page.get_by_label("Save and continue").click()
 
             # Metadata (keywords are semicolon-separated).
-            page.get_by_role("textbox", name="Your title").fill(title)
-            page.get_by_role("textbox", name="Your abstract").fill(abstract)
-            page.get_by_role("textbox", name="Your keywords").fill(keywords)
-            page.get_by_role("button", name="Save and continue").click()
+            page.get_by_test_id("title-field-container").get_by_label("Your title").fill(title)
+            page.get_by_test_id("abstract-field-container").get_by_label("Your abstract").fill(abstract)
+            page.get_by_test_id("keywords-field-container").get_by_label("Your keywords").fill(keywords)
+            page.get_by_label("Save and continue").click()
 
             # Authors.
-            for author in authors:
+            for i, author in enumerate(authors):
+                if i > 0:
+                    page.get_by_label("Add another author").click()
                 _add_author(page, author)
-            page.get_by_role("button", name="Save and continue").click()
+            page.get_by_label("Save and continue").click()
 
             # Research data: decline to share, then pick the no-data statement.
-            page.get_by_role("radio", name="No", exact=True).check()
-            if data_statement:
+            if share_data:
+                page.get_by_placeholder("Paste your data repository link here").fill(data_repository_url)
+                page.get_by_text("Select a repository", exact=True).click()
+                page.get_by_text(data_repository_name).click()
+                if source_of_data == "original":
+                    page.get_by_label("Original data").check()
+                elif source_of_data == "reference":
+                    page.get_by_label("Reference data").check()
+                page.get_by_placeholder("Type your title here").fill(dataset_title)
+            else:
+                page.get_by_label("No").check()
                 page.get_by_text("Select an option", exact=True).click()
-                page.get_by_text(data_statement, exact=True).click()
-            page.get_by_role("button", name="Save and continue").click()
+                options = page.locator('[role="option"]')  # adjust selector if needed
+                texts = [t.strip() for t in options.all_inner_texts()]
+                data_statement_option = data_statement
+                if data_statement not in texts:
+                    data_statement_option = "Other"
+                page.get_by_text(data_statement_option, exact=True).click()
+                if data_statement_option == "Other":
+                    page.locator("textarea").last.fill(data_statement)
+            page.get_by_label("Save and continue").click()
 
             # Final declarations: tick the standard boxes only when the author confirmed.
             if declarations_confirmed:
-                for name in (
-                    "I have read and accept the ethics in publishing policy",
-                    "I have read and accept the copyright terms",
-                    "I confirm I have mentioned",
-                ):
-                    page.get_by_role("checkbox", name=name).check()
+                page.get_by_label("I have read and accept the ethics in publishing policy").check()
+                page.get_by_label("I have read and accept the copyright terms").check()
+                page.get_by_label("I confirm I have mentioned").check()
 
             logger.info("Reached the final declarations step; leaving the browser open for review (the final submit is left to you)")
             hold_open()
@@ -324,26 +341,52 @@ class DiscreteMathematicsVenue(Venue):
         scripted, so if the signed-in dashboard does not appear this raises
         :class:`DiscreteMathematicsLoginError`, letting ``ensure_signed_in`` fall
         back to a manual sign-in (where the human approves Duo in the open window).
+
+        The flow short-circuits between steps: any point at which the dashboard's
+        start-submission control is visible means the session is already signed in
+        (Elsevier can restore one mid-flow, and the recorded steps drift as the
+        portal is restyled), so the sign-in returns successfully rather than
+        pressing on through steps whose selectors no longer apply.
         """
+
+        def signed_in(what: str) -> bool:
+            """True if the dashboard marker is up; a quick probe, not a wait."""
+            if not self.is_logged_in(page, timeout_ms=LOGIN_PROBE_MS):
+                return False
+            logger.info("Discrete Mathematics: already signed in at %s; skipping the rest of the sign-in", what)
+            return True
+
         logger.debug("Filling the Discrete Mathematics (Elsevier) sign-in flow at %s", self.LOGIN_URL)
         page.goto(self.LOGIN_URL)
         _accept_cookies(page)
+        if signed_in("the landing page"):
+            return
 
         _try(lambda: page.get_by_role("button", name="Start a submission").click(), "start a submission (pre-login)")
         _accept_cookies(page)
+        if signed_in("the start-a-submission step"):
+            return
 
         email_box = page.get_by_role("textbox", name="Email")
         try:
             email_box.first.wait_for(state="visible", timeout=timeout_ms)
         except Exception as exc:  # noqa: BLE001
+            if signed_in("the email step"):
+                return
             raise DiscreteMathematicsLoginError("could not find the email field on the Elsevier sign-in page " "(the portal may have changed); re-capture the selectors with " f"'playwright codegen {self.LOGIN_URL}'") from exc
         email_box.first.fill(username)
         _try(lambda: page.get_by_role("button", name="Continue").click(), "continue past email")
+        if signed_in("the email step"):
+            return
 
         # Institution federation: "Access through your institution" -> Caltech Library.
         _try(lambda: page.get_by_role("button", name=INSTITUTION_ACCESS_BUTTON).click(), "access through institution")
         _accept_cookies(page)
+        if signed_in("the institution step"):
+            return
         _try(lambda: page.get_by_role("link", name=INSTITUTION_LINK).click(), "choose Caltech Library")
+        if signed_in("the institution step"):
+            return
 
         # Caltech federated login form (username + password).
         user_box = page.get_by_role("textbox", name="Username")
@@ -351,6 +394,8 @@ class DiscreteMathematicsVenue(Venue):
         try:
             user_box.first.wait_for(state="visible", timeout=timeout_ms)
         except Exception as exc:  # noqa: BLE001
+            if signed_in("the institutional sign-in form"):
+                return
             raise DiscreteMathematicsLoginError("reached the institutional step but the Caltech username/password " "form did not load (the federated login may have changed)") from exc
         user_box.first.fill(username)
         pwd_box.first.fill(password)

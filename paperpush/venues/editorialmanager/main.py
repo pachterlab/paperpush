@@ -1112,16 +1112,3 @@ class EditorialManagerVenue(Venue):
         wait_for_human(f"Sign in to {cfg.name} in the browser window")
         save_storage(context, session)
         return True
-
-
-
-
-    # # if there is a match
-    # page.locator("iframe[name=\"content\"]").content_frame.get_by_role("textbox", name="Institution").fill("Caltech")  # do a fill sequentially
-    # page.locator("iframe[name=\"content\"]").content_frame.locator("#ui-id-99").get_by_text("Caltech").click()
-    # page.locator("iframe[name=\"content\"]").content_frame.get_by_role("button", name="Save This Joe Rich,").click()
-
-    # # if there is not a match
-    # page.locator("iframe[name=\"content\"]").content_frame.get_by_role("textbox", name="Institution").fill("Caltechxxxx")
-    # page.locator("iframe[name=\"content\"]").content_frame.get_by_role("button", name="Save This Joe Rich, Caltech").click()
-    # page.locator("iframe[name=\"content\"]").content_frame.get_by_role("button", name="OK").click()
