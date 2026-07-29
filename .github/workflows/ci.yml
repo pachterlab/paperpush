@@ -3,7 +3,8 @@ name: CI
 # Runs the test suite on every push and pull request. A bare `pytest` skips
 # only the real-portal tests (those marked @pytest.mark.portal); all offline
 # submit logic still runs. So this never touches a real submission portal --
-# see tests/conftest.py. The real submission runs monthly from submit.yml.
+# see tests/conftest.py. The real-portal walkthrough is run locally with
+# `pytest tests/test_submit.py --run-portal`.
 
 on:
   push:

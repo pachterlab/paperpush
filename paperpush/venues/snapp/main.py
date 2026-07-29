@@ -57,12 +57,16 @@ class Variant:
     ``/new-submission/<context>/<step>``; the recording entered at step 3).
     ``login_url`` is an explicit IDP gateway to sign in through; when ``None``,
     sign-in opens the new-submission URL and lets the portal redirect to the IDP.
+    ``login_link_name`` routes sign-in through the journal's public homepage
+    instead: open ``site_url`` and click that link to reach the IDP (the gateway
+    ``state`` token is minted fresh, rather than reusing a stale recorded one).
     """
 
     slug: str
     name: str
     context_code: str
     login_url: str | None = None
+    login_link_name: str | None = None
     country_options_file: str | None = None
 
     @property
@@ -74,6 +78,11 @@ class Variant:
     def portal_url(self) -> str:
         """The submission portal entry point (redirects to the IDP when signed out)."""
         return self.venue.submission_url
+
+    @property
+    def site_url(self) -> str:
+        """The journal's public homepage (where ``login_link_name`` is clicked)."""
+        return self.venue.site_url
 
     @property
     def new_submission_url(self) -> str:
@@ -103,6 +112,7 @@ VARIANTS = {
         "BMC Bioinformatics",
         "12859",
         login_url=_BMC_BIOINFORMATICS_LOGIN_URL,
+        login_link_name="Submit your manuscript",
     ),
 }
 
@@ -402,10 +412,12 @@ def _add_author(page, index: int, author: dict, allowed_countries: list[str] | N
 def _enter_details(page, title: str, abstract: str, cover_letter: str) -> None:
     """Fill the manuscript-details page: title, abstract, and cover letter."""
     if title:
-        _try(lambda: _fill_rich_text(page, "Title. Rich Text Area", title), "title")
+        # _try(lambda: _fill_rich_text(page, "Title. Rich Text Area", title), "title")
+        page.get_by_role("textbox", name="Title").fill(title)
         page.wait_for_timeout(1000)
     if abstract:
-        _try(lambda: _fill_rich_text(page, "Abstract. Rich Text Area", abstract), "abstract")
+        # _try(lambda: _fill_rich_text(page, "Abstract. Rich Text Area", abstract), "abstract")
+        page.get_by_role("textbox", name="Abstract").fill(abstract)
     if cover_letter:
         page.locator("#cover_letter").set_input_files(cover_letter)
 
@@ -642,18 +654,33 @@ class SnappVenue(Venue):
         """Sign in through the Springer Nature IDP from credentials.
 
         Navigates to :attr:`Variant.auto_login_url`, dismisses the cookie banner,
-        then runs the email->password form via :func:`_submit_credentials`. The IDP
-        intermittently bounces a correct sign-in back to the email page; an explicit
-        gateway link carries a one-time ``state`` token that cannot be cleanly
-        reloaded, so the same pass is repeated in place (up to :data:`_LOGIN_ATTEMPTS`
-        times). Raises :class:`SnappLoginError` on failure so :meth:`ensure_signed_in`
-        can fall back to a manual sign-in.
+        then runs the email->password form via :func:`_submit_credentials`. When the
+        variant sets :attr:`Variant.login_link_name` the IDP is instead reached by
+        opening the journal homepage and clicking that link, which mints a fresh
+        gateway ``state`` token. The IDP intermittently bounces a correct sign-in back
+        to the email page; an explicit gateway link carries a one-time ``state`` token
+        that cannot be cleanly reloaded, so the same pass is repeated in place (up to
+        :data:`_LOGIN_ATTEMPTS` times). Raises :class:`SnappLoginError` on failure so
+        :meth:`ensure_signed_in` can fall back to a manual sign-in.
         """
         cfg = self.variant
-        login_url = cfg.auto_login_url
+        link_name = cfg.login_link_name
+        login_url = cfg.site_url if link_name else cfg.auto_login_url
         logger.debug("Signing in to %s via the Springer Nature IDP", cfg.name)
         page.goto(login_url)
+        # The homepage banner overlays the link, so clear it before clicking.
         _dismiss_cookies(page)
+        if link_name:
+            logger.debug("Reaching the IDP from %s via the %r link", login_url, link_name)
+            try:
+                page.get_by_role("link", name=link_name).click(timeout=timeout_ms)
+            except PWTimeout as exc:
+                raise SnappLoginError(
+                    f"could not find the {link_name!r} link on {login_url} "
+                    "(the journal homepage may have changed); re-capture the "
+                    f"selectors with 'playwright codegen {login_url}'"
+                ) from exc
+            _dismiss_cookies(page)
 
         email = page.get_by_role("textbox", name="Email address")
         try:

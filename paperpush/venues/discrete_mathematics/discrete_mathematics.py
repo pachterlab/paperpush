@@ -410,6 +410,9 @@ class DiscreteMathematicsVenue(Venue):
                 raise DiscreteMathematicsLoginError("submitted the credentials but the signed-in Elsevier dashboard " "did not load -- the username or password may be wrong, or the " "sign-in needs a two-factor (Duo) approval that can't be automated")
 
         # Institution federation: "Access through your institution"
+        if not username.lower().endswith("@caltech.edu"):
+            raise DiscreteMathematicsLoginError("the institutional sign-in flow is hard-coded for Caltech; " "use a Caltech email address to test the institutional login")
+
         _try(lambda: page.get_by_role("button", name=INSTITUTION_ACCESS_BUTTON).click(), "access through institution")
         _accept_cookies(page)
         _try(lambda: page.get_by_role("link", name=INSTITUTION_LINK).click(), "choose Institution")

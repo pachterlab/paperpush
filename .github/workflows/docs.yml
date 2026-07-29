@@ -1,12 +1,13 @@
 name: Docs
 
-# Builds the Sphinx documentation. On every push and pull request it builds with
-# warnings treated as errors, so a broken cross-reference or a bad docstring
-# fails CI. On a push to main it also publishes the built HTML to GitHub Pages.
+# Builds the Sphinx documentation with warnings treated as errors, so a broken
+# cross-reference or a bad docstring fails the build.
 #
-# This complements (does not replace) Read the Docs, which builds and hosts the
-# docs independently from .readthedocs.yaml. Keeping the build in CI catches
-# doc breakage on pull requests, before it reaches Read the Docs.
+# This is a CHECK ONLY -- it does not publish anywhere. The docs are hosted by
+# Read the Docs (https://paperpush.readthedocs.io), which builds them itself from
+# .readthedocs.yaml via a GitHub webhook, outside of Actions. Read the Docs also
+# sets fail_on_warning, but a failed build there does not block a pull request --
+# this job is what makes broken docs a red check before the merge.
 
 on:
   push:
@@ -14,16 +15,13 @@ on:
   pull_request:
   workflow_dispatch: {}
 
-# Allow the deploy job to publish to GitHub Pages.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Never run two Pages deploys at once; let an in-progress run finish.
+# A superseded docs build has nothing to publish, so drop it and keep the newest.
 concurrency:
   group: docs-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -46,32 +44,3 @@ jobs:
 
       - name: Build HTML (warnings as errors)
         run: python -m sphinx -b html -W --keep-going docs docs/_build/html
-
-      - name: Configure Pages
-        # enablement: true turns GitHub Pages on for the repo the first time this
-        # runs, so no manual toggle in repo Settings is needed after the repo goes
-        # public. (On a free org plan, Pages only serves once the repo is public.)
-        if: github.ref == 'refs/heads/main'
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: Upload Pages artifact
-        # Only need the artifact for the deploy job, which runs on main.
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs/_build/html
-
-  deploy:
-    # Publish to GitHub Pages only from main.
-    if: github.ref == 'refs/heads/main'
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4

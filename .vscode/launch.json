@@ -23,7 +23,7 @@
         },
         {
             "name": "Debug BMC Bioinformatics",
-            "args": ["submit", "tests/sub_files/bmc_bioinformatics/bmc_bioinformatics.sub"],
+            "args": ["submit", "--new-session", "tests/sub_files/bmc_bioinformatics/bmc_bioinformatics.sub"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {

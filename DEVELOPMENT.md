@@ -61,7 +61,7 @@ pytest tests/test_portal_drift.py --run-portal --update-snapshots
 pytest tests/test_portal_drift.py --run-portal --update-snapshots --venue nature
 ```
 
-Update venues.md checklist after running `pytest tests/test_submit.py --run-portal` (included automatically in pre-commit hook and bi-monthly CI job):
+Update venues.md checklist after running `pytest tests/test_submit.py --run-portal` (also run automatically by the pre-commit hook):
 
 ```bash
 python scripts/gen_readme_venues.py
@@ -75,34 +75,35 @@ black . -l 99999
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/`). All scheduled jobs also allow manual runs
-from the Actions tab. The portal-facing ones share one secret,
-`PAPERPUSH_SESSIONS_B64` — a base64 tar.gz of the saved `*_session.json` files
-(`( cd ~/.config/paperpush && tar -czf - *_session.json ) | base64`) — restored
-by the `restore-portal-sessions` composite action (see each workflow's header).
-
-**On every push / PR**
+GitHub Actions (`.github/workflows/`). Both workflows run on every push and pull
+request, and allow manual runs from the Actions tab. Neither touches a live
+portal, so no session secret is needed.
 
 - `ci.yml` — runs `pytest` (real-portal tests are skipped) and checks that
   `venues.md` / `README.md` and `venues.schema.json` are in sync with their
   generators.
+- `docs.yml` — builds the Sphinx docs with warnings as errors. Check only; it
+  does not publish. The docs are hosted by Read the Docs
+  (<https://paperpush.readthedocs.io>), which builds them from `.readthedocs.yaml`
+  via a webhook, outside of Actions. Read the Docs sets `fail_on_warning` too,
+  but a failure there does not block a PR — `docs.yml` is what turns broken docs
+  into a red check before the merge.
 
-**Scheduled (live portals, in a private fork)**
+**Portal health is checked locally, not in CI.** The scheduled workflows that
+drove live portals (`submit.yml`, `fingerprint.yml`, `nature-categories.yml`)
+were removed when this repo went public: they relied on a `PAPERPUSH_SESSIONS_B64`
+secret carrying live logins to real accounts, which is unsafe in a public repo
+where anyone who can edit a workflow could exfiltrate it. Run the walkthrough
+yourself instead:
 
-- `submit.yml` (every 2 months) — Drives each venue with a
-  session secret through the real submission wizard headless (stopping before the
-  final submit, retrying up to 3× per venue), records ✅ (pass) / ❌ (fail) into
-  `tests/submit_walkthrough_status.json`, regenerates the venue tables, and opens
-  a PR: it auto-merges when only dates changed and stays open — with the failed
-  venues named in a comment — when a venue flips ✅↔❌.
-- `fingerprint.yml` (every 2 months) — the complementary signal to the
-  walkthrough: diffs each portal's login page and first wizard step against the
-  committed fingerprint in `tests/portal_snapshots` and fails loudly if the
-  structure changed, catching a portal that drifted *without* breaking submission.
-- `nature-categories.yml` (every 6 months) — re-scrapes Nature's subject-category
-  tree from the live wizard and opens a PR if it drifted.
+```bash
+pytest tests/test_submit.py --run-portal
+python scripts/gen_readme_venues.py
+```
 
 The submit walkthrough's pass/fail is the portal-health signal: a portal change
-that breaks submission flips the venue to ❌ (and the PR stays open for review).
+that breaks submission flips the venue to ❌ in
+`tests/submit_walkthrough_status.json`. Regenerate the venue tables after any
+run — CI fails if `venues.md` is out of sync with that file.
 
 To deprecate a venue, add the field `deprecated:true` to its entry in `paperpush/venues.json`.

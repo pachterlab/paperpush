@@ -345,8 +345,8 @@ def test_submit_walkthrough(slug, sub_path, capsys):
     """
     sub = sub_path
     # Headed by default (matching launch.json), so a developer can watch and
-    # sign in. An unattended runner (the submit.yml workflow) has no display,
-    # so PAPERPUSH_WALKTHROUGH_HEADLESS=1 switches to headless.
+    # sign in. An unattended runner has no display, so
+    # PAPERPUSH_WALKTHROUGH_HEADLESS=1 switches to headless.
     # Either way, without -s pytest's captured stdin makes hold_open's input()
     # raise OSError, which hold_open swallows and returns -- so reaching
     # hold_open counts as success. With -s it instead waits for Ctrl+D/Ctrl+C.
