@@ -183,15 +183,17 @@ class Field:
     ] = None
     # For a text-bearing field (``text``/``textarea``), the maximum length of the
     # value in words (``word_count``) and/or characters (``character_count``);
-    # e.g. an abstract capped at 250 words. ``None`` means no limit on that
-    # measure. Ignored for non-text fields.
+    # e.g. an abstract capped at 250 words. Also applies to a ``choice`` with
+    # ``options_recommended``, where an off-list value is typed into the portal's
+    # free-text box and so carries that box's limit. ``None`` means no limit on
+    # that measure. Ignored for other field types.
     word_count: Annotated[
         Optional[int],
         PField(description="Maximum length in words for a `text`/`textarea` value."),
     ] = None
     character_count: Annotated[
         Optional[int],
-        PField(description="Maximum length in characters for a `text`/`textarea` " "value."),
+        PField(description="Maximum length in characters for a `text`/`textarea` " "value, or for the free text of a `choice` with `options_recommended`."),
     ] = None
     # For a text-bearing field (``text``/``textarea``), require every non-blank
     # line of the value to be a valid http/https URL (e.g. a data-availability
@@ -289,10 +291,12 @@ class Field:
     # Conditional requirement: the id of another field in the same venue whose
     # non-empty value makes this field required. Layered on top of ``required``
     # (which is the unconditional case): a field is required when ``required`` is
-    # true or when its ``required_if`` target carries a value. Ignored when unset.
+    # true or when its ``required_if`` target carries a value. A ``boolean``
+    # target is the exception -- it triggers only when answered yes, since "no"
+    # is a value but means the dependent fields do not apply. Ignored when unset.
     required_if: Annotated[
         Optional[str],
-        PField(description="Id of another field in the same venue; when that " "field has a non-empty value, this field becomes required. Combined with " "`required` (unconditional)."),
+        PField(description="Id of another field in the same venue; when that " "field has a non-empty value, this field becomes required. A `boolean` " "target triggers only on an affirmative answer, since \"no\" means the " "dependent fields do not apply. Combined with `required` (unconditional)."),
     ] = None
 
     @classmethod

@@ -209,6 +209,42 @@ def test_informational_boolean_no_is_accepted():
     assert _errors(_validate(j, {"prior": "no"})) == []
 
 
+# --- required_if -----------------------------------------------------------
+
+
+def _required_if(trigger_type: str) -> Venue:
+    """A field required by a sibling ``trigger`` of the given type."""
+    return _venue(
+        Field(id="trigger", label="Trigger", type=trigger_type),
+        Field(id="dependent", label="Dependent", type="text", required_if="trigger"),
+    )
+
+
+def test_required_if_text_trigger_provided_makes_dependent_required():
+    errs = _errors(_validate(_required_if("text"), {"trigger": "something"}))
+    assert len(errs) == 1
+    assert errs[0].message == "Dependent is required when Trigger is provided"
+
+
+def test_required_if_text_trigger_empty_leaves_dependent_optional():
+    assert _errors(_validate(_required_if("text"), {"trigger": ""})) == []
+
+
+def test_required_if_boolean_trigger_yes_makes_dependent_required():
+    errs = _errors(_validate(_required_if("boolean"), {"trigger": "yes"}))
+    assert len(errs) == 1
+    assert errs[0].message == "Dependent is required when Trigger is yes"
+
+
+def test_required_if_boolean_trigger_no_leaves_dependent_optional():
+    """Answering the question "no" is a value, but the dependants do not apply."""
+    assert _errors(_validate(_required_if("boolean"), {"trigger": "no"})) == []
+
+
+def test_required_if_boolean_trigger_unanswered_leaves_dependent_optional():
+    assert _errors(_validate(_required_if("boolean"), {"trigger": ""})) == []
+
+
 # --- choice ----------------------------------------------------------------
 
 
@@ -238,6 +274,41 @@ def test_choice_valid_option_passes():
         )
     )
     assert _errors(_validate(j, {"kind": "Review"})) == []
+
+
+def _recommended_choice(**kwargs) -> Venue:
+    """A choice whose options are advisory (the portal has an 'Other' box)."""
+    return _venue(
+        Field(
+            id="statement",
+            label="Data statement",
+            type="choice",
+            options=["No data was used.", "The data is confidential."],
+            options_recommended=True,
+            **kwargs,
+        )
+    )
+
+
+def test_recommended_choice_off_list_value_is_warning_not_error():
+    j = _recommended_choice()
+    issues = _validate(j, {"statement": "Data are in the lab notebook."})
+    assert _errors(issues) == []
+    warns = _warnings(issues)
+    assert len(warns) == 1
+    assert "not in the recommended list" in warns[0].message
+    assert "entered as custom text" in warns[0].message
+
+
+def test_recommended_choice_listed_option_is_silent():
+    j = _recommended_choice()
+    assert _validate(j, {"statement": "The data is confidential."}) == []
+
+
+def test_recommended_choice_over_character_limit_is_error():
+    j = _recommended_choice(character_count=20)
+    errs = _errors(_validate(j, {"statement": "x" * 21}))
+    assert any("21 characters" in i.message and "20-character" in i.message for i in errs)
 
 
 # --- boolean parsing -------------------------------------------------------
@@ -291,6 +362,21 @@ def test_multichoice_invalid_option_is_error():
     assert any("not a valid option" in i.message for i in errs)
     # Inline options are spelled out in the error.
     assert any("a | b | c" in i.message for i in errs)
+
+
+def test_multichoice_recommended_off_list_option_is_warning():
+    j = _venue(
+        Field(
+            id="kw",
+            label="Keywords",
+            type="multichoice",
+            options=["a", "b", "c"],
+            options_recommended=True,
+        )
+    )
+    issues = _validate(j, {"kw": "a, z"})
+    assert _errors(issues) == []
+    assert any("added as a custom keyword" in i.message for i in _warnings(issues))
 
 
 def test_multichoice_file_backed_invalid_option_points_at_command():

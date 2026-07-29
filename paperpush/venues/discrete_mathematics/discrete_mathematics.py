@@ -209,8 +209,34 @@ class DiscreteMathematicsVenue(Venue):
         figures = _parse_files(values.get("figure_files", ""))
         supplements = _parse_files(values.get("supplementary_files", ""))
         latex_source = values.get("latex_source", "").strip()
+        # Research data: either link a deposited dataset (share_data) or decline
+        # and pick a statement. The repository fields are read either way but
+        # only used -- and only required -- when sharing.
+        share_data = _is_yes(values.get("share_data", ""))
+        data_repository_name = values.get("data_repository_name", "").strip()
+        data_repository_url = values.get("data_repository_url", "").strip()
+        source_of_data = values.get("source_of_data", "").strip().lower()
+        dataset_title = values.get("dataset_title", "").strip()
         data_statement = values.get("data_statement", "").strip()
         declarations_confirmed = _is_yes(values.get("declarations_confirmed", ""))
+
+        if share_data:
+            missing = [
+                name
+                for name, value in (
+                    ("data_repository_name", data_repository_name),
+                    ("data_repository_url", data_repository_url),
+                    ("source_of_data", source_of_data),
+                    ("dataset_title", dataset_title),
+                )
+                if not value
+            ]
+            if missing:
+                raise ValueError("share_data is yes but " + ", ".join(missing) + " " + ("was" if len(missing) == 1 else "were") + " not provided")
+            if source_of_data not in ("original", "reference"):
+                raise ValueError(f"source_of_data must be 'original' or 'reference', not {source_of_data!r}")
+        elif not data_statement:
+            raise ValueError("share_data is no but no data_statement was provided")
 
         author_field = next((f for f in self._VENUE.fields if f.type == "authorlist"), None)
         authors = parse_authors(values.get("authors", ""), author_field.fields if author_field else None)
@@ -292,11 +318,14 @@ class DiscreteMathematicsVenue(Venue):
                 _add_author(page, author)
             page.get_by_label("Save and continue").click()
 
-            # Research data: decline to share, then pick the no-data statement.
+            # Research data: either link the deposited dataset, or decline and
+            # pick a statement (an off-list one goes in the "Other" free-text box).
             if share_data:
                 page.get_by_placeholder("Paste your data repository link here").fill(data_repository_url)
                 page.get_by_text("Select a repository", exact=True).click()
                 page.get_by_text(data_repository_name).click()
+                if data_repository_name == "Other":
+                    page.get_by_placeholder("Type your repository name here").fill(data_repository_name)  #! unverified
                 if source_of_data == "original":
                     page.get_by_label("Original data").check()
                 elif source_of_data == "reference":

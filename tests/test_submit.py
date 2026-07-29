@@ -133,6 +133,54 @@ def test_venue_has_submission_runner(scenario):
     assert callable(venues.get_runner(scenario.venue))
 
 
+# --- runner-side cross-field guards ----------------------------------------
+#
+# A runner rejects a value combination the per-field metadata cannot express
+# (validate() checks fields one at a time). These guards run before any browser
+# is opened, so they are testable without Playwright.
+
+
+def _discrete_mathematics_runner():
+    from paperpush.venues.discrete_mathematics.discrete_mathematics import \
+        DiscreteMathematicsVenue
+
+    return DiscreteMathematicsVenue()
+
+
+@pytest.mark.parametrize(
+    "missing",
+    ["data_repository_name", "data_repository_url", "source_of_data", "dataset_title"],
+)
+def test_discrete_mathematics_share_data_requires_repository_fields(missing):
+    values = {
+        "share_data": "yes",
+        "data_repository_name": "Mendeley Data",
+        "data_repository_url": "https://data.mendeley.com/datasets/example",
+        "source_of_data": "original",
+        "dataset_title": "A dataset",
+    }
+    values[missing] = ""
+    with pytest.raises(ValueError, match=missing):
+        _discrete_mathematics_runner().submit(values)
+
+
+def test_discrete_mathematics_share_data_rejects_unknown_source_of_data():
+    values = {
+        "share_data": "yes",
+        "data_repository_name": "Mendeley Data",
+        "data_repository_url": "https://data.mendeley.com/datasets/example",
+        "source_of_data": "borrowed",
+        "dataset_title": "A dataset",
+    }
+    with pytest.raises(ValueError, match="original"):
+        _discrete_mathematics_runner().submit(values)
+
+
+def test_discrete_mathematics_declining_requires_a_data_statement():
+    with pytest.raises(ValueError, match="data_statement"):
+        _discrete_mathematics_runner().submit({"share_data": "no", "data_statement": ""})
+
+
 def test_every_venue_has_a_sample_subfile():
     """Guard: scenarios resolve to committed files on disk for the sweep above."""
     assert SCENARIOS, "no sample scenarios discovered"

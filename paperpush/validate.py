@@ -245,7 +245,10 @@ def _annotation_for(field: Field, custom_validator=None):
 
     A ``choice`` field's closed option set is taken straight from its ``options``
     in ``venues.json`` and enforced as a ``Literal``, so the allowed values live
-    in one place (the database) and are not duplicated in this module.
+    in one place (the database) and are not duplicated in this module. When the
+    field sets ``options_recommended`` the list is advisory instead (the portal
+    offers an "Other" free-text entry), so it validates as a plain string and an
+    off-list value is only warned about in :func:`validate`.
 
     ``custom_validator``, when given, is a venue-specific check contributed by
     the venue's runner module (see
@@ -255,7 +258,7 @@ def _annotation_for(field: Field, custom_validator=None):
     venue can enforce rules the generic field metadata cannot express (for
     example that Nature's subject paths exist in the category tree).
     """
-    if field.type == "choice" and field.options:
+    if field.type == "choice" and field.options and not field.options_recommended:
         base, metadata = Literal[tuple(field.options)], []
     elif field.type == "boolean":
         base, metadata = bool, [BeforeValidator(_parse_bool)]
@@ -427,7 +430,8 @@ def _check_length(field: Field, raw: str) -> list[Issue]:
     """Flag a text value that runs past its word or character limit.
 
     ``word_count`` and ``character_count`` are upper bounds declared on a
-    ``text``/``textarea`` field; either or both may be set. Words are
+    ``text``/``textarea`` field (or on a ``choice`` whose off-list value goes
+    into a portal free-text box); either or both may be set. Words are
     whitespace-delimited tokens; characters count the trimmed value.
     """
     issues: list[Issue] = []
@@ -718,8 +722,17 @@ def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, ch
 
         # A field is required either unconditionally (``required``) or when its
         # ``required_if`` target carries a value (e.g. funding_country is required
-        # only once funding is given).
-        required = field.required or bool(field.required_if and values.get(field.required_if, "").strip())
+        # only once funding is given). A yes/no target is the exception: only an
+        # affirmative triggers the requirement, since answering the question "no"
+        # is itself a value but means the dependent fields do not apply (e.g.
+        # Discrete Mathematics' repository fields under share_data).
+        trigger_field = next((f for f in venue.fields if f.id == field.required_if), None) if field.required_if else None
+        trigger_raw = values.get(field.required_if, "") if field.required_if else ""
+        if trigger_field is not None and trigger_field.type == "boolean":
+            triggered = _truthy_bool(trigger_raw)
+        else:
+            triggered = bool(trigger_raw.strip())
+        required = field.required or triggered
 
         # Required fields must carry a value. A required confirmation boolean (a
         # consent checkbox, ``confirm: true``) must additionally be affirmative,
@@ -731,8 +744,9 @@ def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, ch
             elif field.type == "boolean":
                 issues.append(Issue(ERROR, field.id, f"{field.label} must be answered (yes or no)"))
             elif field.required_if:
-                trigger = next((f.label for f in venue.fields if f.id == field.required_if), field.required_if)
-                issues.append(Issue(ERROR, field.id, f"{field.label} is required when {trigger} is provided"))
+                trigger = trigger_field.label if trigger_field is not None else field.required_if
+                when = "is yes" if trigger_field is not None and trigger_field.type == "boolean" else "is provided"
+                issues.append(Issue(ERROR, field.id, f"{field.label} is required when {trigger} {when}"))
             else:
                 issues.append(Issue(ERROR, field.id, f"{field.label} is required but empty"))
             continue
@@ -740,35 +754,44 @@ def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, ch
         if not present:
             continue
 
-        # Multichoice option validity is not modelled in pydantic (no such fields
-        # today); keep a direct check so the capability is not silently lost. Its
-        # selection-count bounds are handled by the generic item-count check below.
+        # Option membership for the two option-bearing types. A ``choice`` holds
+        # one value; a ``multichoice`` a comma-separated list, whose selection
+        # count is bounded by the generic item-count check below.
+        #
         # When ``options_recommended`` is set, the list is advisory: an off-list
-        # value is allowed and only flagged as a WARNING (e.g. Bioinformatics' free
-        # Keywords box, where any typed term is accepted).
-        if field.type == "multichoice" and field.options:
-            for choice in (c.strip() for c in raw.split(",")):
-                if choice and choice not in field.options:
-                    if field.options_recommended:
-                        issues.append(
-                            Issue(
-                                WARNING,
-                                field.id,
-                                f"{field.label}: '{choice}' is not in the recommended " "list; it will be added as a custom keyword",
-                            )
+        # value is allowed and only flagged as a WARNING (e.g. Bioinformatics'
+        # free Keywords box, where any typed term is accepted, or Discrete
+        # Mathematics' research-data statement, whose dropdown has an "Other"
+        # free-text entry). Otherwise the list is closed. A closed multichoice is
+        # not modelled in pydantic, so the ERROR is raised here; a closed
+        # ``choice`` is already a ``Literal`` in the schema pass and would only be
+        # reported twice.
+        if field.options and field.type in ("choice", "multichoice"):
+            chosen = [raw.strip()] if field.type == "choice" else [c.strip() for c in raw.split(",")]
+            for choice in chosen:
+                if not choice or choice in field.options:
+                    continue
+                if field.options_recommended:
+                    entered = "added as a custom keyword" if field.type == "multichoice" else "entered as custom text"
+                    issues.append(
+                        Issue(
+                            WARNING,
+                            field.id,
+                            f"{field.label}: '{choice}' is not in the recommended " f"list; it will be {entered}",
                         )
+                    )
+                elif field.type == "multichoice":
+                    if field.options_file:
+                        valid = f"run '{options_command(venue.slug, field.id)}' to list the valid options"
                     else:
-                        if field.options_file:
-                            valid = f"run '{options_command(venue.slug, field.id)}' to list the valid options"
-                        else:
-                            valid = " | ".join(field.options)
-                        issues.append(
-                            Issue(
-                                ERROR,
-                                field.id,
-                                f"{field.label}: '{choice}' is not a valid option " f"({valid})",
-                            )
+                        valid = " | ".join(field.options)
+                    issues.append(
+                        Issue(
+                            ERROR,
+                            field.id,
+                            f"{field.label}: '{choice}' is not a valid option " f"({valid})",
                         )
+                    )
 
         # Inclusive item-count bounds on any multi-item field: a multichoice's
         # chosen options, or the lines of a filelist/authorlist/list-style

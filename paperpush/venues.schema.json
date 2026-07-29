@@ -196,7 +196,7 @@
               "type": "null"
             }
           ],
-          "description": "Maximum length in characters for a `text`/`textarea` value."
+          "description": "Maximum length in characters for a `text`/`textarea` value, or for the free text of a `choice` with `options_recommended`."
         },
         "require_url": {
           "anyOf": [
@@ -368,7 +368,7 @@
               "type": "null"
             }
           ],
-          "description": "Id of another field in the same venue; when that field has a non-empty value, this field becomes required. Combined with `required` (unconditional)."
+          "description": "Id of another field in the same venue; when that field has a non-empty value, this field becomes required. A `boolean` target triggers only on an affirmative answer, since \"no\" means the dependent fields do not apply. Combined with `required` (unconditional)."
         }
       },
       "required": [
@@ -526,7 +526,7 @@
               "type": "null"
             }
           ],
-          "description": "Maximum length in characters for a `text`/`textarea` value."
+          "description": "Maximum length in characters for a `text`/`textarea` value, or for the free text of a `choice` with `options_recommended`."
         },
         "require_url": {
           "anyOf": [
@@ -684,7 +684,7 @@
               "type": "null"
             }
           ],
-          "description": "Id of another field in the same venue; when that field has a non-empty value, this field becomes required. Combined with `required` (unconditional)."
+          "description": "Id of another field in the same venue; when that field has a non-empty value, this field becomes required. A `boolean` target triggers only on an affirmative answer, since \"no\" means the dependent fields do not apply. Combined with `required` (unconditional)."
         }
       },
       "required": [

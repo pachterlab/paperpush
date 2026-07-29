@@ -896,7 +896,46 @@
       "figure_files": "tests/manuscript_files/discrete_mathematics/figures/fig1.pdf | Figure 1",
       "latex_source": "tests/manuscript_files/discrete_mathematics/manuscript_tex_bundle.zip",
       "supplementary_files": "tests/manuscript_files/discrete_mathematics/supplement.pdf | Supplement",
-      "data_statement": "The data that has been used is confidential.",
+      "data_statement": "The data supporting this study are included in the supplementary material.",
+      "declarations_confirmed": "yes"
+    }
+  },
+  "discrete_mathematics_shared_data.sub": {
+    "journal": "discrete_mathematics",
+    "fields": {
+      "article_type": "Contribution",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "graph theory;combinatorics",
+      "authors": "Joseph Rich | jmrich@caltech.edu | California Institute of Technology | yes\n",
+      "manuscript_file": "tests/manuscript_files/discrete_mathematics/manuscript.pdf",
+      "no_competing_interests": "yes",
+      "share_data": "yes",
+      "data_repository_name": "Mendeley Data",
+      "data_repository_url": "https://data.mendeley.com/datasets/example",
+      "source_of_data": "original",
+      "dataset_title": "Graphs accompanying Title goes here",
+      "data_statement": "No data was used for the research described in the article.",
+      "declarations_confirmed": "yes"
+    }
+  },
+  "discrete_mathematics_reference_data.sub": {
+    "journal": "discrete_mathematics",
+    "fields": {
+      "article_type": "Note",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "keywords": "graph theory;combinatorics;enumeration",
+      "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | no\nJoseph Rich | jmrich@usc.edu | University of Southern California | yes\n",
+      "manuscript_file": "tests/manuscript_files/discrete_mathematics/manuscript.pdf",
+      "declaration_file": "tests/manuscript_files/discrete_mathematics/declaration_of_interest.pdf",
+      "figure_files": "tests/manuscript_files/discrete_mathematics/figures/fig1.pdf | Figure 1",
+      "share_data": "yes",
+      "data_repository_name": "Other",
+      "data_repository_url": "https://zenodo.org/records/1234567",
+      "source_of_data": "reference",
+      "dataset_title": "Reference graph collection reused in Title goes here",
+      "data_statement": "No data was used for the research described in the article.",
       "declarations_confirmed": "yes"
     }
   }
