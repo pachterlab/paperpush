@@ -523,7 +523,7 @@ def _enter_declarations(page, values: dict) -> None:
         _try(lambda: page.get_by_text("No, this research did not").click(), "research funding = No")
 
 
-def submit_snapp(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def submit_snapp(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, keep_open_on_failure: bool = True, *, venue) -> None:
     """Open the portal, sign in, then drive the Springer Nature wizard from ``values``.
 
     Clicks through the recorded steps (article type + files, details, authors,
@@ -559,7 +559,7 @@ def submit_snapp(values: dict, headless: bool = False, debug: bool = False, new_
         len(authors),
     )
 
-    with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
+    with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
         browser = playwright.chromium.launch(headless=headless)
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
@@ -640,6 +640,7 @@ class SnappVenue(Venue):
         debug: bool = False,
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        keep_open_on_failure: bool = True,
     ) -> None:
         _ENGINE_RUN(
             values,
@@ -647,6 +648,7 @@ class SnappVenue(Venue):
             debug=debug,
             new_session=new_session,
             timeout=timeout,
+            keep_open_on_failure=keep_open_on_failure,
             venue=self,
         )
 

@@ -193,6 +193,7 @@ class DiscreteMathematicsVenue(Venue):
         debug: bool = False,
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        keep_open_on_failure: bool = True,
     ) -> None:
         """Open Discrete Mathematics, sign in, then drive the Elsevier wizard from a ``.sub``."""
         # The Inspector needs a visible browser; debugging headless makes no sense.
@@ -244,7 +245,7 @@ class DiscreteMathematicsVenue(Venue):
 
         logger.info("Starting Discrete Mathematics submission run (headless=%s, debug=%s): manuscript=%s, %d author(s)", headless, debug, manuscript_file, len(authors))
 
-        with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
+        with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
             browser = playwright.chromium.launch(headless=headless)
             context = open_run_context(browser, self.session_path(), new_session=new_session)
             apply_default_timeouts(context, timeout)

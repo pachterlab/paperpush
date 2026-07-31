@@ -1136,7 +1136,7 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     _click_button(page, BTN_SAVE_CONTINUE)
 
 
-def submit_nature(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def submit_nature(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, keep_open_on_failure: bool = True, *, venue) -> None:
     """Open Nature, sign in, then drive the eJP submission wizard from a ``.sub``.
 
     Signs in via ``ensure_signed_in``, then clicks through the captured eJP steps
@@ -1156,7 +1156,7 @@ def submit_nature(values: dict, headless: bool = False, debug: bool = False, new
     manuscript_file = values.get("manuscript_file", "").strip()
     logger.info("Starting %s submission run (headless=%s, debug=%s): " "manuscript=%s", cfg.name, headless, debug, manuscript_file)
 
-    with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
+    with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
         browser = playwright.chromium.launch(headless=headless)
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
@@ -1359,6 +1359,7 @@ class EJPVenue(Venue):
         debug: bool = False,
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        keep_open_on_failure: bool = True,
     ) -> None:
         submit_nature(
             values,
@@ -1366,6 +1367,7 @@ class EJPVenue(Venue):
             debug=debug,
             new_session=new_session,
             timeout=timeout,
+            keep_open_on_failure=keep_open_on_failure,
             venue=self,
         )
 

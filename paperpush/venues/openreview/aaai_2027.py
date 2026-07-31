@@ -277,6 +277,7 @@ class AAAI2027Venue(Venue):
         debug: bool = False,
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        keep_open_on_failure: bool = True,
     ) -> None:
         """Open OpenReview, sign in, then drive the AAAI 2027 wizard from a ``.sub``.
 
@@ -311,7 +312,7 @@ class AAAI2027Venue(Venue):
         code_data_supplement = values.get("code_data_supplement", "").strip()
         conflicts = _parse_authors(values.get("conflicts", ""))
 
-        with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
+        with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
             browser = playwright.chromium.launch(headless=headless)
             context = open_run_context(browser, self.session_path(), new_session=new_session)
             apply_default_timeouts(context, timeout)

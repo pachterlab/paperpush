@@ -100,7 +100,7 @@ def hold_open(reason: str | None = None) -> None:
 
 
 @contextmanager
-def hold_open_on_failure(*, headless: bool = False):
+def hold_open_on_failure(*, headless: bool = False, keep_open: bool = True):
     """Leave the browser open when the wrapped run raises, then re-raise.
 
     A submission wizard that breaks partway -- a selector the portal renamed, a
@@ -112,18 +112,22 @@ def hold_open_on_failure(*, headless: bool = False):
 
     Layer it onto the run's Playwright block rather than nesting it inside::
 
-        with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
+        with sync_playwright() as playwright, hold_open_on_failure(
+            headless=headless, keep_open=keep_open_on_failure
+        ):
 
     ``with A, B`` exits ``B`` first, so the hold happens while the browser is
-    still alive. ``headless=True`` skips the hold (there is no window to look at,
-    and an unattended run should fail immediately). ``KeyboardInterrupt`` is
-    deliberately not caught: a human aborting the run wants the window closed,
-    not a second prompt to press Ctrl+C again.
+    still alive. The hold is skipped when ``headless`` (there is no window to
+    look at, and an unattended run should fail immediately) or when ``keep_open``
+    is ``False`` (``paperpush submit --close-on-failure``, for a run that should
+    just exit). ``KeyboardInterrupt`` is deliberately not caught: a human
+    aborting the run wants the window closed, not a second prompt to press
+    Ctrl+C again.
     """
     try:
         yield
     except Exception as exc:  # noqa: BLE001 -- re-raised below; this only pauses first
-        if headless:
+        if headless or not keep_open:
             raise
         logger.warning("Run failed (%s); leaving the browser open", exc)
         hold_open(reason=f"The run failed: {type(exc).__name__}: {exc}")

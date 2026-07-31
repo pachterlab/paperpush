@@ -340,7 +340,7 @@ def _add_funders(page, funders: list[tuple[str, str]]) -> None:
             logger.warning("nucleic_acids_research: could not add funder %r via the modal (%s); " "leaving it to be finished by hand", funder, exc)
 
 
-def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, keep_open_on_failure: bool = True, *, venue) -> None:
     """Open Nucleic Acids Research (ScholarOne) and drive the submission wizard.
 
     ``values`` is the parsed ``.sub`` field map. The wizard runs across six pages:
@@ -374,7 +374,7 @@ def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: b
 
     logger.info("Starting Nucleic Acids Research (ScholarOne) submission run " "(headless=%s, debug=%s, manuscript=%s, %d file(s) to upload, %d author(s))", headless, debug, manuscript_file, len(upload_files), len(authors))
 
-    with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
+    with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
         browser = playwright.chromium.launch(headless=headless)
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
@@ -501,6 +501,7 @@ class NucleicAcidsResearchVenue(scholarone.ScholarOneVenue):
         debug: bool = False,
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        keep_open_on_failure: bool = True,
     ) -> None:
         submit_nucleic_acids_research(
             values,
@@ -508,6 +509,7 @@ class NucleicAcidsResearchVenue(scholarone.ScholarOneVenue):
             debug=debug,
             new_session=new_session,
             timeout=timeout,
+            keep_open_on_failure=keep_open_on_failure,
             venue=self,
         )
 

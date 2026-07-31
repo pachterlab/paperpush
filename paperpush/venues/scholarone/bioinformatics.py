@@ -196,7 +196,7 @@ def session_path():
     return _session_path("bioinformatics")
 
 
-def submit_bioinformatics(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def submit_bioinformatics(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, keep_open_on_failure: bool = True, *, venue) -> None:
     """Open Bioinformatics (ScholarOne) and drive the submission wizard.
 
     ``values`` is the parsed ``.sub`` field map. Sign-in is handled by the
@@ -226,7 +226,7 @@ def submit_bioinformatics(values: dict, headless: bool = False, debug: bool = Fa
 
     logger.info("Starting Bioinformatics (ScholarOne) submission run " "(headless=%s, debug=%s, manuscript=%s, %d file(s) to upload, %d author(s))", headless, debug, manuscript_file, len(upload_files), len(authors))
 
-    with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
+    with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
         browser = playwright.chromium.launch(headless=headless)
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
@@ -343,6 +343,7 @@ class BioinformaticsVenue(scholarone.ScholarOneVenue):
         debug: bool = False,
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        keep_open_on_failure: bool = True,
     ) -> None:
         submit_bioinformatics(
             values,
@@ -350,6 +351,7 @@ class BioinformaticsVenue(scholarone.ScholarOneVenue):
             debug=debug,
             new_session=new_session,
             timeout=timeout,
+            keep_open_on_failure=keep_open_on_failure,
             venue=self,
         )
 

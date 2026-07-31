@@ -564,8 +564,8 @@ def _cmd_submit(args: argparse.Namespace) -> int:
             "Field values come from the .sub file; the wizard stops before "
             "the final submit."
         )
-    logger.info("submit: launching %s runner (headless=%s, debug=%s, timeout=%ss)", venue, args.headless, args.debug, args.timeout)
-    run(subfile.values, headless=args.headless, debug=args.debug, new_session=args.new_session, timeout=args.timeout)
+    logger.info("submit: launching %s runner (headless=%s, debug=%s, timeout=%ss, " "keep_open_on_failure=%s)", venue, args.headless, args.debug, args.timeout, not args.close_on_failure)
+    run(subfile.values, headless=args.headless, debug=args.debug, new_session=args.new_session, timeout=args.timeout, keep_open_on_failure=not args.close_on_failure)
     logger.info("submit: %s runner returned", venue)
     return 0
 
@@ -996,6 +996,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_TIMEOUT_SECONDS,
         metavar="SECONDS",
         help="cap how long the browser waits for any action or page " f"load before failing (default: {DEFAULT_TIMEOUT_SECONDS:g}s; " "0 waits forever)",
+    )
+    p_submit.add_argument(
+        "--close-on-failure",
+        action="store_true",
+        help="close the browser when the run fails (default: leave the " "window open at the step that broke so you can see the page " "and finish by hand); --headless always closes",
     )
     p_submit.set_defaults(func=_cmd_submit)
 

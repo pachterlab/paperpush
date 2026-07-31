@@ -108,8 +108,16 @@ class Venue(ABC):
         debug: bool = False,
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        keep_open_on_failure: bool = True,
     ) -> None:
-        """Drive the submission wizard from a ``.sub``'s parsed field values."""
+        """Drive the submission wizard from a ``.sub``'s parsed field values.
+
+        ``keep_open_on_failure`` (the default) leaves a headed run's browser
+        window open at the step that raised, instead of letting Playwright close
+        it as the exception unwinds; implementations get this by wrapping their
+        ``sync_playwright`` block in
+        :func:`~paperpush.venues.common.hold_open_on_failure`.
+        """
 
     @abstractmethod
     def login(self, page, username: str, password: str, *, timeout_ms: int = 15000) -> None:

@@ -888,7 +888,7 @@ def _select_publishing_options(page, cf, open_access: bool, cfg: Variant = _DEFA
     _try(lambda: cf.get_by_role("button", name="Proceed").click(timeout=8000), "Proceed past publishing options")
 
 
-def editorialmanager_run(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, *, venue) -> None:
+def editorialmanager_run(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, keep_open_on_failure: bool = True, *, venue) -> None:
     """Open the portal, sign in, then drive the Editorial Manager wizard from a ``.sub``.
 
     Sign-in is handled by ``venue.ensure_signed_in`` (saved session, stored
@@ -930,7 +930,7 @@ def editorialmanager_run(values: dict, headless: bool = False, debug: bool = Fal
 
     logger.info("Starting %s submission run (headless=%s, debug=%s, type=%s, " "manuscript=%s, authors=%d, reviewers=%d, figures=%d)", cfg.name, headless, debug, article_type, manuscript_file, len(authors), len(reviewers), len(figure_files))
 
-    with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
+    with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
         browser = playwright.chromium.launch(headless=headless)
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
@@ -1015,6 +1015,7 @@ class EditorialManagerVenue(Venue):
         debug: bool = False,
         new_session: bool = False,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        keep_open_on_failure: bool = True,
     ) -> None:
         editorialmanager_run(
             values,
@@ -1022,6 +1023,7 @@ class EditorialManagerVenue(Venue):
             debug=debug,
             new_session=new_session,
             timeout=timeout,
+            keep_open_on_failure=keep_open_on_failure,
             venue=self,
         )
 
