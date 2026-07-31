@@ -17,7 +17,7 @@ from playwright.sync_api import sync_playwright
 from ...database import get_venue
 from ...validate import parse_authors
 from ..base import Venue
-from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
+from ..common import (DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts,
                       hold_open, hold_open_on_failure, open_run_context,
                       split_name_first_last)
 from ..login import VenueLoginError
@@ -51,16 +51,6 @@ class DiscreteMathematicsLoginError(VenueLoginError):
 def _is_yes(value: str) -> bool:
     """True when a ``.sub`` value reads as an affirmative (yes/true/1/on)."""
     return str(value or "").strip().lower() in _YES
-
-
-def _try(fn, what: str) -> bool:
-    """Run ``fn`` best-effort; log and continue on failure (the fragile login flow)."""
-    try:
-        fn()
-        return True
-    except Exception as exc:  # noqa: BLE001 -- best-effort optional step
-        logger.warning("Discrete Mathematics: skipped %s (%s)", what, exc)
-        return False
 
 
 def _accept_cookies(page) -> None:

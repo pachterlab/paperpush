@@ -5,13 +5,11 @@ import logging
 from playwright.sync_api import TimeoutError as PWTimeout
 from playwright.sync_api import sync_playwright
 
-from paperpush.venues.discrete_mathematics.discrete_mathematics import _try
-
 from ...database import get_venue
 from ...validate import _truthy_bool, parse_authors
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                      hold_open, hold_open_on_failure, open_run_context)
+                      hold_open, hold_open_on_failure, open_run_context, _try)
 from ..login import VenueLoginError
 
 logger = logging.getLogger(__name__)
@@ -83,8 +81,6 @@ class ArxivVenue(Venue):
         doi = values.get("doi", "").strip()
         crosslist_archives = values.get("crosslist_archives", "").strip()
         crosslist_categories = values.get("crosslist_categories", "").strip()
-        # Defaults to yes: keep everything in the uploaded LaTeX bundle rather
-        # than letting arXiv delete the files it auto-selects for removal.
         keep_all_files = _truthy_bool(values.get("keep_all_files", "").strip() or "yes")
 
         # The arXiv metadata form takes one comma-separated *Author(s) string, and

@@ -28,7 +28,7 @@ from ... import credentials
 from ...database import get_venue
 from ...validate import parse_authors
 from ..base import Venue
-from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
+from ..common import (DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts,
                       hold_open, hold_open_on_failure, open_run_context)
 from ..common import parse_pipe_funders as _parse_funders
 from ..common import save_storage
@@ -148,21 +148,6 @@ def _content(page):
     """The Editorial Manager content frame (re-resolved on each action)."""
     return page.frame_locator(CONTENT_FRAME)
 
-
-def _try(fn, what: str) -> bool:
-    """Run ``fn``; log and continue if it fails.
-
-    The Editorial Manager declarations page is a long list of policy questions
-    whose exact controls drift between deployments. A missing or moved control
-    there should not abort the data-bearing steps that follow, so each optional
-    click goes through here. Returns True if ``fn`` ran without raising.
-    """
-    try:
-        fn()
-        return True
-    except Exception as exc:  # noqa: BLE001 -- best-effort optional step
-        logger.warning("Editorial Manager: skipped %s (%s)", what, exc)
-        return False
 
 def _pick_or_enter_institution(cf, institution: str) -> bool:
     """Enter an institution into Editorial Manager.

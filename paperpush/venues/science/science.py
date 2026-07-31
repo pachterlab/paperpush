@@ -17,7 +17,7 @@ from playwright.sync_api import sync_playwright
 from ...database import get_venue
 from ...validate import parse_authors
 from ..base import Venue
-from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
+from ..common import (DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts,
                       hold_open, hold_open_on_failure, open_run_context)
 from ..login import VenueLoginError
 
@@ -114,16 +114,6 @@ class ScienceLoginError(VenueLoginError):
 def _is_yes(value: str) -> bool:
     """True when a ``.sub`` value reads as an affirmative (yes/true/1/on)."""
     return str(value or "").strip().lower() in _YES
-
-
-def _try(fn, what: str) -> bool:
-    """Run ``fn``; log and continue if it fails (for optional/account-dependent steps)."""
-    try:
-        fn()
-        return True
-    except Exception as exc:  # noqa: BLE001 -- best-effort optional step
-        logger.warning("Science: skipped %s (%s)", what, exc)
-        return False
 
 
 def _click(page, name: str, exact: bool = False, settle_ms: int = 1200) -> None:

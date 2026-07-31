@@ -5,6 +5,9 @@ Each venue has its own module in this package (``biorxiv.py``,
 pieces that are not venue-specific live here so the runners share one
 implementation instead of each keeping a private copy:
 
+* :func:`_try` -- the wrapper every runner puts its optional steps through, so a
+  control that has moved or gone missing logs and is skipped instead of
+  aborting the run.
 * :func:`wait_for_human` / :func:`hold_open` -- pausing for a manual step and
   keeping the launched browser open after the run finishes.
 * :func:`hold_open_on_failure` -- the same, for a run that *raises* partway
@@ -54,6 +57,23 @@ def apply_default_timeouts(context, timeout_seconds: float = DEFAULT_TIMEOUT_SEC
     ms = int(timeout_seconds * 1000)
     context.set_default_timeout(ms)
     context.set_default_navigation_timeout(ms)
+
+
+def _try(fn, what: str) -> bool:
+    """Run ``fn``; log and continue if it fails. Returns True if it ran without raising.
+
+    Portal wizards are long lists of controls that drift between deployments, so
+    a missing or moved optional control should not abort the data-bearing steps
+    that follow. Every optional step in a runner is wrapped in this::
+
+        from ..common import _try
+    """
+    try:
+        fn()
+        return True
+    except Exception as exc:  # noqa: BLE001 -- best-effort optional step
+        logger.warning("skipped %s (%s)", what, exc)
+        return False
 
 
 def wait_for_human(prompt: str) -> None:

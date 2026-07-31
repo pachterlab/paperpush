@@ -25,7 +25,7 @@ from ...database import get_venue
 from ...validate import parse_authors
 from .. import get_venue_impl
 from ..base import Venue
-from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
+from ..common import (DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts,
                       hold_open, hold_open_on_failure, open_run_context)
 from ..common import session_path as _session_path
 from ..common import split_name_first_last as _split_name
@@ -491,18 +491,6 @@ def login_nature(headless: bool = False, new_session: bool = False, cfg: Variant
 
 
 # --- submission wizard ----------------------------------------------------
-
-
-def _try(fn, what: str) -> bool:
-    """Run ``fn``; log and continue if it fails, so a missing optional control
-    does not abort the data-bearing steps that follow. Returns True on success.
-    """
-    try:
-        fn()
-        return True
-    except Exception as exc:  # noqa: BLE001 -- best-effort optional step
-        logger.warning("Nature: skipped %s (%s)", what, exc)
-        return False
 
 
 def _country_label(country: str) -> str:
