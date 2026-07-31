@@ -382,33 +382,38 @@ def _name_matches(author_name: str, profile_name: str) -> bool:
     return bool(a) and bool(b) and len(a & b) >= 1
 
 
-def fill_author_block(block_text: str, profile: OrcidProfile) -> tuple[str, str | None]:
+def fill_author_block(block_text: str, profile: OrcidProfile, fields: list[str] | None = None) -> tuple[str, str | None]:
     """Fill ``profile`` into the matching author line of an author block.
 
     The author block is the value of an ``authorlist`` field: one author per
-    line as ``Name | email | affiliation | ORCID | corresponding``. The target
-    line is chosen by name match against the profile, falling back to the
-    corresponding author, then the sole author if there is only one. The ORCID
-    column is always set; empty email and affiliation columns are filled from
-    the public record but existing values are left untouched.
+    line, ``|``-delimited in the venue's column order (``fields``, defaulting to
+    ``Name | email | affiliation | ORCID | corresponding``). The target line is
+    chosen by name match against the profile, falling back to the corresponding
+    author, then the sole author if there is only one. Only columns the venue
+    actually declares are written -- arXiv's list is name-only, so there is
+    nothing to fill and the block comes back unchanged. Where the column exists,
+    the ORCID one is always set; empty email and affiliation columns are filled
+    from the public record but existing values are left untouched.
 
     Returns ``(new_block_text, matched_name)`` where ``matched_name`` is None if
     no author line could be matched.
     """
     # Local import avoids a circular import at module load time.
-    from .validate import parse_authors
+    from .validate import (DEFAULT_AUTHOR_FIELDS, _author_name,
+                           _subfield_specs, parse_authors)
 
-    authors = parse_authors(block_text)
+    columns = [name for name, _ in _subfield_specs(fields or DEFAULT_AUTHOR_FIELDS)]
+    authors = parse_authors(block_text, fields)
     if not authors:
         return block_text, None
 
     target = None
     if profile.name:
         for author in authors:
-            if _name_matches(author["name"], profile.name):
+            if _name_matches(_author_name(author), profile.name):
                 target = author
                 break
-    if target is None:
+    if target is None and "corresponding" in columns:
         corresponding = [a for a in authors if a["corresponding"]]
         if len(corresponding) == 1:
             target = corresponding[0]
@@ -417,26 +422,20 @@ def fill_author_block(block_text: str, profile: OrcidProfile) -> tuple[str, str 
     if target is None:
         logger.debug("No author line matched ORCID iD %s among %d author(s)", profile.orcid_id, len(authors))
         return block_text, None
-    logger.debug("Matched ORCID iD %s to author %r", profile.orcid_id, target["name"])
+    matched_name = _author_name(target)
+    logger.debug("Matched ORCID iD %s to author %r", profile.orcid_id, matched_name)
 
-    target["orcid"] = profile.orcid_id
-    if not target["email"] and profile.email:
+    if "orcid" in columns:
+        target["orcid"] = profile.orcid_id
+    if "email" in columns and not target["email"] and profile.email:
         target["email"] = profile.email
-    if not target["affiliation"] and profile.affiliation:
+    if "affiliation" in columns and not target["affiliation"] and profile.affiliation:
         target["affiliation"] = profile.affiliation
 
-    lines = []
-    for author in authors:
-        corr = "yes" if author["corresponding"] else "no"
-        lines.append(
-            " | ".join(
-                [
-                    author["name"],
-                    author["email"],
-                    author["affiliation"],
-                    author["orcid"],
-                    corr,
-                ]
-            )
-        )
-    return "\n".join(lines), target["name"]
+    def _cell(author: dict, col: str) -> str:
+        if col == "corresponding":
+            return "yes" if author[col] else "no"
+        return author[col]
+
+    lines = [" | ".join(_cell(author, col) for col in columns) for author in authors]
+    return "\n".join(lines), matched_name

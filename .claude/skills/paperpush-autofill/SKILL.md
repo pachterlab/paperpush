@@ -92,10 +92,11 @@ named the venue, use it; otherwise infer or ask per the inputs below.
    a value:
 
    - `extract`: pull the statement verbatim where it exists. For `authors`, emit
-     one line per author as `Name | email | affiliation | ORCID | corresponding`,
-     marking exactly one corresponding author `yes` and the rest `no`. Leave a
-     subfield blank (keep the `|`) if the source does not give it — never invent
-     an email or ORCID.
+     one line per author in the column format that field's `help` gives — usually
+     `Name | email | affiliation | ORCID | corresponding`, marking exactly one
+     corresponding author `yes` and the rest `no`, but some venues reorder the
+     columns and some (arXiv) take the name alone. Leave a subfield blank (keep
+     the `|`) if the source does not give it — never invent an email or ORCID.
    - `classify`: pick one option from `options` and explain your choice in
      `source`. Use `medium` confidence at best.
    - `filemap`: give an **absolute path** to each file (e.g.

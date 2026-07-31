@@ -7,6 +7,8 @@ implementation instead of each keeping a private copy:
 
 * :func:`wait_for_human` / :func:`hold_open` -- pausing for a manual step and
   keeping the launched browser open after the run finishes.
+* :func:`hold_open_on_failure` -- the same, for a run that *raises* partway
+  through, so a failed wizard leaves its window on screen instead of vanishing.
 * :func:`session_path` / :func:`save_storage` -- persisting and locating a
   signed-in Playwright session so later runs skip the login.
 * :func:`capture_failure` -- dumping a screenshot and the live HTML of a page
@@ -25,6 +27,7 @@ guarding the import.
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from pathlib import Path
 
 from ..credentials import config_dir
@@ -61,30 +64,70 @@ def wait_for_human(prompt: str) -> None:
         pass
 
 
-def hold_open() -> None:
+def hold_open(reason: str | None = None) -> None:
     """Keep the script (and so the launched browser) alive indefinitely.
 
     Playwright closes any browser it launched as soon as the ``sync_playwright``
     block exits, so the only way to leave the window open after the click-through
     finishes is to never return. Block here until the human kills the process
     (Ctrl+C / closing the terminal), which is what finally closes the browser.
+
+    ``reason`` replaces the "script finished" banner; :func:`hold_open_on_failure`
+    passes the error that stopped the run, so the window that stays open is
+    labelled with why it stopped rather than looking like a clean finish.
     """
-    print("\nScript finished. The browser is left open for you to take over.")
+    if reason:
+        print(f"\n{reason}")
+        print("The browser is left open where the run stopped, so you can see " "the page and finish (or debug) by hand.")
+    else:
+        print("\nScript finished. The browser is left open for you to take over.")
     print("Press Ctrl+C here (or close this terminal) to close the browser.")
     try:
         while True:
             input()
     except (EOFError, KeyboardInterrupt, OSError):
-        # Reaching this point means the run already succeeded -- hold_open is
-        # only ever called after a runner finishes the wizard, and its sole job
-        # is to pause for a human. So any inability to read a keypress means
-        # "no human to wait for; just return cleanly" rather than fail the run:
+        # hold_open's sole job is to pause for a human -- after a finished
+        # wizard, or (via hold_open_on_failure) at the point a run broke. Either
+        # way, any inability to read a keypress means "no human to wait for;
+        # just return" rather than an error of its own; on the failure path the
+        # original exception is re-raised by the caller once this returns:
         #   EOFError        -- stdin is /dev/null (attended `-s` run, EOF)
         #   KeyboardInterrupt-- the human pressed Ctrl+C
         #   OSError         -- stdin is captured by pytest (a bare `pytest
         #                      --run-portal` status check, or the headless CI
         #                      refresh), whose fake stdin raises rather than EOFs
         pass
+
+
+@contextmanager
+def hold_open_on_failure(*, headless: bool = False):
+    """Leave the browser open when the wrapped run raises, then re-raise.
+
+    A submission wizard that breaks partway -- a selector the portal renamed, a
+    timeout, a bad value the form rejects -- used to take its window down with
+    it: the exception unwinds out of the ``sync_playwright`` block, and
+    Playwright kills the browser it launched, so the error page is gone before it
+    can be read. This holds the process (and the window) at the point of failure
+    via :func:`hold_open`, then re-raises so the command still fails.
+
+    Layer it onto the run's Playwright block rather than nesting it inside::
+
+        with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
+
+    ``with A, B`` exits ``B`` first, so the hold happens while the browser is
+    still alive. ``headless=True`` skips the hold (there is no window to look at,
+    and an unattended run should fail immediately). ``KeyboardInterrupt`` is
+    deliberately not caught: a human aborting the run wants the window closed,
+    not a second prompt to press Ctrl+C again.
+    """
+    try:
+        yield
+    except Exception as exc:  # noqa: BLE001 -- re-raised below; this only pauses first
+        if headless:
+            raise
+        logger.warning("Run failed (%s); leaving the browser open", exc)
+        hold_open(reason=f"The run failed: {type(exc).__name__}: {exc}")
+        raise
 
 
 def session_path(slug: str) -> Path:

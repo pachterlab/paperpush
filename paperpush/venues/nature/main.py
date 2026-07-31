@@ -26,7 +26,7 @@ from ...validate import parse_authors
 from .. import get_venue_impl
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                      hold_open, open_run_context)
+                      hold_open, hold_open_on_failure, open_run_context)
 from ..common import session_path as _session_path
 from ..common import split_name_first_last as _split_name
 from ..login import VenueLoginError
@@ -1156,7 +1156,7 @@ def submit_nature(values: dict, headless: bool = False, debug: bool = False, new
     manuscript_file = values.get("manuscript_file", "").strip()
     logger.info("Starting %s submission run (headless=%s, debug=%s): " "manuscript=%s", cfg.name, headless, debug, manuscript_file)
 
-    with sync_playwright() as playwright:
+    with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
         browser = playwright.chromium.launch(headless=headless)
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)

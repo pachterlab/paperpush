@@ -74,8 +74,10 @@ defaults to `--engine manual`, which applies the `values.json` **you** wrote. So
    ```
 
    Rules for the values:
-   - `authors`: one line per author as `Name | email | affiliation | ORCID |
-     corresponding`; mark exactly one corresponding author `yes`. Leave a
+   - `authors`: one line per author in the venue's column order, given in that
+     field's `help` — usually `Name | email | affiliation | ORCID |
+     corresponding` with exactly one corresponding author marked `yes`, but some
+     venues reorder the columns and some (arXiv) take the name alone. Leave a
      subfield blank (keep the `|`) rather than inventing an email or ORCID.
    - `filemap`: use **absolute paths**; only the leading path segment is
      resolved, so extra columns (`| label`, or bioRxiv `| type | linktext`) are

@@ -28,7 +28,7 @@ from ...database import _load_options_file, get_venue
 from ...validate import parse_authors
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                      hold_open, open_run_context)
+                      hold_open, hold_open_on_failure, open_run_context)
 from ..common import session_path as _session_path
 from ..common import split_name_first_last as _split_name
 from ..login import VenueLoginError
@@ -559,7 +559,7 @@ def submit_snapp(values: dict, headless: bool = False, debug: bool = False, new_
         len(authors),
     )
 
-    with sync_playwright() as playwright:
+    with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
         browser = playwright.chromium.launch(headless=headless)
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)

@@ -29,7 +29,7 @@ from ...database import get_venue
 from ...validate import parse_authors
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                      hold_open, open_run_context)
+                      hold_open, hold_open_on_failure, open_run_context)
 from ..common import parse_pipe_funders as _parse_funders
 from ..common import save_storage
 from ..common import split_name_first_last as _split_name
@@ -930,7 +930,7 @@ def editorialmanager_run(values: dict, headless: bool = False, debug: bool = Fal
 
     logger.info("Starting %s submission run (headless=%s, debug=%s, type=%s, " "manuscript=%s, authors=%d, reviewers=%d, figures=%d)", cfg.name, headless, debug, article_type, manuscript_file, len(authors), len(reviewers), len(figure_files))
 
-    with sync_playwright() as playwright:
+    with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
         browser = playwright.chromium.launch(headless=headless)
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)

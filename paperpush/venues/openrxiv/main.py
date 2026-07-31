@@ -22,7 +22,7 @@ from ..base import Venue
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts
 from ..common import \
     declares_no_competing_interest as _declares_no_competing_interest
-from ..common import hold_open, open_run_context
+from ..common import hold_open, hold_open_on_failure, open_run_context
 from ..common import parse_pipe_file_list as _parse_file_list
 from ..common import parse_pipe_funders as _parse_funders
 from ..common import session_path as _session_path
@@ -430,7 +430,7 @@ def submit_biorxiv(values: dict, headless: bool = False, debug: bool = False, ne
 
     logger.info("Starting %s submission run (headless=%s, debug=%s): " "%d author(s), %d funder(s), %d figure(s), %d supplementary " "file(s)", cfg.name, headless, debug, len(authors), len(funders), len(figure_files), len(supp_files))
 
-    with sync_playwright() as playwright:
+    with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
         browser = playwright.chromium.launch(headless=headless)
 
         context = open_run_context(browser, venue.session_path(), new_session=new_session)

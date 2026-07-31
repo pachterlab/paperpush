@@ -39,18 +39,23 @@ license:
 title: 
 
 # Authors (authorlist, REQUIRED)
-#   One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). arXiv records authors as a single comma-separated list of names, so only the Name column is used for the metadata field; mark exactly one corresponding author (the account submitting). Use the form 'Firstname Lastname' for each name.
+#   One author per line, in order. Format: Name. The arXiv metadata form has a single *Author(s) box that takes a comma-separated list of names, so a name is all that is recorded -- no emails, affiliations, ORCIDs, or corresponding-author marker. Use the form 'Firstname Lastname' for each name (first names first, no 'et al.').
 authors: |
   
 
 # Abstract (textarea, REQUIRED)
 #   Plain-text abstract as it should appear on the arXiv abstract page.
+#   at least 20 characters
 abstract: |
   
 
 # Manuscript file (file, REQUIRED)
 #   Path to the submission. arXiv prefers a LaTeX source bundle (a .zip or .tar.gz of the .tex, figures, and .bbl); a single PDF is accepted for PDF-only submissions. The file is uploaded, processed, and confirmed on the Files step.
 manuscript_file: 
+
+# Keep all uploaded files (boolean, optional)
+#   Only applies to LaTeX source submissions (.tex/.zip). Set to yes to keep every file in the uploaded bundle, including any arXiv's processor flags as removable (e.g. a bundled .pdf or auxiliary files); set to no to let arXiv delete the files it auto-selects for removal.
+keep_all_files: 
 
 # Comments (textarea, optional)
 #   Optional. Free-text comments shown on the abstract page, conventionally the page/figure count and notes (e.g. '10 pages, 4 figures; submitted to JOSS').

@@ -117,6 +117,7 @@ def field_schema(venue: Venue) -> list[dict]:
                 "max_count": f.max_count,
                 "word_count": f.word_count,
                 "character_count": f.character_count,
+                "min_character_count": f.min_character_count,
             }
         )
     return out
@@ -466,14 +467,14 @@ def _field_brief(venue: Venue) -> tuple[list[dict], list[str]]:
             entry["file_types"] = f["type_options"]
         if f["accept"]:
             entry["accepts"] = f["accept"]
-        for key in ("min_count", "max_count", "word_count", "character_count"):
+        for key in ("min_count", "max_count", "word_count", "character_count", "min_character_count"):
             if f.get(key) is not None:
                 entry[key] = f[key]
         brief.append(entry)
     return brief, [e["id"] for e in brief]
 
 
-_SYSTEM = "You prepare academic venue submissions. Read the attached manuscript " "documents and propose values for the listed submission fields. Rules: " "(1) Extract values that appear in the text verbatim where possible. " "(2) For a 'classify' field, choose exactly one of its options. " "(3) For a 'filemap' field, assign one or more file paths from the directory " "listing, given relative to the manuscript directory; one per line, using " "the column format described in the field's help. " "(4) Never invent emails, ORCID iDs, DOIs, funders, or licenses that are not " "present in the documents -- leave a subfield blank instead. " "(5) Set confidence honestly: 'high' only for verbatim copies or unambiguous " "file matches, 'medium' for inference or classification, 'low' for guesses. " "(6) Put any field you cannot fill in 'unfilled' with a brief reason. " "Authors use the format 'Name | email | affiliation | ORCID | corresponding' " "with exactly one corresponding author marked 'yes'."
+_SYSTEM = "You prepare academic venue submissions. Read the attached manuscript " "documents and propose values for the listed submission fields. Rules: " "(1) Extract values that appear in the text verbatim where possible. " "(2) For a 'classify' field, choose exactly one of its options. " "(3) For a 'filemap' field, assign one or more file paths from the directory " "listing, given relative to the manuscript directory; one per line, using " "the column format described in the field's help. " "(4) Never invent emails, ORCID iDs, DOIs, funders, or licenses that are not " "present in the documents -- leave a subfield blank instead. " "(5) Set confidence honestly: 'high' only for verbatim copies or unambiguous " "file matches, 'medium' for inference or classification, 'low' for guesses. " "(6) Put any field you cannot fill in 'unfilled' with a brief reason. " "Authors go one per line in the exact pipe-delimited column format the " "authors field's help gives -- usually " "'Name | email | affiliation | ORCID | corresponding' with exactly one " "corresponding author marked 'yes', but some venues order the columns " "differently or take the name alone; follow the help, not this example."
 
 
 def _build_prompt(venue: Venue, documents: list[DocumentInput], file_listing: list[str]) -> tuple[str, list[dict], dict, list[str]]:

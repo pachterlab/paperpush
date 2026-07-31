@@ -8,7 +8,11 @@ into ``tmp_path`` so nothing depends on fixtures outside this module.
 
 from __future__ import annotations
 
+import contextlib
 import io
+import threading
+import urllib.error
+import urllib.request
 import zipfile
 from pathlib import Path
 from PIL import Image
@@ -17,6 +21,12 @@ import pytest
 
 from paperpush import sensitive
 from paperpush.sensitive import Finding, scan_file, scan_paths
+
+
+# Captured at import time, before conftest's autouse fixture stubs the probe out
+# to keep the suite offline; the tests below exercise the real request logic
+# against a patched ``urlopen``.
+_real_url_is_reachable = sensitive._url_is_reachable
 
 
 def _categories(findings) -> set[str]:
@@ -213,6 +223,90 @@ def test_scan_links_check_access_false_skips_probes(tmp_path, monkeypatch):
     monkeypatch.setattr(sensitive, "_url_is_reachable", lambda url, **k: False)
     # check_access=False must not consult the probe at all.
     assert sensitive.scan_links([p], check_access=False) == []
+
+
+def test_scan_links_probes_urls_concurrently(tmp_path, monkeypatch):
+    # Each probe blocks until every worker has arrived, so this only finishes if
+    # the probes really do overlap; a serial loop would deadlock and time out.
+    workers = sensitive.LINK_CHECK_WORKERS
+    p = tmp_path / "paper.tex"
+    p.write_text("".join(f"https://example.com/p{i}\n" for i in range(workers)))
+
+    barrier = threading.Barrier(workers, timeout=10)
+
+    def reach(url, **k):
+        barrier.wait()
+        return False
+
+    monkeypatch.setattr(sensitive, "_url_is_reachable", reach)
+    findings = sensitive.scan_links([p], check_access=True)
+    assert len(findings) == workers
+
+
+def test_scan_links_findings_keep_source_order(tmp_path, monkeypatch):
+    # Threading must not reorder the findings relative to the manuscript text.
+    p = tmp_path / "paper.tex"
+    p.write_text("".join(f"https://example.com/p{i}\n" for i in range(6)))
+    monkeypatch.setattr(sensitive, "_url_is_reachable", lambda url, **k: False)
+    findings = sensitive.scan_links([p], check_access=True)
+    assert [f"https://example.com/p{i}" in f.detail for i, f in enumerate(findings)] == [True] * 6
+
+
+@pytest.mark.parametrize("member", ["ref.bib", "plain.bst", "style.cls", "pkg.sty"])
+def test_scan_links_skips_bibliography_and_style_members(tmp_path, monkeypatch, member):
+    # Citation/template URLs aren't the submission's claims -- and left in, they
+    # eat the MAX_LINK_CHECKS budget the manuscript's own links need.
+    path = tmp_path / "source.zip"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr(member, "url = {https://example.com/cited-and-gone}\n")
+        z.writestr("main.tex", "Code at https://example.com/ours\n")
+    monkeypatch.setattr(sensitive, "_url_is_reachable", lambda url, **k: False)
+    findings = sensitive.scan_links([path], check_access=True)
+    assert len(findings) == 1
+    assert "example.com/ours" in findings[0].detail
+
+
+def test_scan_links_skips_bibliography_listed_directly(tmp_path, monkeypatch):
+    # Same rule when the .bib is a top-level upload rather than an archive member.
+    p = tmp_path / "ref.bib"
+    p.write_text("url = {https://example.com/cited-and-gone}\n")
+    monkeypatch.setattr(sensitive, "_url_is_reachable", lambda url, **k: False)
+    assert sensitive.scan_links([p], check_access=True) == []
+
+
+def test_secret_scan_still_reads_skipped_link_scan_files(tmp_path):
+    # The link-scan skip must not blind the secret/LaTeX passes to the same file.
+    p = tmp_path / "ref.bib"
+    p.write_text("note = {key AKIAIOSFODNN7EXAMPLE}\n")
+    assert "AWS access key" in _categories(scan_file(p))
+
+
+def test_url_is_reachable_skips_get_retry_after_transport_failure(monkeypatch):
+    # A timeout/DNS failure ends the probe: one request, not a HEAD-then-GET pair.
+    calls = []
+
+    def fake_urlopen(req, timeout=None):
+        calls.append(req.get_method())
+        raise OSError("timed out")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    assert _real_url_is_reachable("https://example.com/x") is None
+    assert calls == ["HEAD"]
+
+
+def test_url_is_reachable_retries_with_get_when_head_rejected(monkeypatch):
+    # 405 means "no HEAD here", not "missing" -- that retry is still worth it.
+    calls = []
+
+    def fake_urlopen(req, timeout=None):
+        calls.append(req.get_method())
+        if req.get_method() == "HEAD":
+            raise urllib.error.HTTPError("https://example.com/x", 405, "no", {}, None)
+        return contextlib.nullcontext()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    assert _real_url_is_reachable("https://example.com/x") is True
+    assert calls == ["HEAD", "GET"]
 
 
 def test_scan_links_finds_url_inside_archive_member(tmp_path, monkeypatch):

@@ -1,6 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "Debug AAAI 2027",
             "args": ["submit", "tests/sub_files/aaai_2027/aaai_2027.sub"],
@@ -84,6 +85,11 @@
         {
             "name": "Debug Science",
             "args": ["submit", "tests/sub_files/science/science.sub"],
+            "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
+        },
+        {
+            "name": "Debug arXiv varseek",
+            "args": ["submit", "/Users/joeyrich/Documents/Caltech/Pachter/varseek_paper_materials_final/arxiv/arxiv.sub"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         }
     ]

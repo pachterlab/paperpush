@@ -198,6 +198,17 @@
           ],
           "description": "Maximum length in characters for a `text`/`textarea` value, or for the free text of a `choice` with `options_recommended`."
         },
+        "min_character_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Minimum length in characters for a `text`/`textarea` value (the lower-bound counterpart to `character_count`)."
+        },
         "require_url": {
           "anyOf": [
             {
@@ -527,6 +538,17 @@
             }
           ],
           "description": "Maximum length in characters for a `text`/`textarea` value, or for the free text of a `choice` with `options_recommended`."
+        },
+        "min_character_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Minimum length in characters for a `text`/`textarea` value (the lower-bound counterpart to `character_count`)."
         },
         "require_url": {
           "anyOf": [

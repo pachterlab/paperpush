@@ -494,6 +494,22 @@ def test_character_count_at_limit_passes():
     assert _errors(_validate(j, {"title": "abcde"})) == []
 
 
+def test_min_character_count_under_minimum_is_error():
+    j = _venue(Field(id="abstract", label="Abstract", type="textarea", min_character_count=20))
+    errs = _errors(_validate(j, {"abstract": "too short"}))
+    assert any("9 characters" in i.message and "20-character minimum" in i.message for i in errs)
+
+
+def test_min_character_count_at_minimum_passes():
+    j = _venue(Field(id="abstract", label="Abstract", type="textarea", min_character_count=20))
+    assert _errors(_validate(j, {"abstract": "x" * 20})) == []
+
+
+def test_min_character_count_ignores_an_empty_optional_value():
+    j = _venue(Field(id="abstract", label="Abstract", type="textarea", min_character_count=20))
+    assert _errors(_validate(j, {"abstract": ""})) == []
+
+
 # --- require_url -----------------------------------------------------------
 
 

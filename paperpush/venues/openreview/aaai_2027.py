@@ -50,7 +50,7 @@ from ...database import get_venue
 from ...validate import _truthy_bool, parse_authors
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                      hold_open, open_run_context)
+                      hold_open, hold_open_on_failure, open_run_context)
 from ..login import VenueLoginError
 
 logger = logging.getLogger(__name__)
@@ -311,7 +311,7 @@ class AAAI2027Venue(Venue):
         code_data_supplement = values.get("code_data_supplement", "").strip()
         conflicts = _parse_authors(values.get("conflicts", ""))
 
-        with sync_playwright() as playwright:
+        with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
             browser = playwright.chromium.launch(headless=headless)
             context = open_run_context(browser, self.session_path(), new_session=new_session)
             apply_default_timeouts(context, timeout)

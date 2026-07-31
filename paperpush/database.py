@@ -195,6 +195,13 @@ class Field:
         Optional[int],
         PField(description="Maximum length in characters for a `text`/`textarea` " "value, or for the free text of a `choice` with `options_recommended`."),
     ] = None
+    # The lower bound counterpart to ``character_count``: the shortest value the
+    # portal accepts (e.g. arXiv rejects an abstract under 20 characters).
+    # ``None`` means no minimum.
+    min_character_count: Annotated[
+        Optional[int],
+        PField(description="Minimum length in characters for a `text`/`textarea` " "value (the lower-bound counterpart to `character_count`)."),
+    ] = None
     # For a text-bearing field (``text``/``textarea``), require every non-blank
     # line of the value to be a valid http/https URL (e.g. a data-availability
     # statement that must hold repository links). ``None``/false imposes no URL
@@ -318,6 +325,7 @@ class Field:
             max_count=data.get("max_count"),
             word_count=data.get("word_count"),
             character_count=data.get("character_count"),
+            min_character_count=data.get("min_character_count"),
             require_url=data.get("require_url"),
             max_words_before_refs=data.get("max_words_before_refs"),
             max_pages_before_refs=data.get("max_pages_before_refs"),

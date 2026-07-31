@@ -630,9 +630,22 @@ _GITHUB_RESERVED_OWNERS = {
 # Cap the number of distinct URLs we hit the network for, so a link-heavy
 # bibliography can't turn validation into a crawl.
 MAX_LINK_CHECKS = 50
+# Probes are pure socket waits, so they overlap well; this many run at once.
+LINK_CHECK_WORKERS = 10
+# Per-request budget. Kept short because an unreachable-but-not-404 host tells
+# us nothing anyway -- waiting longer only slows validation down.
+LINK_CHECK_TIMEOUT = 3.0
 # 404/410 are the only codes we treat as definitively broken. Others (403 bot
 # blocks, 405 no-HEAD, 5xx blips, timeouts, DNS) are inconclusive -> stay quiet.
 _BROKEN_STATUS = {404, 410}
+# Codes that mean "this server dislikes HEAD", not "this URL is missing" -- the
+# only case worth spending a second request on.
+_HEAD_REJECTED_STATUS = {400, 403, 405, 406, 501}
+# LaTeX support files the link scan skips. Their URLs aren't the submission's
+# claims: a .bib holds the works being cited, and a .cls/.sty/.bst is a journal
+# or template author's boilerplate. Left in, a bibliography's citation URLs also
+# crowd out the manuscript's own links under the MAX_LINK_CHECKS budget.
+LINK_SCAN_SKIP_EXTS = {".bib", ".bst", ".cls", ".sty"}
 
 
 def _find_urls(text: str) -> Iterator[str]:
@@ -655,14 +668,18 @@ def _find_github_repos(text: str) -> Iterator[tuple[str, str]]:
         yield owner, repo
 
 
-def _url_is_reachable(url: str, *, timeout: float = 6.0) -> bool | None:
+def _url_is_reachable(url: str, *, timeout: float = LINK_CHECK_TIMEOUT) -> bool | None:
     """Whether an anonymous visitor can reach ``url``.
 
     ``True`` if it resolves, ``False`` only on a 404/410 (missing/gone -- which
     also covers a private GitHub repo, invisible to an anonymous reader), and
     ``None`` when inconclusive (offline, timeout, 403 bot-block, a server that
     rejects HEAD, a 5xx blip) so the caller stays silent rather than crying wolf.
-    Tries HEAD first, then GET for the servers that refuse HEAD.
+
+    Sends a HEAD, and retries with GET only when the server answered with a code
+    that means it dislikes HEAD. A transport-level failure (timeout, DNS,
+    refused connection) ends the probe there: the host is unreachable for this
+    run either way, and a second request would just double the wait.
     """
     import urllib.error
     import urllib.request
@@ -675,8 +692,8 @@ def _url_is_reachable(url: str, *, timeout: float = 6.0) -> bool | None:
         except urllib.error.HTTPError as exc:
             if exc.code in _BROKEN_STATUS:
                 return False
-            if method == "HEAD" and exc.code in (400, 403, 405, 406, 501):
-                continue  # server may reject HEAD; try GET before giving up
+            if method == "HEAD" and exc.code in _HEAD_REJECTED_STATUS:
+                continue  # server rejects HEAD; try GET before giving up
             return None
         except Exception:
             logger.debug("could not check reachability of %s", url, exc_info=True)
@@ -703,6 +720,10 @@ def scan_links(paths: Iterable[Path], *, check_access: bool = True) -> list[Find
     each for reachability, flagging only the definitively broken ones (404/gone,
     including still-private GitHub repos). ``check_access=False`` collects the
     URLs but skips the network probes (used by tests and offline callers).
+
+    The probes are pure network waits, so they run on a small thread pool --
+    a link-heavy bibliography would otherwise dominate validation's runtime.
+    Findings stay in the order the URLs were encountered.
     """
     urls: dict[str, str] = {}
     for path in _dedup_paths(paths):
@@ -713,11 +734,18 @@ def scan_links(paths: Iterable[Path], *, check_access: bool = True) -> list[Find
     if not check_access:
         return []
 
-    findings: list[Finding] = []
-    for url, where in list(urls.items())[:MAX_LINK_CHECKS]:
-        if _url_is_reachable(url) is False:
-            findings.append(_broken_link_finding(where, url))
-    return findings
+    checked = list(urls.items())[:MAX_LINK_CHECKS]
+    if not checked:
+        return []
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    workers = min(LINK_CHECK_WORKERS, len(checked))
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="paperpush-linkcheck") as pool:
+        # map() keeps results aligned with `checked`, so findings stay ordered.
+        reachable = list(pool.map(lambda item: _url_is_reachable(item[0]), checked))
+
+    return [_broken_link_finding(where, url) for (url, where), ok in zip(checked, reachable) if ok is False]
 
 
 def scan_missing_code_link(paths: Iterable[Path]) -> list[Finding]:
@@ -752,6 +780,11 @@ def _iter_text_blobs(path: Path) -> Iterator[tuple[str, str]]:
     file, a PDF's extracted text, and the text members of an archive. Images and
     binary blobs yield nothing. Used by the GitHub-link scan, which cares about
     URLs in prose rather than the format-specific secret/EXIF passes.
+
+    Bibliographies and LaTeX class/style/bibstyle files (``LINK_SCAN_SKIP_EXTS``)
+    are skipped, at the top level and inside archives alike: their URLs belong to
+    the cited works or the template's author, not to this submission. The
+    secret/EXIF passes in :func:`scan_file` still read those files.
     """
     try:
         suffix = path.suffix.lower()
@@ -766,7 +799,8 @@ def _iter_text_blobs(path: Path) -> Iterator[tuple[str, str]]:
             for count, (mname, data) in enumerate(members):
                 if count >= MAX_ARCHIVE_MEMBERS:
                     break
-                if Path(mname).suffix.lower() in IMAGE_EXTS or len(data) > MAX_TEXT_BYTES:
+                msuffix = Path(mname).suffix.lower()
+                if msuffix in IMAGE_EXTS or msuffix in LINK_SCAN_SKIP_EXTS or len(data) > MAX_TEXT_BYTES:
                     continue
                 text = _decode(data)
                 if text is not None:
@@ -775,7 +809,7 @@ def _iter_text_blobs(path: Path) -> Iterator[tuple[str, str]]:
             text = _pdf_text(path)
             if text:
                 yield name, text
-        elif suffix not in IMAGE_EXTS:
+        elif suffix not in IMAGE_EXTS and suffix not in LINK_SCAN_SKIP_EXTS:
             data = path.read_bytes()
             if len(data) <= MAX_TEXT_BYTES:
                 text = _decode(data)

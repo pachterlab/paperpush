@@ -26,7 +26,7 @@ from ...database import get_venue
 from ...manuscript import manuscript_text
 from ...validate import parse_authors
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                      hold_open, open_run_context)
+                      hold_open, hold_open_on_failure, open_run_context)
 from ..common import session_path as _session_path
 # Reuse the shared ScholarOne platform engine (author/keyword/reviewer/parse
 # helpers). Sign-in is inherited from ScholarOneVenue.
@@ -374,7 +374,7 @@ def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: b
 
     logger.info("Starting Nucleic Acids Research (ScholarOne) submission run " "(headless=%s, debug=%s, manuscript=%s, %d file(s) to upload, %d author(s))", headless, debug, manuscript_file, len(upload_files), len(authors))
 
-    with sync_playwright() as playwright:
+    with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
         browser = playwright.chromium.launch(headless=headless)
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)

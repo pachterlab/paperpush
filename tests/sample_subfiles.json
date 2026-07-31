@@ -307,7 +307,7 @@
       "primary_category": "cs.AI",
       "license": "CC BY 4.0",
       "title": "Title goes here",
-      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "authors": "Joseph Richie\nJoseph Rich\n",
       "abstract": "Abstract goes here. It's a really good abstract.",
       "manuscript_file": "tests/manuscript_files/arxiv/manuscript.pdf"
     }
@@ -319,7 +319,7 @@
       "primary_category": "cs.AI",
       "license": "CC BY 4.0",
       "title": "Title goes here",
-      "authors": "Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no\nJoseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes\n",
+      "authors": "Joseph Richie\nJoseph Rich\n",
       "abstract": "Abstract goes here. It's a really good abstract.",
       "manuscript_file": "tests/manuscript_files/arxiv/manuscript_tex_bundle.zip"
     }

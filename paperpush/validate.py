@@ -433,6 +433,8 @@ def _check_length(field: Field, raw: str) -> list[Issue]:
     ``text``/``textarea`` field (or on a ``choice`` whose off-list value goes
     into a portal free-text box); either or both may be set. Words are
     whitespace-delimited tokens; characters count the trimmed value.
+    ``min_character_count`` is the matching lower bound (e.g. arXiv's 20-character
+    minimum abstract); a blank value is left to the required/optional check.
     """
     issues: list[Issue] = []
     if field.word_count is not None:
@@ -453,6 +455,16 @@ def _check_length(field: Field, raw: str) -> list[Issue]:
                     ERROR,
                     field.id,
                     f"{field.label}: {chars} characters exceeds the {field.character_count}-character limit",
+                )
+            )
+    if field.min_character_count is not None:
+        chars = len(raw.strip())
+        if chars < field.min_character_count:
+            issues.append(
+                Issue(
+                    ERROR,
+                    field.id,
+                    f"{field.label}: {chars} characters is under the " f"{field.min_character_count}-character minimum",
                 )
             )
     return issues

@@ -1318,13 +1318,9 @@
         "label": "Authors",
         "type": "authorlist",
         "required": true,
-        "help": "One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). arXiv records authors as a single comma-separated list of names, so only the Name column is used for the metadata field; mark exactly one corresponding author (the account submitting). Use the form 'Firstname Lastname' for each name.",
+        "help": "One author per line, in order. Format: Name. The arXiv metadata form has a single *Author(s) box that takes a comma-separated list of names, so a name is all that is recorded -- no emails, affiliations, ORCIDs, or corresponding-author marker. Use the form 'Firstname Lastname' for each name (first names first, no 'et al.').",
         "fields": [
-          "name",
-          "email?",
-          "affiliation?",
-          "orcid?",
-          "corresponding"
+          "name"
         ]
       },
       {
@@ -1333,7 +1329,8 @@
         "label": "Abstract",
         "type": "textarea",
         "required": true,
-        "help": "Plain-text abstract as it should appear on the arXiv abstract page."
+        "help": "Plain-text abstract as it should appear on the arXiv abstract page.",
+        "min_character_count": 20
       },
       {
         "id": "manuscript_file",
@@ -1350,6 +1347,15 @@
           ".pdf",
           ".tex"
         ]
+      },
+      {
+        "id": "keep_all_files",
+        "autofill": "never",
+        "label": "Keep all uploaded files",
+        "type": "boolean",
+        "required": false,
+        "help": "Only applies to LaTeX source submissions (.tex/.zip). Set to yes to keep every file in the uploaded bundle, including any arXiv's processor flags as removable (e.g. a bundled .pdf or auxiliary files); set to no to let arXiv delete the files it auto-selects for removal.",
+        "default": true
       },
       {
         "id": "comments",

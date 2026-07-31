@@ -393,7 +393,7 @@ def _populate_orcid_into(sub_path: str, venue, profile) -> None:
         print(f"  warning: no '{author_field.id}' block found in {sub_path}.", file=sys.stderr)
         return
 
-    new_block, matched = orcid_mod.fill_author_block(block, profile)
+    new_block, matched = orcid_mod.fill_author_block(block, profile, author_field.fields)
     if matched is None:
         print(f"  warning: could not match an author line to ORCID iD " f"{profile.orcid_id} in {sub_path}.", file=sys.stderr)
         return
@@ -918,7 +918,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--engine",
         choices=["manual", "api"],
         default="manual",
-        help="manual: read proposed values from --values (default; used by the " "Claude skill); api: extract them with the Anthropic API " "(not yet implemented)",
+        help="manual: read proposed values from --values (default; used by the " "Claude skill); api: extract them with the Anthropic API ",
     )
     p_autofill.add_argument("--values", metavar="FILE", help="JSON file of proposed field values (required for --engine manual)")
     p_autofill.add_argument("--manuscript", metavar="FILE", help="(api) the manuscript file; inferred from the directory if omitted")

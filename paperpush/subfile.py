@@ -100,6 +100,8 @@ def render_template(
             lines.append(f"#   at most {field.word_count} words")
         if field.character_count is not None:
             lines.append(f"#   at most {field.character_count} characters")
+        if field.min_character_count is not None:
+            lines.append(f"#   at least {field.min_character_count} characters")
         if field.require_url:
             lines.append("#   each non-blank line must be a valid http/https URL")
         if field.max_words_before_refs is not None:

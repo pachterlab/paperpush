@@ -5,11 +5,13 @@ import logging
 from playwright.sync_api import TimeoutError as PWTimeout
 from playwright.sync_api import sync_playwright
 
+from paperpush.venues.discrete_mathematics.discrete_mathematics import _try
+
 from ...database import get_venue
-from ...validate import parse_authors
+from ...validate import _truthy_bool, parse_authors
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                      hold_open, open_run_context)
+                      hold_open, hold_open_on_failure, open_run_context)
 from ..login import VenueLoginError
 
 logger = logging.getLogger(__name__)
@@ -80,16 +82,19 @@ class ArxivVenue(Venue):
         doi = values.get("doi", "").strip()
         crosslist_archives = values.get("crosslist_archives", "").strip()
         crosslist_categories = values.get("crosslist_categories", "").strip()
+        # Defaults to yes: keep everything in the uploaded LaTeX bundle rather
+        # than letting arXiv delete the files it auto-selects for removal.
+        keep_all_files = _truthy_bool(values.get("keep_all_files", "").strip() or "yes")
 
-        # converting authors list into a comma-separated string
-        authors = values.get("authors", "")
+        # The arXiv metadata form takes one comma-separated *Author(s) string, and
+        # the venue's author list is name-only, so the block collapses to the names.
         author_field = next((f for f in self._VENUE.fields if f.type == "authorlist"), None)
-        authors = parse_authors(values.get("authors", ""), author_field.fields if author_field else None)
-        authors = ", ".join(a["name"] for a in authors if a.get("name"))
+        author_lines = parse_authors(values.get("authors", ""), author_field.fields if author_field else None)
+        authors = ", ".join(a["name"] for a in author_lines if a.get("name"))
 
         logger.info("Starting arXiv submission run (headless=%s, debug=%s, archive=%s, " "category=%s, manuscript=%s)", headless, debug, primary_archive, primary_category, manuscript_file)
 
-        with sync_playwright() as playwright:
+        with sync_playwright() as playwright, hold_open_on_failure(headless=headless):
             browser = playwright.chromium.launch(headless=headless)
 
             context = open_run_context(browser, self.session_path(), new_session=new_session)
@@ -128,10 +133,15 @@ class ArxivVenue(Venue):
             page.get_by_role("button", name="Upload").click()
             page.locator("#check-files-button-top").click()
             if manuscript_file.lower().endswith(".tex") or manuscript_file.lower().endswith(".zip"):
-                # in this case, I need to click the button twice
                 page.wait_for_timeout(3000)
-                page.locator("#check-files-button-top").click()
-                page.get_by_role("button", name="Confirm").click()
+                if keep_all_files:
+                    # keep all files
+                    _try(lambda: page.get_by_role("link", name="Keep All").click(), "Keep All")
+                    _try(lambda: page.locator("#check-files-button-top").click(timeout=120_000), "Accept and Continue")
+                else:
+                    # delete auto-selected files
+                    _try(lambda: page.locator("#check-files-button-top").click(), "Accept and Continue")
+                    _try(lambda: page.get_by_role("button", name="Confirm").click(), "Confirm")
             page.get_by_role("link", name="Continue").click()
 
             # Fill in the metadata form.
