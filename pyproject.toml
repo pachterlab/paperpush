@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paperpush"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Python library for automating the submission of manuscripts to academic venues."
 readme = "README.md"
 requires-python = ">=3.10"
