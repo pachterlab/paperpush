@@ -34,6 +34,23 @@ fly. See step 1.
 
 ## Steps
 
+0. **Check the login first, before any other work.** Run:
+
+   ```
+   paperpush login --list
+   ```
+
+   If the venue is not listed (or the output is `Not logged in to any venues.`),
+   tell the user immediately — in your next message, not at the end — to run
+
+   ```
+   paperpush login <venue>
+   ```
+
+   themselves in a terminal, since it opens a browser and may need their
+   password, ORCID, CAPTCHA, or two-factor code. Then **carry on with steps 1-3
+   anyway** while they do it; a missing login only blocks step 5.
+
 1. **Resolve the `.sub` by hierarchy** (user-provided > in manuscript dir >
    create on the fly):
    - If the user named a `.sub` path, use it as-is.
@@ -65,16 +82,12 @@ fly. See step 1.
    not proceed to login or submit until they are resolved. A file with
    validation errors will not submit.
 
-4. **Log in (only after the user confirms).** Logging in opens a browser and may
-   require the user's password, ORCID, CAPTCHA, or two-factor prompt, so confirm
-   before running it and let the user drive the browser:
-
-   ```
-   paperpush login <venue>
-   ```
-
-   You can check existing state first with `paperpush login <venue>
-   --status`; skip the login if credentials are already stored and valid.
+4. **Confirm the login landed.** Re-run `paperpush login --list` (or
+   `paperpush login <venue> --status`). If the venue is now listed, go on to
+   step 5. If it still is not, stop and wait — repeat the step-0 ask that the
+   user run `paperpush login <venue>` in their terminal. Logging in opens a
+   browser and may require their password, ORCID, CAPTCHA, or two-factor prompt,
+   so it is theirs to drive; do not run it for them.
 
 5. **Submit (only after the user confirms).** Submitting is outward-facing.
    Confirm explicitly first, then run:
@@ -92,7 +105,11 @@ fly. See step 1.
 - **Always use absolute paths** for the `.sub` file and the manuscript directory.
 - Never infer the manuscript directory; ask (in plain text) if it is missing.
 - Generate the `.sub` in the manuscript directory, not the working directory.
-- Do not run `login` or `submit` without explicit user confirmation, and never
-  past a failed `validate`.
+- Check `paperpush login --list` up front and surface a missing login
+  immediately, so the user can log in while you do the rest of the work.
+- Never run `paperpush login` yourself — it is interactive and belongs in the
+  user's terminal.
+- Do not run `submit` without explicit user confirmation, and never past a
+  failed `validate`.
 - Delegate all field extraction to `paperpush-autofill`; do not duplicate its
   logic here.

@@ -20,6 +20,58 @@ path calls the Anthropic API and needs an `ANTHROPIC_API_KEY`. You already have
 the manuscript in front of you; extract from it directly. Use `--engine api`
 only if the user has explicitly set an API key and asked for it.
 
+## Before anything else: check the user is logged in
+
+The pipeline ends in a real browser sign-in, and that sign-in is the one step you
+cannot do for the user — it may need their password, ORCID, a CAPTCHA, or a
+two-factor code. Check it **first**, before you read a single manuscript file, so
+the user can log in while you work instead of discovering the blocker at the end:
+
+```
+paperpush login --list
+```
+
+It prints `Not logged in to any venues.` or a `Logged in to:` block with one
+`<venue>: <who>` line per stored credential. If the target venue is not in that
+list, stop and tell the user right away — in your very next message — to run the
+login themselves in their terminal:
+
+```
+paperpush login <venue>
+```
+
+Say plainly that this opens a browser and is theirs to complete, and that you
+will keep going in the meantime. Do not run `paperpush login` yourself, and do
+not treat a missing login as a reason to skip the extraction work — do the
+`.sub` creation, autofill, and validation regardless, then re-check
+`paperpush login --list` before the submit step.
+
+(For a single venue, `paperpush login <venue> --status` gives the same answer;
+`--list` is the one call that covers "am I logged in anywhere yet".)
+
+**Connected over MCP instead of a shell?** `login_status` is this check, and
+`login_status(venue=...)` is the per-venue form — it returns the exact
+`login_command` to pass along when the venue is not signed in. The `login` tool
+is the same guard in one call: it reports an existing login, and otherwise hands
+back the command for the user to run, so the user's password never passes
+through the conversation. (It does run the login itself when
+`PAPERPUSH_USERNAME` and `PAPERPUSH_PASSWORD` are already set in the server's
+environment.) Everything else in this document maps to a tool too —
+`list_supported_venues`, `describe_venue` for the schema, `field_options`,
+`create_subfile`, `read_subfile`, `autofill_subfile` (same `values.json` shape,
+passed as the `values` argument), `validate_subfile`, `submit`, `submit_status`,
+and `submit_close`. Pass **absolute paths**: the server has its own working
+directory, so a relative path means something different to it than it does to
+you.
+
+`submit` is the one tool that does not finish its work before returning. The
+wizard fills the form and then parks holding the browser open for the author, so
+the tool hands back a `pid` as soon as the run has started: poll `submit_status`
+for progress, tell the user to review and send the form themselves, and call
+`submit_close` when they say they are done. It refuses to open a browser at all
+unless the `.sub` validates and the venue already has a stored login — so run
+the login check above first, or you will spend a tool call learning it.
+
 ## Run the full pipeline, autofilling yourself
 
 The whole flow — create the `.sub`, fill it from your values, validate, log in,
@@ -96,7 +148,10 @@ defaults to `--engine manual`, which applies the `values.json` **you** wrote. So
    ```
 
    This runs `subfile` → `autofill --engine manual` (applying your values) →
-   `validate` → `login` → `submit`, stopping at the first failure. The submit
+   `validate` → `login` → `submit`, stopping at the first failure. The `login`
+   step is interactive, so it is the user's to complete in their terminal — if
+   the pre-flight check above showed them logged out, make sure they have run
+   `paperpush login <venue>` before you kick off the pipeline. The submit
    step opens the portal headed and stops before the final click so the user can
    review. Add `--headless`, `--orcid`, `--force`, etc. as the user needs (see
    `--help`).

@@ -10,13 +10,19 @@ Prepare manuscripts for submission to preprint servers, venues, and conferences 
 pip install paperpush
 ```
 
-To install the playwright dependency and the required browsers, run:
+To install the playwright dependency and the required chromium browser, run:
 
 ```bash
-playwright install
+playwright install chromium
 ```
 
 ## Use with AI
+
+```bash
+git clone https://github.com/paperpush/paperpush.git
+cd paperpush
+```
+
 ```LLM
 Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.
 ```
@@ -24,6 +30,28 @@ Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE w
 The Claude skill `/paperpush-prepare-submission` helps with this. 
 
 See [`docs/example-session.md`](docs/example-session.md) for a full worked example of this flow.
+
+### MCP server
+
+To drive paperpush from any MCP client — Claude Desktop, an IDE extension — run
+it as an MCP server:
+
+```bash
+pip install 'paperpush[mcp]'
+```
+
+```json
+{
+  "mcpServers": {
+    "paperpush": {
+      "command": "paperpush-mcp"
+    }
+  }
+}
+```
+
+The server exposes the whole pipeline as tools. See [`AGENTS.md`](AGENTS.md) for
+the tool list and the contract agents should follow.
 
 ## Quickstart
 1. `paperpush subfile VENUE`: creates a file VENUE.sub that is a template for the VENUE submission.
@@ -73,7 +101,10 @@ If you are an AI agent asked to submit a manuscript on the user's behalf, read
 [`AGENTS.md`](AGENTS.md). It describes how to run the full pipeline while doing
 your **own** field extraction (reading the manuscript and writing a
 `values.json` for the default `--engine manual`) rather than relying on the
-API-backed engine. Claude Code should prefer the `/paperpush-prepare-submission`
+API-backed engine. It also asks the agent to check `paperpush login --list`
+before it starts, and to tell you right away if you still need to run
+`paperpush login <venue>` yourself — that sign-in is interactive and belongs in
+your terminal. Claude Code should prefer the `/paperpush-prepare-submission`
 and `/paperpush-autofill` skills, which encode the same contract.
 
 ## License

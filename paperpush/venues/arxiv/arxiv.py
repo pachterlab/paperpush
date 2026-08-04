@@ -128,9 +128,10 @@ class ArxivVenue(Venue):
                 page.get_by_role("button", name="Choose File").click()
             fc_info.value.set_files(manuscript_file)
             page.get_by_role("button", name="Upload").click()
+            page.wait_for_timeout(3_000)
             page.locator("#check-files-button-top").click()
             if manuscript_file.lower().endswith(".tex") or manuscript_file.lower().endswith(".zip"):
-                page.wait_for_timeout(3000)
+                page.wait_for_timeout(3_000)
                 if keep_all_files:
                     # keep all files
                     _try(lambda: page.get_by_role("link", name="Keep All").click(), "Keep All")
@@ -139,6 +140,7 @@ class ArxivVenue(Venue):
                     # delete auto-selected files
                     _try(lambda: page.locator("#check-files-button-top").click(), "Accept and Continue")
                     _try(lambda: page.get_by_role("button", name="Confirm").click(), "Confirm")
+                page.wait_for_timeout(3_000)
             page.get_by_role("link", name="Continue").click()
 
             # Fill in the metadata form.

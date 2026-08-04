@@ -31,10 +31,12 @@ Issues = "https://github.com/pachterlab/paperpush/issues"
 
 [project.optional-dependencies]
 autofill = ["anthropic>=0.40"]
-dev = ["pytest>=7.0", "bandit", "black", "chromium", "jsonschema>=4.18", "sphinx", "isort"]
+mcp = ["mcp>=1.2"]
+dev = ["pytest>=7.0", "bandit", "black", "jsonschema>=4.18", "sphinx", "isort"]
 
 [project.scripts]
 paperpush = "paperpush.cli:main"
+paperpush-mcp = "paperpush.mcp_server:main"
 
 [tool.pytest.ini_options]
 # Put the repo root on sys.path so test modules can import the `tests` package
