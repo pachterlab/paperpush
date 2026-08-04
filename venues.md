@@ -5,7 +5,7 @@ _21 supported venues (auto-generated from `paperpush/venues.json`)._
 
 | Slug | Venue | Venue type | Submission platform | Description | Submit walkthrough |
 | --- | --- | --- | --- | --- | --- |
-| `arxiv` | [arXiv](https://arxiv.org) | Preprint | arXiv (native) | Free distribution service and open-access archive for preprints in physics, mathematics, computer science, quantitative biology, quantitative finance, statistics, and more. | ✅ 2026-07-29 |
+| `arxiv` | [arXiv](https://arxiv.org) | Preprint | arXiv (native) | Free distribution service and open-access archive for preprints in physics, mathematics, computer science, quantitative biology, quantitative finance, statistics, and more. | ✅ 2026-08-04 |
 | `bioinformatics` | [Bioinformatics](https://academic.oup.com/bioinformatics) | Journal | ScholarOne Manuscripts | Computational molecular biology covering new algorithms, software, databases, and analyses of biological data. | ✅ 2026-07-29 |
 | `biorxiv` | [bioRxiv](https://www.biorxiv.org) | Preprint | openRxiv | Free online archive and distribution service for unpublished preprints in the life sciences. | ✅ 2026-07-29 |
 | `bmc_bioinformatics` | [BMC Bioinformatics](https://link.springer.com/journal/12859) | Journal | Springer Nature Snapp | BMC Bioinformatics is an open access, peer-reviewed journal that considers articles describing novel computational algorithms and software, models and tools, including statistical methods, machine learning and artificial intelligence, for the modelling and analysis of all kinds of biological data, as well as systems biology. | ✅ 2026-07-29 |
