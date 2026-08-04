@@ -38,5 +38,8 @@ jobs:
       - name: Check venues.schema.json is in sync with the schema models
         run: python scripts/gen_venues_schema.py --check
 
+      - name: Check .sub templates are in sync with venues.json
+        run: python scripts/gen_subfile_templates.py --check
+
       - name: Run tests (real-portal tests skipped by default)
         run: pytest -v

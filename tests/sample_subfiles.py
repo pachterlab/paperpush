@@ -15,7 +15,7 @@ more ready-to-submit sample submission files (``<venue>.sub`` and, optionally,
   command's template format changes the committed files can simply be
   regenerated (and a test flags the drift until they are).
 
-``sample_subfiles.json`` maps each sample's filename to its ``journal`` (the
+``sample_subfiles.json`` maps each sample's filename to its ``venue`` (the
 venue slug) and its ``fields`` (the fully filled-in value map). Every field is
 written out in full, so each entry is self-contained: there is no base/overlay
 inheritance to trace. Two invariants are enforced when the JSON is loaded (see
@@ -117,8 +117,8 @@ class Scenario:
 def _load_definitions() -> list[Scenario]:
     """Parse ``sample_subfiles.json`` into scenarios, validating its invariants.
 
-    The JSON maps ``<filename>.sub`` -> ``{"journal": <slug>, "fields": {...}}``.
-    Raises ``ValueError`` if a filename is not prefixed with its journal slug, if
+    The JSON maps ``<filename>.sub`` -> ``{"venue": <slug>, "fields": {...}}``.
+    Raises ``ValueError`` if a filename is not prefixed with its venue slug, if
     a venue has no sample, or if two samples for the same venue are identical --
     the guarantees CONTRIBUTING.md asks contributors to uphold.
     """
@@ -128,7 +128,7 @@ def _load_definitions() -> list[Scenario]:
     for filename, entry in raw.items():
         if not filename.endswith(".sub"):
             raise ValueError(f"{filename!r}: sample filenames must end in '.sub'")
-        venue = entry["journal"]
+        venue = entry["venue"]
         stem = filename[: -len(".sub")]
         if stem != venue and not stem.startswith(f"{venue}_"):
             raise ValueError(f"{filename!r}: filename must be '{venue}.sub' or '{venue}_<variant>.sub'")

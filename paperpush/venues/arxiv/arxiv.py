@@ -14,6 +14,61 @@ from ..login import VenueLoginError
 
 logger = logging.getLogger(__name__)
 
+# License name (as in the .sub) -> the value of the matching radio on the
+# license step, which arXiv sets to the license URI rather than a short code.
+_LICENSE_URLS = {
+    "arXiv.org perpetual, non-exclusive license 1.0": "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+    "CC BY 4.0": "http://creativecommons.org/licenses/by/4.0/",
+    "CC BY-SA 4.0": "http://creativecommons.org/licenses/by-sa/4.0/",
+    "CC BY-NC-SA 4.0": "http://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "CC BY-NC-ND 4.0": "http://creativecommons.org/licenses/by-nc-nd/4.0/",
+    "CC0 1.0": "http://creativecommons.org/publicdomain/zero/1.0/",
+}
+DEFAULT_LICENSE = "arXiv.org perpetual, non-exclusive license 1.0"
+
+# Shorthands people (and autofill) write instead of the full option text. Keys
+# here and in _LICENSE_URLS are matched with case and punctuation stripped, so
+# "CC BY 4.0", "cc-by-4.0", and "CC_BY" all land on the same license.
+_LICENSE_ALIASES = {
+    "arxiv": DEFAULT_LICENSE,
+    "arxivorg": DEFAULT_LICENSE,
+    "arxivperpetualnonexclusivelicense10": DEFAULT_LICENSE,
+    "ccby": "CC BY 4.0",
+    "ccbysa": "CC BY-SA 4.0",
+    "ccbyncsa": "CC BY-NC-SA 4.0",
+    "ccbyncnd": "CC BY-NC-ND 4.0",
+    "cc0": "CC0 1.0",
+}
+
+
+def _license_key(value: str) -> str:
+    """Fold a license name to letters and digits, for forgiving lookups."""
+    return "".join(ch for ch in value if ch.isalnum()).lower()
+
+
+_LICENSE_BY_KEY = {_license_key(name): url for name, url in _LICENSE_URLS.items()}
+_LICENSE_BY_KEY.update({key: _LICENSE_URLS[name] for key, name in _LICENSE_ALIASES.items()})
+
+
+def license_url(license_name: str) -> str:
+    """Return the license radio's value for a ``license`` field from a ``.sub``.
+
+    An empty value takes arXiv's own perpetual, non-exclusive license -- the
+    minimum arXiv requires, and the venue's default. A URI is passed through, so
+    a license arXiv adds later can be named directly. Anything else that is not
+    a known license raises, before the run opens a browser, rather than posting
+    the paper under a license the author did not pick.
+    """
+    name = license_name.strip()
+    if not name:
+        return _LICENSE_URLS[DEFAULT_LICENSE]
+    if name.startswith(("http://", "https://")):
+        return name
+    url = _LICENSE_BY_KEY.get(_license_key(name))
+    if url is None:
+        raise ValueError(f"unknown arXiv license {license_name!r}; expected one of: " + " | ".join(_LICENSE_URLS))
+    return url
+
 
 class ArxivVenue(Venue):
     slug = "arxiv"  # * slug name
@@ -68,6 +123,7 @@ class ArxivVenue(Venue):
             headless = False
 
         # grab values from the .sub file
+        license = license_url(values.get("license", ""))
         primary_archive = values.get("primary_archive", "").strip()
         primary_category = values.get("primary_category", "").strip()
         manuscript_file = values.get("manuscript_file", "").strip()
@@ -117,7 +173,15 @@ class ArxivVenue(Venue):
             # License/policy + category
             radios = page.get_by_role("radio")
             radios.first.check()
-            radios.nth(2).check()
+
+            logger.debug("Selecting the license radio %s", license)
+            radio = page.locator(f'input[name="license"][value="{license}"]')
+            if radio.count() == 0:
+                # arXiv has served these URIs under both http:// and https://;
+                # match on the rest of the URI so either form is found.
+                radio = page.locator(f'input[name="license"][value$="{license.split("://", 1)[1]}"]')
+            radio.check()
+
             page.locator("#select_arch").select_option(primary_archive)
             page.locator("#select_sc").select_option(primary_category)
             page.get_by_role("button", name="Continue").nth(1).click()

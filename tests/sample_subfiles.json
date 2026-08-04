@@ -1,6 +1,6 @@
 {
   "biorxiv.sub": {
-    "journal": "biorxiv",
+    "venue": "biorxiv",
     "fields": {
       "result_type": "New Results",
       "server_suitability": "Biological research",
@@ -18,7 +18,7 @@
     }
   },
   "biorxiv_figures.sub": {
-    "journal": "biorxiv",
+    "venue": "biorxiv",
     "fields": {
       "result_type": "New Results",
       "server_suitability": "Biological research",
@@ -37,7 +37,7 @@
     }
   },
   "biorxiv_funding.sub": {
-    "journal": "biorxiv",
+    "venue": "biorxiv",
     "fields": {
       "result_type": "New Results",
       "server_suitability": "Biological research",
@@ -56,7 +56,7 @@
     }
   },
   "biorxiv_supplement.sub": {
-    "journal": "biorxiv",
+    "venue": "biorxiv",
     "fields": {
       "result_type": "New Results",
       "server_suitability": "Biological research",
@@ -75,7 +75,7 @@
     }
   },
   "medrxiv.sub": {
-    "journal": "medrxiv",
+    "venue": "medrxiv",
     "fields": {
       "subject_category": "Epidemiology",
       "title": "Title goes here",
@@ -94,7 +94,7 @@
     }
   },
   "medrxiv_figures.sub": {
-    "journal": "medrxiv",
+    "venue": "medrxiv",
     "fields": {
       "subject_category": "Epidemiology",
       "title": "Title goes here",
@@ -114,7 +114,7 @@
     }
   },
   "medrxiv_funding.sub": {
-    "journal": "medrxiv",
+    "venue": "medrxiv",
     "fields": {
       "subject_category": "Epidemiology",
       "title": "Title goes here",
@@ -134,7 +134,7 @@
     }
   },
   "medrxiv_supplement.sub": {
-    "journal": "medrxiv",
+    "venue": "medrxiv",
     "fields": {
       "subject_category": "Epidemiology",
       "title": "Title goes here",
@@ -154,7 +154,7 @@
     }
   },
   "medrxiv_human_subjects.sub": {
-    "journal": "medrxiv",
+    "venue": "medrxiv",
     "fields": {
       "subject_category": "Epidemiology",
       "title": "Title goes here",
@@ -175,7 +175,7 @@
     }
   },
   "bioinformatics.sub": {
-    "journal": "bioinformatics",
+    "venue": "bioinformatics",
     "fields": {
       "article_type": "Original Paper",
       "title": "Title goes here",
@@ -211,7 +211,7 @@
     }
   },
   "bioinformatics_figures.sub": {
-    "journal": "bioinformatics",
+    "venue": "bioinformatics",
     "fields": {
       "article_type": "Original Paper",
       "title": "Title goes here",
@@ -250,7 +250,7 @@
     }
   },
   "nucleic_acids_research.sub": {
-    "journal": "nucleic_acids_research",
+    "venue": "nucleic_acids_research",
     "fields": {
       "article_type": "Standard Article",
       "title": "Title goes here",
@@ -274,7 +274,7 @@
     }
   },
   "nucleic_acids_research_declarations.sub": {
-    "journal": "nucleic_acids_research",
+    "venue": "nucleic_acids_research",
     "fields": {
       "article_type": "Standard Article",
       "title": "Title goes here",
@@ -301,7 +301,7 @@
     }
   },
   "arxiv.sub": {
-    "journal": "arxiv",
+    "venue": "arxiv",
     "fields": {
       "primary_archive": "cs",
       "primary_category": "cs.AI",
@@ -313,7 +313,7 @@
     }
   },
   "arxiv_tex.sub": {
-    "journal": "arxiv",
+    "venue": "arxiv",
     "fields": {
       "primary_archive": "cs",
       "primary_category": "cs.AI",
@@ -325,7 +325,7 @@
     }
   },
   "cell.sub": {
-    "journal": "cell",
+    "venue": "cell",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -343,7 +343,7 @@
     }
   },
   "cell_code.sub": {
-    "journal": "cell",
+    "venue": "cell",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -362,7 +362,7 @@
     }
   },
   "cell_funding.sub": {
-    "journal": "cell",
+    "venue": "cell",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -381,7 +381,7 @@
     }
   },
   "cell_figures.sub": {
-    "journal": "cell",
+    "venue": "cell",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -400,7 +400,7 @@
     }
   },
   "cell_corresponding_second.sub": {
-    "journal": "cell",
+    "venue": "cell",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -418,7 +418,7 @@
     }
   },
   "cell_systems.sub": {
-    "journal": "cell_systems",
+    "venue": "cell_systems",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -436,7 +436,7 @@
     }
   },
   "cell_systems_code.sub": {
-    "journal": "cell_systems",
+    "venue": "cell_systems",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -455,7 +455,7 @@
     }
   },
   "cell_systems_funding.sub": {
-    "journal": "cell_systems",
+    "venue": "cell_systems",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -474,7 +474,7 @@
     }
   },
   "cell_systems_figures.sub": {
-    "journal": "cell_systems",
+    "venue": "cell_systems",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -493,7 +493,7 @@
     }
   },
   "cell_systems_corresponding_second.sub": {
-    "journal": "cell_systems",
+    "venue": "cell_systems",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -511,7 +511,7 @@
     }
   },
   "cell_genomics.sub": {
-    "journal": "cell_genomics",
+    "venue": "cell_genomics",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -529,7 +529,7 @@
     }
   },
   "cell_genomics_code.sub": {
-    "journal": "cell_genomics",
+    "venue": "cell_genomics",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -548,7 +548,7 @@
     }
   },
   "cell_genomics_funding.sub": {
-    "journal": "cell_genomics",
+    "venue": "cell_genomics",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -567,7 +567,7 @@
     }
   },
   "cell_genomics_figures.sub": {
-    "journal": "cell_genomics",
+    "venue": "cell_genomics",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -586,7 +586,7 @@
     }
   },
   "cell_genomics_corresponding_second.sub": {
-    "journal": "cell_genomics",
+    "venue": "cell_genomics",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -604,7 +604,7 @@
     }
   },
   "plos_compbio.sub": {
-    "journal": "plos_compbio",
+    "venue": "plos_compbio",
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
@@ -627,7 +627,7 @@
     }
   },
   "nature.sub": {
-    "journal": "nature",
+    "venue": "nature",
     "fields": {
       "manuscript_type": "Biological Sciences - Article",
       "title": "Title goes here",
@@ -646,7 +646,7 @@
     }
   },
   "nature_biotech.sub": {
-    "journal": "nature_biotech",
+    "venue": "nature_biotech",
     "fields": {
       "manuscript_type": "Article",
       "title": "Title goes here",
@@ -665,7 +665,7 @@
     }
   },
   "nature_methods.sub": {
-    "journal": "nature_methods",
+    "venue": "nature_methods",
     "fields": {
       "manuscript_type": "Article",
       "title": "Title goes here",
@@ -684,7 +684,7 @@
     }
   },
   "genome_biology.sub": {
-    "journal": "genome_biology",
+    "venue": "genome_biology",
     "fields": {
       "article_type": "research",
       "title": "title of the manuscript",
@@ -699,7 +699,7 @@
     }
   },
   "bmc_bioinformatics.sub": {
-    "journal": "bmc_bioinformatics",
+    "venue": "bmc_bioinformatics",
     "fields": {
       "article_type": "research",
       "title": "title of the manuscript",
@@ -714,7 +714,7 @@
     }
   },
   "science.sub": {
-    "journal": "science",
+    "venue": "science",
     "fields": {
       "publication": "Science",
       "article_type": "Research Article",
@@ -735,7 +735,7 @@
     }
   },
   "science_advances.sub": {
-    "journal": "science_advances",
+    "venue": "science_advances",
     "fields": {
       "publication": "Science Advances",
       "article_type": "Research Article",
@@ -756,7 +756,7 @@
     }
   },
   "science_immunology.sub": {
-    "journal": "science_immunology",
+    "venue": "science_immunology",
     "fields": {
       "publication": "Science Immunology",
       "article_type": "Research Article",
@@ -777,7 +777,7 @@
     }
   },
   "science_robotics.sub": {
-    "journal": "science_robotics",
+    "venue": "science_robotics",
     "fields": {
       "publication": "Science Robotics",
       "article_type": "Research Article",
@@ -798,7 +798,7 @@
     }
   },
   "science_signaling.sub": {
-    "journal": "science_signaling",
+    "venue": "science_signaling",
     "fields": {
       "publication": "Science Signaling",
       "article_type": "Research Article",
@@ -819,7 +819,7 @@
     }
   },
   "science_translational_medicine.sub": {
-    "journal": "science_translational_medicine",
+    "venue": "science_translational_medicine",
     "fields": {
       "publication": "Science Translational Medicine",
       "article_type": "Research Article",
@@ -840,7 +840,7 @@
     }
   },
   "aaai_2027.sub": {
-    "journal": "aaai_2027",
+    "venue": "aaai_2027",
     "fields": {
       "title": "Title goes here",
       "authors": " | Joseph Rich | caltech.edu, usc.edu | no\n | Lior Pachter | caltech.edu | no\n",
@@ -853,7 +853,7 @@
     }
   },
   "aaai_2027_supplements.sub": {
-    "journal": "aaai_2027",
+    "venue": "aaai_2027",
     "fields": {
       "title": "Title goes here",
       "authors": "~Joseph_Rich1 |  |  | no\n | Lior Pachter | caltech.edu | yes\n",
@@ -870,7 +870,7 @@
     }
   },
   "discrete_mathematics.sub": {
-    "journal": "discrete_mathematics",
+    "venue": "discrete_mathematics",
     "fields": {
       "article_type": "Contribution",
       "title": "Title goes here",
@@ -884,7 +884,7 @@
     }
   },
   "discrete_mathematics_supplements.sub": {
-    "journal": "discrete_mathematics",
+    "venue": "discrete_mathematics",
     "fields": {
       "article_type": "Note",
       "title": "Title goes here",
@@ -901,7 +901,7 @@
     }
   },
   "discrete_mathematics_shared_data.sub": {
-    "journal": "discrete_mathematics",
+    "venue": "discrete_mathematics",
     "fields": {
       "article_type": "Contribution",
       "title": "Title goes here",
@@ -920,7 +920,7 @@
     }
   },
   "discrete_mathematics_reference_data.sub": {
-    "journal": "discrete_mathematics",
+    "venue": "discrete_mathematics",
     "fields": {
       "article_type": "Note",
       "title": "Title goes here",

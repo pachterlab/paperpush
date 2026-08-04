@@ -30,7 +30,7 @@ crosslist_archives:
 crosslist_categories: 
 
 # License (choice, REQUIRED)
-#   Distribution license for the submission. The arXiv perpetual, non-exclusive license is the minimum arXiv requires; the Creative Commons options grant broader reuse. Note: the runner currently selects the license radio captured in the recording (the first option); full license-by-name selection is pending, so confirm the license in the browser before the final submit.
+#   Distribution license for the submission. The arXiv perpetual, non-exclusive license is the minimum arXiv requires; the Creative Commons options grant broader reuse. The runner selects the matching radio on the license step; it is shown again on the review page, so you can confirm it before the final submit.
 #   options: arXiv.org perpetual, non-exclusive license 1.0 | CC BY 4.0 | CC BY-SA 4.0 | CC BY-NC-SA 4.0 | CC BY-NC-ND 4.0 | CC0 1.0
 license: 
 

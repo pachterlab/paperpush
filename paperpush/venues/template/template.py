@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class TemplateVenue(Venue):  #!!! change to the name of the venue
     slug = "template"  #!!! change to the slug name of the venue
     logged_in_names = ("NAME1", "NAME2", ...)  #!!! change to the names of buttons/links that appear when signed in
+    _VENUE = get_venue(slug)
 
     # * login
     def login(self, page, username: str, password: str, *, timeout_ms: int = 15000) -> None:

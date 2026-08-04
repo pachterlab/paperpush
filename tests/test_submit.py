@@ -181,6 +181,46 @@ def test_discrete_mathematics_declining_requires_a_data_statement():
         _discrete_mathematics_runner().submit({"share_data": "no", "data_statement": ""})
 
 
+# arXiv's license radios carry the license URI as their value, so the runner
+# maps the .sub's license name onto one before it opens a browser.
+
+
+def _arxiv_license_url(name):
+    from paperpush.venues.arxiv.arxiv import license_url
+
+    return license_url(name)
+
+
+def test_arxiv_maps_every_declared_license_to_a_distinct_uri():
+    field = next(f for f in venues.get_venue_impl("arxiv")._VENUE.fields if f.id == "license")
+    urls = {option: _arxiv_license_url(option) for option in field.options}
+    assert all(url.endswith("/") and "://" in url for url in urls.values())
+    assert len(set(urls.values())) == len(field.options), f"licenses share a URI: {urls}"
+    assert urls["CC BY 4.0"] == "http://creativecommons.org/licenses/by/4.0/"
+    assert urls["arXiv.org perpetual, non-exclusive license 1.0"] == "http://arxiv.org/licenses/nonexclusive-distrib/1.0/"
+
+
+@pytest.mark.parametrize(
+    "written, expected",
+    [
+        ("CC-BY-NC-ND", "CC BY-NC-ND 4.0"),
+        ("cc_by_sa", "CC BY-SA 4.0"),
+        (" CC0 ", "CC0 1.0"),
+        ("arXiv", "arXiv.org perpetual, non-exclusive license 1.0"),
+        # Unset falls back to the venue default, arXiv's own license.
+        ("", "arXiv.org perpetual, non-exclusive license 1.0"),
+    ],
+)
+def test_arxiv_accepts_license_shorthands(written, expected):
+    assert _arxiv_license_url(written) == _arxiv_license_url(expected)
+
+
+def test_arxiv_rejects_an_unknown_license():
+    # Better to stop here than to post the paper under a license nobody chose.
+    with pytest.raises(ValueError, match="MIT"):
+        _arxiv_license_url("MIT")
+
+
 def test_every_venue_has_a_sample_subfile():
     """Guard: scenarios resolve to committed files on disk for the sweep above."""
     assert SCENARIOS, "no sample scenarios discovered"
