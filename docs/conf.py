@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.abspath(".."))
 try:
     from paperpush import __version__ as _version
 except Exception:  # pragma: no cover - docs should build even if import fails
-    _version = "0.1.3"
+    _version = "0.1.4"
 
 # -- Project information ------------------------------------------------------
 
