@@ -5,7 +5,12 @@ submission portal through. Only two are venue-specific and abstract, so a new
 journal is as little work as possible:
 
 * :meth:`~Venue.submit` -- fill and drive the submission wizard from a ``.sub``.
-* :meth:`~Venue.login` -- fill and submit the sign-in form.
+* :meth:`~Venue.login` -- fill and submit the sign-in form. One method covers
+  both ways in: its ``orcid`` argument selects the portal's "Sign in with ORCID"
+  branch over its own credential form. A venue that offers that branch sets
+  :attr:`~Venue.supports_orcid_login` and handles the flag inside ``login``
+  (splitting the branch into a private helper of its own if it is long); a venue
+  that does not is never passed ``orcid=True``.
 
 Everything else is provided by this base class and steered by a handful of class
 attributes:
@@ -51,7 +56,7 @@ from .common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
                      save_storage)
 from .common import session_path as _slug_session_path
 from .common import wait_for_human
-from .login import VenueLoginError, first_visible
+from .login import VenueLoginError, first_visible, orcid_unsupported
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +101,15 @@ class Venue(ABC):
     #: ScholarOne journals cannot, so they set this ``False`` and ``save_session``
     #: raises rather than opening a browser that can never sign in.
     supports_session_capture: bool = True
+    #: Whether :meth:`login` accepts ``orcid=True`` -- i.e. whether this portal's
+    #: "Sign in with ORCID" control has been recorded. Default ``False``, and it
+    #: is the contract: callers check this attribute and refuse with
+    #: :func:`~paperpush.venues.login.orcid_unsupported` rather than passing the
+    #: flag, so a venue that has not recorded that flow never has to guard
+    #: against it. Independent of
+    #: :func:`paperpush.venues.orcid_login_offered`, which says whether the
+    #: ``--orcid`` *option* applies to the venue at all.
+    supports_orcid_login: bool = False
 
     # -- The two venue-specific operations (required) --------------------------
 
@@ -120,7 +134,7 @@ class Venue(ABC):
         """
 
     @abstractmethod
-    def login(self, page, username: str, password: str, *, timeout_ms: int = 15000) -> None:
+    def login(self, page, username: str, password: str, *, orcid: bool = False, timeout_ms: int = 15000) -> None:
         """Fill and submit the venue's sign-in form; raise on failure.
 
         Should raise a subclass of
@@ -128,6 +142,19 @@ class Venue(ABC):
         not take, so :meth:`ensure_signed_in` can fall back to a manual sign-in.
         The standard three-field form is a one-liner via
         :func:`paperpush.venues.login.fill_login_form`.
+
+        ``orcid`` selects the same page's "Sign in with ORCID" branch: the portal
+        link opens ORCID's popup, and ``username``/``password`` are the author's
+        ORCID iD (or registered email) and ORCID password rather than a venue
+        account. One method rather than two keeps the shared parts -- loading the
+        sign-in page, dismissing cookie banners, checking the author area actually
+        loaded -- written once; a long ORCID branch belongs in a private helper
+        the venue keeps to itself, not in a second entry point.
+
+        Only a venue that sets :attr:`supports_orcid_login` is ever passed the
+        flag: both callers check that first and refuse otherwise, so a venue with
+        no ORCID branch omits the parameter entirely rather than carrying one it
+        would only ignore.
         """
 
     # -- Portal URLs (default to the venue database) ---------------------------
@@ -183,14 +210,59 @@ class Venue(ABC):
         present = first_visible(self._login_root(page), self.logged_in_role, self.logged_in_names, timeout_ms) is not None
         return present if self.logged_in_present_means_in else not present
 
+    def _sign_in_with_credential(self, page, cred) -> bool:
+        """Drive :meth:`login` for a stored credential. True if the sign-in took.
+
+        The one place the stored credential's ``method`` becomes an argument: an
+        ORCID credential calls ``login(..., orcid=True)``, anything else the plain
+        form. A venue that has not recorded its ORCID branch is not called at all
+        -- :attr:`supports_orcid_login` is checked first. Every foreseeable
+        failure (no ORCID branch, or a
+        :class:`~paperpush.venues.login.VenueLoginError` because the sign-in did
+        not take) returns ``False`` after explaining why, so the caller falls back
+        to a manual sign-in rather than aborting a submission. ``cred`` may be
+        ``None`` or incomplete, which is simply "nothing to sign in with".
+
+        Shared by this class's :meth:`ensure_signed_in` and the portal overrides
+        of it. Does not save the session -- the caller owns that, since it holds
+        the browser context.
+        """
+        if cred is None or not cred.username or not cred.password:
+            return False
+        name = self.display_name
+        via_orcid = cred.method == "orcid"
+        if via_orcid and not self.supports_orcid_login:
+            exc = orcid_unsupported(self)
+            logger.warning("No automated ORCID sign-in for %s: %s", name, exc)
+            print(f"Cannot sign in with ORCID automatically: {exc}")
+            return False
+        kind = "ORCID credentials" if via_orcid else "credentials"
+        try:
+            logger.info("Signing in to %s with stored %s", name, kind)
+            print(f"Signing in to {name} with your stored {kind}…")
+            # Passed only when set, so a venue with no ORCID branch does not have
+            # to declare the parameter just to ignore it.
+            if via_orcid:
+                self.login(page, cred.username, cred.password, orcid=True)
+            else:
+                self.login(page, cred.username, cred.password)
+        except VenueLoginError as exc:
+            logger.warning("Automatic %s sign-in failed: %s", name, exc)
+            print(f"Automatic sign-in failed: {exc}")
+            logger.info("Falling back to a manual %s sign-in", name)
+            print("Falling back to a manual sign-in.")
+            return False
+        return True
+
     def ensure_signed_in(self, page, context, *, debug: bool = False) -> bool:
         """Get ``page`` to a signed-in portal without retyping a login.
 
         Order of preference:
           1. A live session (the saved ``storage_state`` already loaded into
              ``context``, or cookies the portal still honors) -- silent.
-          2. Stored username/password (``paperpush login <slug>``): fill the
-             sign-in form via :meth:`login`, then save the session so the next run
+          2. Stored credentials (``paperpush login <slug>``): fill the sign-in
+             form via :meth:`login` -- with ``orcid=True`` when the stored
+             credential is an ORCID one -- then save the session so the next run
              skips even this step.
           3. Manual sign-in -- only if there are no usable credentials or the
              credential sign-in failed.
@@ -216,20 +288,11 @@ class Venue(ABC):
             logger.debug("Could not load stored %s credentials (%s)", name, exc)
             cred = None
 
-        if cred and cred.method == "password" and cred.username and cred.password:
-            try:
-                logger.info("Signing in to %s with stored credentials", name)
-                print(f"Signing in to {name} with your stored credentials…")
-                self.login(page, cred.username, cred.password)
-                save_storage(context, session)
-                logger.info("Signed in to %s; saved the session for reuse", name)
-                print("Signed in; saved the session for next time.")
-                return True
-            except VenueLoginError as exc:
-                logger.warning("Automatic %s sign-in failed: %s", name, exc)
-                print(f"Automatic sign-in failed: {exc}")
-                logger.info("Falling back to a manual %s sign-in", name)
-                print("Falling back to a manual sign-in.")
+        if self._sign_in_with_credential(page, cred):
+            save_storage(context, session)
+            logger.info("Signed in to %s; saved the session for reuse", name)
+            print("Signed in; saved the session for next time.")
+            return True
 
         # No usable credentials, or the auto sign-in failed: show the sign-in page,
         # prefilling the known email where the portal supports it (see the hook).

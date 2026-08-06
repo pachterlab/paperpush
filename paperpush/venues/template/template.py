@@ -21,6 +21,7 @@ class TemplateVenue(Venue):  #!!! change to the name of the venue
     _VENUE = get_venue(slug)
 
     # * login
+    # Optional ORCID branch: only if this venue's sign-in page also has a "Sign in with ORCID" button. Add `orcid: bool = False` to the signature below, and when it is set click through to ORCID's popup and fill the author's ORCID iD and ORCID password there instead of this form (a long branch goes in a private _login_orcid helper). Then set supports_orcid_login = True on the class. Do neither otherwise: callers check that attribute and refuse first, so a venue with no ORCID branch is never passed the flag. See paperpush/venues/editorialmanager/main.py for a worked example.
     def login(self, page, username: str, password: str, *, timeout_ms: int = 15000) -> None:
         """
         Fill and submit the template sign-in form from stored credentials. Falls back to manual sign-in if the automatic attempt fails.

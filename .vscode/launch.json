@@ -91,6 +91,11 @@
             "name": "Debug arXiv varseek",
             "args": ["submit", "/Users/joeyrich/Documents/Caltech/Pachter/varseek_paper_materials_final/arxiv/arxiv.sub"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
-        }
+        },
+        {
+            "name": "Debug Cell Genomics login",
+            "args": ["login", "cell_genomics"],
+            "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
+        },
     ]
 }

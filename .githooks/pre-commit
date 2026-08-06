@@ -122,6 +122,27 @@ if git diff --cached --name-only --diff-filter=ACM -z \
 fi
 
 # ---------------------------------------------------------------------------
+# Keep the packaged copy of AGENTS.md in sync with the root file. The root copy
+# is canonical (agent tooling looks for it there); the copy under
+# paperpush/_docs/ is what ships in the wheel and backs `paperpush
+# agent-guide`, so a pip-installed agent reads the same contract.
+# ---------------------------------------------------------------------------
+if git diff --cached --name-only --diff-filter=ACM -z \
+    | tr '\0' '\n' | grep -qx 'AGENTS.md'; then
+    if python scripts/sync_agent_docs.py; then
+        # --porcelain (not `git diff`) so a brand-new, still-untracked copy is
+        # staged too; `git diff` reports no change for an untracked file.
+        if [ -n "$(git status --porcelain --untracked-files=all -- paperpush/_docs)" ]; then
+            git add paperpush/_docs
+            echo "pre-commit: re-synced paperpush/_docs from AGENTS.md and re-staged it."
+        fi
+    else
+        echo "pre-commit: failed to sync paperpush/_docs from AGENTS.md." >&2
+        status=1
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Keep the generated test fixtures in sync with sample_subfiles.json. Only
 # runs when the JSON is part of this commit; re-stages the regenerated sample
 # .sub files and their input assets so the committed tree never drifts.

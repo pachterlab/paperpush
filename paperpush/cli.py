@@ -14,8 +14,10 @@ Implemented so far:
                                       by default; --dont-check-* to opt out)
     paperpush login <venue>     store credentials for a venue
     paperpush login --list        list the venues you are logged in to
-    paperpush login --orcid <j>   sign in with ORCID (Sign in with ORCID)
+    paperpush login --orcid <j>   store an ORCID iD/password for a journal that
+                                      offers "Sign in with ORCID"
     paperpush submit <subfile>    open bioRxiv and run the submission
+    paperpush agent-guide         print the guide for AI agents (AGENTS.md)
 
 ``submit`` drives the bioRxiv wizard, typing in the field values read from the
 .sub file and stopping before the final submit. The first run signs in (reusing
@@ -35,7 +37,7 @@ from pathlib import Path
 
 from pydantic import ConfigDict, validate_call
 
-from . import __version__, credentials
+from . import __url__, __version__, credentials
 from ._logging import configure_logging
 from .database import get_venue, list_venues
 from .subfile import default_filename, write_template
@@ -58,6 +60,31 @@ _VENUE_GROUPS = [
 ]
 
 _VENUES_URL = "https://github.com/pachterlab/paperpush/blob/main/venues.md"
+
+# Agent-facing docs shipped inside the package (see package-data in
+# pyproject.toml). Mirrored from the repo root by scripts/sync_agent_docs.py so
+# a pip install -- which gets no AGENTS.md -- can still read the contract.
+_DOCS_DIR = Path(__file__).with_name("_docs")
+_AGENT_GUIDE_PATH = _DOCS_DIR / "agents.md"
+_AGENT_GUIDE_URL = "https://github.com/pachterlab/paperpush/blob/main/AGENTS.md"
+
+
+@_validate
+def _cmd_agent_guide(args: argparse.Namespace) -> int:
+    """Print the agent-facing guide (the packaged copy of AGENTS.md).
+
+    Exists so an AI agent driving a pip-installed paperpush can read the
+    submission contract without network access: `--help` points here, and this
+    reads the copy that shipped with the installed version rather than whatever
+    the GitHub HEAD happens to say.
+    """
+    try:
+        print(_AGENT_GUIDE_PATH.read_text(encoding="utf-8"), end="")
+    except OSError as exc:
+        print(f"error: could not read the packaged agent guide: {exc}", file=sys.stderr)
+        print(f"Read it online instead: {_AGENT_GUIDE_URL}", file=sys.stderr)
+        return 1
+    return 0
 
 
 @_validate
@@ -126,12 +153,15 @@ def _login_args(venue_slug: str) -> argparse.Namespace:
 
     Used by ``submit`` to drive ``_cmd_login`` directly when no credentials are
     stored: a plain username/password login (prompting as needed), with the
-    ORCID, status, logout, and ``--into`` paths left off.
+    ORCID, status, logout, and ``--into`` paths left off. An author who wants to
+    sign in through ORCID runs ``paperpush login --orcid <venue>`` first; submit
+    then finds that credential stored and never reaches here.
     """
     return argparse.Namespace(
         venue=venue_slug,
         username=None,
         password=None,
+        confirm_password=False,
         orcid=False,
         orcid_id=None,
         into=None,
@@ -146,6 +176,19 @@ def _login_args(venue_slug: str) -> argparse.Namespace:
     )
 
 
+def _describe_identity(cred) -> str:
+    """One-line description of who a stored credential signs in as.
+
+    Spells out the sign-in method for an ORCID credential (and the iD versus the
+    registered email, since either may have been given), so ``--list`` and
+    ``--status`` read the same way.
+    """
+    if cred.method != "orcid":
+        return cred.username
+    who = f"ORCID iD {cred.orcid}" if cred.orcid else f"ORCID account {cred.username}"
+    return f"{who} ({cred.display_name})" if cred.display_name else who
+
+
 def _list_logins() -> int:
     """Print every venue with stored credentials, and who they belong to."""
     creds = credentials.list_credentials()
@@ -156,12 +199,7 @@ def _list_logins() -> int:
 
     print("Logged in to:")
     for cred in creds:
-        if cred.method == "orcid":
-            who = f"ORCID iD {cred.orcid}"
-            if cred.display_name:
-                who += f" ({cred.display_name})"
-        else:
-            who = cred.username
+        who = _describe_identity(cred)
         # A venue that submits through this one's portal shares this single
         # login, so list each sibling on its own line as if separately logged
         # in -- the credential is stored once under the base slug, but the user
@@ -217,16 +255,21 @@ def _cmd_login(args: argparse.Namespace) -> int:
             return 1
         location = credentials.credential_location(venue.slug)
         store = "OS keyring" if location == "keyring" else "config file"
+        who = _describe_identity(cred)
         if cred.method == "orcid":
-            who = f"ORCID iD {cred.orcid}"
-            if cred.display_name:
-                who += f" ({cred.display_name})"
             print(f"Logged in to {venue.slug} via {who} (stored in {store}).")
         else:
-            print(f"Logged in to {venue.slug} as {cred.username} " f"(stored in {store}).")
+            print(f"Logged in to {venue.slug} as {who} (stored in {store}).")
         return 0
 
     if args.orcid or args.orcid_id:
+        # ORCID sign-in is a journal thing: the preprint servers and conference
+        # portals have their own accounts and no ORCID button to click.
+        if not venues.orcid_login_offered(venue.slug):
+            logger.info("login: %s does not offer ORCID sign-in", venue.slug)
+            print(f"error: {venue.slug} does not offer signing in with ORCID.", file=sys.stderr)
+            print(f"Sign in with a {venue.slug} username and password instead: " f"'paperpush login {venue.slug}'.", file=sys.stderr)
+            return 2
         return _login_orcid(venue, args)
 
     # Collect the username (flag, then env var, then prompt).
@@ -240,8 +283,9 @@ def _cmd_login(args: argparse.Namespace) -> int:
         print("error: a username is required", file=sys.stderr)
         return 1
 
-    # Collect the password (flag, then env var, else prompt twice). The flag is a
-    # convenience for non-interactive use; warn because it exposes the password.
+    # Collect the password (flag, then env var, else prompt once -- twice with
+    # --confirm-password). The flag is a convenience for non-interactive use;
+    # warn because it exposes the password.
     password = args.password
     if password:
         print("warning: --password exposes the password as plain text in the " "process list and shell history", file=sys.stderr)
@@ -250,12 +294,13 @@ def _cmd_login(args: argparse.Namespace) -> int:
     if not password:
         try:
             password = getpass.getpass("Password: ")
-            confirm = getpass.getpass("Confirm password: ")
+            if getattr(args, "confirm_password", False):
+                confirm = getpass.getpass("Confirm password: ")
+                if password != confirm:
+                    print("error: passwords do not match", file=sys.stderr)
+                    return 1
         except EOFError:
             print("error: no password provided", file=sys.stderr)
-            return 1
-        if password != confirm:
-            print("error: passwords do not match", file=sys.stderr)
             return 1
     if not password:
         print("error: a password is required", file=sys.stderr)
@@ -292,81 +337,120 @@ def _cmd_login(args: argparse.Namespace) -> int:
 
 
 def _login_orcid(venue, args: argparse.Namespace) -> int:
-    """Sign in to a venue with ORCID and store the resulting identity.
+    """Store an ORCID sign-in for a venue: the author's ORCID iD and password.
 
-    Uses the full "Sign in with ORCID" OAuth flow when a registered client is
-    configured; otherwise opens the ORCID sign-in page and reads the public
-    record for the supplied iD. With ``--into`` the authenticated author's
-    ORCID (and any blank email/affiliation) is written back into a .sub file.
+    The ORCID branch of :func:`_cmd_login`, and deliberately the same shape as
+    the username/password one: collect a credential (an ORCID iD or registered
+    email plus the ORCID password), check it against the venue's real sign-in --
+    the same page, taken down its "Sign in with ORCID" path -- and store it. What
+    differs is only which form the browser fills, so ``submit`` later signs in
+    through ORCID rather than the venue's own account.
+
+    With ``--into`` the author's public ORCID record is read afterwards and their
+    ORCID (plus any blank email/affiliation) written into a .sub author block.
+    That lookup is a convenience, not part of signing in: it never happens
+    without the flag, and a failure there does not fail the login.
     """
     from . import orcid as orcid_mod
 
-    orcid_id = orcid_mod.normalize_id(args.orcid_id) if args.orcid_id else ""
-    name = ""
-    token: str | None = None
-
-    if orcid_mod.oauth_available() and not orcid_id:
-        logger.info("login --orcid: starting OAuth flow for %s", venue.slug)
-        print("Opening ORCID so you can authorize paperpush...")
+    # Collect the ORCID iD (flag, then env var, then prompt) -- the same order
+    # the username/password path uses.
+    orcid_id = args.orcid_id or os.environ.get("PAPERPUSH_ORCID_ID") or os.environ.get("PAPERPUSH_USERNAME")
+    if not orcid_id:
         try:
-            orcid_id, name, token = orcid_mod.run_oauth_flow()
-        except orcid_mod.OrcidError as exc:
-            logger.error("login --orcid: OAuth flow failed: %s", exc)
-            print(f"error: ORCID sign-in failed: {exc}", file=sys.stderr)
-            return 1
-        logger.info("login --orcid: authenticated as %s (token issued=%s)", orcid_id, bool(token))
-        print(f"Authenticated as ORCID iD {orcid_id}.")
-    elif not orcid_id:
-        # Assisted fallback: send the user to ORCID, then take the iD they paste.
-        if orcid_mod.open_signin():
-            print(f"Opened {orcid_mod.signin_url()} in your browser.")
-        else:
-            print(f"Sign in to ORCID at {orcid_mod.signin_url()}")
-        print("After signing in, copy your ORCID iD from your record page.")
-        try:
-            orcid_id = input("ORCID iD (0000-0000-0000-0000): ").strip()
+            orcid_id = input("ORCID iD or email: ").strip()
         except EOFError:
             orcid_id = ""
-
     if not orcid_id:
         print("error: an ORCID iD is required", file=sys.stderr)
         return 1
-    if not orcid_mod.is_valid_id(orcid_id):
-        print(f"error: '{orcid_id}' is not a valid ORCID iD", file=sys.stderr)
+    if not orcid_mod.is_valid_identity(orcid_id):
+        print(f"error: '{orcid_id}' is not a valid ORCID iD or email address", file=sys.stderr)
+        print("An ORCID iD looks like 0000-0002-1825-0097.", file=sys.stderr)
         return 1
-    orcid_id = orcid_mod.normalize_id(orcid_id)
+    orcid_id = orcid_mod.normalize_identity(orcid_id)
 
-    # Read the public record to confirm the iD and to populate fields.
+    # And the ORCID password, on the same terms as the venue password: the flag
+    # warns, the env var is silent, otherwise prompt once (twice with
+    # --confirm-password).
+    password = args.password
+    if password:
+        print("warning: --password exposes the password as plain text in the " "process list and shell history", file=sys.stderr)
+    else:
+        password = os.environ.get("PAPERPUSH_PASSWORD")
+    if not password:
+        try:
+            password = getpass.getpass("ORCID password: ")
+            if getattr(args, "confirm_password", False):
+                confirm = getpass.getpass("Confirm ORCID password: ")
+                if password != confirm:
+                    print("error: passwords do not match", file=sys.stderr)
+                    return 1
+        except EOFError:
+            print("error: no password provided", file=sys.stderr)
+            return 1
+    if not password:
+        print("error: a password is required", file=sys.stderr)
+        return 1
+
+    # Verify against the venue's real sign-in before storing, exactly as the
+    # username/password path does -- but down the ORCID branch of the same page.
+    if not getattr(args, "no_verify", False):
+        from .venues.login import LoginVerificationError, verify_login
+
+        print(f"Checking the ORCID credentials by signing in to {venue.slug}…")
+        try:
+            verify_login(
+                venue.slug,
+                orcid_id,
+                password,
+                method="orcid",
+                headless=getattr(args, "verify_headless", False),
+                timeout=getattr(args, "timeout", DEFAULT_TIMEOUT_SECONDS),
+            )
+        except NotImplementedError as exc:
+            # The venue offers ORCID sign-in but paperpush cannot drive it yet.
+            # Storing the pair would only defer the failure to submit time.
+            logger.warning("login --orcid: no automated ORCID sign-in for %s: %s", venue.slug, exc)
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        except LoginVerificationError as exc:
+            logger.warning("login --orcid: verification failed for %s: %s", venue.slug, exc)
+            print(f"error: ORCID sign-in check failed: {exc}", file=sys.stderr)
+            print("Credentials were not stored. Re-run with --no-verify to store " "them without checking.", file=sys.stderr)
+            return 1
+        print("Sign-in confirmed.")
+
+    # --into reads the public record; do it before storing so the author's name
+    # can be recorded alongside the credential.
     profile = None
-    try:
-        profile = orcid_mod.fetch_profile(orcid_id)
-    except orcid_mod.OrcidError as exc:
-        logger.warning("login --orcid: could not read public record for %s: %s", orcid_id, exc)
-        print(f"warning: could not read the ORCID record: {exc}", file=sys.stderr)
-        profile = orcid_mod.OrcidProfile(orcid_id=orcid_id, name=name)
-    if profile.name:
-        name = name or profile.name
+    if args.into:
+        if orcid_mod.is_valid_id(orcid_id):
+            try:
+                profile = orcid_mod.fetch_profile(orcid_id)
+            except orcid_mod.OrcidError as exc:
+                logger.warning("login --orcid: could not read public record for %s: %s", orcid_id, exc)
+                print(f"warning: could not read the public ORCID record: {exc}", file=sys.stderr)
+        else:
+            print("warning: --into needs an ORCID iD (an email cannot be looked " "up in the public registry); skipping.", file=sys.stderr)
 
-    used_keyring = credentials.save_orcid_credential(venue.slug, orcid_id, name=name, token=token)
+    used_keyring = credentials.save_orcid_credential(venue.slug, orcid_id, password, name=profile.name if profile else "")
     logger.info("login --orcid: stored ORCID login for %s (iD %s, keyring=%s)", venue.slug, orcid_id, used_keyring)
 
-    who = orcid_id + (f" ({name})" if name else "")
+    who = orcid_id + (f" ({profile.name})" if profile and profile.name else "")
     print(f"Stored ORCID login for {venue.slug} (iD: {who}).")
-    if token:
-        if used_keyring:
-            print("  Access token saved to the operating system secret store.")
-        else:
-            path = credentials.config_dir() / "credentials.json"
-            print(f"  Access token saved to {path} (readable only by you).")
-            print("  Note: no usable OS secret store was found, so this fallback " "file is not encrypted.")
+    if used_keyring:
+        print("  Saved to the operating system secret store.")
     else:
-        print("  No access token was issued; the public ORCID iD is recorded.")
-    if profile.affiliation:
+        path = credentials.config_dir() / "credentials.json"
+        print(f"  Saved to {path} (readable only by you).")
+        print("  Note: no usable OS secret store was found, so this fallback " "file is not encrypted.")
+    if profile and profile.affiliation:
         print(f"  Affiliation: {profile.affiliation}")
     if venue.submission_url:
         print(f"  Submission system: {venue.submission_url}")
 
-    if args.into:
+    if profile is not None:
         _populate_orcid_into(args.into, venue, profile)
     return 0
 
@@ -881,9 +965,14 @@ def _cmd_options(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    # The epilog is the discovery path for AI agents: an agent handed a
+    # pip-installed paperpush reaches for `--help` long before it would think to
+    # look up a URL, so the pointer to the packaged guide belongs here.
     parser = argparse.ArgumentParser(
         prog="paperpush",
         description="Make venue submission as easy as a single click.",
+        epilog=("AI agents: run 'paperpush agent-guide' before driving this CLI.\n" f"Docs and issues: {__url__}"),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"paperpush {__version__}")
     parser.add_argument("--venues", action="store_true", help="list supported venues and exit")
@@ -896,7 +985,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # metavar lists only the public commands; the internal 'schema' command is
     # registered below but deliberately left out so it does not appear in --help.
-    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,login,submit}")
+    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,login,submit,agent-guide}")
 
     p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub submission template")
     p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv")
@@ -965,9 +1054,19 @@ def build_parser() -> argparse.ArgumentParser:
         "PAPERPUSH_PASSWORD environment variable). WARNING: exposes "
         "the password as plain text in the process list and shell history",
     )
-    p_login.add_argument("--orcid", action="store_true", help="sign in with ORCID instead of a username/password")
-    p_login.add_argument("--orcid-id", metavar="ID", dest="orcid_id", help="your ORCID iD (e.g. 0000-0002-1825-0097); " "implies --orcid and skips the prompt")
-    p_login.add_argument("--into", metavar="SUBFILE", help="after an ORCID login, fill the matching author's " "ORCID/name/affiliation in this .sub file")
+    p_login.add_argument(
+        "--confirm-password",
+        dest="confirm_password",
+        action="store_true",
+        help="ask for the password twice and check the two match " "(by default it is asked for once)",
+    )
+    p_login.add_argument(
+        "--orcid",
+        action="store_true",
+        help="sign in with your ORCID account instead of a venue " "username/password: prompts for your ORCID iD and ORCID " "password, and signs in through the venue's 'Sign in with " "ORCID' button. Journals only",
+    )
+    p_login.add_argument("--orcid-id", metavar="ID", dest="orcid_id", help="your ORCID iD (e.g. 0000-0002-1825-0097) or the email " "registered with ORCID; implies --orcid and skips that " "prompt (you are still asked for the ORCID password)")
+    p_login.add_argument("--into", metavar="SUBFILE", help="after an ORCID login, fill the matching author's " "ORCID/name/affiliation in this .sub file, read from " "their public ORCID record")
     p_login.add_argument("--status", action="store_true", help="show whether credentials are stored, then exit")
     p_login.add_argument("--logout", action="store_true", help="remove stored credentials for the venue")
     p_login.add_argument(
@@ -1003,6 +1102,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="close the browser when the run fails (default: leave the " "window open at the step that broke so you can see the page " "and finish by hand); --headless always closes",
     )
     p_submit.set_defaults(func=_cmd_submit)
+
+    p_agent_guide = sub.add_parser("agent-guide", parents=[verbosity], help="print the guide for AI agents driving this CLI (AGENTS.md)")
+    p_agent_guide.set_defaults(func=_cmd_agent_guide)
 
     # Internal command: the autofill front-ends (the Claude skill and the API
     # engine) read field roles from here. Hidden from --help (use 'subfile' to

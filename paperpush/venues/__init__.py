@@ -124,6 +124,46 @@ def submission_aliases(slug: str) -> list[str]:
     return sorted(alias for alias, base in _SUBMISSION_BASE.items() if base == key and alias != key)
 
 
+# Venues whose submission system has no "Sign in with ORCID" control, so
+# ``paperpush login --orcid`` is not offered for them. Conference portals are
+# excluded by venue type in :func:`orcid_login_offered`; this names the journals
+# and preprint servers that authenticate only with their own accounts.
+_NO_ORCID_LOGIN = frozenset({"discrete_mathematics"})
+
+
+def orcid_login_offered(slug: str) -> bool:
+    """Whether ``paperpush login --orcid`` is accepted for ``slug``.
+
+    Two ways to qualify, because offering the option and being able to drive it
+    are different facts:
+
+    * the venue's implementation declares ``supports_orcid_login`` -- its ORCID
+      flow has been recorded, so the option demonstrably works; or
+    * it is a journal or preprint server not listed in :data:`_NO_ORCID_LOGIN`.
+      Those portals carry an ORCID button even where paperpush cannot drive it
+      yet, so the option is accepted and the venue reports that the flow is not
+      implemented (rather than pretending ORCID is not a way in at all).
+
+    Conference portals are excluded: they run on their own accounts. Resolved
+    through :func:`submission_base` so a venue that submits through another's
+    portal answers for the portal it actually signs in to. An unknown slug is
+    simply not offered ORCID rather than raising, since callers reach here only
+    after the slug has been checked against the database.
+    """
+    from ..database import get_venue
+
+    base = submission_base(slug)
+    impl = try_get_venue_impl(base)
+    if impl is not None and impl.supports_orcid_login:
+        return True
+    if base in _NO_ORCID_LOGIN:
+        return False
+    try:
+        return get_venue(base).venue_type in {"journal", "preprint"}
+    except KeyError:
+        return False
+
+
 def import_venue(slug: str):
     """Import and return the module implementing ``slug``'s runner.
 

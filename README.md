@@ -60,7 +60,7 @@ the tool list and the contract agents should follow.
    - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
    - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE.sub`: Use an LLM API. Requires an API key.
 3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`.
-4. `paperpush login VENUE`: log in to the VENUE submission portal
+4. `paperpush login VENUE`: log in to the VENUE submission portal. Add `--orcid` to sign in with your ORCID iD and ORCID password instead of a VENUE account, for venues whose portal offers "Sign in with ORCID" (bioRxiv, medRxiv, arXiv, the Cell Press journals, PLOS Computational Biology, BMC Bioinformatics, and Genome Biology so far).
 5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
 
 ## Run the whole pipeline at once
@@ -98,7 +98,9 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for instructions on adding new venues. 
 ## For AI agents
 
 If you are an AI agent asked to submit a manuscript on the user's behalf, read
-[`AGENTS.md`](AGENTS.md). It describes how to run the full pipeline while doing
+[`AGENTS.md`](AGENTS.md) — or, if you are working from a `pip install` rather
+than a clone of this repo, run `paperpush agent-guide`, which prints the same
+document from the copy that shipped with the installed version. It describes how to run the full pipeline while doing
 your **own** field extraction (reading the manuscript and writing a
 `values.json` for the default `--engine manual`) rather than relying on the
 API-backed engine. It also asks the agent to check `paperpush login --list`

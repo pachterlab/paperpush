@@ -37,11 +37,17 @@ SERVICE_PREFIX = "paperpush"
 class Credential:
     """A stored credential for one venue.
 
-    For a password login ``username``/``password`` are the submission-system
-    login. For an ORCID login (``method == "orcid"``) ``username`` is the ORCID
-    iD, ``orcid`` repeats it, ``display_name`` is the author's name when known,
-    and ``password`` holds the OAuth access token if one was issued (empty when
-    only the public iD is on record).
+    ``username``/``password`` are always the pair typed into a sign-in form;
+    ``method`` says *which* form. For ``"password"`` (the default) that is the
+    submission system's own account. For ``"orcid"`` it is the author's ORCID
+    account -- ``username`` is the ORCID iD or registered email, ``password`` the
+    ORCID password, and ``orcid`` repeats the iD when the identity given was one
+    (empty when the author signed in by email). ``display_name`` is the author's
+    name when a public ORCID record supplied it.
+
+    The two methods therefore round-trip through the same storage; all that
+    differs is which branch of :meth:`~paperpush.venues.base.Venue.login` the
+    venue takes (its ``orcid`` argument).
     """
 
     venue: str
@@ -50,6 +56,15 @@ class Credential:
     method: str = "password"
     orcid: str = ""
     display_name: str = ""
+
+    @property
+    def identity(self) -> str:
+        """Who this credential signs in as, for display and reporting.
+
+        The ORCID iD when one is on record, else the username -- which for an
+        ORCID login signed in by email is that email. Never the password.
+        """
+        return self.orcid or self.username
 
 
 def _service_name(slug: str) -> str:
@@ -136,8 +151,14 @@ def using_keyring() -> bool:
     return _get_keyring() is not None
 
 
-def save_credential(slug: str, username: str, password: str) -> bool:
+def save_credential(slug: str, username: str, password: str, *, method: str = "password", orcid: str = "", name: str = "") -> bool:
     """Store ``username``/``password`` for ``slug``.
+
+    ``method`` records which sign-in form the pair belongs to -- ``"password"``
+    for the venue's own account, ``"orcid"`` for an ORCID sign-in (see
+    :func:`save_orcid_credential`). The ORCID iD and author name are public
+    identifiers and are kept in the file store either way; only the password ever
+    goes to the secret store.
 
     Returns True if the OS keyring was used, False if the file fallback was.
     A keyring backend that is advertised but unusable at runtime (for example a
@@ -145,6 +166,14 @@ def save_credential(slug: str, username: str, password: str) -> bool:
     unavailable and the file fallback is used instead.
     """
     slug = slug.lower()
+    entry: dict = {"username": username}
+    if method != "password":
+        entry["method"] = method
+    if orcid:
+        entry["orcid"] = orcid
+    if name:
+        entry["name"] = name
+
     kr = _get_keyring()
     if kr is not None:
         try:
@@ -155,55 +184,42 @@ def save_credential(slug: str, username: str, password: str) -> bool:
         else:
             # Record the username so we can look the password back up later.
             store = _read_file_store()
-            entry = store.get(slug, {})
-            entry["username"] = username
-            entry.pop("password", None)  # never keep plaintext alongside keyring
-            store[slug] = entry
+            store[slug] = entry  # never keep plaintext alongside keyring
             _write_file_store(store)
-            logger.info("Saved password credential for %s to the OS keyring", slug)
+            logger.info("Saved %s credential for %s to the OS keyring", method, slug)
             return True
 
     store = _read_file_store()
-    store[slug] = {"username": username, "password": password}
+    entry["password"] = password
+    store[slug] = entry
     _write_file_store(store)
-    logger.info("Saved password credential for %s to the file store", slug)
+    logger.info("Saved %s credential for %s to the file store", method, slug)
     return False
 
 
-def save_orcid_credential(slug: str, orcid_id: str, name: str = "", token: str | None = None) -> bool:
-    """Store an ORCID-based login for ``slug``.
+def save_orcid_credential(slug: str, orcid_id: str, password: str, name: str = "") -> bool:
+    """Store an ORCID sign-in (iD or registered email, plus ORCID password).
 
-    ``orcid_id`` becomes the credential's username. A non-empty ``token`` (the
-    OAuth access token) is treated as a secret and goes to the OS keyring when
-    one is available, mirroring :func:`save_credential`. The ORCID iD and name
-    are public identifiers, so they are always recorded in the file store.
+    A thin wrapper over :func:`save_credential` that tags the entry
+    ``method="orcid"``, so ``submit`` drives the venue's "Sign in with ORCID"
+    path rather than its own credential form. ``orcid_id`` may be the iD or the
+    email registered with ORCID; the ``orcid`` field is recorded only for an
+    actual iD, since that is the identifier other commands report.
 
-    Returns True if a token was written to the OS keyring, False otherwise (no
-    token, or no usable keyring so the token fell back to the file store).
+    Returns True if the password was written to the OS keyring, False if it fell
+    back to the config file.
     """
-    slug = slug.lower()
-    entry: dict = {"method": "orcid", "username": orcid_id, "orcid": orcid_id}
-    if name:
-        entry["name"] = name
+    from .orcid import is_valid_id, normalize_id
 
-    stored_in_keyring = False
-    if token:
-        kr = _get_keyring()
-        if kr is not None:
-            try:
-                kr.set_password(_service_name(slug), orcid_id, token)
-                stored_in_keyring = True
-            except Exception as exc:
-                logger.warning("Keyring rejected the ORCID token for %s (%s); " "falling back to the file store", slug, exc)
-                stored_in_keyring = False
-        if not stored_in_keyring:
-            entry["token"] = token
-
-    store = _read_file_store()
-    store[slug] = entry
-    _write_file_store(store)
-    logger.info("Saved ORCID credential for %s (iD %s, token=%s, keyring=%s)", slug, orcid_id, bool(token), stored_in_keyring)
-    return stored_in_keyring
+    identity = normalize_id(orcid_id) if is_valid_id(orcid_id) else orcid_id.strip()
+    return save_credential(
+        slug,
+        identity,
+        password,
+        method="orcid",
+        orcid=identity if is_valid_id(identity) else "",
+        name=name,
+    )
 
 
 def get_credential(slug: str) -> Credential | None:
@@ -215,20 +231,9 @@ def get_credential(slug: str) -> Credential | None:
         logger.debug("No stored credential for %s", slug)
         return None
 
-    if entry.get("method") == "orcid":
-        orcid_id = entry.get("orcid") or entry.get("username", "")
-        token = entry.get("token", "")
-        if not token:
-            kr = _get_keyring()
-            if kr is not None and orcid_id:
-                try:
-                    token = kr.get_password(_service_name(slug), orcid_id) or ""
-                except Exception as exc:
-                    logger.warning("Could not read the ORCID token for %s from " "the keyring (%s)", slug, exc)
-                    # clearing the token after a read failure, not a hardcoded secret
-                    token = ""  # nosec B105
-        logger.debug("Loaded ORCID credential for %s (iD %s, token=%s)", slug, orcid_id, bool(token))
-        return Credential(venue=slug, username=orcid_id, password=token, method="orcid", orcid=orcid_id, display_name=entry.get("name", ""))
+    method = entry.get("method", "password")
+    orcid_id = entry.get("orcid", "")
+    display_name = entry.get("name", "")
 
     kr = _get_keyring()
     if kr is not None and entry.get("username"):
@@ -239,12 +244,12 @@ def get_credential(slug: str) -> Credential | None:
             logger.warning("Could not read the password for %s from the " "keyring (%s)", slug, exc)
             password = None
         if password is not None:
-            logger.debug("Loaded password credential for %s from the keyring", slug)
-            return Credential(venue=slug, username=username, password=password)
+            logger.debug("Loaded %s credential for %s from the keyring", method, slug)
+            return Credential(venue=slug, username=username, password=password, method=method, orcid=orcid_id, display_name=display_name)
 
     if "password" in entry and "username" in entry:
-        logger.debug("Loaded password credential for %s from the file store", slug)
-        return Credential(venue=slug, username=entry["username"], password=entry["password"])
+        logger.debug("Loaded %s credential for %s from the file store", method, slug)
+        return Credential(venue=slug, username=entry["username"], password=entry["password"], method=method, orcid=orcid_id, display_name=display_name)
     logger.debug("Credential entry for %s is incomplete; treating as absent", slug)
     return None
 
@@ -272,15 +277,6 @@ def credential_location(slug: str) -> str | None:
     entry = _read_file_store().get(slug)
     if not entry:
         return None
-    if entry.get("method") == "orcid":
-        if entry.get("token"):
-            return "file"
-        cred = get_credential(slug)
-        if cred is None:
-            return None
-        # A token recovered from the keyring lives there; an identity-only
-        # ORCID login (public iD, no token) is recorded in the file store.
-        return "keyring" if cred.password else "file"
     if "password" in entry:
         return "file"
     cred = get_credential(slug)

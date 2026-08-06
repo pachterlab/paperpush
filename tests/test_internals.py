@@ -1,6 +1,6 @@
 """Guards for the project's internal building blocks (no command driven here).
 
-Consolidates three sets of low-level checks that back the CLI commands but are
+Consolidates four sets of low-level checks that back the CLI commands but are
 not commands themselves:
 
 1. **venues.schema.json** -- the generated schema stays in sync with the
@@ -11,6 +11,8 @@ not commands themselves:
 3. **conftest sample-file builders** -- the fixtures the rest of the suite relies
    on produce valid PDFs, DOCX, figures, and LaTeX source bundles, so a builder
    regression surfaces here rather than as a confusing downstream error.
+4. **packaged agent docs** -- the copy of AGENTS.md that ships in the wheel stays
+   in sync with the root file and is reachable via ``paperpush agent-guide``.
 """
 
 from __future__ import annotations
@@ -420,3 +422,57 @@ def test_latex_bundle_is_deterministic(samples, tmp_path):
     second = type(samples)(other).latex_bundle("b").read_bytes()
     # Same inputs -> byte-identical archive (fixed timestamps, sorted members).
     assert first == second
+
+
+# ===========================================================================
+# packaged agent docs
+# ===========================================================================
+#
+# AGENTS.md lives at the repo root (where agent tooling looks for it), but a
+# pip install only ships what is under paperpush/. scripts/sync_agent_docs.py
+# mirrors it into paperpush/_docs/ so `paperpush agent-guide` can serve it
+# offline. These guard the two ways that can silently break: the copy drifting
+# from the root file, and the copy not being packaged at all.
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def test_packaged_agent_guide_matches_root_agents_md():
+    from scripts.sync_agent_docs import main as sync_main
+
+    # --check writes nothing; it exits 1 when the packaged copy is stale.
+    assert sync_main(["--check"]) == 0, "paperpush/_docs is stale -- run: python scripts/sync_agent_docs.py"
+
+    packaged = (REPO_ROOT / "paperpush" / "_docs" / "agents.md").read_text(encoding="utf-8")
+    # The body is carried verbatim; only a generated-file header is prepended.
+    assert (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8") in packaged
+
+
+def test_packaged_agent_guide_is_declared_as_package_data():
+    # A wheel-only failure otherwise: the file imports fine from an editable
+    # checkout but is absent from a pip install if the glob does not cover it.
+    # Sliced out of the raw text rather than parsed -- tomllib is 3.11+ and this
+    # project supports 3.10.
+    text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    section = text.split("[tool.setuptools.package-data]", 1)[1].split("\n[", 1)[0]
+    assert "_docs/*.md" in section
+
+
+def test_agent_guide_command_prints_the_guide(capsys):
+    from paperpush.cli import main
+
+    assert main(["agent-guide"]) == 0
+    out = capsys.readouterr().out
+    # The contract an agent is meant to find, not just any output.
+    assert "you are the extractor" in out
+    assert "paperpush login --list" in out
+
+
+def test_help_points_agents_at_the_guide(capsys):
+    from paperpush.cli import build_parser
+
+    build_parser().print_help()
+    out = capsys.readouterr().out
+    # --help is the discovery path an agent actually takes.
+    assert "paperpush agent-guide" in out
+    assert "github.com/pachterlab/paperpush" in out

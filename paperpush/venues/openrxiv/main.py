@@ -27,7 +27,7 @@ from ..common import parse_pipe_file_list as _parse_file_list
 from ..common import parse_pipe_funders as _parse_funders
 from ..common import session_path as _session_path
 from ..common import split_name_first_middle_last as _split_name
-from ..login import VenueLoginError
+from ..login import VenueLoginError, login_orcid
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,10 @@ class OpenRxivLoginError(VenueLoginError):
 LOGIN_EMAIL_LABEL = "Email:"
 LOGIN_PASSWORD_LABEL = "Password:"  # form label, not a credential  # nosec B105
 LOGIN_BUTTON_NAME = "Sign in"
+# The ORCID hand-off, offered beside the credential form on the same page. Unlike
+# Editorial Manager's popup, this navigates the tab it is clicked in; the shared
+# login_orcid helper detects that, so only the control's name is declared here.
+LOGIN_ORCID_BUTTON_NAME = "ORCID logo Log in with ORCiD"
 
 #* shared selectors -- the runner and the interface checker share these, so one fix corrects both
 
@@ -563,6 +567,8 @@ class OpenRxivVenue(Venue):
 
     #: The queue-page link that only renders for a signed-in session.
     logged_in_names = (BTN_SUBMIT_NEW,)
+    #: Both servers offer "Log in with ORCiD" beside the credential form.
+    supports_orcid_login = True
 
     @property
     def portal_url(self) -> str:
@@ -599,37 +605,59 @@ class OpenRxivVenue(Venue):
             venue=self,
         )
 
-    def login(self, page, username: str, password: str, *, timeout_ms: int = 15000) -> None:
-        """Fill and submit the openRxiv sign-in form from stored credentials.
+    def login(self, page, username: str, password: str, *, orcid: bool = False, timeout_ms: int = 15000) -> None:
+        """Sign in to openRxiv from stored credentials.
+
+        Both ways in start from the same page and end with the same queue check,
+        so only the middle differs: by default the email/password form, with
+        ``orcid`` the "Log in with ORCiD" button beside it -- handed to the shared
+        :func:`~paperpush.venues.login.login_orcid`, with ``username``/``password``
+        then being the author's ORCID iD and ORCID password.
 
         Raises :class:`OpenRxivLoginError` if a form field can't be found or the
         signed-in queue never loads, so :meth:`ensure_signed_in` can fall back to
         a manual sign-in.
         """
         cfg = self.variant
-        logger.debug("Filling the %s sign-in form at %s", cfg.name, cfg.login_url)
+        logger.debug("Signing in to %s at %s (orcid=%s)", cfg.name, cfg.login_url, orcid)
         page.goto(cfg.login_url)
 
-        email = page.get_by_role("textbox", name=LOGIN_EMAIL_LABEL)
-        pwd = page.get_by_role("textbox", name=LOGIN_PASSWORD_LABEL)
-        try:
-            email.wait_for(state="visible", timeout=timeout_ms)
-            pwd.wait_for(state="visible", timeout=timeout_ms)
-        except PWTimeout as exc:
-            raise OpenRxivLoginError(
-                f"could not find the email/password fields on the {cfg.name} sign-in "
-                "page (the sign-in form may have changed)"
-            ) from exc
+        if orcid:
+            login_orcid(
+                page,
+                username,
+                password,
+                entry=page.get_by_role("button", name=LOGIN_ORCID_BUTTON_NAME),
+                return_url=cfg.queues_url,
+                venue_name=cfg.name,
+                timeout_ms=timeout_ms,
+                error=OpenRxivLoginError,
+            )
+        else:
+            email = page.get_by_role("textbox", name=LOGIN_EMAIL_LABEL)
+            pwd = page.get_by_role("textbox", name=LOGIN_PASSWORD_LABEL)
+            try:
+                email.wait_for(state="visible", timeout=timeout_ms)
+                pwd.wait_for(state="visible", timeout=timeout_ms)
+            except PWTimeout as exc:
+                raise OpenRxivLoginError(f"could not find the email/password fields on the {cfg.name} sign-in " "page (the sign-in form may have changed)") from exc
 
-        email.fill(username)
-        pwd.fill(password)
-        page.get_by_role("button", name=LOGIN_BUTTON_NAME).click()
+            email.fill(username)
+            pwd.fill(password)
+            page.get_by_role("button", name=LOGIN_BUTTON_NAME).click()
 
         # Confirm we reached the submission queue (navigating there if the landing
         # page differs); if it still isn't visible, the sign-in did not take.
         if not self.is_logged_in(page, timeout_ms=timeout_ms):
             page.goto(cfg.queues_url)
             if not self.is_logged_in(page, timeout_ms=timeout_ms):
+                if orcid:
+                    raise OpenRxivLoginError(
+                        f"signed in to ORCID but the {cfg.name} submission queue did not "
+                        "load -- the ORCID iD or password may be wrong, or the ORCID "
+                        f"account may not be linked to a {cfg.name} account yet (link it "
+                        "once by signing in by hand)"
+                    )
                 raise OpenRxivLoginError(
                     f"submitted the credentials but the signed-in {cfg.name} submission "
                     "queue did not load -- the email or password may be wrong, or "

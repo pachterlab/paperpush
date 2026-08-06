@@ -31,9 +31,14 @@ from ..common import (DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts,
                       hold_open, hold_open_on_failure, open_run_context)
 from ..common import session_path as _session_path
 from ..common import split_name_first_last as _split_name
-from ..login import VenueLoginError
+from ..login import VenueLoginError, login_orcid
 
 logger = logging.getLogger(__name__)
+
+# The ORCID hand-off on the Springer Nature IDP, offered beside the email field
+# as an alternative to typing one. The shared login_orcid helper takes it from
+# there, detecting whether the link opens a popup or navigates this tab.
+LOGIN_ORCID_LINK_NAME = "Continue with ORCID"
 
 # The Springer Nature IDP gateway used by venues that sign in directly rather than
 # via a portal redirect; it scopes the flow to the venue's context code. Re-capture
@@ -610,6 +615,8 @@ class SnappVenue(Venue):
     logged_in_role = "textbox"
     logged_in_names = ("Email address",)
     logged_in_present_means_in = False
+    #: The Springer Nature IDP offers "Continue with ORCID" beside that field.
+    supports_orcid_login = True
 
     # portal_url and display_name are inherited (base returns the venue's
     # submission_url == variant.portal_url, and .name).
@@ -638,7 +645,7 @@ class SnappVenue(Venue):
             venue=self,
         )
 
-    def login(self, page, username: str, password: str, *, timeout_ms: int = 20000) -> None:
+    def login(self, page, username: str, password: str, *, orcid: bool = False, timeout_ms: int = 20000) -> None:
         """Sign in through the Springer Nature IDP from credentials.
 
         Navigates to :attr:`Variant.auto_login_url`, dismisses the cookie banner,
@@ -650,11 +657,18 @@ class SnappVenue(Venue):
         that cannot be cleanly reloaded, so the same pass is repeated in place (up to
         :data:`_LOGIN_ATTEMPTS` times). Raises :class:`SnappLoginError` on failure so
         :meth:`ensure_signed_in` can fall back to a manual sign-in.
+
+        ``orcid`` takes the IDP's "Continue with ORCID" link instead of typing an
+        email, handing off to the shared
+        :func:`~paperpush.venues.login.login_orcid`; ``username``/``password`` are
+        then the author's ORCID iD and ORCID password. Reaching the IDP is the same
+        either way, so only the step after it differs -- and ORCID owns the retry,
+        so the bounce-back loop below does not apply.
         """
         cfg = self.variant
         link_name = cfg.login_link_name
         login_url = cfg.site_url if link_name else cfg.auto_login_url
-        logger.debug("Signing in to %s via the Springer Nature IDP", cfg.name)
+        logger.debug("Signing in to %s via the Springer Nature IDP (orcid=%s)", cfg.name, orcid)
         page.goto(login_url)
         # The homepage banner overlays the link, so clear it before clicking.
         _dismiss_cookies(page)
@@ -669,6 +683,26 @@ class SnappVenue(Venue):
                     f"selectors with 'playwright codegen {login_url}'"
                 ) from exc
             _dismiss_cookies(page)
+
+        if orcid:
+            login_orcid(
+                page,
+                username,
+                password,
+                entry=page.get_by_role("link", name=LOGIN_ORCID_LINK_NAME),
+                return_url=self.portal_url,
+                venue_name=cfg.name,
+                timeout_ms=timeout_ms,
+                error=SnappLoginError,
+            )
+            if self.is_logged_in(page, timeout_ms=8000):
+                return
+            raise SnappLoginError(
+                f"signed in to ORCID but the {cfg.name} portal did not load -- the "
+                "ORCID iD or password may be wrong, or the ORCID account may not be "
+                "linked to a Springer Nature account yet (link it once by signing in "
+                "by hand)"
+            )
 
         email = page.get_by_role("textbox", name="Email address")
         try:

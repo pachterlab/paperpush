@@ -10,7 +10,7 @@ from ...validate import _truthy_bool, parse_authors
 from ..base import Venue
 from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
                       hold_open, hold_open_on_failure, open_run_context, _try)
-from ..login import VenueLoginError
+from ..login import VenueLoginError, login_orcid
 
 logger = logging.getLogger(__name__)
 
@@ -73,36 +73,59 @@ def license_url(license_name: str) -> str:
 class ArxivVenue(Venue):
     slug = "arxiv"  # * slug name
     logged_in_names = ("START NEW SUBMISSION",)  # * a button I expect to see when signed in
+    supports_orcid_login = True  # * arXiv offers "Log in with ORCiD" beside the credential form
 
     _VENUE = get_venue(slug)
     SITE_URL = _VENUE.site_url
     LOGIN_URL = f"{SITE_URL}/login"
     USER_URL = f"{SITE_URL}/user"
 
+    # * The ORCID hand-off on the sign-in page. Several accessible names are tried
+    # because arXiv words the control differently from openRxiv's identical flow;
+    # the first one that renders wins (see first_present).
+    ORCID_BUTTON_NAMES = ("ORCID logo Log in with ORCiD", "Log in with ORCiD", "Log in with ORCID", "Sign in with ORCID")
+
     # * login
-    def login(self, page, username: str, password: str, *, timeout_ms: int = 15000) -> None:
+    def login(self, page, username: str, password: str, *, orcid: bool = False, timeout_ms: int = 15000) -> None:
         """
-        Fill and submit the arXiv sign-in form from stored credentials. Falls back to manual sign-in if the automatic attempt fails.
+        Sign in to arXiv from stored credentials. Falls back to manual sign-in if the automatic attempt fails.
+
+        Both ways in start from the same page and end with the same dashboard check, so only the middle differs: by default the username/password form, with ``orcid`` the "Log in with ORCiD" control beside it -- handed to the shared login_orcid helper, with ``username``/``password`` then being the author's ORCID iD and ORCID password.
         """
-        logger.debug("Filling the arXiv sign-in form at %s", self.LOGIN_URL)
+        logger.debug("Signing in to arXiv at %s (orcid=%s)", self.LOGIN_URL, orcid)
         page.goto(self.LOGIN_URL)
-        user_box = page.get_by_role("textbox", name="Username or e-mail")
-        pwd_box = page.get_by_role("textbox", name="Password")
 
-        try:
-            user_box.wait_for(state="visible", timeout=timeout_ms)
-            pwd_box.wait_for(state="visible", timeout=timeout_ms)
-        except PWTimeout as exc:
-            raise VenueLoginError("could not find the username/password fields on the arXiv sign-in " "page (the sign-in form may have changed)") from exc
+        if orcid:
+            login_orcid(
+                page,
+                username,
+                password,
+                entry=[page.get_by_role("button", name=name) for name in self.ORCID_BUTTON_NAMES] + [page.get_by_role("link", name=name) for name in self.ORCID_BUTTON_NAMES],
+                return_url=self.USER_URL,
+                venue_name="arXiv",
+                timeout_ms=timeout_ms,
+                error=VenueLoginError,
+            )
+        else:
+            user_box = page.get_by_role("textbox", name="Username or e-mail")
+            pwd_box = page.get_by_role("textbox", name="Password")
 
-        user_box.fill(username)
-        pwd_box.fill(password)
-        page.get_by_role("button", name="Submit").click()
+            try:
+                user_box.wait_for(state="visible", timeout=timeout_ms)
+                pwd_box.wait_for(state="visible", timeout=timeout_ms)
+            except PWTimeout as exc:
+                raise VenueLoginError("could not find the username/password fields on the arXiv sign-in " "page (the sign-in form may have changed)") from exc
+
+            user_box.fill(username)
+            pwd_box.fill(password)
+            page.get_by_role("button", name="Submit").click()
 
         # A successful sign-in lands on the user dashboard, where the "START NEW SUBMISSION" link renders. If it never appears, the sign-in did not take (navigate to /user once in case the landing page differs).
         if not self.is_logged_in(page, timeout_ms=timeout_ms):
             page.goto(self.USER_URL)
             if not self.is_logged_in(page, timeout_ms=timeout_ms):
+                if orcid:
+                    raise VenueLoginError("signed in to ORCID but the arXiv dashboard did not load -- the " "ORCID iD or password may be wrong, or the ORCID account may not " "be linked to an arXiv account yet (link it once by signing in by hand)")
                 raise VenueLoginError("submitted the credentials but the signed-in arXiv dashboard did " "not load -- the username or password may be wrong, or arXiv " "added a step (CAPTCHA / two-factor) that can't be automated")
 
     # * run

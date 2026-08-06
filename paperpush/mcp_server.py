@@ -487,7 +487,7 @@ def login_status(venue: Optional[str] = None) -> dict[str, Any]:
             entry["login_command"] = " ".join(["paperpush", "login", base])
             return entry
         entry["method"] = credential.method
-        entry["identity"] = credential.orcid if credential.method == "orcid" else credential.username
+        entry["identity"] = credential.identity
         if credential.display_name:
             entry["display_name"] = credential.display_name
         entry["stored_in"] = "OS keyring" if credentials.credential_location(base) == "keyring" else "config file"
@@ -495,7 +495,7 @@ def login_status(venue: Optional[str] = None) -> dict[str, Any]:
 
     logins: list[dict[str, Any]] = []
     for credential in credentials.list_credentials():
-        identity = credential.orcid if credential.method == "orcid" else credential.username
+        identity = credential.identity
         for slug in [credential.venue, *venues_pkg.submission_aliases(credential.venue)]:
             logins.append(
                 {
@@ -550,7 +550,7 @@ def login(
 
     existing = credentials.get_credential(base)
     if existing is not None:
-        identity = existing.orcid if existing.method == "orcid" else existing.username
+        identity = existing.identity
         return {
             "status": "already_logged_in",
             "venue": resolved.slug,

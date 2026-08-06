@@ -32,8 +32,8 @@ Examples:
     python scripts/paperpush_pipeline.py biorxiv \\
         -d ./my_manuscript --values values.json
 
-    # API autofill, then sign in with ORCID, run headless:
-    python scripts/paperpush_pipeline.py nature \\
+    # API autofill, then sign in with ORCID (journals that offer it), run headless:
+    python scripts/paperpush_pipeline.py cell_genomics \\
         -d ./my_manuscript --engine api --orcid --headless
 
     # Re-run end to end, overwriting an existing nature.sub:
@@ -56,6 +56,7 @@ from paperpush.cli import (_cmd_autofill, _cmd_login,  # noqa: E402
                            _cmd_subfile, _cmd_submit, _cmd_validate)
 from paperpush.database import get_venue  # noqa: E402
 from paperpush.subfile import default_filename  # noqa: E402
+from paperpush.venues.common import DEFAULT_TIMEOUT_SECONDS  # noqa: E402
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -93,8 +94,8 @@ def build_parser() -> argparse.ArgumentParser:
     # login-only.
     login = parser.add_argument_group("login step")
     login.add_argument("-u", "--username", help="username or email (otherwise you are prompted)")
-    login.add_argument("--orcid", action="store_true", help="sign in with ORCID instead of a username/password")
-    login.add_argument("--orcid-id", metavar="ID", dest="orcid_id", help="your ORCID iD (e.g. 0000-0002-1825-0097); implies --orcid")
+    login.add_argument("--orcid", action="store_true", help="sign in with your ORCID account (prompts for your ORCID iD and ORCID password) instead of a venue username/password; journals only")
+    login.add_argument("--orcid-id", metavar="ID", dest="orcid_id", help="your ORCID iD (e.g. 0000-0002-1825-0097) or registered email; implies --orcid")
     login.add_argument("--into", metavar="SUBFILE", help="after an ORCID login, fill the matching author's ORCID/name/affiliation in this .sub file")
     login.add_argument("--status", action="store_true", help="show whether credentials are stored instead of signing in")
     login.add_argument("--logout", action="store_true", help="remove stored credentials for the venue")
@@ -169,14 +170,23 @@ def main(argv: list[str] | None = None) -> int:
         (
             "login",
             _cmd_login,
+            # The full set of login arguments: _cmd_login reads them directly, so
+            # every flag the CLI defines needs a value here even when the pipeline
+            # exposes no switch for it. Passwords are never taken as a pipeline
+            # flag -- login prompts, or reads PAPERPUSH_PASSWORD.
             Namespace(
                 venue=args.venue,
                 username=args.username,
+                password=None,
                 orcid=args.orcid,
                 orcid_id=args.orcid_id,
                 into=args.into,
                 status=args.status,
                 logout=args.logout,
+                list=False,
+                no_verify=False,
+                verify_headless=args.headless,
+                timeout=DEFAULT_TIMEOUT_SECONDS,
             ),
         ),
         (

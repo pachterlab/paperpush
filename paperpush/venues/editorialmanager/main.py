@@ -34,7 +34,7 @@ from ..common import parse_pipe_funders as _parse_funders
 from ..common import save_storage
 from ..common import split_name_first_last as _split_name
 from ..common import wait_for_human
-from ..login import VenueLoginError
+from ..login import VenueLoginError, login_orcid
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,10 @@ class Variant:
     ``plos_declarations`` (PLOS's separate ``QR23_1_Q*`` question set, driving
     :func:`_answer_declarations_plos` instead of :func:`_answer_declarations`), and
     ``no_funding_label`` (the checkbox label used to declare no funding).
+
+    Signing in does not vary: every Editorial Manager deployment offers the same
+    credential form and the same "Login using ORCID" link, so neither is a toggle
+    here (see :meth:`EditorialManagerVenue.login`).
     """
 
     slug: str
@@ -128,6 +132,10 @@ LOGIN_FRAME = 'iframe[name="login"]'
 
 # The author-area link that only renders once signed in.
 SUBMIT_NEW_LINK = "Submit New Manuscript"
+
+# The ORCID hand-off, offered on the same sign-in panel as the credential form.
+# It opens ORCID in a popup window; the shared login_orcid helper detects that.
+LOGIN_ORCID_LINK_NAME = "Login using ORCID"
 
 # Normalize spellings/abbreviations to the label shown in the "Country or Region"
 # drop-down; anything not listed falls through to the stripped input unchanged.
@@ -340,7 +348,6 @@ def _attach_files(page, cf, manuscript_file: str, cover_letter: str, declaration
         except:  # Button didn't appear, continue
             pass
 
-    
     _upload(page, cf, manuscript_file)
     page.wait_for_timeout(2000)
     if cfg.annotate_manuscript_manually:
@@ -469,6 +476,7 @@ def _answer_declarations_plos(
     best-effort (see :func:`_try`); re-capture with ``playwright codegen`` if the
     page is restyled.
     """
+
     def _select_country(select, country):
         # Match the .sub country against the option labels by leading text,
         # case-insensitively. A blank value is a no-op.
@@ -763,7 +771,6 @@ def _add_reviewer(page, cf, reviewer: dict) -> None:
         cf.get_by_role("button", name="OK").click(timeout=1000)
 
 
-
 def _enter_reviewers(page, cf, reviewers: list[dict]) -> None:
     """Fill the reviewer-preferences step.
 
@@ -989,6 +996,9 @@ class EditorialManagerVenue(Venue):
     #: EM hosts its whole author area inside this iframe, so the login-state
     #: marker is searched under it rather than on the top-level page.
     login_frame_selector = CONTENT_FRAME
+    #: Every Editorial Manager deployment offers "Login using ORCID" on its
+    #: sign-in panel, so this holds for the whole portal rather than per variant.
+    supports_orcid_login = True
 
     # display_name is inherited: the base returns get_venue(slug).name == variant.name.
 
@@ -1012,35 +1022,66 @@ class EditorialManagerVenue(Venue):
             venue=self,
         )
 
-    def login(self, page, username: str, password: str, *, timeout_ms: int = 15000) -> None:
-        """Fill and submit the Editorial Manager sign-in form from stored credentials.
+    def login(self, page, username: str, password: str, *, orcid: bool = False, timeout_ms: int = 15000) -> None:
+        """Sign in to Editorial Manager from stored credentials.
 
-        Locates the credential form (see :func:`_login_form`), clicking a splash
-        "Log In" reveal button first if needed, submits it, and raises
+        Both ways in start from the same page and end with the same check, so
+        only the middle differs: by default the credential form, with ``orcid``
+        the "Login using ORCID" link handed to the shared
+        :func:`~paperpush.venues.login.login_orcid`, in which case
+        ``username``/``password`` are the author's ORCID iD and ORCID password.
+        Cell hides the whole sign-in panel behind a splash "Log In" button (PLOS
+        shows it directly) and *both* controls live on that panel, so it is
+        revealed once, before the branch. The ORCID link is looked for in the
+        content frame and in the nested login iframe, the same two roots
+        :func:`_login_form` probes for the credential form, since PLOS renders its
+        panel one level deeper than Cell does. Raises
         :class:`EditorialManagerLoginError` if the author area never loads.
         """
         cfg = self.variant
         login_url = cfg.login_url
-        logger.debug("Filling the %s (Editorial Manager) sign-in form at %s", cfg.name, login_url)
+        logger.debug("Signing in to %s (Editorial Manager) at %s (orcid=%s)", cfg.name, login_url, orcid)
         page.goto(login_url)
         _dismiss_cookies(page)
 
-        try:
-            # Cell hides the form behind a splash "Log In" button; PLOS shows it
-            # directly. Look for the form first, revealing it only if absent.
-            frame = _login_form(page, 4000)
-            if frame is None:
-                _try(lambda: _content(page).get_by_role("button", name="Log In").click(timeout=5000), "reveal login form")
-                frame = _login_form(page, timeout_ms)
-            if frame is None:
-                raise PWTimeout("username field never became visible")
-            frame.get_by_role("textbox", name="username").fill(username)
-            frame.get_by_role("textbox", name="password").fill(password)
-            frame.get_by_role("button", name="Author Login").click()
-        except PWTimeout as exc:
-            raise EditorialManagerLoginError(f"could not find the username/password fields on the {cfg.name} sign-in " "page (the Editorial Manager form may have changed); re-capture " "the selectors with 'playwright codegen %s'" % login_url) from exc
+        # Look for the sign-in panel first, revealing it only if absent.
+        frame = _login_form(page, 4000)
+        if frame is None:
+            _try(lambda: _content(page).get_by_role("button", name="Log In").click(timeout=5000), "reveal login form")
+            frame = _login_form(page, timeout_ms)
+
+        if orcid:
+            content = _content(page)
+            login_orcid(
+                page,
+                username,
+                password,
+                entry=[root.get_by_role("link", name=LOGIN_ORCID_LINK_NAME) for root in (content, content.frame_locator(LOGIN_FRAME))],
+                return_url=cfg.portal_url,
+                venue_name=cfg.name,
+                timeout_ms=timeout_ms,
+                error=EditorialManagerLoginError,
+            )
+        else:
+            try:
+                if frame is None:
+                    raise PWTimeout("username field never became visible")
+                frame.get_by_role("textbox", name="username").fill(username)
+                frame.get_by_role("textbox", name="password").fill(password)
+                frame.get_by_role("button", name="Author Login").click()
+            except PWTimeout as exc:
+                raise EditorialManagerLoginError(f"could not find the username/password fields on the {cfg.name} sign-in " "page (the Editorial Manager form may have changed); re-capture " "the selectors with 'playwright codegen %s'" % login_url) from exc
 
         if not self.is_logged_in(page, timeout_ms=timeout_ms):
+            if orcid:
+                # sometimes I must try one more time to click on the ORCID link
+                _try(lambda: _content(page).get_by_role("button", name="Log In").click(timeout=5000), "reveal login form")
+                with page.expect_popup() as page1_info:
+                    _try(lambda: page.locator("iframe[name=\"content\"]").content_frame.get_by_role("link", name="Login using ORCID").click(timeout=2000), "try orcid again")  # works for Cell family
+                    _try(lambda: page.locator("iframe[name=\"content\"]").content_frame.locator("iframe[name=\"login\"]").content_frame.get_by_role("link", name="Login using ORCID").click(timeout=2000), "try orcid again")  # works for PLOS family
+                    
+                if not self.is_logged_in(page, timeout_ms=timeout_ms):
+                    raise EditorialManagerLoginError(f"signed in to ORCID but the {cfg.name} author area did not load -- the " "ORCID iD or password may be wrong, or the ORCID account may not be " f"linked to a {cfg.name} account yet (link it once by signing in by hand)")
             raise EditorialManagerLoginError(f"submitted the credentials but the signed-in {cfg.name} author area did " f"not load -- the username or password may be wrong, or {cfg.name} added " "a step (CAPTCHA / two-factor) that can't be automated")
 
     def ensure_signed_in(self, page, context, *, debug: bool = False) -> bool:
@@ -1069,20 +1110,13 @@ class EditorialManagerVenue(Venue):
             logger.debug("Could not load stored %s credentials (%s)", cfg.name, exc)
             cred = None
 
-        if cred and cred.method == "password" and cred.username and cred.password:
-            try:
-                logger.info("Signing in to %s with stored credentials", cfg.name)
-                print(f"Signing in to {cfg.name} with your stored credentials…")
-                self.login(page, cred.username, cred.password)
-                save_storage(context, session)
-                logger.info("Signed in to %s; saved the session for reuse", cfg.name)
-                print("Signed in; saved the session for next time.")
-                return True
-            except EditorialManagerLoginError as exc:
-                logger.warning("Automatic %s sign-in failed: %s", cfg.name, exc)
-                print(f"Automatic sign-in failed: {exc}")
-                logger.info("Falling back to a manual %s sign-in", cfg.name)
-                print("Falling back to a manual sign-in.")
+        # Shared branch: an ORCID credential signs in with orcid=True, anything
+        # else through the Editorial Manager credential form.
+        if self._sign_in_with_credential(page, cred):
+            save_storage(context, session)
+            logger.info("Signed in to %s; saved the session for reuse", cfg.name)
+            print("Signed in; saved the session for next time.")
+            return True
 
         # Manual fallback: reached when there are no usable credentials or the auto
         # sign-in failed.

@@ -1,29 +1,28 @@
-"""ORCID-based sign-in for journal submission systems.
+"""ORCID identities used to sign in to journal submission systems.
 
-Many editorial managers (Editorial Manager, ScholarOne, eJournalPress, and the
-target system here) offer a "Sign in with ORCID" button instead of a separate
-username and password. This module provides the pieces ``paperpush login
---orcid`` needs:
+Many editorial managers (Editorial Manager, ScholarOne, eJournalPress) offer a
+"Sign in with ORCID" button beside their own username/password form. Signing in
+that way is still a credential the author types -- their ORCID iD (or registered
+email) and their ORCID password -- so ``paperpush login --orcid`` collects
+exactly that pair, and the venue's :meth:`~paperpush.venues.base.Venue.login`
+types it into the portal's ORCID popup when called with ``orcid=True``.
+paperpush is not a registered ORCID API client and deliberately runs no OAuth
+flow of its own; nothing here talks to ORCID on the author's behalf at sign-in
+time.
+
+What this module provides:
 
 * :func:`is_valid_id` / :func:`normalize_id` validate and canonicalize an ORCID
-  iD, including its ISO 7064 MOD 11-2 checksum, so a typo is caught before any
-  network call.
-* :func:`fetch_profile` reads the author's public ORCID record (name, primary
-  affiliation, public email) so those fields can be filled in programmatically.
-* :func:`run_oauth_flow` performs the three-legged OAuth "/authenticate" flow
-  used by the real ORCID button: it opens the browser, captures the redirect on
-  a loopback server, and exchanges the code for the authenticated iD. This path
-  is only available when a registered ORCID client is configured (see below).
+  iD, including its ISO 7064 MOD 11-2 checksum, so a typo is caught before a
+  browser is ever opened. :func:`is_valid_identity` widens that to the registered
+  email the ORCID form also accepts.
+* :func:`fetch_profile` reads an author's *public* ORCID record (name, primary
+  affiliation, public email), and :func:`fill_author_block` writes those into a
+  ``.sub`` author line. This is the ``login --into`` convenience, not part of
+  signing in; it is a plain unauthenticated read of the public API.
 
-Configuration (all optional):
-
-* ``PAPERPUSH_ORCID_CLIENT_ID`` / ``PAPERPUSH_ORCID_CLIENT_SECRET`` --
-  credentials of a registered ORCID API client. When both are set the full
-  OAuth flow is used; otherwise ``login --orcid`` falls back to an assisted flow
-  that opens the ORCID sign-in page and asks for the iD, then reads the public
-  record.
-* ``PAPERPUSH_ORCID_SANDBOX=1`` -- talk to ORCID's sandbox
-  (``sandbox.orcid.org``) instead of the production registry.
+``PAPERPUSH_ORCID_SANDBOX=1`` points the public-record lookup at ORCID's sandbox
+(``sandbox.orcid.org``) instead of the production registry.
 
 Only the Python standard library is used, so the dependency footprint does not
 grow.
@@ -31,22 +30,16 @@ grow.
 
 from __future__ import annotations
 
-import http.server
 import json
 import logging
 import os
-import socket
-import threading
 import urllib.error
-import urllib.parse
 import urllib.request
-import webbrowser
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 HTTP_TIMEOUT = 15  # seconds for any ORCID API call
-OAUTH_TIMEOUT = 300  # seconds to wait for the user to authorize in the browser
 
 
 class OrcidError(Exception):
@@ -62,18 +55,6 @@ def _sandbox() -> bool:
 
 def _base_host() -> str:
     return "sandbox.orcid.org" if _sandbox() else "orcid.org"
-
-
-def authorize_endpoint() -> str:
-    return f"https://{_base_host()}/oauth/authorize"
-
-
-def token_endpoint() -> str:
-    return f"https://{_base_host()}/oauth/token"
-
-
-def signin_url() -> str:
-    return f"https://{_base_host()}/signin"
 
 
 def public_api_base() -> str:
@@ -136,6 +117,30 @@ def is_valid_id(value: str) -> bool:
     if check not in "0123456789X":
         return False
     return _checksum_char(body) == check
+
+
+def is_email(value: str) -> bool:
+    """True if ``value`` looks like the email address ORCID's form also accepts."""
+    text = value.strip()
+    if text.count("@") != 1 or any(ch.isspace() for ch in text):
+        return False
+    local, _, domain = text.partition("@")
+    return bool(local) and "." in domain and not domain.startswith(".") and not domain.endswith(".")
+
+
+def is_valid_identity(value: str) -> bool:
+    """True if ``value`` is something ORCID's sign-in form accepts.
+
+    The field is labelled "Email or ORCID iD", so either is a legitimate answer
+    to the ``login --orcid`` prompt. Checked before opening a browser so an
+    obvious typo costs no time.
+    """
+    return is_valid_id(value) or is_email(value)
+
+
+def normalize_identity(value: str) -> str:
+    """Canonicalize an ORCID sign-in identity: hyphenate an iD, strip an email."""
+    return normalize_id(value) if is_valid_id(value) else value.strip()
 
 
 # --- public record lookup -------------------------------------------------
@@ -231,148 +236,6 @@ def fetch_profile(orcid_id: str) -> OrcidProfile:
     return profile
 
 
-# --- three-legged OAuth ("Sign in with ORCID") ----------------------------
-
-
-def oauth_available() -> bool:
-    """True if a registered ORCID client is configured for the full OAuth flow."""
-    return bool(os.environ.get("PAPERPUSH_ORCID_CLIENT_ID") and os.environ.get("PAPERPUSH_ORCID_CLIENT_SECRET"))
-
-
-def open_signin() -> bool:
-    """Open the ORCID sign-in page in a browser. Returns True if a browser opened."""
-    try:
-        return webbrowser.open(signin_url())
-    except Exception:
-        return False
-
-
-def authorize_url(client_id: str, redirect_uri: str, scope: str = "/authenticate") -> str:
-    """Build the ORCID authorization URL the browser is sent to."""
-    query = urllib.parse.urlencode(
-        {
-            "client_id": client_id,
-            "response_type": "code",
-            "scope": scope,
-            "redirect_uri": redirect_uri,
-        }
-    )
-    return f"{authorize_endpoint()}?{query}"
-
-
-class _CallbackHandler(http.server.BaseHTTPRequestHandler):
-    """One-shot handler that captures the ``?code=`` (or ``?error=``) redirect."""
-
-    def do_GET(self):  # noqa: N802 (name mandated by BaseHTTPRequestHandler)
-        params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        self.server.oauth_code = (params.get("code") or [None])[0]
-        self.server.oauth_error = (params.get("error_description") or params.get("error") or [None])[0]
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.end_headers()
-        if self.server.oauth_code:
-            body = "<h2>ORCID sign-in complete.</h2>" "<p>You can close this tab and return to the terminal.</p>"
-        else:
-            body = "<h2>ORCID sign-in failed.</h2>" "<p>Return to the terminal for details.</p>"
-        self.wfile.write(body.encode("utf-8"))
-
-    def log_message(self, fmt, *args):  # route the default stderr logging to us
-        logger.debug("ORCID callback server: " + fmt, *args)
-
-
-def _exchange_code(code: str, redirect_uri: str) -> dict:
-    """Trade an authorization code for a token payload (incl. the ORCID iD)."""
-    data = urllib.parse.urlencode(
-        {
-            "client_id": os.environ["PAPERPUSH_ORCID_CLIENT_ID"],
-            "client_secret": os.environ["PAPERPUSH_ORCID_CLIENT_SECRET"],
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": redirect_uri,
-        }
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        token_endpoint(),
-        data=data,
-        headers={
-            "Accept": "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-    )
-    logger.debug("Exchanging ORCID authorization code at %s", token_endpoint())
-    try:
-        # token_endpoint() is a hardcoded https URL; not attacker-controlled
-        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:  # nosec B310
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        logger.warning("ORCID token exchange failed (HTTP %s)", exc.code)
-        raise OrcidError(f"token exchange failed (HTTP {exc.code})") from exc
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        logger.warning("ORCID token exchange failed (%s)", exc)
-        raise OrcidError(f"token exchange failed ({exc})") from exc
-
-
-def run_oauth_flow() -> tuple[str, str, str]:
-    """Run the interactive "Sign in with ORCID" flow.
-
-    Opens the browser to ORCID, waits for the loopback redirect, and exchanges
-    the resulting code for the authenticated identity. Returns
-    ``(orcid_id, name, access_token)``. Raises :class:`OrcidError` on any
-    failure or timeout.
-    """
-    if not oauth_available():
-        raise OrcidError("no ORCID client configured " "(set PAPERPUSH_ORCID_CLIENT_ID/SECRET)")
-    client_id = os.environ["PAPERPUSH_ORCID_CLIENT_ID"]
-
-    # Bind a loopback server on an ephemeral port for the redirect URI.
-    try:
-        server = http.server.HTTPServer(("127.0.0.1", 0), _CallbackHandler)
-    except OSError as exc:
-        raise OrcidError(f"could not start a local redirect server ({exc})") from exc
-    server.oauth_code = None
-    server.oauth_error = None
-    server.timeout = OAUTH_TIMEOUT
-    port = server.server_address[1]
-    redirect_uri = f"http://127.0.0.1:{port}/callback"
-    logger.debug("Started ORCID OAuth redirect server on 127.0.0.1:%d", port)
-
-    url = authorize_url(client_id, redirect_uri)
-    opened = False
-    try:
-        opened = webbrowser.open(url)
-    except Exception:
-        opened = False
-    if not opened:
-        # Headless host: the caller should still be able to complete it by hand.
-        print(f"Open this URL to authorize with ORCID:\n  {url}")
-
-    # Service exactly one request (the redirect), bounded by the timeout.
-    thread = threading.Thread(target=server.handle_request, daemon=True)
-    thread.start()
-    thread.join(OAUTH_TIMEOUT)
-    try:
-        if thread.is_alive():
-            logger.warning("Timed out after %ds waiting for ORCID authorization", OAUTH_TIMEOUT)
-            raise OrcidError("timed out waiting for ORCID authorization")
-        if server.oauth_error:
-            logger.warning("ORCID authorization reported an error: %s", server.oauth_error)
-            raise OrcidError(f"ORCID reported: {server.oauth_error}")
-        if not server.oauth_code:
-            raise OrcidError("no authorization code was returned by ORCID")
-        logger.debug("Received ORCID authorization code; exchanging for a token")
-        payload = _exchange_code(server.oauth_code, redirect_uri)
-    finally:
-        server.server_close()
-
-    orcid_id = normalize_id(payload.get("orcid", ""))
-    if not is_valid_id(orcid_id):
-        raise OrcidError("ORCID did not return a valid iD")
-    name = (payload.get("name") or "").strip()
-    token = (payload.get("access_token") or "").strip()
-    logger.info("Completed ORCID OAuth flow for %s (token issued=%s)", orcid_id, bool(token))
-    return orcid_id, name, token
-
-
 # --- programmatic field population ----------------------------------------
 
 
@@ -399,8 +262,7 @@ def fill_author_block(block_text: str, profile: OrcidProfile, fields: list[str] 
     no author line could be matched.
     """
     # Local import avoids a circular import at module load time.
-    from .validate import (DEFAULT_AUTHOR_FIELDS, _author_name,
-                           _subfield_specs, parse_authors)
+    from .validate import DEFAULT_AUTHOR_FIELDS, _author_name, _subfield_specs, parse_authors
 
     columns = [name for name, _ in _subfield_specs(fields or DEFAULT_AUTHOR_FIELDS)]
     authors = parse_authors(block_text, fields)
