@@ -1,7 +1,7 @@
 ## Supported venues
 
 <!-- BEGIN SUPPORTED VENUES -->
-_21 supported venues (auto-generated from `paperpush/venues.json`)._
+_22 supported venues (auto-generated from `paperpush/venues.json`)._
 
 | Slug | Venue | Venue type | Submission platform | Description | Submit walkthrough |
 | --- | --- | --- | --- | --- | --- |
@@ -12,6 +12,7 @@ _21 supported venues (auto-generated from `paperpush/venues.json`)._
 | `cell` | [Cell](https://www.cell.com/cell/home) | Journal | Editorial Manager | Cell Press flagship journal publishing high-impact peer-reviewed research across the full breadth of the life sciences. | ✅ 2026-07-29 |
 | `cell_genomics` | [Cell Genomics](https://www.cell.com/cell-genomics/home) | Journal | Editorial Manager | Open-access Cell Press journal publishing research across genetics and genomics, including functional, evolutionary, and computational genomics and their applications to health and disease. | ✅ 2026-07-29 |
 | `cell_systems` | [Cell Systems](https://www.cell.com/cell-systems/home) | Journal | Editorial Manager | Cell Press journal publishing research in systems biology, including quantitative, computational, and theoretical approaches to understanding biological systems across scales. | ✅ 2026-07-29 |
+| `combinatorica` | [Combinatorica](https://link.springer.com/journal/493) | Journal | EditFlow | International journal publishing research in combinatorics and the theory of computing, including combinatorial structures, optimization, algorithms, complexity, geometry, and number theory. | ✅ 2026-08-06 |
 | `discrete_mathematics` | [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics) | Journal | Editorial Manager | Elsevier journal publishing original research and survey articles across combinatorics, graph theory, and the broader field of discrete mathematics. | ✅ 2026-07-29 |
 | `genome_biology` | [Genome Biology](https://genomebiology.biomedcentral.com) | Journal | Springer Nature Snapp | Open-access journal publishing peer-reviewed research and methods across all areas of biology and biomedicine studied from a genomic and post-genomic perspective. | ✅ 2026-07-29 |
 | `medrxiv` | [medRxiv](https://www.medrxiv.org) | Preprint | openRxiv | Free online archive and distribution server for complete but unpublished manuscripts (preprints) in the medical, clinical, and related health sciences. | ✅ 2026-07-29 |

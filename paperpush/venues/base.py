@@ -20,7 +20,9 @@ attributes:
   *in* or *out*) -- a venue declares those instead of writing the check.
 * :meth:`~Venue.ensure_signed_in` is the one shared sign-in orchestrator (reuse a
   saved session, else stored credentials via :meth:`~Venue.login`, else a manual
-  sign-in); no venue reimplements it.
+  sign-in); no venue reimplements it. A loginless portal sets
+  :attr:`~Venue.requires_login` to ``False`` and the orchestrator simply opens
+  its submission page.
 * :meth:`~Venue.session_path` / :meth:`~Venue.save_session` locate and capture the
   saved Playwright session; :attr:`~Venue.field_validators` defaults to empty.
 
@@ -101,6 +103,11 @@ class Venue(ABC):
     #: ScholarOne journals cannot, so they set this ``False`` and ``save_session``
     #: raises rather than opening a browser that can never sign in.
     supports_session_capture: bool = True
+    #: Whether the portal requires an author to sign in before submitting.
+    #: Loginless systems (EditFlow) set this ``False``: the CLI then skips the
+    #: credential prompt, :meth:`ensure_signed_in` only opens ``portal_url``, and
+    #: :meth:`save_session` refuses because there is no session to capture.
+    requires_login: bool = True
     #: Whether :meth:`login` accepts ``orcid=True`` -- i.e. whether this portal's
     #: "Sign in with ORCID" control has been recorded. Default ``False``, and it
     #: is the contract: callers check this attribute and refuse with
@@ -271,8 +278,14 @@ class Venue(ABC):
         debug mode's manual path, where the caller's ``page.pause()`` lets you sign
         in by hand in the Inspector.
         """
-        session = self.session_path()
         name = self.display_name
+
+        if not self.requires_login:
+            page.goto(self.portal_url)
+            logger.info("%s does not require sign-in", name)
+            return True
+
+        session = self.session_path()
 
         page.goto(self.portal_url)
         if self.is_logged_in(page):
@@ -325,6 +338,8 @@ class Venue(ABC):
         whose recorded flow cannot script a fresh sign-in sets
         :attr:`supports_session_capture` to ``False``, and this raises instead.
         """
+        if not self.requires_login:
+            raise NotImplementedError(f"{self.slug} does not require or use a saved login session")
         if not self.supports_session_capture:
             raise NotImplementedError(f"{self.slug} does not support capturing a session by hand")
 

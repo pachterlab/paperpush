@@ -29,7 +29,7 @@ SUBMITTABLE = sorted(set(venues.SLUG_TO_MODULE) | set(_SUBMISSION_BASE))
 # A baseline of venues that must always be discovered -- one per portal, so a
 # regression in discovery that silently drops a whole subpackage is caught even
 # though the registry itself is generated rather than hand-listed.
-_EXPECTED_BASELINE = {"arxiv", "biorxiv", "medrxiv", "cell", "bmc_bioinformatics", "bioinformatics", "nature", "science"}
+_EXPECTED_BASELINE = {"arxiv", "biorxiv", "medrxiv", "cell", "bmc_bioinformatics", "bioinformatics", "nature", "science", "combinatorica"}
 
 
 def test_slug_to_module_is_discovered_from_filenames():
@@ -112,3 +112,21 @@ def test_incomplete_subclass_cannot_be_instantiated():
 
     # Sanity: the base class really is abstract.
     assert isinstance(Venue, abc.ABCMeta)
+
+
+def test_loginless_venue_opens_the_public_form_without_a_session():
+    impl = venues.get_venue_impl("combinatorica")
+
+    class Page:
+        urls = []
+
+        def goto(self, url):
+            self.urls.append(url)
+
+    page = Page()
+    assert impl.requires_login is False
+    assert impl.ensure_signed_in(page, object()) is True
+    assert page.urls == [impl.portal_url]
+
+    with pytest.raises(NotImplementedError, match="does not require"):
+        impl.save_session()

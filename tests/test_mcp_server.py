@@ -19,6 +19,7 @@ from paperpush import credentials, mcp_server
 from paperpush.database import list_venues
 
 VENUE = "biorxiv"
+LOGINLESS_VENUE = "combinatorica"
 
 
 # --- helpers ---------------------------------------------------------------
@@ -260,6 +261,13 @@ def test_login_status_for_one_venue_when_signed_in():
     assert status["identity"] == "ada@example.com"
 
 
+def test_login_status_reports_when_login_is_not_required():
+    status = mcp_server.login_status(LOGINLESS_VENUE)
+    assert status["login_required"] is False
+    assert status["logged_in"] is True
+    assert "login_command" not in status
+
+
 def test_login_status_accepts_a_subfile_reference(tmp_path):
     path = tmp_path / f"{VENUE}.sub"
     mcp_server.create_subfile(VENUE, str(path))
@@ -290,6 +298,12 @@ def test_login_hands_back_the_command_when_it_cannot_prompt(monkeypatch):
     result = mcp_server.login(VENUE)
     assert result["status"] == "action_required"
     assert result["command"] == f"paperpush login {VENUE}"
+
+
+def test_login_short_circuits_when_not_required(monkeypatch):
+    monkeypatch.setattr(mcp_server.subprocess, "run", lambda *a, **k: pytest.fail("login must not shell out"))
+    result = mcp_server.login(LOGINLESS_VENUE)
+    assert result["status"] == "not_required"
 
 
 def test_login_takes_no_password_argument():
@@ -359,6 +373,7 @@ def test_login_reports_a_failed_sign_in(monkeypatch):
 # A committed, fully-filled sample that passes validation, so the submit tests
 # exercise the launch path rather than tripping the preflight.
 VALID_SUB = Path(__file__).resolve().parent / "sub_files" / VENUE / f"{VENUE}.sub"
+LOGINLESS_SUB = Path(__file__).resolve().parent / "sub_files" / LOGINLESS_VENUE / f"{LOGINLESS_VENUE}.sub"
 
 
 class FakePopen:
@@ -438,6 +453,13 @@ def test_submit_launches_and_returns_a_handle(fake_launch):
     command = fake_launch.instances[0].command
     assert command[:4] == [mcp_server.sys.executable, "-m", "paperpush", "submit"]
     assert command[4] == str(VALID_SUB)
+
+
+def test_submit_launches_loginless_venue_without_credentials(fake_launch):
+    result = mcp_server.submit(str(LOGINLESS_SUB))
+    assert result["status"] == "running"
+    command = fake_launch.instances[0].command
+    assert command[4] == str(LOGINLESS_SUB)
 
 
 def test_submit_holds_the_childs_stdin_open(fake_launch):

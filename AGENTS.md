@@ -46,6 +46,11 @@ not treat a missing login as a reason to skip the extraction work — do the
 `.sub` creation, autofill, and validation regardless, then re-check
 `paperpush login --list` before the submit step.
 
+Some public submission systems do not have author accounts. If the target is
+absent from `--list`, check it with `paperpush login <venue> --status` before
+asking the user to sign in. A loginless venue reports that it does not require
+login and exits successfully; proceed without credentials in that case.
+
 (For a single venue, `paperpush login <venue> --status` gives the same answer;
 `--list` is the one call that covers "am I logged in anywhere yet".)
 
@@ -69,8 +74,8 @@ wizard fills the form and then parks holding the browser open for the author, so
 the tool hands back a `pid` as soon as the run has started: poll `submit_status`
 for progress, tell the user to review and send the form themselves, and call
 `submit_close` when they say they are done. It refuses to open a browser at all
-unless the `.sub` validates and the venue already has a stored login — so run
-the login check above first, or you will spend a tool call learning it.
+unless the `.sub` validates and, when the portal requires authentication, the
+venue already has a stored login — so run the login check above first.
 
 ## Run the full pipeline, autofilling yourself
 

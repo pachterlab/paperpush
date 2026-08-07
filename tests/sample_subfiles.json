@@ -938,5 +938,17 @@
       "data_statement": "No data was used for the research described in the article.",
       "declarations_confirmed": "yes"
     }
+  },
+  "combinatorica.sub": {
+    "venue": "combinatorica",
+    "fields": {
+      "author_agreement": "yes",
+      "authors": "Ada |  | Lovelace | ada@example.edu |  | Example University | United States",
+      "title": "A sample result in extremal combinatorics",
+      "msc_classification": "05C05",
+      "handling_editor": "107743",
+      "arxiv_reference": "https://arxiv.org/abs/2101.00001",
+      "abstract": "We prove a sample theorem about a family of finite combinatorial structures."
+    }
   }
 }

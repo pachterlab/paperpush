@@ -154,6 +154,8 @@ def orcid_login_offered(slug: str) -> bool:
 
     base = submission_base(slug)
     impl = try_get_venue_impl(base)
+    if impl is not None and not impl.requires_login:
+        return False
     if impl is not None and impl.supports_orcid_login:
         return True
     if base in _NO_ORCID_LOGIN:
@@ -162,6 +164,18 @@ def orcid_login_offered(slug: str) -> bool:
         return get_venue(base).venue_type in {"journal", "preprint"}
     except KeyError:
         return False
+
+
+def login_required(slug: str) -> bool:
+    """Whether submitting to ``slug`` requires a stored or manual sign-in.
+
+    Unknown or temporarily unimportable venues conservatively return ``True``.
+    Known loginless implementations (currently EditFlow) declare
+    :attr:`~paperpush.venues.base.Venue.requires_login` as ``False`` so the CLI
+    and end-to-end pipeline skip credential collection entirely.
+    """
+    impl = try_get_venue_impl(submission_base(slug))
+    return True if impl is None else impl.requires_login
 
 
 def import_venue(slug: str):

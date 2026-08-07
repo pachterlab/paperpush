@@ -239,6 +239,10 @@ def _cmd_login(args: argparse.Namespace) -> int:
         print(f"{venue.slug} shares the {sub_base} sign-in; storing under '{sub_base}'.")
         venue = get_venue(sub_base)
 
+    if not venues.login_required(venue.slug):
+        print(f"{venue.slug} does not require login; submissions start directly in its portal.")
+        return 0
+
     if args.logout:
         if credentials.delete_credential(venue.slug):
             logger.info("login: removed stored credentials for %s", venue.slug)
@@ -620,7 +624,8 @@ def _cmd_submit(args: argparse.Namespace) -> int:
     # If no credentials are stored, run the login flow now so the submission can
     # sign in unattended. The user may still decline (e.g. to sign in by hand in
     # the browser), so a failed or skipped login is advisory, not blocking.
-    if credentials.get_credential(cred_slug) is None:
+    needs_login = venues.login_required(cred_slug)
+    if needs_login and credentials.get_credential(cred_slug) is None:
         logger.info("submit: no stored credentials for %s; prompting to log in", cred_slug)
         print(f"Not logged in to {cred_slug}; starting login (Ctrl-C to skip and " "sign in by hand in the browser).")
         try:
@@ -633,13 +638,20 @@ def _cmd_submit(args: argparse.Namespace) -> int:
 
     if args.debug:
         print(f"Opening {venue} in debug mode for {args.subfile}…")
-        print(
-            "The Playwright Inspector opens at the first step; use 'Step "
-            "over' to walk the wizard line by line. If a saved session "
-            "exists (from an earlier submit run) you start signed in; "
-            "otherwise sign in in the browser, then resume."
-        )
-    else:
+        if needs_login:
+            print(
+                "The Playwright Inspector opens at the first step; use 'Step "
+                "over' to walk the wizard line by line. If a saved session "
+                "exists (from an earlier submit run) you start signed in; "
+                "otherwise sign in in the browser, then resume."
+            )
+        else:
+            print(
+                "The Playwright Inspector opens at the first step; use 'Step "
+                "over' to walk the wizard line by line. This public portal "
+                "does not require sign-in."
+            )
+    elif needs_login:
         print(f"Opening {venue} to run the submission for {args.subfile}…")
         print(
             "Sign-in is automatic when possible: a saved session is reused, "
@@ -647,6 +659,12 @@ def _cmd_submit(args: argparse.Namespace) -> int:
             "filled in (and the session saved); otherwise sign in by hand. "
             "Field values come from the .sub file; the wizard stops before "
             "the final submit."
+        )
+    else:
+        print(f"Opening {venue} to run the submission for {args.subfile}…")
+        print(
+            "This portal does not require login. Field values come from the "
+            ".sub file; the wizard stops before the final submit."
         )
     logger.info("submit: launching %s runner (headless=%s, debug=%s, timeout=%ss, " "keep_open_on_failure=%s)", venue, args.headless, args.debug, args.timeout, not args.close_on_failure)
     run(subfile.values, headless=args.headless, debug=args.debug, new_session=args.new_session, timeout=args.timeout, keep_open_on_failure=not args.close_on_failure)

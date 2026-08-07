@@ -98,6 +98,19 @@ def test_submit_skips_login_when_already_logged_in(monkeypatch, capsys):
     assert ran
 
 
+def test_submit_skips_login_for_loginless_venue(monkeypatch, capsys):
+    ran = _stub_submit(monkeypatch)
+
+    monkeypatch.setattr(venues, "login_required", lambda slug: False)
+    rc = main(["submit", "biorxiv.sub"])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "does not require login" in out
+    assert credentials.get_credential("biorxiv") is None
+    assert ran
+
+
 # --- offline CLI wiring: sweep every committed sample ----------------------
 
 
@@ -179,6 +192,21 @@ def test_discrete_mathematics_share_data_rejects_unknown_source_of_data():
 def test_discrete_mathematics_declining_requires_a_data_statement():
     with pytest.raises(ValueError, match="data_statement"):
         _discrete_mathematics_runner().submit({"share_data": "no", "data_statement": ""})
+
+
+def test_combinatorica_requires_the_author_agreement_before_browser_launch():
+    from paperpush.venues.editflow.combinatorica import CombinatoricaVenue
+
+    with pytest.raises(ValueError, match="author_agreement"):
+        CombinatoricaVenue().submit({"author_agreement": "no"})
+
+
+@pytest.mark.parametrize("value", ["05", "5C05", "05-05", "05C050"])
+def test_combinatorica_rejects_malformed_msc_classification(value):
+    from paperpush.venues.editflow.combinatorica import validate_msc_classification
+
+    with pytest.raises(ValueError, match="five-character MSC"):
+        validate_msc_classification(value)
 
 
 # arXiv's license radios carry the license URI as their value, so the runner
