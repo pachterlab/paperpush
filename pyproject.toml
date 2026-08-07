@@ -57,7 +57,7 @@ include = ["paperpush*"]
 [tool.setuptools.package-data]
 # "_assets/*" (not "*.json") so the .txt category/keyword files ship too.
 # "_docs/*.md" carries the agent-facing guide (mirrored from the repo root by
-# scripts/sync_agent_docs.py) so `paperpush agent-guide` works from a plain pip
+# scripts/sync_agent_docs.py) so `paperpush --agent-guide` works from a plain pip
 # install, where the repo's AGENTS.md is not present.
 paperpush = ["venues.json", "venues.schema.json", "subfile_templates/*.sub", "_docs/*.md"]
 "paperpush.venues" = ["_assets/*"]

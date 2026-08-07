@@ -12,7 +12,7 @@ not commands themselves:
    on produce valid PDFs, DOCX, figures, and LaTeX source bundles, so a builder
    regression surfaces here rather than as a confusing downstream error.
 4. **packaged agent docs** -- the copy of AGENTS.md that ships in the wheel stays
-   in sync with the root file and is reachable via ``paperpush agent-guide``.
+   in sync with the root file and is reachable via ``paperpush --agent-guide``.
 """
 
 from __future__ import annotations
@@ -430,7 +430,7 @@ def test_latex_bundle_is_deterministic(samples, tmp_path):
 #
 # AGENTS.md lives at the repo root (where agent tooling looks for it), but a
 # pip install only ships what is under paperpush/. scripts/sync_agent_docs.py
-# mirrors it into paperpush/_docs/ so `paperpush agent-guide` can serve it
+# mirrors it into paperpush/_docs/ so `paperpush --agent-guide` can serve it
 # offline. These guard the two ways that can silently break: the copy drifting
 # from the root file, and the copy not being packaged at all.
 
@@ -458,10 +458,10 @@ def test_packaged_agent_guide_is_declared_as_package_data():
     assert "_docs/*.md" in section
 
 
-def test_agent_guide_command_prints_the_guide(capsys):
+def test_agent_guide_flag_prints_the_guide(capsys):
     from paperpush.cli import main
 
-    assert main(["agent-guide"]) == 0
+    assert main(["--agent-guide"]) == 0
     out = capsys.readouterr().out
     # The contract an agent is meant to find, not just any output.
     assert "you are the extractor" in out
@@ -474,5 +474,5 @@ def test_help_points_agents_at_the_guide(capsys):
     build_parser().print_help()
     out = capsys.readouterr().out
     # --help is the discovery path an agent actually takes.
-    assert "paperpush agent-guide" in out
+    assert "paperpush --agent-guide" in out
     assert "github.com/pachterlab/paperpush" in out

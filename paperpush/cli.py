@@ -17,7 +17,7 @@ Implemented so far:
     paperpush login --orcid <j>   store an ORCID iD/password for a journal that
                                       offers "Sign in with ORCID"
     paperpush submit <subfile>    open bioRxiv and run the submission
-    paperpush agent-guide         print the guide for AI agents (AGENTS.md)
+    paperpush --agent-guide       print the guide for AI agents (AGENTS.md)
 
 ``submit`` drives the bioRxiv wizard, typing in the field values read from the
 .sub file and stopping before the final submit. The first run signs in (reusing
@@ -70,7 +70,7 @@ _AGENT_GUIDE_URL = "https://github.com/pachterlab/paperpush/blob/main/AGENTS.md"
 
 
 @_validate
-def _cmd_agent_guide(args: argparse.Namespace) -> int:
+def _print_agent_guide() -> int:
     """Print the agent-facing guide (the packaged copy of AGENTS.md).
 
     Exists so an AI agent driving a pip-installed paperpush can read the
@@ -971,11 +971,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="paperpush",
         description="Make venue submission as easy as a single click.",
-        epilog=("AI agents: run 'paperpush agent-guide' before driving this CLI.\n" f"Docs and issues: {__url__}"),
+        epilog=("AI agents: run 'paperpush --agent-guide' before driving this CLI.\n" f"Docs and issues: {__url__}"),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"paperpush {__version__}")
     parser.add_argument("--venues", action="store_true", help="list supported venues and exit")
+    parser.add_argument("--agent-guide", dest="agent_guide", action="store_true", help="print the guide for AI agents driving this CLI (AGENTS.md) and exit")
 
     # Verbosity is a per-command concern, so -v/-q live on each subcommand
     # (added via this shared parent) rather than at the top level.
@@ -985,7 +986,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # metavar lists only the public commands; the internal 'schema' command is
     # registered below but deliberately left out so it does not appear in --help.
-    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,login,submit,agent-guide}")
+    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,login,submit}")
 
     p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub submission template")
     p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv")
@@ -1103,9 +1104,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_submit.set_defaults(func=_cmd_submit)
 
-    p_agent_guide = sub.add_parser("agent-guide", parents=[verbosity], help="print the guide for AI agents driving this CLI (AGENTS.md)")
-    p_agent_guide.set_defaults(func=_cmd_agent_guide)
-
     # Internal command: the autofill front-ends (the Claude skill and the API
     # engine) read field roles from here. Hidden from --help (use 'subfile' to
     # inspect a venue's fields by hand).
@@ -1126,6 +1124,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.venues:
         return _print_venues()
+
+    if args.agent_guide:
+        return _print_agent_guide()
 
     if not getattr(args, "command", None):
         parser.print_help()

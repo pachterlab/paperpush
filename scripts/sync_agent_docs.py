@@ -6,7 +6,7 @@ for it, but a pip install only gets what is inside ``paperpush/``. An agent
 helping someone who ran ``pip install paperpush`` therefore has no way to read
 the submission contract -- it is in the repo it does not have. Mirroring the
 file into ``paperpush/_docs/`` (shipped via ``[tool.setuptools.package-data]``)
-makes it readable offline through ``paperpush agent-guide``, with no network
+makes it readable offline through ``paperpush --agent-guide``, with no network
 access and no version skew against whatever ``main`` says today.
 
 The root copy stays canonical; this script only ever writes the package copy:

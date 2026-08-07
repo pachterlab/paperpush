@@ -125,7 +125,7 @@ fi
 # Keep the packaged copy of AGENTS.md in sync with the root file. The root copy
 # is canonical (agent tooling looks for it there); the copy under
 # paperpush/_docs/ is what ships in the wheel and backs `paperpush
-# agent-guide`, so a pip-installed agent reads the same contract.
+# --agent-guide`, so a pip-installed agent reads the same contract.
 # ---------------------------------------------------------------------------
 if git diff --cached --name-only --diff-filter=ACM -z \
     | tr '\0' '\n' | grep -qx 'AGENTS.md'; then
