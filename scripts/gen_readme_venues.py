@@ -78,6 +78,7 @@ PLATFORMS = {
     "cell": "Editorial Manager",
     "cell_systems": "Editorial Manager",
     "cell_genomics": "Editorial Manager",
+    "combinatorica": "EditFlow",
     "plos_compbio": "Editorial Manager",
     "genome_biology": "Springer Nature Snapp",
     "science": "AAAS Contributor Tracking System",

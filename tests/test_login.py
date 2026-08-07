@@ -245,6 +245,10 @@ def test_login_command_for_each_venue(venue, monkeypatch, capsys):
 
     assert rc == 0, out
     base = venues.submission_base(venue.slug)
+    if not venues.login_required(base):
+        assert "does not require login" in out
+        assert credentials.get_credential(base) is None
+        return
     cred = credentials.get_credential(base)
     assert cred is not None, f"no credential stored for {venue.slug} (base {base})"
     assert cred.username == _USERNAME
@@ -439,7 +443,7 @@ def test_orcid_offered_for_journals_and_preprints(venue):
     """
     impl = venues.try_get_venue_impl(venues.submission_base(venue.slug))
     implemented = impl is not None and impl.supports_orcid_login
-    expected = implemented or (venue.venue_type in {"journal", "preprint"} and venue.slug != "discrete_mathematics")
+    expected = implemented or (venues.login_required(venue.slug) and venue.venue_type in {"journal", "preprint"} and venue.slug != "discrete_mathematics")
     assert venues.orcid_login_offered(venue.slug) is expected
 
 
@@ -456,6 +460,19 @@ def test_login_orcid_refused_where_not_offered(slug, monkeypatch, capsys):
     assert credentials.get_credential(slug) is None
 
 
+def test_loginless_venue_needs_no_orcid_credentials(monkeypatch, capsys):
+    monkeypatch.setenv("PAPERPUSH_ORCID_ID", VALID_ID)
+    monkeypatch.setenv("PAPERPUSH_PASSWORD", _PASSWORD)
+
+    rc = main(["login", "combinatorica", "--orcid", "--no-verify"])
+    captured = capsys.readouterr()
+
+    assert rc == 0
+    assert "does not require login" in captured.out
+    assert captured.err == ""
+    assert credentials.get_credential("combinatorica") is None
+
+
 @pytest.mark.parametrize("slug", ["cell", "cell_systems", "cell_genomics", "plos_compbio", "biorxiv", "medrxiv", "arxiv", "bmc_bioinformatics", "genome_biology"])
 def test_recorded_venues_implement_orcid_sign_in(slug):
     # The deployments whose ORCID hand-off has been captured: Editorial Manager's
@@ -467,10 +484,10 @@ def test_recorded_venues_implement_orcid_sign_in(slug):
     assert impl.supports_orcid_login is True
 
 
-@pytest.mark.parametrize("slug", ["nature", "science", "bioinformatics", "nucleic_acids_research", "discrete_mathematics"])
+@pytest.mark.parametrize("slug", ["nature", "science", "bioinformatics", "nucleic_acids_research", "discrete_mathematics", "combinatorica"])
 def test_other_venues_do_not_advertise_orcid(slug):
-    # Offered by --orcid (except Discrete Mathematics), but not driveable yet, so
-    # nothing passes them orcid=True.
+    # The loginless Combinatorica and account-based Discrete Mathematics do not
+    # offer ORCID. The other listed portals have no driveable ORCID flow yet.
     impl = venues.try_get_venue_impl(slug)
     if impl is None:
         pytest.skip("venue implementation not importable (Playwright missing)")

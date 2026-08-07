@@ -1,0 +1,41 @@
+# paperpush submission file for combinatorica  -*- mode: yaml -*-
+# Combinatorica (János Bolyai Mathematical Society / Springer)
+#
+# Edit the values below, then run:  paperpush submit combinatorica.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: combinatorica
+# submission guide: https://combinatorica.hu/
+
+# EditFlow author agreement accepted (boolean, REQUIRED)
+#   Author-only attestation on EditFlow Step 0. Set to yes only after every coauthor has authorized the submission and you personally confirm the article is a genuinely new Combinatorica submission, is not under consideration or published elsewhere, is not an uninvited resubmission of a rejected article, and every author has their own valid email address. Paperpush never autofills this consent.
+author_agreement: yes
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: given name | middle name (optional) | family name | email | MR author ID (optional) | institution | country. EditFlow first uses the email to recognize a returning author, then fills or confirms the remaining details. Each coauthor must have a distinct personal email address.
+authors: |
+  Ada |  | Lovelace | ada@example.edu |  | Example University | United States
+
+# Article title (text, REQUIRED)
+#   The manuscript's full title, entered in EditFlow's Article Title field.
+title: A sample result in extremal combinatorics
+
+# Mathematics Subject Classification (text, REQUIRED)
+#   One five-character Mathematics Subject Classification code, such as 05C05. EditFlow validates the code before advancing.
+msc_classification: 05C05
+
+# Handling editor (text, REQUIRED)
+#   Author-only choice from EditFlow's editor menu. Prefer the editor's visible menu label exactly as shown. A portal option value may be used in a test fixture. Paperpush never chooses an editor on the author's behalf.
+handling_editor: 107743
+
+# arXiv reference (text, REQUIRED)
+#   Full http(s) URL of the manuscript on arXiv, entered in EditFlow's arXiv-reference field. This runner implements the verified arXiv-reference submission path. Combinatorica ordinarily limits the submitted version to 30 pages; for a longer work, its author instructions advise a 30-page version with a link to the full arXiv version.
+#   each non-blank line must be a valid http/https URL
+arxiv_reference: https://arxiv.org/abs/2101.00001
+
+# Abstract (textarea, REQUIRED)
+#   The manuscript abstract, entered in EditFlow's required Abstract field.
+abstract: |
+  We prove a sample theorem about a family of finite combinatorial structures.
+
+# vim: set filetype=yaml :

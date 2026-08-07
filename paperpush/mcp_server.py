@@ -196,6 +196,7 @@ def list_supported_venues(include_deprecated: bool = False) -> list[dict[str, An
             "description": venue.description,
             "submission_url": venue.submission_url,
             "submission_guide": venue.submission_guide,
+            "login_required": venues_pkg.login_required(venue.slug),
             "field_count": len(venue.fields),
             "required_field_count": sum(1 for f in venue.fields if f.required),
         }
@@ -225,6 +226,7 @@ def describe_venue(venue: str) -> dict[str, Any]:
         "submission_url": resolved.submission_url,
         "submission_guide": resolved.submission_guide,
         "site_url": resolved.site_url,
+        "login_required": venues_pkg.login_required(resolved.slug),
         "max_upload_mb": resolved.max_upload_mb,
         "file_type_options": resolved.file_type_options,
         "default_subfile_name": default_filename(resolved),
@@ -476,11 +478,21 @@ def login_status(venue: Optional[str] = None) -> dict[str, Any]:
         slug = _slug_from_reference(venue)
         resolved = _venue_or_error(slug)
         base = venues_pkg.submission_base(resolved.slug)
+        if not venues_pkg.login_required(base):
+            return {
+                "venue": resolved.slug,
+                "credential_stored_under": base,
+                "shares_login_with_base_venue": base != resolved.slug,
+                "login_required": False,
+                "logged_in": True,
+                "reason": "This venue uses a public submission form and does not require login.",
+            }
         credential = credentials.get_credential(base)
         entry: dict[str, Any] = {
             "venue": resolved.slug,
             "credential_stored_under": base,
             "shares_login_with_base_venue": base != resolved.slug,
+            "login_required": True,
             "logged_in": credential is not None,
         }
         if credential is None:
@@ -545,6 +557,13 @@ def login(
     slug = _slug_from_reference(venue)
     resolved = _venue_or_error(slug)
     base = venues_pkg.submission_base(resolved.slug)
+    if not venues_pkg.login_required(base):
+        return {
+            "status": "not_required",
+            "venue": resolved.slug,
+            "credential_stored_under": base,
+            "reason": "This venue uses a public submission form and does not require login.",
+        }
     command = _paperpush_command("login", base)
     display_command = " ".join(["paperpush", "login", base])
 
@@ -715,10 +734,11 @@ def submit(
 
     - The `.sub` file is validated. Errors come back as `blocked`, with the same
       list `validate_subfile` gives.
-    - The venue must already have stored credentials. Without them the run would
-      stall on a password prompt it has no terminal to ask on, so it comes back
-      as `action_required` with the `paperpush login` command instead. Call
-      `login_status` first to avoid the round trip.
+    - A venue that requires login must already have stored credentials. Without
+      them the run would stall on a password prompt it has no terminal to ask on,
+      so it comes back as `action_required` with the `paperpush login` command
+      instead. Loginless public forms skip this preflight. Call `login_status`
+      first to tell which case applies.
 
     `headless` runs without a visible window -- only useful for a smoke test,
     since the point is a browser the author can look at. `new_session` discards
@@ -744,7 +764,7 @@ def submit(
         }
 
     base = venues_pkg.submission_base(venue.slug)
-    if credentials.get_credential(base) is None:
+    if venues_pkg.login_required(base) and credentials.get_credential(base) is None:
         return {
             "status": "action_required",
             "venue": venue.slug,
@@ -948,9 +968,9 @@ def build_server():
             "submit fills the venue's form and stops before the final submit button, leaving "
             "the browser open for the author to review and send themselves -- so it returns a "
             "pid, not a finished run. Follow it with submit_status; call submit_close when the "
-            "author says they are done. It needs a stored login (check login_status first) and "
-            "a .sub file that passes validation; it refuses rather than opening a browser "
-            "otherwise.\n\n"
+            "author says they are done. It needs a .sub file that passes validation and, for "
+            "portals that require authentication, a stored login (check login_status first); "
+            "it refuses rather than opening a browser otherwise.\n\n"
             "Signing in is the one step you cannot do for the user: login hands back a "
             "`paperpush login <venue>` command for them to run in their own terminal."
         ),

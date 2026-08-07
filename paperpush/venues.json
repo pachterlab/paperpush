@@ -3083,6 +3083,84 @@
         "default": false
       }
     ]
+  },
+  "combinatorica": {
+    "venue_type": "journal",
+    "name": "Combinatorica",
+    "full_name": "Combinatorica (János Bolyai Mathematical Society / Springer)",
+    "submission_url": "https://ef.msp.org/submit/combinatorica",
+    "site_url": "https://link.springer.com/journal/493",
+    "submission_guide": "https://combinatorica.hu/",
+    "description": "International journal publishing research in combinatorics and the theory of computing, including combinatorial structures, optimization, algorithms, complexity, geometry, and number theory.",
+    "fields": [
+      {
+        "id": "author_agreement",
+        "autofill": "never",
+        "label": "EditFlow author agreement accepted",
+        "type": "boolean",
+        "required": true,
+        "confirm": true,
+        "default": false,
+        "help": "Author-only attestation on EditFlow Step 0. Set to yes only after every coauthor has authorized the submission and you personally confirm the article is a genuinely new Combinatorica submission, is not under consideration or published elsewhere, is not an uninvited resubmission of a rejected article, and every author has their own valid email address. Paperpush never autofills this consent."
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: given name | middle name (optional) | family name | email | MR author ID (optional) | institution | country. EditFlow first uses the email to recognize a returning author, then fills or confirms the remaining details. Each coauthor must have a distinct personal email address.",
+        "fields": [
+          "first_name",
+          "middle_name?",
+          "last_name",
+          "email",
+          "mr_author_id?",
+          "institution",
+          "country"
+        ]
+      },
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Article title",
+        "type": "text",
+        "required": true,
+        "help": "The manuscript's full title, entered in EditFlow's Article Title field."
+      },
+      {
+        "id": "msc_classification",
+        "autofill": "extract",
+        "label": "Mathematics Subject Classification",
+        "type": "text",
+        "required": true,
+        "help": "One five-character Mathematics Subject Classification code, such as 05C05. EditFlow validates the code before advancing."
+      },
+      {
+        "id": "handling_editor",
+        "autofill": "never",
+        "label": "Handling editor",
+        "type": "text",
+        "required": true,
+        "help": "Author-only choice from EditFlow's editor menu. Prefer the editor's visible menu label exactly as shown. A portal option value may be used in a test fixture. Paperpush never chooses an editor on the author's behalf."
+      },
+      {
+        "id": "arxiv_reference",
+        "autofill": "extract",
+        "label": "arXiv reference",
+        "type": "text",
+        "required": true,
+        "require_url": true,
+        "help": "Full http(s) URL of the manuscript on arXiv, entered in EditFlow's arXiv-reference field. This runner implements the verified arXiv-reference submission path. Combinatorica ordinarily limits the submitted version to 30 pages; for a longer work, its author instructions advise a 30-page version with a link to the full arXiv version."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "help": "The manuscript abstract, entered in EditFlow's required Abstract field."
+      }
+    ]
   }
 }
-
