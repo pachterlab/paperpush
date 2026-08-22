@@ -3160,6 +3160,17 @@
         "type": "textarea",
         "required": true,
         "help": "The manuscript abstract, entered in EditFlow's required Abstract field."
+      },
+      {
+        "id": "manuscript_file",
+        "autofill": "filemap",
+        "label": "Article PDF",
+        "type": "file",
+        "required": true,
+        "help": "PDF manuscript uploaded to EditFlow's required Article field.",
+        "accept": [
+          ".pdf"
+        ]
       }
     ]
   }

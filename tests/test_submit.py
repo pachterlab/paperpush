@@ -209,6 +209,52 @@ def test_combinatorica_rejects_malformed_msc_classification(value):
         validate_msc_classification(value)
 
 
+def test_combinatorica_waits_for_step_four_then_fills_metadata_and_pdf(tmp_path):
+    """Regression: Step 4 text must not be appended to the focused MSC box."""
+    from paperpush.venues.editflow.main import _fill_final_page
+
+    events = []
+
+    class Control:
+        def __init__(self, selector):
+            self.selector = selector
+
+        def wait_for(self, **kwargs):
+            events.append(("wait_for", self.selector, kwargs))
+
+        def select_option(self, **kwargs):
+            events.append(("select_option", self.selector, kwargs))
+
+        def fill(self, value, **kwargs):
+            events.append(("fill", self.selector, value, kwargs))
+
+        def dispatch_event(self, event):
+            events.append(("dispatch_event", self.selector, event))
+
+        def set_input_files(self, value):
+            events.append(("set_input_files", self.selector, value))
+
+    class Page:
+        def locator(self, selector):
+            return Control(selector)
+
+    manuscript = tmp_path / "manuscript.pdf"
+    manuscript.write_bytes(b"%PDF-1.4 test")
+    _fill_final_page(
+        Page(),
+        handling_editor="József Balogh",
+        arxiv_reference="https://arxiv.org/abs/2608.03542",
+        abstract="A short abstract.",
+        manuscript_file=manuscript,
+    )
+
+    assert events[0] == ("wait_for", "#papers-arxiv_reference", {"state": "visible"})
+    assert ("select_option", '[id="editor[]"]', {"label": "József Balogh", "force": True}) in events
+    assert ("fill", "#papers-arxiv_reference", "https://arxiv.org/abs/2608.03542", {"force": True}) in events
+    assert ("fill", "#papers-abstract", "A short abstract.", {"force": True}) in events
+    assert ("set_input_files", "#version_files-main", str(manuscript)) in events
+
+
 # arXiv's license radios carry the license URI as their value, so the runner
 # maps the .sub's license name onto one before it opens a browser.
 

@@ -38,4 +38,8 @@ arxiv_reference:
 abstract: |
   
 
+# Article PDF (file, REQUIRED)
+#   PDF manuscript uploaded to EditFlow's required Article field.
+manuscript_file: 
+
 # vim: set filetype=yaml :

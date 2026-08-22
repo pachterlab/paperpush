@@ -15,6 +15,7 @@ runner deliberately stops on that last page before the live Submit control.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
@@ -41,6 +42,22 @@ def _select_label_or_value(select, choice: str) -> None:
         select.select_option(label=choice, force=True)
     except Exception:  # noqa: BLE001 -- a fixture may intentionally use the portal value
         select.select_option(value=choice, force=True)
+
+
+def _fill_final_page(
+    page, *, handling_editor: str, arxiv_reference: str, abstract: str, manuscript_file: Path
+) -> None:
+    """Wait for EditFlow Step 4, then fill its metadata and PDF controls."""
+    editor_select = page.locator('[id="editor[]"]')
+    # The URL stays fixed while EditFlow posts the step. Waiting for the visible
+    # Step 4 arXiv input prevents text from landing in the focused MSC box.
+    arxiv_input = page.locator("#papers-arxiv_reference")
+    arxiv_input.wait_for(state="visible")
+    _select_label_or_value(editor_select, handling_editor)
+    arxiv_input.fill(arxiv_reference, force=True)
+    arxiv_input.dispatch_event("change")
+    page.locator("#papers-abstract").fill(abstract, force=True)
+    page.locator("#version_files-main").set_input_files(str(manuscript_file))
 
 
 class EditFlowVenue(Venue):
@@ -80,6 +97,9 @@ class EditFlowVenue(Venue):
         handling_editor = values.get("handling_editor", "").strip()
         arxiv_reference = values.get("arxiv_reference", "").strip()
         abstract = values.get("abstract", "").strip()
+        manuscript_file = Path(values.get("manuscript_file", "")).expanduser().resolve()
+        if not manuscript_file.is_file():
+            raise ValueError(f"manuscript_file does not exist: {manuscript_file}")
 
         logger.info("Starting %s EditFlow submission (%d author(s), headless=%s, debug=%s)", venue, len(authors), headless, debug)
 
@@ -145,16 +165,13 @@ class EditFlowVenue(Venue):
             # Final form page. Editor choice is an author policy decision, so its
             # .sub field is never autofilled. Prefer a readable label; accept the
             # portal's numeric option value for stable test fixtures.
-            _select_label_or_value(page.locator('[id="editor[]"]'), handling_editor)
-            # Like the enhanced editor selector above, EditFlow may hide this
-            # real validated input behind its arXiv widget. Forced fill targets
-            # the underlying text control and still dispatches input events.
-            arxiv_input = page.locator("#papers-arxiv_reference")
-            arxiv_input.fill(arxiv_reference, force=True)
-            # EditFlow validates the ID and updates its dependent required
-            # fields from this jQuery change handler (not from input alone).
-            arxiv_input.dispatch_event("change")
-            page.locator("#papers-abstract").fill(abstract, force=True)
+            _fill_final_page(
+                page,
+                handling_editor=handling_editor,
+                arxiv_reference=arxiv_reference,
+                abstract=abstract,
+                manuscript_file=manuscript_file,
+            )
 
             logger.info("Reached %s's final EditFlow submission page; leaving the browser open for review (Submit is left to you)", venue)
             hold_open()

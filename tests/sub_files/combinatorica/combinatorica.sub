@@ -38,4 +38,8 @@ arxiv_reference: https://arxiv.org/abs/2101.00001
 abstract: |
   We prove a sample theorem about a family of finite combinatorial structures.
 
+# Article PDF (file, REQUIRED)
+#   PDF manuscript uploaded to EditFlow's required Article field.
+manuscript_file: tests/manuscript_files/arxiv/manuscript.pdf
+
 # vim: set filetype=yaml :
