@@ -997,7 +997,12 @@
       },
       {
         "id": "manuscript_file",
-        "max_pages_by": null
+        "autofill": "filemap",
+        "required": true,
+        "max_pages_by": null,
+        "type": "file",
+        "accept": ["pdf"],
+        "help": "Manuscrupt documebt. Initial submission requires PDF, revision requires .docx, .rtf, or .tex (NOT PDF)"
       },
       {
         "id": "authors",
