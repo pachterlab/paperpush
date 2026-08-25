@@ -550,9 +550,20 @@ def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> 
     from . import manuscript
 
     issues: list[Issue] = []
+    # Sections beyond the references that this venue leaves out of its main-text
+    # count (an appendix, a required statement); empty for most venues.
+    headings = tuple(field.main_text_end_headings or ())
+    scope_before = "before references" if not headings else "in the main text"
+
+    def _words_before(path: Path) -> int | None:
+        return manuscript.words_before_references(path, headings)
+
+    def _pages_before(path: Path) -> int | None:
+        return manuscript.pages_before_references(path, headings)
+
     # (limit, counter, scope phrase). An empty scope means the whole document.
     for limit, count, scope in (
-        (word_before, manuscript.words_before_references, "before references"),
+        (word_before, _words_before, scope_before),
         (word_total, manuscript.total_words, ""),
     ):
         if limit is None:
@@ -576,7 +587,7 @@ def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> 
                 )
             )
     for limit, count, scope, unsupported in (
-        (page_before, manuscript.pages_before_references, "before references", "page counts can only be verified for PDF"),
+        (page_before, _pages_before, scope_before, "page counts can only be verified for PDF"),
         (page_total, manuscript.total_pages, "", "page counts can only be verified for PDF or a Word (.docx) file with a saved page count"),
     ):
         if limit is None:
@@ -980,4 +991,3 @@ def _check_subfields(field: Field, raw: str) -> list[Issue]:
             if not value:
                 issues.append(Issue(ERROR, field.id, f"{field.label}: line {line_no} is missing {name.replace('_', ' ')}"))
     return issues
-

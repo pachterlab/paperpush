@@ -29,6 +29,7 @@ from paperpush import manuscript as m
 from paperpush.database import DATABASE_PATH, Field
 from paperpush.schema_models import build_schema
 from paperpush.validate import _check_file_field
+
 # Reuse the same low-level builders the sample fixtures use.
 from tests.conftest import _build_docx, _build_pdf
 
@@ -143,6 +144,74 @@ def test_passing_mention_of_references_is_not_a_heading():
     # "references" inside a sentence must not be treated as the heading.
     text = "We compare our references to prior work here."
     assert m.truncate_at_references(text) == text
+
+
+# --- main_text_end_headings ------------------------------------------------
+#
+# A venue may exclude more than the reference list from its before-refs limits
+# (ICLR excludes the ethics / reproducibility / AI-use statements, the
+# acknowledgements, and the appendix). Those headings come from the venue field
+# and are matched alongside the built-in references headings.
+
+_ICLR_HEADINGS = ("Ethics Statement", "Acknowledgements", "Appendix")
+
+
+@pytest.mark.parametrize("heading", ["Ethics Statement", "ETHICS STATEMENT", "Acknowledgements", "Appendix", "A Appendix", "Appendix A", "3. Ethics Statement"])
+def test_extra_headings_end_the_main_text(heading):
+    text = f"Body word one two.\n{heading}\nExcluded excluded excluded."
+    assert m.truncate_at_references(text, _ICLR_HEADINGS).strip() == "Body word one two."
+
+
+def test_extra_headings_do_not_apply_when_not_requested():
+    text = "Body word one two.\nAppendix\nStill counted."
+    assert m.truncate_at_references(text) == text
+
+
+def test_earliest_main_text_end_wins():
+    # The appendix comes first here, so it -- not the reference list -- ends the
+    # main text.
+    text = "Body one.\nAppendix\nExtra results.\nReferences\nSmith 2020."
+    assert m.truncate_at_references(text, _ICLR_HEADINGS).strip() == "Body one."
+
+
+def test_passing_mention_of_an_extra_heading_is_not_a_heading():
+    text = "We defer the proofs to the appendix of this paper."
+    assert m.truncate_at_references(text, _ICLR_HEADINGS) == text
+
+
+def test_extra_heading_mid_page_counts_that_page(tmp_path):
+    path = tmp_path / "ms.pdf"
+    # Page 3 holds a paragraph of main text and only then the excluded section,
+    # so it counts.
+    body = "We conclude by noting that the proposed estimator remains stable across every " "setting we examined, and that the remaining gap is small."
+    path.write_bytes(_build_pdf(pages=4, title="Doc", page_lines={2: [body, "Ethics Statement", "excluded"]}))
+    assert m.pages_before_references(path, _ICLR_HEADINGS) == 3
+
+
+def test_extra_heading_starting_a_page_does_not_count_that_page(tmp_path):
+    path = tmp_path / "ms.pdf"
+    # Page 3 opens with the excluded section -- only the running head precedes
+    # it -- so the main text ended on page 2. This is the case a hard page limit
+    # turns on: a paper whose main text exactly fills its allowance.
+    path.write_bytes(_build_pdf(pages=4, title="Doc", page_lines={2: ["Ethics Statement", "excluded excluded"]}))
+    assert m.pages_before_references(path, _ICLR_HEADINGS) == 2
+
+
+def test_page_count_without_extra_headings_still_includes_the_heading_page(tmp_path):
+    # Regression guard: venues that name no extra headings keep the original
+    # "up to and including the page the references start on" count.
+    path = tmp_path / "ms.pdf"
+    path.write_bytes(_build_pdf(pages=4, title="Doc", page_lines={2: ["References", "Smith 2020"]}))
+    assert m.pages_before_references(path) == 3
+
+
+def test_words_before_references_honours_extra_headings(tmp_path):
+    path = tmp_path / "ms.pdf"
+    path.write_bytes(_build_pdf(pages=1, title="Doc", body_lines=["alpha beta", "Appendix", "excluded excluded excluded"]))
+    with_headings = m.words_before_references(path, _ICLR_HEADINGS)
+    without = m.words_before_references(path)
+    assert with_headings is not None and without is not None
+    assert with_headings < without
 
 
 # --- LaTeX -----------------------------------------------------------------

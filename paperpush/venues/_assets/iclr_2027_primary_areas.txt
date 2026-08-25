@@ -1,0 +1,21 @@
+unsupervised, self-supervised, semi-supervised, and supervised representation learning
+transfer learning, meta learning, and lifelong learning
+foundation or frontier models, including LLMs
+reinforcement learning
+probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)
+generative models
+causal reasoning
+optimization
+learning theory
+learning on graphs and other geometries & topologies
+learning on time series and dynamical systems
+alignment, fairness, safety, privacy, and societal considerations
+interpretability and explainable AI
+datasets and benchmarks
+infrastructure, software libraries, hardware, systems, etc.
+neurosymbolic & hybrid AI systems (physics-informed, logic & formal reasoning, etc.)
+applications to computer vision, audio, language, and other modalities
+applications to robotics, autonomy, planning
+applications to neuroscience & cognitive science
+applications to physical sciences (physics, chemistry, biology, etc.)
+other topics in machine learning (i.e., none of the above)

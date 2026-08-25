@@ -1,7 +1,7 @@
 ## Supported venues
 
 <!-- BEGIN SUPPORTED VENUES -->
-_22 supported venues (auto-generated from `paperpush/venues.json`)._
+_23 supported venues (auto-generated from `paperpush/venues.json`)._
 
 | Slug | Venue | Venue type | Submission platform | Description | Submit walkthrough |
 | --- | --- | --- | --- | --- | --- |
@@ -15,6 +15,7 @@ _22 supported venues (auto-generated from `paperpush/venues.json`)._
 | `combinatorica` | [Combinatorica](https://link.springer.com/journal/493) | Journal | EditFlow | International journal publishing research in combinatorics and the theory of computing, including combinatorial structures, optimization, algorithms, complexity, geometry, and number theory. | ✅ 2026-08-21 |
 | `discrete_mathematics` | [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics) | Journal | Editorial Manager | Elsevier journal publishing original research and survey articles across combinatorics, graph theory, and the broader field of discrete mathematics. | ✅ 2026-07-29 |
 | `genome_biology` | [Genome Biology](https://genomebiology.biomedcentral.com) | Journal | Springer Nature Snapp | Open-access journal publishing peer-reviewed research and methods across all areas of biology and biomedicine studied from a genomic and post-genomic perspective. | ✅ 2026-07-29 |
+| `iclr_2027` | [ICLR 2027](https://iclr.cc/Conferences/2027) | Conference | OpenReview | Conference on representation learning, deep learning, and their applications, covering machine learning theory, methods, and practice. | ✅ 2026-08-24 |
 | `medrxiv` | [medRxiv](https://www.medrxiv.org) | Preprint | openRxiv | Free online archive and distribution server for complete but unpublished manuscripts (preprints) in the medical, clinical, and related health sciences. | ✅ 2026-07-29 |
 | `nature` | [Nature](https://www.nature.com) | Journal | eJournalPress | Weekly multidisciplinary journal publishing peer-reviewed research of outstanding significance across all fields of science and technology, alongside news and commentary. | ✅ 2026-07-29 |
 | `nature_biotech` | [Nature Biotechnology](https://www.nature.com/nbt) | Journal | eJournalPress | Publishes peer-reviewed research and analysis on the science and business of biotechnology, covering the application of biological systems to therapeutics, diagnostics, agriculture, and related areas. | ✅ 2026-07-29 |

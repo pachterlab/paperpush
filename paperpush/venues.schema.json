@@ -242,6 +242,20 @@
           ],
           "description": "For a manuscript `file` (PDF), the maximum page count before the reference list."
         },
+        "main_text_end_headings": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a manuscript `file`, headings *other than the reference list* that end the main text for the `*_before_refs` limits (e.g. `Appendix`, `Ethics Statement`) -- sections the venue excludes from its word/page count. Each is a heading phrase matched on a line of its own; the earliest match, references included, ends the main text. When set, a heading that starts its own page (only a running head or page number ahead of it) counts the main text as ending on the previous page."
+        },
         "max_words": {
           "anyOf": [
             {
@@ -582,6 +596,20 @@
             }
           ],
           "description": "For a manuscript `file` (PDF), the maximum page count before the reference list."
+        },
+        "main_text_end_headings": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For a manuscript `file`, headings *other than the reference list* that end the main text for the `*_before_refs` limits (e.g. `Appendix`, `Ethics Statement`) -- sections the venue excludes from its word/page count. Each is a heading phrase matched on a line of its own; the earliest match, references included, ends the main text. When set, a heading that starts its own page (only a running head or page number ahead of it) counts the main text as ending on the previous page."
         },
         "max_words": {
           "anyOf": [

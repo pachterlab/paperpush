@@ -86,6 +86,8 @@ Conferences
      - Slug
    * - `AAAI 2027 <https://aaai.org/conference/aaai/aaai-27/>`_
      - ``aaai_2027``
+   * - `ICLR 2027 <https://iclr.cc/Conferences/2027>`_
+     - ``iclr_2027``
 
 Sample submission files
 -----------------------

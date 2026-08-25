@@ -869,6 +869,39 @@
       "conflicts": " | Jane Smith | mit.edu | "
     }
   },
+  "iclr_2027.sub": {
+    "venue": "iclr_2027",
+    "fields": {
+      "title": "Title goes here",
+      "authors": " | Joseph Rich | caltech.edu, usc.edu | yes\n | Lior Pachter | caltech.edu | no\n",
+      "keywords": "representation learning, benchmarks, reproducibility",
+      "tldr": "A one-sentence summary of the paper.",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "pdf_file": "tests/manuscript_files/iclr_2027/manuscript.pdf",
+      "primary_area": "datasets and benchmarks",
+      "code_of_ethics": "yes",
+      "reciprocal_reviewing_exemption": "We do not need an exemption.",
+      "ai_assistance": "Yes, to aid or polish writing. Details are described in the paper.\nYes, for retrieval and discovery (e.g., finding related work). Details are described in the paper.",
+      "license": "CC BY 4.0"
+    }
+  },
+  "iclr_2027_exemption.sub": {
+    "venue": "iclr_2027",
+    "fields": {
+      "title": "Title goes here",
+      "authors": "~Joseph_Rich1 | Joseph Rich |  | no\n | Lior Pachter | caltech.edu | no\n",
+      "keywords": "representation learning, benchmarks",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "pdf_file": "tests/manuscript_files/iclr_2027/manuscript.pdf",
+      "supplementary_material": "tests/manuscript_files/iclr_2027/supplement.pdf",
+      "primary_area": "datasets and benchmarks",
+      "code_of_ethics": "yes",
+      "reciprocal_reviewing_exemption": "I believe the submission is exempt for a different reason, specified below.",
+      "reciprocal_reviewing_exemption_reason": "Every qualified author is on sabbatical outside the review period.",
+      "ai_assistance": "No, not at all.",
+      "license": "CC BY 4.0"
+    }
+  },
   "discrete_mathematics.sub": {
     "venue": "discrete_mathematics",
     "fields": {

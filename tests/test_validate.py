@@ -579,6 +579,34 @@ def test_manuscript_page_count_over_limit_is_error(tmp_path):
     assert any("pages before references" in i.message and "2-page limit" in i.message for i in errs)
 
 
+def test_manuscript_page_limit_excludes_the_venues_own_sections(tmp_path):
+    """``main_text_end_headings`` stops the page count early, and says so.
+
+    A four-page PDF whose appendix opens page 3 is two pages of main text, so a
+    two-page cap passes -- and the same file fails without the headings, since
+    then only the reference list would end the main text.
+    """
+    from tests.conftest import _build_pdf
+
+    ms = tmp_path / "manuscript.pdf"
+    ms.write_bytes(_build_pdf(pages=4, title="Doc", page_lines={2: ["Appendix", "extra results"]}))
+    counted = Field(id="ms", label="Manuscript", type="file", max_pages_before_refs=2)
+    excluded = Field(id="ms", label="Manuscript", type="file", max_pages_before_refs=2, main_text_end_headings=["Appendix"])
+
+    assert not _errors(_validate(_venue(excluded), {"ms": str(ms)}))
+    errs = _errors(_validate(_venue(counted), {"ms": str(ms)}))
+    assert any("4 pages before references" in i.message for i in errs)
+
+
+def test_manuscript_page_limit_message_names_the_main_text(tmp_path):
+    """With extra headings the scope reads "in the main text", not "before
+    references" -- the references are no longer the only thing excluded."""
+    ms = _pdf_manuscript(tmp_path, pages=3, title="Doc")
+    j = _venue(Field(id="ms", label="Manuscript", type="file", max_pages_before_refs=2, main_text_end_headings=["Appendix"]))
+    errs = _errors(_validate(j, {"ms": str(ms)}))
+    assert any("3 pages in the main text exceeds the 2-page limit" in i.message for i in errs)
+
+
 def test_manuscript_page_count_non_pdf_warns(tmp_path):
     from tests.conftest import _build_docx
 

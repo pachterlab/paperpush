@@ -226,6 +226,18 @@ class Field:
         Optional[int],
         PField(description="For a manuscript `file` (PDF), the maximum page count " "before the reference list."),
     ] = None
+    # Sections other than the references that a venue excludes from its
+    # before-refs limits -- an appendix, or a required statement a conference
+    # asks for outside the page count (ICLR's ethics / reproducibility / AI-use
+    # statements). Each entry is a heading *phrase*, matched as a standalone
+    # heading line, and the earliest of them or the reference list ends the main
+    # text. Setting it also sharpens the page count: a heading that starts its
+    # own page means the main text ended on the page before. See
+    # ``paperpush.manuscript.main_text_end``.
+    main_text_end_headings: Annotated[
+        Optional[list[str]],
+        PField(description="For a manuscript `file`, headings *other than the reference " "list* that end the main text for the `*_before_refs` limits (e.g. " "`Appendix`, `Ethics Statement`) -- sections the venue excludes from " "its word/page count. Each is a heading phrase matched on a line of " "its own; the earliest match, references included, ends the main text. " "When set, a heading that starts its own page (only a running head or " "page number ahead of it) counts the main text as ending on the " "previous page."),
+    ] = None
     max_words: Annotated[
         Optional[int],
         PField(description="For a manuscript `file`, the maximum word count of the " "whole document (references included)."),
@@ -303,7 +315,7 @@ class Field:
     # is a value but means the dependent fields do not apply. Ignored when unset.
     required_if: Annotated[
         Optional[str],
-        PField(description="Id of another field in the same venue; when that " "field has a non-empty value, this field becomes required. A `boolean` " "target triggers only on an affirmative answer, since \"no\" means the " "dependent fields do not apply. Combined with `required` (unconditional)."),
+        PField(description="Id of another field in the same venue; when that " "field has a non-empty value, this field becomes required. A `boolean` " 'target triggers only on an affirmative answer, since "no" means the ' "dependent fields do not apply. Combined with `required` (unconditional)."),
     ] = None
 
     @classmethod
@@ -329,6 +341,7 @@ class Field:
             require_url=data.get("require_url"),
             max_words_before_refs=data.get("max_words_before_refs"),
             max_pages_before_refs=data.get("max_pages_before_refs"),
+            main_text_end_headings=data.get("main_text_end_headings"),
             max_words=data.get("max_words"),
             max_pages=data.get("max_pages"),
             max_words_before_refs_by=_opt_conditional_limit(data.get("max_words_before_refs_by")),

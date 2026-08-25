@@ -55,13 +55,57 @@ _TEX_REFERENCE_SECTION = re.compile(
 )
 
 
-def truncate_at_references(text: str) -> str:
-    """Return ``text`` up to the start of its reference list.
+# Words of leading text on a page that still count as page furniture -- a running
+# head ("Published as a conference paper at ICLR 2027"), a page number, an
+# extracted margin note -- rather than main text. Used to decide whether a
+# heading starts its page. Set well above any real running head and far below a
+# page of prose (several hundred words): erring high costs at most a sentence or
+# two of overflow going unflagged, while erring low would reject a manuscript
+# that is exactly at its limit, which is the common case for a hard page cap.
+_PAGE_FURNITURE_WORDS = 25
 
-    Looks for a standalone references/bibliography heading; if none is found the
-    text is returned whole (the whole document then counts toward the limit).
+
+def _extra_heading_pattern(headings: tuple[str, ...]) -> re.Pattern[str] | None:
+    """A standalone-heading matcher for a venue's ``main_text_end_headings``.
+
+    Each entry is a literal phrase, so ``venues.json`` lists heading wordings
+    ("Ethics Statement", "Appendix") rather than regular expressions. The shape
+    mirrors :data:`_REFERENCE_HEADING` -- the phrase alone on its line, with an
+    optional leading section designator -- plus an optional trailing designator,
+    so both ``A Appendix`` and ``Appendix A`` are recognised. ``None`` when the
+    venue names no extra headings.
     """
-    match = _REFERENCE_HEADING.search(text)
+    phrases = [h.strip() for h in headings if h and h.strip()]
+    if not phrases:
+        return None
+    alternatives = "|".join(re.escape(phrase) for phrase in phrases)
+    return re.compile(
+        r"^\s*(?:\d+\.?\s+|[A-Za-z]\.?\s+|[ivxlcIVXLC]+\.?\s+)?" rf"(?:{alternatives})" r"(?:\s+[A-Za-z0-9]{1,3})?" r"\s*:?\s*$",
+        re.IGNORECASE | re.MULTILINE,
+    )
+
+
+def main_text_end(text: str, headings: tuple[str, ...] = ()) -> re.Match[str] | None:
+    """The earliest heading in ``text`` that ends the main text, or ``None``.
+
+    The reference list always ends it; ``headings`` names the further sections a
+    venue excludes from its before-refs limits (see ``main_text_end_headings`` in
+    ``venues.json``), such as an appendix or a required statement. Whichever
+    comes first wins.
+    """
+    pattern = _extra_heading_pattern(headings)
+    found = [m for m in (_REFERENCE_HEADING.search(text), pattern.search(text) if pattern else None) if m is not None]
+    return min(found, key=lambda m: m.start()) if found else None
+
+
+def truncate_at_references(text: str, headings: tuple[str, ...] = ()) -> str:
+    """Return ``text`` up to the end of its main text.
+
+    Looks for a standalone references/bibliography heading, or one of the venue's
+    extra ``headings``; if none is found the text is returned whole (the whole
+    document then counts toward the limit).
+    """
+    match = main_text_end(text, headings)
     return text[: match.start()] if match else text
 
 
@@ -321,27 +365,36 @@ def manuscript_text(path: Path) -> str | None:
     return None
 
 
-def words_before_references(path: Path) -> int | None:
-    """Word count of the manuscript before its reference list, or None.
+def words_before_references(path: Path, headings: tuple[str, ...] = ()) -> int | None:
+    """Word count of the manuscript's main text, or None.
 
-    None means the format could not be measured (e.g. a ``.doc`` binary or a PDF
-    whose text could not be extracted), so the caller should not treat the limit
-    as violated.
+    The main text ends at the reference list, or earlier at one of the venue's
+    ``headings`` (see :func:`main_text_end`). None means the format could not be
+    measured (e.g. a ``.doc`` binary or a PDF whose text could not be extracted),
+    so the caller should not treat the limit as violated.
     """
     text = manuscript_text(path)
     if text is None:
         return None
-    return _word_count(truncate_at_references(text))
+    return _word_count(truncate_at_references(text, headings))
 
 
-def pages_before_references(path: Path) -> int | None:
-    """Number of pages up to and including the page the references start on.
+def pages_before_references(path: Path, headings: tuple[str, ...] = ()) -> int | None:
+    """Number of pages the manuscript's main text occupies, or None.
 
     Only a PDF carries fixed pages with a known layout, so this returns None for
     every other format -- a ``.docx`` records only a single cached total (see
     :func:`total_pages`), not where the references fall, and a ``.tex`` page
-    count is only fixed once rendered. When no references heading is found, the
+    count is only fixed once rendered. When nothing ends the main text, the
     document's full page count is returned.
+
+    Without ``headings`` this counts up to *and including* the page the
+    references start on. A venue that names its own ``main_text_end_headings``
+    is measuring the main text proper against a hard limit, where that extra page
+    is the difference between passing and failing, so for those the page holding
+    the heading is counted only when real text precedes it: a heading with
+    nothing but a running head or page number ahead of it starts its page, and
+    the main text ended on the one before.
     """
     if path.suffix.lower() != ".pdf":
         return None
@@ -349,8 +402,13 @@ def pages_before_references(path: Path) -> int | None:
     if pages is None:
         return None
     for index, page_text in enumerate(pages):
-        if _REFERENCE_HEADING.search(page_text or ""):
+        match = main_text_end(page_text or "", headings)
+        if match is None:
+            continue
+        if not headings:
             return index + 1
+        preceding = (page_text or "")[: match.start()]
+        return index if len(preceding.split()) <= _PAGE_FURNITURE_WORDS else index + 1
     return len(pages)
 
 

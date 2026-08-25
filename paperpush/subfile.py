@@ -104,10 +104,14 @@ def render_template(
             lines.append(f"#   at least {field.min_character_count} characters")
         if field.require_url:
             lines.append("#   each non-blank line must be a valid http/https URL")
+        # A venue that names its own main_text_end_headings excludes more than the
+        # references from these limits, so the hint says "main text" rather than
+        # naming the one section it stops at.
+        before = "in the main text" if field.main_text_end_headings else "before the references"
         if field.max_words_before_refs is not None:
-            lines.append(f"#   at most {field.max_words_before_refs} words before the references")
+            lines.append(f"#   at most {field.max_words_before_refs} words {before}")
         if field.max_pages_before_refs is not None:
-            lines.append(f"#   at most {field.max_pages_before_refs} pages before the references")
+            lines.append(f"#   at most {field.max_pages_before_refs} pages {before}")
         if field.type == "int" and (field.min_value is not None or field.max_value is not None):
             lo = "any" if field.min_value is None else field.min_value
             hi = "any" if field.max_value is None else field.max_value

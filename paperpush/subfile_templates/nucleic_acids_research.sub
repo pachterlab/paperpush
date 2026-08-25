@@ -38,7 +38,7 @@ authors: |
 cover_letter: 
 
 # Manuscript file (file, REQUIRED)
-#   Manuscrupt documebt. Initial submission requires PDF, revision requires .docx, .rtf, or .tex (NOT PDF)
+#   Manuscript document. Initial submission requires PDF, revision requires .docx, .rtf, or .tex (NOT PDF)
 manuscript_file: 
 
 # Figures (filelist, optional)

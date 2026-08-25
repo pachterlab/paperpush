@@ -1,0 +1,74 @@
+# paperpush submission file for iclr_2027  -*- mode: yaml -*-
+# The Fifteenth International Conference on Learning Representations
+#
+# Edit the values below, then run:  paperpush submit iclr_2027.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: iclr_2027
+# submission guide: https://iclr.cc/Conferences/2027/AuthorGuidelines
+
+# Title (text, REQUIRED)
+#   The full title of the paper. TeX formulas are supported with $In-line Formula$ or $$Block Formula$$.
+title: 
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Open Review ID | Name | Email suffixes | Reciprocal Reviewer(yes/no). Every author must already have an OpenReview profile. If Open Review ID is added, then name and email suffixes are optional. Each author is added to the OpenReview author page by a profile search on the Name column, so the name must match the author's OpenReview profile. Email suffixes should be comma-separated, in decreasing order of likelihood of association with the author. Mark the author(s) who agree to register as a reviewer to satisfy ICLR's reciprocal reviewing requirement with 'yes' in the Reciprocal Reviewer column; they are selected from the form's Reciprocal Reviewing Author dropdown, which lists authors by name, so a reciprocal reviewer must carry a Name even when an Open Review ID is given. Check eligibility at https://openreview.net/group?id=ICLR.cc/2027/Conference/Reciprocal_Reviewing_Check. At least one author is required.
+authors: |
+  
+
+# Keywords (text, REQUIRED)
+#   Comma-separated list of keywords describing the paper.
+keywords: 
+
+# TL;DR (text, optional)
+#   Optional. A one-sentence summary of the paper ("too long; didn't read").
+tldr: 
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract of the paper. Must be one paragraph. TeX formulas are supported with $In-line Formula$ or $$Block Formula$$.
+abstract: |
+  
+
+# PDF (file, REQUIRED)
+#   The paper PDF, at most 50 MB. The main text must fit in 9 pages; page counting stops at the first heading ICLR excludes from that limit -- the references, the reproducibility / ethics / AI-use statements, the acknowledgements, or the appendix -- so everything from there on is unlimited. The headings are matched by name (see main_text_end_headings), so an unusually worded one is counted as main text; check the page count yourself if validation flags a paper you believe is within the limit.
+#   at most 9 pages in the main text
+#   each file at most 50 MB
+pdf_file: 
+
+# Supplementary material (file, optional)
+#   Optional. All supplementary material must be self-contained and zipped into a single file. It is visible to reviewers and the public throughout and after the review period, so it must be anonymized. Maximum 100 MB.
+#   each file at most 100 MB
+supplementary_material: 
+
+# Primary area (choice, REQUIRED)
+#   The closest area the submission falls into, chosen from the ICLR 2027 primary-area list (_assets/iclr_2027_primary_areas.txt). Use the full label as it appears in the dropdown.
+#   options: run 'paperpush options iclr_2027.primary_area' to list the choices
+primary_area: 
+
+# All authors have read and commit to the ICLR Code of Ethics (boolean, REQUIRED)
+#   Confirms that you and all co-authors have read, and commit to adhering to, the ICLR Code of Ethics (https://iclr.cc/public/CodeOfEthics).
+code_of_ethics: 
+
+# Reciprocal reviewing exemption (choice, REQUIRED)
+#   Whether the submission is exempt from ICLR's reciprocal reviewing requirement, and why. Must be "We do not need an exemption." when an author is marked as the Reciprocal Reviewer in the Authors field, and one of the other reasons when none is. Choose "I believe the submission is exempt for a different reason, specified below." to give a reason of your own in Reciprocal reviewing exemption reason.
+#   options: We do not need an exemption. | We want an exemption because all authors are unqualified (i.e., no author has a publication on the approved venue list). | We want an exemption because all qualified authors have already accepted to serve as ACs/SACs/other chair in the ICLR 2027 Program/Organizing committee. | We want an exemption because all qualified authors will be on medical/parental leave. | We want an exemption because all qualified authors are Program Chairs for other conferences. | I believe the submission is exempt for a different reason, specified below.
+reciprocal_reviewing_exemption: 
+
+# Reciprocal reviewing exemption reason (textarea, optional)
+#   The reason this submission is exempt from the reciprocal reviewing requirement, when none of the listed reasons applies. Fill this in exactly when Reciprocal reviewing exemption is "I believe the submission is exempt for a different reason, specified below."; leave it blank otherwise. At most 500 characters.
+reciprocal_reviewing_exemption_reason: |
+  
+
+# AI assistance (textarea, REQUIRED)
+#   How Large Language Models or other AI tools were used in writing the paper, one answer per line, each chosen from the ICLR 2027 AI-assistance list. Give all that apply -- except "No, not at all." and "Yes, but for none of the above purposes. Details are described in the paper.", each of which must be the only answer. AI use must also be disclosed in a mandatory section of the paper itself (https://iclr.cc/Conferences/2027/AIPolicyForAuthors); failing to do so can lead to desk rejection. (One-per-line rather than comma-separated because the answers contain commas.)
+#   provide 1-any item(s), one per line
+#   options: No, not at all. | Yes, to aid or polish writing. Details are described in the paper. | Yes, for retrieval and discovery (e.g., finding related work). Details are described in the paper. | Yes, for research ideation or execution. Details are described in the paper. | Yes, but for none of the above purposes. Details are described in the paper.
+ai_assistance: |
+  
+
+# License (choice, REQUIRED)
+#   Distribution license for the submission. ICLR 2027 offers only CC BY 4.0.
+#   options: CC BY 4.0
+license: 
+
+# vim: set filetype=yaml :

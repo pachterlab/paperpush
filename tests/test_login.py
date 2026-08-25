@@ -447,7 +447,7 @@ def test_orcid_offered_for_journals_and_preprints(venue):
     assert venues.orcid_login_offered(venue.slug) is expected
 
 
-@pytest.mark.parametrize("slug", ["aaai_2027", "discrete_mathematics"])
+@pytest.mark.parametrize("slug", ["aaai_2027", "iclr_2027", "discrete_mathematics"])
 def test_login_orcid_refused_where_not_offered(slug, monkeypatch, capsys):
     monkeypatch.setenv("PAPERPUSH_ORCID_ID", VALID_ID)
     monkeypatch.setenv("PAPERPUSH_PASSWORD", _PASSWORD)

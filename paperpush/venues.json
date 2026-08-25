@@ -1002,7 +1002,7 @@
         "max_pages_by": null,
         "type": "file",
         "accept": ["pdf"],
-        "help": "Manuscrupt documebt. Initial submission requires PDF, revision requires .docx, .rtf, or .tex (NOT PDF)"
+        "help": "Manuscript document. Initial submission requires PDF, revision requires .docx, .rtf, or .tex (NOT PDF)"
       },
       {
         "id": "authors",
@@ -2877,6 +2877,179 @@
           "email_suffixes?",
           "reciprocal_reviewer?"
         ]
+      }
+    ]
+  },
+  "iclr_2027": {
+    "venue_type": "conference",
+    "name": "ICLR 2027",
+    "full_name": "The Fifteenth International Conference on Learning Representations",
+    "submission_url": "https://openreview.net/group?id=ICLR.cc/2027/Conference&referrer=%5BHomepage%5D(%2F)#tab-recent-activity",
+    "site_url": "https://iclr.cc/Conferences/2027",
+    "submission_guide": "https://iclr.cc/Conferences/2027/AuthorGuidelines",
+    "description": "Conference on representation learning, deep learning, and their applications, covering machine learning theory, methods, and practice.",
+    "fields": [
+      {
+        "id": "title",
+        "autofill": "extract",
+        "label": "Title",
+        "type": "text",
+        "required": true,
+        "help": "The full title of the paper. TeX formulas are supported with $In-line Formula$ or $$Block Formula$$."
+      },
+      {
+        "id": "authors",
+        "autofill": "extract",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order. Format: Open Review ID | Name | Email suffixes | Reciprocal Reviewer(yes/no). Every author must already have an OpenReview profile. If Open Review ID is added, then name and email suffixes are optional. Each author is added to the OpenReview author page by a profile search on the Name column, so the name must match the author's OpenReview profile. Email suffixes should be comma-separated, in decreasing order of likelihood of association with the author. Mark the author(s) who agree to register as a reviewer to satisfy ICLR's reciprocal reviewing requirement with 'yes' in the Reciprocal Reviewer column; they are selected from the form's Reciprocal Reviewing Author dropdown, which lists authors by name, so a reciprocal reviewer must carry a Name even when an Open Review ID is given. Check eligibility at https://openreview.net/group?id=ICLR.cc/2027/Conference/Reciprocal_Reviewing_Check. At least one author is required.",
+        "fields": [
+          "open_review_id?",
+          "name",
+          "email_suffixes?",
+          "reciprocal_reviewer?"
+        ]
+      },
+      {
+        "id": "keywords",
+        "autofill": "extract",
+        "label": "Keywords",
+        "type": "text",
+        "required": true,
+        "help": "Comma-separated list of keywords describing the paper."
+      },
+      {
+        "id": "tldr",
+        "autofill": "extract",
+        "label": "TL;DR",
+        "type": "text",
+        "required": false,
+        "help": "Optional. A one-sentence summary of the paper (\"too long; didn't read\")."
+      },
+      {
+        "id": "abstract",
+        "autofill": "extract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "help": "Plain-text abstract of the paper. Must be one paragraph. TeX formulas are supported with $In-line Formula$ or $$Block Formula$$."
+      },
+      {
+        "id": "pdf_file",
+        "autofill": "filemap",
+        "label": "PDF",
+        "type": "file",
+        "required": true,
+        "max_file_size_mb": 50,
+        "max_pages_before_refs": 9,
+        "main_text_end_headings": [
+          "Reproducibility Statement",
+          "Reproducibility",
+          "Ethics Statement",
+          "Ethics",
+          "AI Use Statement",
+          "Use of Large Language Models",
+          "Use of Large Language Models (LLMs)",
+          "LLM Usage",
+          "Acknowledgements",
+          "Acknowledgments",
+          "Acknowledgement",
+          "Acknowledgment",
+          "Appendix",
+          "Appendices",
+          "Supplementary Material",
+          "Supplementary Materials"
+        ],
+        "help": "The paper PDF, at most 50 MB. The main text must fit in 9 pages; page counting stops at the first heading ICLR excludes from that limit -- the references, the reproducibility / ethics / AI-use statements, the acknowledgements, or the appendix -- so everything from there on is unlimited. The headings are matched by name (see main_text_end_headings), so an unusually worded one is counted as main text; check the page count yourself if validation flags a paper you believe is within the limit.",
+        "accept": [
+          ".pdf"
+        ]
+      },
+      {
+        "id": "supplementary_material",
+        "autofill": "filemap",
+        "label": "Supplementary material",
+        "type": "file",
+        "required": false,
+        "max_file_size_mb": 100,
+        "help": "Optional. All supplementary material must be self-contained and zipped into a single file. It is visible to reviewers and the public throughout and after the review period, so it must be anonymized. Maximum 100 MB.",
+        "accept": [
+          ".zip",
+          ".pdf"
+        ]
+      },
+      {
+        "id": "primary_area",
+        "autofill": "classify",
+        "label": "Primary area",
+        "type": "choice",
+        "required": true,
+        "help": "The closest area the submission falls into, chosen from the ICLR 2027 primary-area list (_assets/iclr_2027_primary_areas.txt). Use the full label as it appears in the dropdown.",
+        "options_file": "iclr_2027_primary_areas.txt"
+      },
+      {
+        "id": "code_of_ethics",
+        "autofill": "never",
+        "label": "All authors have read and commit to the ICLR Code of Ethics",
+        "type": "boolean",
+        "required": true,
+        "confirm": true,
+        "help": "Confirms that you and all co-authors have read, and commit to adhering to, the ICLR Code of Ethics (https://iclr.cc/public/CodeOfEthics).",
+        "default": false
+      },
+      {
+        "id": "reciprocal_reviewing_exemption",
+        "autofill": "never",
+        "label": "Reciprocal reviewing exemption",
+        "type": "choice",
+        "required": true,
+        "help": "Whether the submission is exempt from ICLR's reciprocal reviewing requirement, and why. Must be \"We do not need an exemption.\" when an author is marked as the Reciprocal Reviewer in the Authors field, and one of the other reasons when none is. Choose \"I believe the submission is exempt for a different reason, specified below.\" to give a reason of your own in Reciprocal reviewing exemption reason.",
+        "options": [
+          "We do not need an exemption.",
+          "We want an exemption because all authors are unqualified (i.e., no author has a publication on the approved venue list).",
+          "We want an exemption because all qualified authors have already accepted to serve as ACs/SACs/other chair in the ICLR 2027 Program/Organizing committee.",
+          "We want an exemption because all qualified authors will be on medical/parental leave.",
+          "We want an exemption because all qualified authors are Program Chairs for other conferences.",
+          "I believe the submission is exempt for a different reason, specified below."
+        ],
+        "default": "We do not need an exemption."
+      },
+      {
+        "id": "reciprocal_reviewing_exemption_reason",
+        "autofill": "never",
+        "label": "Reciprocal reviewing exemption reason",
+        "type": "textarea",
+        "required": false,
+        "help": "The reason this submission is exempt from the reciprocal reviewing requirement, when none of the listed reasons applies. Fill this in exactly when Reciprocal reviewing exemption is \"I believe the submission is exempt for a different reason, specified below.\"; leave it blank otherwise. At most 500 characters."
+      },
+      {
+        "id": "ai_assistance",
+        "autofill": "never",
+        "label": "AI assistance",
+        "type": "textarea",
+        "required": true,
+        "min_count": 1,
+        "help": "How Large Language Models or other AI tools were used in writing the paper, one answer per line, each chosen from the ICLR 2027 AI-assistance list. Give all that apply -- except \"No, not at all.\" and \"Yes, but for none of the above purposes. Details are described in the paper.\", each of which must be the only answer. AI use must also be disclosed in a mandatory section of the paper itself (https://iclr.cc/Conferences/2027/AIPolicyForAuthors); failing to do so can lead to desk rejection. (One-per-line rather than comma-separated because the answers contain commas.)",
+        "options": [
+          "No, not at all.",
+          "Yes, to aid or polish writing. Details are described in the paper.",
+          "Yes, for retrieval and discovery (e.g., finding related work). Details are described in the paper.",
+          "Yes, for research ideation or execution. Details are described in the paper.",
+          "Yes, but for none of the above purposes. Details are described in the paper."
+        ]
+      },
+      {
+        "id": "license",
+        "autofill": "never",
+        "label": "License",
+        "type": "choice",
+        "required": true,
+        "help": "Distribution license for the submission. ICLR 2027 offers only CC BY 4.0.",
+        "options": [
+          "CC BY 4.0"
+        ],
+        "default": "CC BY 4.0"
       }
     ]
   },

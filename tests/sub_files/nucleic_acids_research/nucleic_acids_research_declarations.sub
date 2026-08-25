@@ -39,7 +39,7 @@ authors: |
 cover_letter: tests/manuscript_files/bioinformatics/cover_letter.pdf
 
 # Manuscript file (file, REQUIRED)
-#   Manuscrupt documebt. Initial submission requires PDF, revision requires .docx, .rtf, or .tex (NOT PDF)
+#   Manuscript document. Initial submission requires PDF, revision requires .docx, .rtf, or .tex (NOT PDF)
 manuscript_file: tests/manuscript_files/bioinformatics/manuscript.pdf
 
 # Figures (filelist, optional)

@@ -7,8 +7,10 @@ of submissions ship hidden information: API keys and passwords pasted into a
 config, private SSH keys, GPS coordinates baked into figure photos (which can
 pinpoint a home address), editable Google-Docs links to internal review notes,
 and LaTeX ``%`` comments arguing with a co-author or listing a paper's known
-weaknesses. (See Pennekamp et al., *"You Shall Not Reveal"*, IEEE S&P 2026, and
-arXiv's recommended sanitiser ``arxiv_latex_cleaner``.)
+weaknesses. (See Pennekamp et al., *"Hidden Secrets in the arXiv: Discovering,
+Analyzing, and Preventing Unintentional Information Disclosure in Source Files of
+Scientific Preprints"*, IEEE S&P 2026, arXiv:2604.20927, and arXiv's recommended
+sanitiser ``arxiv_latex_cleaner``.)
 
 This module is the sensitive-info back end for ``paperpush validate`` (which
 runs it by default; ``--dont-check-for-sensitive-info`` opts out).

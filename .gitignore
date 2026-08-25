@@ -190,3 +190,4 @@ prompts.txt
 # fails (tests/test_portal_drift.py -> common.capture_failure). Diagnostic
 # scratch that embeds per-session tokens; never commit it.
 tests/portal_snapshots/_failures/
+/paper/

@@ -53,6 +53,11 @@
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
+            "name": "Debug ICLR 2027",
+            "args": ["submit", "tests/sub_files/iclr_2027/iclr_2027.sub"],
+            "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
+        },
+        {
             "name": "Debug medRxiv",
             "args": ["submit", "tests/sub_files/medrxiv/medrxiv.sub"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false

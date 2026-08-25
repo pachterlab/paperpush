@@ -3,22 +3,18 @@
 AAAI 2027 is submitted through OpenReview (https://openreview.net). This module
 is a faithful port of a ``playwright codegen`` recording of the AAAI 2027
 submission wizard, reshaped to the per-venue runner layout: a single
-:class:`AAAI2027Venue` exposing :meth:`~AAAI2027Venue.login` and
-:meth:`~AAAI2027Venue.submit`, with the recording's hard-coded values replaced by
-the parsed ``.sub`` field values and its repeated author / topic / reviewer /
-conflict steps turned into loops.
+:class:`AAAI2027Venue` exposing :meth:`~AAAI2027Venue.submit`, with the
+recording's hard-coded values replaced by the parsed ``.sub`` field values and
+its repeated author / topic / reviewer / conflict steps turned into loops.
+Signing in and the OpenReview profile-search author widget are not AAAI-specific
+and come from :mod:`paperpush.venues.openreview.main`.
 
 Constraints carried from the venue over the raw recording:
 
 * At least one author must be added to the author page, or the run aborts. Each
-  author line is ``open_review_id | name | email_suffixes | reciprocal_reviewer``.
-  Authors are resolved against OpenReview's profile search: if the line carries an
-  OpenReview ID that ID is searched directly (no result is a fatal error);
-  otherwise the name is searched (no result is fatal), a single hit is taken as-is
-  (warning if the profile's email suffixes don't overlap the provided ones), and
-  when several hits come back the one with the greatest email-suffix overlap is
-  chosen -- ties broken by the order the suffixes were listed -- with a warning
-  raised regardless. See :func:`_choose_result`.
+  author line is ``open_review_id | name | email_suffixes | reciprocal_reviewer``
+  and is resolved against OpenReview's profile search (see
+  :meth:`~paperpush.venues.openreview.main.OpenReviewVenue.add_profile`).
 * Exactly one primary topic and up to five secondary topics, each from the AAAI
   2027 topic list (``_assets/aaai_2027_topics.txt``); one or more countries of
   institutions from ``_assets/aaai_2027_countries.txt``, each selected in turn.
@@ -42,114 +38,21 @@ form via :func:`~paperpush.venues.common.hold_open`.
 from __future__ import annotations
 
 import logging
-import re
 
 from playwright.sync_api import sync_playwright
 
 from ...database import get_venue
-from ...validate import _truthy_bool, parse_authors
-from ..base import Venue
-from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                      hold_open, hold_open_on_failure, open_run_context)
-from ..login import VenueLoginError
+from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
+from .main import OpenReviewVenue, lines, parse_profiles
 
 logger = logging.getLogger(__name__)
 
-# JavaScript run against the OpenReview profile-search results: it turns each
-# result row into ``{name, title, emails}``, where ``emails`` is the list of
-# (masked) email addresses OpenReview shows for that profile. The email suffixes
-# are what author lines are matched on (see :func:`_choose_result`).
-_SEARCH_ROWS_JS = """
-rows => rows.map(row => {
-    const basic = row.querySelector("div[class*='basicInfo']");
-    const lines = basic.innerText.split("\\n").map(x => x.trim()).filter(Boolean);
-
-    return {
-        name: lines[0],
-        title: lines.slice(1).join(" "),
-        emails: [...row.querySelectorAll("div[class*='authorEmails'] span")]
-            .map(e => e.innerText.trim())
-    };
-})
-"""
-
-
-class AAAI2027LoginError(VenueLoginError):
-    """Raised when an automatic AAAI 2027 (OpenReview) sign-in cannot be completed."""
-
-
-def _lines(value: str) -> list[str]:
-    """Split a newline-delimited ``.sub`` value into its trimmed, non-empty lines."""
-    return [line.strip() for line in value.splitlines() if line.strip()]
-
-
-def _suffixes(value: str) -> list[str]:
-    """Parse an author's ``email_suffixes`` column into ordered, lowercased suffixes.
-
-    The column is comma-separated, in decreasing order of likelihood of
-    association with the author; that order is preserved so a tie in overlap can
-    be broken by it (see :func:`_choose_result`).
-    """
-    return [s.strip().lower() for s in value.split(",") if s.strip()]
-
-
-def _email_suffix(email: str) -> str:
-    """The domain part (after ``@``) of one email address, lowercased."""
-    email = email.strip().lower()
-    return email.split("@", 1)[1] if "@" in email else ""
-
-
-def _result_suffixes(result: dict) -> set[str]:
-    """The set of email suffixes a profile-search result exposes."""
-    return {s for s in (_email_suffix(e) for e in result.get("emails", [])) if s}
+SLUG = "aaai_2027"
 
 
 def _parse_authors(value: str) -> list[dict]:
-    """Parse the AAAI ``authorlist`` ``.sub`` value into normalized author dicts.
-
-    Each dict has ``open_review_id`` and ``name`` (trimmed strings), ``suffixes``
-    (the ordered ``email_suffixes`` list) and ``reciprocal_reviewer`` (a bool).
-    """
-    author_field = next((f for f in get_venue("aaai_2027").fields if f.type == "authorlist"), None)
-    parsed = parse_authors(value, author_field.fields if author_field else None)
-    authors: list[dict] = []
-    for a in parsed:
-        authors.append(
-            {
-                "open_review_id": a.get("open_review_id", "").strip(),
-                "name": a.get("name", "").strip(),
-                "suffixes": _suffixes(a.get("email_suffixes", "")),
-                "reciprocal_reviewer": _truthy_bool(a.get("reciprocal_reviewer", "")),
-            }
-        )
-    return authors
-
-
-def _choose_result(results: list[dict], suffixes: list[str]) -> int:
-    """Pick the best-matching profile-search result index for an author.
-
-    ``results`` is the list of ``{name, title, emails}`` rows (in DOM order) and
-    ``suffixes`` is the author's ordered ``email_suffixes``. The result with the
-    greatest email-suffix overlap wins; ties are broken by the order the suffixes
-    were listed (a match on an earlier, more-likely suffix beats a later one) and
-    then by DOM order.
-    """
-    provided = set(suffixes)
-
-    def rank(item: tuple[int, dict]) -> tuple[int, int, int]:
-        index, result = item
-        theirs = _result_suffixes(result)
-        overlap = len(provided & theirs)
-        order = next((i for i, s in enumerate(suffixes) if s in theirs), len(suffixes))
-        return (-overlap, order, index)
-
-    return min(enumerate(results), key=rank)[0]
-
-
-def _warn(message: str) -> None:
-    """Log and print a non-fatal warning about author resolution."""
-    logger.warning(message)
-    print(f"Warning: {message}")
+    """Parse the AAAI ``authorlist`` ``.sub`` value into normalized author dicts."""
+    return parse_profiles(SLUG, value)
 
 
 def _validate_secondary_topics(value: str) -> str:
@@ -160,9 +63,9 @@ def _validate_secondary_topics(value: str) -> str:
     vocabulary (the field is a free ``textarea`` because many topic names contain
     commas, so it cannot use the comma-separated ``multichoice`` closed-set check).
     """
-    field = next(f for f in get_venue("aaai_2027").fields if f.id == "secondary_topics")
+    field = next(f for f in get_venue(SLUG).fields if f.id == "secondary_topics")
     allowed = set(field.options or [])
-    topics = _lines(value)
+    topics = lines(value)
     if len(topics) > 5:
         raise ValueError(f"at most 5 secondary topics are allowed (got {len(topics)})")
     unknown = [t for t in topics if t not in allowed]
@@ -193,81 +96,15 @@ FIELD_VALIDATORS = {
 }
 
 
-class AAAI2027Venue(Venue):
+class AAAI2027Venue(OpenReviewVenue):
     """The AAAI 2027 venue, submitted through OpenReview.
 
-    The base class supplies the sign-in orchestration, session capture, and the
-    login-state check. OpenReview shows a "Login" link only while signed *out*, so
-    that link's presence is the signed-out marker (``logged_in_present_means_in``
-    is ``False``).
+    The OpenReview base class supplies the sign-in form, the profile-search author
+    widget, and the login-state check; only :meth:`submit` is AAAI-specific.
     """
 
-    slug = "aaai_2027"
+    slug = SLUG
     field_validators = FIELD_VALIDATORS
-
-    #: The "Login" link renders only for a signed-out session, so its presence
-    #: means signed out (hence ``logged_in_present_means_in = False``).
-    logged_in_role = "link"
-    logged_in_names = ("Login",)
-    logged_in_present_means_in = False
-
-    def login(self, page, username: str, password: str, *, timeout_ms: int = 15000) -> None:
-        """Fill and submit the OpenReview sign-in form from stored credentials.
-
-        Opens the AAAI 2027 portal, follows its "Login" link, types the email and
-        password, and submits. Raises :class:`AAAI2027LoginError` if the signed-in
-        page does not load, so :meth:`ensure_signed_in` can fall back to a manual
-        sign-in rather than failing the whole run.
-        """
-        page.goto(self.login_url)
-        page.get_by_role("link", name="Login").click()
-        page.get_by_role("textbox", name="Email").fill(username)
-        page.get_by_role("textbox", name="Password").fill(password)
-        page.get_by_role("button", name="Login to OpenReview").click()
-        if not self.is_logged_in(page, timeout_ms=timeout_ms):
-            raise AAAI2027LoginError("submitted the credentials but OpenReview did not sign in -- the email " "or password may be wrong, or a step (CAPTCHA / two-factor) that can't " "be automated was added")
-
-    def _add_author(self, page, author: dict, *, search_index: int = 0, required: bool = True) -> None:
-        """Resolve one profile against OpenReview's search and add it.
-
-        Searches by OpenReview ID when the line carries one, otherwise by name,
-        applying the match rules in the module docstring. ``search_index`` selects
-        which "search profiles" box to drive (0 = author list, 1 = conflicts list).
-        When ``required`` is false a search that returns nothing is warned about and
-        skipped rather than raising -- used for conflicts, which are dropped rather
-        than aborting the run when not found.
-        """
-        search_by_id = bool(author["open_review_id"])
-        term = author["open_review_id"] if search_by_id else author["name"]
-        label = author["open_review_id"] or author["name"]
-
-        box = page.get_by_role("textbox", name="search profiles by name or").nth(search_index)
-        box.click()
-        box.fill(term)
-        page.get_by_role("button", name="Search").nth(search_index).click()
-        page.wait_for_timeout(1000)
-        results = page.locator("div[class*='searchResultRow']").evaluate_all(_SEARCH_ROWS_JS)
-        if not search_by_id:
-            results = [r for r in results if re.sub(r"\d+$", "", r["name"][1:]).strip().replace("_", " ") == author["name"].strip()]  # filter out rows whose names don't match the author name (ignoring OpenReview ID suffixes)
-
-        if not results:
-            if not required:
-                _warn(f"{label!r} was not found in the OpenReview profile search; skipping")
-                return
-            kind = "OpenReview ID" if search_by_id else "author"
-            raise ValueError(f"no OpenReview profile found for {kind} {term!r}")
-
-        if search_by_id:
-            index = 0
-        elif len(results) == 1:
-            index = 0
-            if author["suffixes"] and not (set(author["suffixes"]) & _result_suffixes(results[0])):
-                _warn(f"author {label!r}: the matched profile's email suffixes do not overlap the provided ones")
-        else:
-            _warn(f"author {label!r}: OpenReview returned {len(results)} matching profiles; " "selecting the one with the greatest email-suffix overlap")
-            index = _choose_result(results, author["suffixes"])
-
-        page.locator("div[class*='searchResultRow']").nth(index).get_by_role("button", name="plus").click()
 
     def submit(
         self,
@@ -303,7 +140,7 @@ class AAAI2027Venue(Venue):
         tldr = values.get("tldr", "").strip()
         abstract = values.get("abstract", "")
         primary_topic = values.get("primary_topic", "").strip()
-        secondary_topics = _lines(values.get("secondary_topics", ""))
+        secondary_topics = lines(values.get("secondary_topics", ""))
         countries = [c.strip() for c in values.get("country", "").split(",") if c.strip()]
         pdf_file = values.get("pdf_file", "").strip()
         reproducibility_checklist = values.get("reproducibility_checklist", "").strip()
@@ -330,10 +167,10 @@ class AAAI2027Venue(Venue):
             page.get_by_role("textbox").nth(1).fill(title)
 
             # Authors: remove the pre-filled author entry, then add each author by
-            # OpenReview profile search (by ID or name, see _add_author).
+            # OpenReview profile search (by ID or name, see add_profile).
             page.get_by_role("button", name="remove").click()
             for author in authors:
-                self._add_author(page, author)
+                self.add_profile(page, author)
 
             # TL;DR (optional).
             if tldr:
@@ -404,7 +241,7 @@ class AAAI2027Venue(Venue):
             for conflict in conflicts:
                 if conflict["name"] and conflict["name"].lower() in author_names:
                     raise ValueError(f"self-declared conflict {conflict['name']!r} must not be one of the submission's authors")
-                self._add_author(page, conflict, search_index=1, required=False)
+                self.add_profile(page, conflict, search_index=1, required=False)
 
             # Consent, license, and signatures (replayed from the recording).
             page.get_by_role("checkbox", name="I confirm that all authors").check()

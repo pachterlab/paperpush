@@ -67,6 +67,7 @@ VENUE_GROUPS = [
 # slug, then to a dash, so an unmapped venue still renders sensibly.
 PLATFORMS = {
     "aaai_2027": "OpenReview",
+    "iclr_2027": "OpenReview",
     "discrete_mathematics": "Editorial Manager",
     "arxiv": "arXiv (native)",
     "biorxiv": "openRxiv",
