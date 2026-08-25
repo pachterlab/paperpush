@@ -1,7 +1,7 @@
 # Example session
 
 A full end-to-end PaperPush run captured from Claude Code: preparing the
-`fastQpick` manuscript for submission to *Bioinformatics* — creating and
+`MANUSCRIPT` manuscript for submission to *JOURNAL* — creating and
 autofilling the `.sub` file, validating it, logging in, and driving the
 ScholarOne portal up to (but not including) the final submit click.
 
@@ -12,21 +12,21 @@ ScholarOne portal up to (but not including) the final submit click.
 
 
 ❯ Prepare my manuscript in                                                      
-  /Users/joeyrich/Documents/Caltech/Pachter/fastqpick/bioinformatics for        
-  submission to Bioinformatics using PaperPush                              
+  /PATH/TO/MANUSCRIPT/DIRECTORY for        
+  submission to JOURNAL using PaperPush                              
 
-⏺ I'll help prepare your manuscript for Bioinformatics submission. Let me first
+⏺ I'll help prepare your manuscript for JOURNAL submission. Let me first
   explore the PaperPush tool to understand the workflow.
 
   Listed 2 directories, ran 1 shell command (ctrl+o to expand)
 
-⏺ bioinformatics is supported. The manuscript directory contains a cover letter
-  and fastQpick.pdf. Let me check the CLI workflow for creating a subfile.
+⏺ JOURNAL is supported. The manuscript directory contains a cover letter
+  and MANUSCRIPT.pdf. Let me check the CLI workflow for creating a subfile.
 
   Ran 5 shell commands (ctrl+o to expand)
 
-⏺ bioinformatics is supported, and your manuscript directory has fastQpick.pdf
-  plus a cover letter. The workflow is: create a bioinformatics.sub template,
+⏺ JOURNAL is supported, and your manuscript directory has MANUSCRIPT.pdf
+  plus a cover letter. The workflow is: create a JOURNAL.sub template,
   then autofill it from your files using the paperpush-autofill skill.
 
   Before I run the autofill, I need to confirm the two paths (my memory says
@@ -34,9 +34,9 @@ ScholarOne portal up to (but not including) the final submit click.
   ⎿  Invalid tool parameters
 
 ⏺ User answered Claude's questions:
-  ⎿  · Where should I write the bioinformatics.sub submission file? (Manuscript 
+  ⎿  · Where should I write the JOURNAL.sub submission file? (Manuscript 
      dir confirmed as 
-     /Users/joeyrich/Documents/Caltech/Pachter/fastqpick/bioinformatics) → In 
+     /PATH/TO/MANUSCRIPT/DIRECTORY) → In 
      the manuscript dir
 
 ⏺ Both paths confirmed. Now I'll run the autofill skill to create and populate
@@ -45,7 +45,7 @@ ScholarOne portal up to (but not including) the final submit click.
 ⏺ Skill(paperpush-autofill)
   ⎿  Successfully loaded skill
 
-⏺ I have all inputs. Let me get the field schema for bioinformatics and render
+⏺ I have all inputs. Let me get the field schema for JOURNAL and render
   the skeleton.
 
   Read 1 file, ran 1 shell command (ctrl+o to expand)
@@ -62,10 +62,10 @@ ScholarOne portal up to (but not including) the final submit click.
 
 ⏺ Now I'll write the extracted values and apply them.
 
-⏺ Write(/private/tmp/claude-501/-Users-joeyrich-Desktop-local-paperpush/cafd
+⏺ Write(/private/tmp/claude-501/-Users-USER-Desktop-paperpush/cafd
        5a92-fb62-4e66-8365-0d2813923f5c/scratchpad/values.json)
-  ⎿  Wrote 44 lines to ../../../../../private/tmp/claude-501/-Users-joeyric
-     h-Desktop-local-paperpush/cafd5a92-fb62-4e66-8365-0d2813923f5c/scr
+  ⎿  Wrote 44 lines to ../../../../../private/tmp/claude-501/-Users-USER
+     -Desktop-paperpush/cafd5a92-fb62-4e66-8365-0d2813923f5c/scr
      atchpad/values.json
       1 {
       3     {"id": "article_type", "value": "Applications Note", "confide
@@ -81,15 +81,14 @@ ScholarOne portal up to (but not including) the final submit click.
 
   Ran 1 shell command (ctrl+o to expand)
 
-⏺ Done. Your bioinformatics.sub is created and populated at /Users/joeyrich/Docu
-  ments/Caltech/Pachter/fastqpick/bioinformatics/bioinformatics.sub.
+⏺ Done. Your JOURNAL.sub is created and populated at /PATH/TO/MANUSCRIPT/DIRECTORY/JOURNAL.sub.
 
   Filled with high confidence (12, copied from the manuscript)
 
   Title, structured abstract, cover letter + manuscript file, page/table/figure
   counts (4/1/1), data-availability statement, conflict-of-interest statement,
   CRediT author contributions, code repository link
-  (github.com/pachterlab/fastQpick), and data source (SRA SRR453566).
+  (github.com/pachterlab/MANUSCRIPT), and data source (SRA SRR453566).
 
   Please review these (13 — classifications and author metadata)
 
@@ -130,15 +129,15 @@ ScholarOne portal up to (but not including) the final submit click.
   Next steps
 
   Add reviewers (and any of the above), then:
-  paperpush login bioinformatics
-  paperpush submit /Users/joeyrich/Documents/Caltech/Pachter/fastqpick/bioin
-  formatics/bioinformatics.sub
+  paperpush login JOURNAL
+  paperpush submit /PATH/TO/MANUSCRIPT/DIRECTORY/bioin
+  formatics/JOURNAL.sub
   submit opens the ScholarOne portal and stops before the final click so you can
   review everything in the submission system first.
 
 ✻ Crunched for 2m 59s
 
-※ recap: Preparing your fastQpick manuscript for Bioinformatics submission via PaperPush. The bioinformatics.sub file is created and autofilled from the manuscript. Next, add at least 4 recommended reviewers (the one blocking field), then run login and submit. (disable recaps in /config)
+※ recap: Preparing your MANUSCRIPT manuscript for JOURNAL submission via PaperPush. The JOURNAL.sub file is created and autofilled from the manuscript. Next, add at least 4 recommended reviewers (the one blocking field), then run login and submit. (disable recaps in /config)
 
 ❯ I have verified and filled gaps in the sub file. Please fill out submission portal.                                                                       
 ⏺ Let me validate the completed .sub file before opening the portal.
@@ -150,7 +149,7 @@ ScholarOne portal up to (but not including) the final submit click.
 
   Ran 2 shell commands (ctrl+o to expand)
 
-⏺ Credentials are stored (easyeditorial26@gmail.com) and the file passes
+⏺ Credentials are stored (EMAIL) and the file passes
   validation. I'll run submit, which opens the ScholarOne portal and drives the
   submission click-through, stopping before the final submit so you can review
   everything.
@@ -162,9 +161,9 @@ ScholarOne portal up to (but not including) the final submit click.
 
   - Validated — the .sub passed (only the two expected off-list keyword warnings
   for Bootstrap/Subsampling, which get added as custom keywords).
-  - Signed in to Bioinformatics (ScholarOne) automatically using your stored
-  credentials (easyeditorial26@gmail.com), and saved the session for next time.
-  - Ran the click-through — every field value from bioinformatics.sub was
+  - Signed in to JOURNAL (PUBLISHER) automatically using your stored
+  credentials (EMAIL), and saved the session for next time.
+  - Ran the click-through — every field value from JOURNAL.sub was
   entered into the wizard, and it stopped before the final submit.
   - The browser is left open for you to take over.
 
@@ -178,8 +177,8 @@ ScholarOne portal up to (but not including) the final submit click.
   automated browser.
 
   I stopped short of the final click by design — nothing has been submitted to
-  Bioinformatics yet.
+  JOURNAL yet.
 
 ✻ Crunched for 1m 38s
 
-※ recap: Your fastQpick manuscript is prepped and its Bioinformatics submission portal is filled out and signed in, stopped before the final submit. Review the open browser wizard and click Submit yourself when satisfied.```
+※ recap: Your MANUSCRIPT manuscript is prepped and its JOURNAL submission portal is filled out and signed in, stopped before the final submit. Review the open browser wizard and click Submit yourself when satisfied.```
