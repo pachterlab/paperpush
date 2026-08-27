@@ -644,6 +644,25 @@ def _link_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     return _findings_to_issues(sensitive.scan_links(paths))
 
 
+def _reference_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
+    """Flag references whose DOI does not match the work they cite.
+
+    Reads the submission's bibliography whichever way it ships it -- the ``.bib``
+    files among the referenced uploads (including one inside a source archive),
+    and the manuscript's own reference list -- resolves each DOI through
+    doi.org, and reports the ones that are malformed, duplicated, unregistered,
+    or registered to a different title/author/year, which is the signature of a
+    DOI copied from the wrong row. Runs by default (disable with
+    ``--dont-check-references``) and makes network requests; anything
+    inconclusive is left unreported.
+    """
+    from . import references
+
+    paths = list(_iter_upload_paths(venue, values))
+    logger.info("Checking %d upload file(s) for reference DOI problems (%s)", len(paths), venue.slug)
+    return _findings_to_issues(references.scan_references(paths))
+
+
 def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     """Scan every referenced upload for information not meant to be public.
 
@@ -707,7 +726,7 @@ def _arxiv_cleaner_reminder(venue: Venue, findings) -> list[Issue]:
     ]
 
 
-def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, check_links: bool = True) -> list[Issue]:
+def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True) -> list[Issue]:
     """Return all issues found in ``subfile`` against ``venue``.
 
     Combines schema-level checks (allowed options, file types, booleans, and
@@ -721,14 +740,19 @@ def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, ch
     :func:`_sensitive_issues`) -- and reported as advisory WARNINGs. When
     ``check_links`` is set (also the default), the URLs those files cite are
     probed and any that are unreachable (404/gone, including a still-private
-    GitHub repo) are likewise flagged; this makes network requests.
+    GitHub repo) are likewise flagged. When ``check_references`` is set (also
+    the default), the DOIs in the submission's bibliography -- its ``.bib``
+    files and the manuscript's own reference list -- are resolved and compared
+    against the title, author, and year each reference claims (see
+    :func:`_reference_issues`). Both make network requests.
     """
     logger.info(
-        "Validating %s: %d field(s) (sensitive-scan=%s, link-check=%s)",
+        "Validating %s: %d field(s) (sensitive-scan=%s, link-check=%s, reference-check=%s)",
         venue.slug,
         len(venue.fields),
         check_sensitive,
         check_links,
+        check_references,
     )
     issues: list[Issue] = list(_schema_issues(venue, subfile.values))
     values = subfile.values
@@ -736,6 +760,8 @@ def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, ch
     issues.extend(_upload_size_issues(venue, values))
     if check_links:
         issues.extend(_link_issues(venue, values))
+    if check_references:
+        issues.extend(_reference_issues(venue, values))
     if check_sensitive:
         issues.extend(_sensitive_issues(venue, values))
 

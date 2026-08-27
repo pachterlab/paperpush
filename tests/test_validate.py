@@ -1185,6 +1185,96 @@ def test_cli_validate_dont_check_links_skips_probes(tmp_path, monkeypatch, capsy
     assert "example.com/gone-page" not in err
 
 
+def test_cli_validate_checks_references_by_default(tmp_path, monkeypatch, capsys):
+    # Bibliography checking is on by default: a .bib entry whose DOI is
+    # registered to a different paper is warned about, without blocking (rc 0).
+    import paperpush.cli as cli
+    import paperpush.references as references
+
+    j = _venue(Field(id="src", label="Source", type="file", required=True), slug="biorxiv")
+    monkeypatch.setattr(cli, "get_venue", lambda slug: j)
+    record = {"title": "The Genome of C. elegans", "author": [{"family": "Brenner"}], "issued": {"date-parts": [[1974]]}}
+    monkeypatch.setattr(references, "_resolve_doi", lambda doi, **k: (references.DOI_FOUND, record))
+    bib = tmp_path / "ref.bib"
+    bib.write_text("@article{lovelace1843,\n  author = {Ada Lovelace},\n  title = {Notes on the Analytical Engine},\n  year = {1843},\n  doi = {10.1234/abc},\n}\n", encoding="utf-8")
+    sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {bib}\n")
+
+    rc = main(["validate", str(sub)])
+    err = capsys.readouterr().err
+
+    assert rc == 0
+    assert "lovelace1843" in err
+    assert "10.1234/abc" in err
+
+
+def test_cli_validate_dont_check_references_skips_lookups(tmp_path, monkeypatch, capsys):
+    import paperpush.cli as cli
+    import paperpush.references as references
+
+    j = _venue(Field(id="src", label="Source", type="file", required=True), slug="biorxiv")
+    monkeypatch.setattr(cli, "get_venue", lambda slug: j)
+
+    # If this were consulted the entry would be reported; --dont-check-references
+    # must mean it is never called.
+    def fail(doi, **kwargs):
+        raise AssertionError(f"resolved {doi} despite --dont-check-references")
+
+    monkeypatch.setattr(references, "_resolve_doi", fail)
+    bib = tmp_path / "ref.bib"
+    bib.write_text("@article{lovelace1843, title = {Notes}, doi = {10.1234/abc}}\n", encoding="utf-8")
+    sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {bib}\n")
+
+    rc = main(["validate", str(sub), "--dont-check-references"])
+    err = capsys.readouterr().err
+
+    assert rc == 0
+    assert "10.1234/abc" not in err
+
+
+def test_cli_validate_checks_the_manuscript_reference_list(tmp_path, monkeypatch, capsys):
+    # No .bib in the submission: the reference list in the manuscript itself is
+    # what gets checked, which is the shape most submissions actually ship.
+    import paperpush.cli as cli
+    import paperpush.references as references
+
+    j = _venue(Field(id="src", label="Source", type="file", required=True), slug="biorxiv")
+    monkeypatch.setattr(cli, "get_venue", lambda slug: j)
+    record = {"title": "Computing Machinery and Intelligence", "author": [{"family": "Turing"}], "issued": {"date-parts": [[1950]]}}
+    monkeypatch.setattr(references, "_resolve_doi", lambda doi, **k: (references.DOI_FOUND, record))
+    doc = tmp_path / "manuscript.txt"
+    doc.write_text("Body.\n\nReferences\n\n1. Franklin, R. Molecular configuration in sodium thymonucleate. Acta Cryst (1953). doi:10.1093/mind/LIX.236.433\n", encoding="utf-8")
+    sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {doc}\n")
+
+    rc = main(["validate", str(sub)])
+    err = capsys.readouterr().err
+
+    assert rc == 0
+    assert "10.1093/mind/lix.236.433" in err
+    assert "Computing Machinery and Intelligence" in err
+
+
+def test_cli_validate_reference_problems_do_not_block(tmp_path, monkeypatch, capsys):
+    # A wrong DOI is advisory, like every other scanner finding: it is reported
+    # but the file still passes, because the registry record may itself be off.
+    import paperpush.cli as cli
+    import paperpush.references as references
+
+    j = _venue(Field(id="src", label="Source", type="file", required=True), slug="biorxiv")
+    monkeypatch.setattr(cli, "get_venue", lambda slug: j)
+    monkeypatch.setattr(references, "_resolve_doi", lambda doi, **k: (references.DOI_MISSING, None))
+    bib = tmp_path / "ref.bib"
+    bib.write_text("@article{k, title = {Notes}, doi = {10.1234/abc}}\n", encoding="utf-8")
+    sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {bib}\n")
+
+    rc = main(["validate", str(sub)])
+    out, err = capsys.readouterr()
+
+    assert rc == 0
+    assert "warning:" in err
+    assert "not registered" in err
+    assert "passed validation" in out
+
+
 def test_cli_validate_arxiv_reminds_to_run_cleaner(tmp_path, monkeypatch, capsys):
     # An arXiv .sub whose LaTeX source still has comments earns a one-line
     # reminder to run arxiv_latex_cleaner (evidence it hasn't been sanitised).

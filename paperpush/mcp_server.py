@@ -334,6 +334,7 @@ def validate_subfile(
     manuscript_dir: Optional[str] = None,
     check_links: bool = True,
     check_sensitive: bool = True,
+    check_references: bool = True,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file.
 
@@ -341,17 +342,21 @@ def validate_subfile(
     limits, and that referenced upload files exist, are the right type, and fit
     the portal's size caps.
 
-    Two heavier passes are on by default and can be turned off:
+    Three heavier passes are on by default and can be turned off:
     `check_links` probes the URLs cited in the manuscript for 404s and
-    still-private repositories (needs network); `check_sensitive` scans the
-    referenced files for API keys, passwords, private keys, GPS data in
-    figures, and LaTeX source comments.
+    still-private repositories (needs network); `check_references` resolves the
+    DOIs in the submission's bibliography -- its .bib files, and the
+    manuscript's own reference list -- and reports references whose title,
+    author, or year does not match the work the DOI points to (also needs
+    network);
+    `check_sensitive` scans the referenced files for API keys, passwords,
+    private keys, GPS data in figures, and LaTeX source comments.
 
     `errors` block submission; `warnings` are advisory. `ok` is true when there
     are no errors.
     """
     path, text, venue = _load_subfile(subfile, manuscript_dir)
-    issues = _run_validate(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links)
+    issues = _run_validate(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references)
     errors = [i for i in issues if i.is_error]
     warnings = [i for i in issues if not i.is_error]
     return {
@@ -753,7 +758,7 @@ def submit(
     except KeyError:
         raise ValueError(f"no submission runner is registered for {venue.slug!r}; " "this venue can be prepared but not driven") from None
 
-    checked = validate_subfile(str(path), check_links=False, check_sensitive=False)
+    checked = validate_subfile(str(path), check_links=False, check_sensitive=False, check_references=False)
     if not checked["ok"]:
         return {
             "status": "blocked",

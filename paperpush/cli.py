@@ -10,8 +10,10 @@ Implemented so far:
                                       fill a .sub from a manuscript directory
     paperpush validate <subfile>  run the pre-submission checks on a .sub
                                       (scans referenced files for secrets, GPS
-                                      metadata, LaTeX comments, and broken links
-                                      by default; --dont-check-* to opt out)
+                                      metadata, LaTeX comments, broken links, and
+                                      references whose DOI points at a different
+                                      work, by default; --dont-check-* to opt
+                                      out)
     paperpush login <venue>     store credentials for a venue
     paperpush login --list        list the venues you are logged in to
     paperpush login --orcid <j>   store an ORCID iD/password for a journal that
@@ -493,7 +495,7 @@ def _populate_orcid_into(sub_path: str, venue, profile) -> None:
     print(f"  Updated {sub_path}: filled ORCID details for author '{matched}'.")
 
 
-def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive: bool = True, check_links: bool = True) -> list:
+def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True) -> list:
     """Validate a loaded .sub against its venue and print the findings.
 
     Runs the same checks ``submit`` performs before opening a browser --
@@ -505,14 +507,16 @@ def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive
     ``validate`` command.
 
     When ``check_links`` is set (the default), the URLs cited in the referenced
-    files are probed and broken ones reported (makes network requests). When
-    ``check_sensitive`` is set, those files are additionally scanned for
+    files are probed and broken ones reported. When ``check_references`` is set
+    (also the default), the DOIs in the submission's bibliography are resolved
+    and compared against what each entry claims; both make network requests.
+    When ``check_sensitive`` is set, those files are additionally scanned for
     information not meant to be published (secrets, GPS metadata,
     editable-document links, LaTeX comments); all surface as advisory warnings.
     """
     from .validate import validate
 
-    issues = validate(subfile, venue_def, check_sensitive=check_sensitive, check_links=check_links)
+    issues = validate(subfile, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references)
     errors = [i for i in issues if i.is_error]
     warnings = [i for i in issues if not i.is_error]
     for issue in warnings:
@@ -564,6 +568,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         args.subfile,
         check_sensitive=getattr(args, "check_sensitive", True),
         check_links=getattr(args, "check_links", True),
+        check_references=getattr(args, "check_references", True),
     )
     if errors:
         print("\nFix the items above, then run 'paperpush validate' again.", file=sys.stderr)
@@ -1061,7 +1066,19 @@ def build_parser() -> argparse.ArgumentParser:
         "and reminds arXiv submitters to run arxiv_latex_cleaner on unclean "
         "source. Reported as advisory warnings.",
     )
-    p_validate.set_defaults(func=_cmd_validate, check_links=True, check_sensitive=True)
+    p_validate.add_argument(
+        "--dont-check-references",
+        dest="check_references",
+        action="store_false",
+        help="skip checking the references against the DOI registry. By "
+        "default validate reads the submission's bibliography -- its .bib "
+        "files, and the reference list in the manuscript itself -- resolves "
+        "each DOI through doi.org, and warns when one is "
+        "malformed, duplicated, unregistered, or registered to a different "
+        "title, author, or year than the reference claims -- the usual sign of "
+        "a DOI copied from the wrong reference. Requires network access.",
+    )
+    p_validate.set_defaults(func=_cmd_validate, check_links=True, check_sensitive=True, check_references=True)
 
     p_login = sub.add_parser("login", parents=[verbosity], help="store credentials for a venue submission system")
     p_login.add_argument("venue", nargs="?", help="venue slug, e.g. biorxiv (omit with --list)")

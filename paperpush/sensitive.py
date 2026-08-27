@@ -89,12 +89,17 @@ _JUNK_DIR_MARKERS = ("/.git/", "/.svn/", "/.hg/", "/__macosx/", "/.ipynb_checkpo
 
 @dataclass(frozen=True)
 class Finding:
-    """One piece of sensitive information found in a submission file.
+    """One problem found in a submission file.
 
     ``where`` locates it: the file's display name, plus an archive-member path
-    when the hit is inside a bundle (``figures.zip:notes.tex``). ``category`` is a
-    short human phrase (e.g. ``"private key"``); ``detail`` is a
+    when the hit is inside a bundle (``figures.zip:notes.tex``), or the literal
+    ``"submission"`` for a finding about the submission as a whole. ``category``
+    is a short human phrase (e.g. ``"private key"``); ``detail`` is an
     already-masked, safe-to-print description.
+
+    Shared with :mod:`paperpush.references`, whose bibliography checks report in
+    the same shape, so :func:`paperpush.validate._findings_to_issues` renders
+    every advisory pass identically.
     """
 
     where: str

@@ -58,6 +58,21 @@ def _no_network_link_checks(monkeypatch):
     monkeypatch.setattr(sensitive, "_url_is_reachable", lambda *a, **k: None)
 
 
+@pytest.fixture(autouse=True)
+def _no_network_doi_checks(monkeypatch):
+    """Keep the suite offline: stub DOI resolution to "unknown".
+
+    The bibliography check resolves every DOI through doi.org by default, which
+    would put a network request behind any test that runs ``validate`` on a
+    submission carrying a ``.bib``. ``DOI_UNKNOWN`` produces no findings, so
+    tests stay hermetic; a test exercising the check re-patches ``_resolve_doi``
+    itself and that patch wins for its duration.
+    """
+    import paperpush.references as references
+
+    monkeypatch.setattr(references, "_resolve_doi", lambda *a, **k: (references.DOI_UNKNOWN, None))
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--run-portal",
