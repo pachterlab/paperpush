@@ -567,6 +567,9 @@ class OpenRxivVenue(Venue):
 
     #: The queue-page link that only renders for a signed-in session.
     logged_in_names = (BTN_SUBMIT_NEW,)
+    #: The Author Area queue is slow to first-paint; give the initial load 20 s
+    #: before deciding the session is stale (the base default is 6 s).
+    logged_in_timeout_ms = 20000
     #: Both servers offer "Log in with ORCiD" beside the credential form.
     supports_orcid_login = True
 

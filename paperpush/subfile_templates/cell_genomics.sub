@@ -9,7 +9,7 @@
 
 # Article type (choice, REQUIRED)
 #   The Editorial Manager 'Select Article Type' value. Pick the label that matches your submission; if the runner cannot match the label it falls back to the article-type drop-down's first option.
-#   options: Research Article | Resource | Short Article | Matters Arising | Correspondence | Review | Perspective
+#   options: Research Article | Resource Article | Short Article | Technology | Review | Perspective | Preview | Minireview | Primer | Forum | Commentary | Letter | Backstory
 article_type: 
 
 # Manuscript title (text, REQUIRED)

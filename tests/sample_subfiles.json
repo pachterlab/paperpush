@@ -608,6 +608,7 @@
     "fields": {
       "article_type": "Research Article",
       "title": "Title goes here",
+      "short_title": "Short title goes here",
       "abstract": "Abstract goes here. It's a really good abstract.",
       "keywords": "keyword1;keyword2",
       "authors": "Joseph Richie | jmrich@caltech.edu | California Institute of Technology | Biology | 91125 | USA | yes\nJoseph Rich | jmrich@usc.edu | University of Southern California | Radiology | 90033 | USA | no\n",

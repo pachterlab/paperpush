@@ -9,7 +9,7 @@
 
 # Article type (choice, REQUIRED)
 #   The Editorial Manager 'Select Article Type' value. Pick the label that matches your submission; if the runner cannot match the label it falls back to the article-type drop-down's first option.
-#   options: Research Article | Resource | Short Article | Matters Arising | Correspondence | Review | Perspective
+#   options: Research Article | Review | Education | Perspective | Methods | Software | Formal Comment (invitation only)
 article_type: 
 
 # Manuscript title (text, REQUIRED)
@@ -83,8 +83,8 @@ declarations_confirmed:
 #   options: Yes | No
 open_access: 
 
-# Manuscript short title (text, optional)
-#   Short title.
+# Manuscript short title (text, REQUIRED)
+#   A short running title, typed into the 'Short Title' box beside the full title on the Editorial Manager manuscript-data step. PLOS Computational Biology requires it and will not accept the step without one.
 #   at most 90 characters
 short_title: 
 

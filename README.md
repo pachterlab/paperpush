@@ -60,7 +60,7 @@ the tool list and the contract agents should follow.
    - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
    - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE.sub`: Use an LLM API. Requires an API key.
 3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`.
-4. `paperpush login VENUE`: log in to the VENUE submission portal. Public portals without author accounts, such as Combinatorica's EditFlow form, skip this step automatically. Add `--orcid` to sign in with your ORCID iD and ORCID password instead of a VENUE account, for venues whose portal offers "Sign in with ORCID" (bioRxiv, medRxiv, arXiv, the Cell Press journals, PLOS Computational Biology, BMC Bioinformatics, and Genome Biology so far).
+4. `paperpush login VENUE`: log in to the VENUE submission portal.
 5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
 
 See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)

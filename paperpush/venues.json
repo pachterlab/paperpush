@@ -1760,12 +1760,23 @@
         "help": "The Editorial Manager 'Select Article Type' value. Pick the label that matches your submission; if the runner cannot match the label it falls back to the article-type drop-down's first option.",
         "options": [
           "Research Article",
-          "Resource",
+          "Resource Article",
           "Short Article",
           "Matters Arising",
-          "Correspondence",
+          "Theory",
           "Review",
-          "Perspective"
+          "Primer",
+          "Perspective",
+          "Preview",
+          "BenchMarks",
+          "Commentary",
+          "Letter",
+          "Obituary",
+          "Stories",
+          "Q&A",
+          "Profile",
+          "SnapShot",
+          "Bench to Bedside"
         ],
         "default": "Research Article"
       },
@@ -1968,6 +1979,25 @@
     "submission_url": "https://www.editorialmanager.com/cell-systems/default.aspx",
     "fields": [
       {
+        "id": "article_type",
+        "options": [
+          "Research Article",
+          "Report",
+          "Brief Report",
+          "Methods",
+          "Methods in Brief",
+          "Review",
+          "Perspective",
+          "Commentary",
+          "Letter",
+          "Essay",
+          "Synthesis",
+          "Best Practices",
+          "Minireview",
+          "Preview"
+        ]
+      },
+      {
         "id": "open_access",
         "help": "On the Publishing Options step shown after 'Build PDF for Approval', Cell Systems offers an open-access publishing model that carries an article-publishing charge. Choose 'Yes' to select open access or 'No' to keep the standard (subscription) model. The runner opens the Publishing Options popup and applies this choice best-effort."
       }
@@ -1984,6 +2014,26 @@
     "submission_url": "https://www.editorialmanager.com/cell-genomics/default.aspx",
     "removed_fields": [
       "open_access"
+    ],
+    "fields": [
+      {
+        "id": "article_type",
+        "options": [
+          "Research Article",
+          "Resource Article",
+          "Short Article",
+          "Technology",
+          "Review",
+          "Perspective",
+          "Preview",
+          "Minireview",
+          "Primer",
+          "Forum",
+          "Commentary",
+          "Letter",
+          "Backstory"
+        ]
+      }
     ]
   },
   "plos_compbio": {
@@ -2000,6 +2050,18 @@
     ],
     "fields": [
       {
+        "id": "article_type",
+        "options": [
+          "Research Article",
+          "Review",
+          "Education",
+          "Perspective",
+          "Methods",
+          "Software",
+          "Formal Comment (invitation only)"
+        ]
+      },
+      {
         "id": "title",
         "autofill": "extract",
         "label": "Manuscript title",
@@ -2013,9 +2075,9 @@
         "autofill": "extract",
         "label": "Manuscript short title",
         "type": "text",
-        "required": false,
+        "required": true,
         "character_count": 90,
-        "help": "Short title."
+        "help": "A short running title, typed into the 'Short Title' box beside the full title on the Editorial Manager manuscript-data step. PLOS Computational Biology requires it and will not accept the step without one."
       },
       {
         "id": "abstract",
