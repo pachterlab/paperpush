@@ -91,3 +91,21 @@ Run the pre-submission checks against a loaded ``.sub`` file and its venue. See
 :doc:`commands/validate` for the CLI equivalent.
 
 .. autofunction:: paperpush.validate
+
+Manuscript requirements
+-----------------------
+
+What a venue's author guidelines require of the manuscript itself, read from
+``manuscript_requirements.json``. ``validate`` applies these through
+:func:`paperpush.requirements_check.check_manuscript_requirements`; see
+:doc:`commands/requirements` for the CLI that prints them.
+
+.. autofunction:: paperpush.requirements.get_requirements
+
+.. autofunction:: paperpush.requirements.resolve
+
+.. autoclass:: paperpush.requirements.ManuscriptRequirements
+   :members: to_dict
+   :undoc-members:
+
+.. autofunction:: paperpush.requirements_check.check_manuscript_requirements

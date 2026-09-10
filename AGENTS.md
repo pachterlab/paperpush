@@ -175,6 +175,20 @@ paperpush autofill <venue>.sub -d <manuscript-dir> --engine manual --values valu
 
 (Add `--dry-run` to preview without writing.)
 
+## The manuscript itself is checked too
+
+`validate` (and the pipeline's validate step) measures the uploaded files
+against the venue's author guidelines -- word/page limits for the selected
+article type, required sections and statements, title-page items, figure
+resolution and dimensions, reference count, file formats and sizes. A LaTeX
+manuscript is compiled with `latexmk`/`pdflatex` for its page count when a
+toolchain is installed. To see the rules before you fill anything, run
+`paperpush requirements <venue>` (or read `manuscript_requirements` in the
+MCP `describe_venue` result), and pick the article type in `values.json`
+accordingly, since it selects which limits apply. Warnings from this pass are
+heuristics over extracted text and images: relay them to the user as things to
+confirm, not as blockers. `--dont-check-manuscript` skips the pass.
+
 ## After it runs, tell the user what's left
 
 `paperpush` deliberately leaves the `never` fields blank. Spell out for the

@@ -59,7 +59,7 @@ the tool list and the contract agents should follow.
    - **a.** *fill out manually*
    - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
    - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE.sub`: Use an LLM API. Requires an API key.
-3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`.
+3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count).
 4. `paperpush login VENUE`: log in to the VENUE submission portal.
 5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
 
@@ -96,6 +96,8 @@ For more details, see [`venues.md`](venues.md)
 ## Adding new venues
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for instructions on adding new venues. See [`DEVELOPMENT.md`](DEVELOPMENT.md) for tips on adding new venues and running unit tests.
+
+Each venue has two data entries: its submission form in `paperpush/venues.json` (the fields the portal asks for) and its manuscript requirements in `paperpush/manuscript_requirements.json` (what the venue's author guidelines demand of the manuscript: file formats and sizes, word/page limits, required sections and statements, title-page items, figure resolution and dimensions, reference rules). Both use a shared vocabulary across venues, each has a generated JSON schema, and `paperpush validate` checks a `.sub` against both.
 
 ## For AI agents
 

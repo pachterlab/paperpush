@@ -17,9 +17,12 @@ the formats venues accept for the main manuscript:
 
 The public helpers return the measure of the text *before the references*, or
 ``None`` when the format cannot yield it -- a word count of a ``.doc`` binary,
-or the page count of a ``.tex`` source, which is only fixed once rendered. The
-caller (``paperpush.validate``) turns a ``None`` into an advisory warning
-rather than a hard error.
+or the page count of a ``.tex`` source when no TeX toolchain is installed. A
+page count of LaTeX source is only fixed once rendered, so when ``latexmk`` or
+``pdflatex`` is available the source is compiled to a scratch PDF first (see
+:func:`build_pdf`) and that PDF is measured. The caller
+(``paperpush.validate``) turns a ``None`` into an advisory warning rather than
+a hard error.
 
 The counts are deliberately approximate: a venue's word/page limit is itself
 a soft target, and the aim here is to catch a manuscript that is clearly over,
@@ -28,8 +31,13 @@ not to reproduce a word processor's exact tally.
 
 from __future__ import annotations
 
+import atexit
 import logging
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 import zipfile
 import zlib
 from pathlib import Path
@@ -384,9 +392,11 @@ def pages_before_references(path: Path, headings: tuple[str, ...] = ()) -> int |
 
     Only a PDF carries fixed pages with a known layout, so this returns None for
     every other format -- a ``.docx`` records only a single cached total (see
-    :func:`total_pages`), not where the references fall, and a ``.tex`` page
-    count is only fixed once rendered. When nothing ends the main text, the
-    document's full page count is returned.
+    :func:`total_pages`), not where the references fall. A ``.tex`` source (or a
+    ``.zip`` bundle of one) is first compiled to a scratch PDF when a TeX
+    toolchain is installed (see :func:`build_pdf`); without one it returns None.
+    When nothing ends the main text, the document's full page count is
+    returned.
 
     Without ``headings`` this counts up to *and including* the page the
     references start on. A venue that names its own ``main_text_end_headings``
@@ -396,9 +406,10 @@ def pages_before_references(path: Path, headings: tuple[str, ...] = ()) -> int |
     nothing but a running head or page number ahead of it starts its page, and
     the main text ended on the one before.
     """
-    if path.suffix.lower() != ".pdf":
+    pdf = _as_pdf(path)
+    if pdf is None:
         return None
-    pages = _pdf_pages(path)
+    pages = _pdf_pages(pdf)
     if pages is None:
         return None
     for index, page_text in enumerate(pages):
@@ -454,13 +465,352 @@ def total_pages(path: Path) -> int | None:
 
     A PDF carries fixed pages and is counted exactly. A ``.docx`` has no fixed
     pagination, so its count comes from Word's cached statistic and is a
-    best-effort hint (see :func:`_docx_page_count`). Every other format -- a
-    ``.tex`` source or a legacy ``.doc`` binary -- returns None.
+    best-effort hint (see :func:`_docx_page_count`). A ``.tex`` source (or a
+    ``.zip`` bundle of one) is compiled to a scratch PDF first when a TeX
+    toolchain is installed (see :func:`build_pdf`). Every other format -- a
+    legacy ``.doc`` binary, or LaTeX with no toolchain -- returns None.
     """
     suffix = path.suffix.lower()
-    if suffix == ".pdf":
-        pages = _pdf_pages(path)
-        return None if pages is None else len(pages)
     if suffix == ".docx":
         return _docx_page_count(path)
+    pdf = _as_pdf(path)
+    if pdf is None:
+        return None
+    pages = _pdf_pages(pdf)
+    return None if pages is None else len(pages)
+
+
+# --- LaTeX -> PDF ----------------------------------------------------------
+#
+# A page limit can only be checked on rendered pages, so a LaTeX manuscript is
+# compiled to a scratch PDF before counting. The build runs in a temporary
+# output directory (the source tree is never written to) and is cached per
+# source file for the life of the process, so the validate pass that counts
+# pages before the references and the one that counts the total share one
+# compile.
+
+# Seconds a single compile may take before it is abandoned.
+BUILD_TIMEOUT_S = 300
+
+_BUILD_CACHE: dict[tuple[str, int, int], Path | None] = {}
+_BUILD_DIRS: list[str] = []
+
+
+def _cleanup_build_dirs() -> None:
+    for d in _BUILD_DIRS:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+atexit.register(_cleanup_build_dirs)
+
+
+def _new_build_dir() -> Path:
+    d = tempfile.mkdtemp(prefix="paperpush-build-")
+    _BUILD_DIRS.append(d)
+    return Path(d)
+
+
+_DOCUMENTCLASS = re.compile(r"^\s*\\documentclass", re.MULTILINE)
+
+
+def _main_tex(tex_files: list[Path]) -> Path | None:
+    """Pick the root ``.tex`` of a source tree: the one with ``\\documentclass``.
+
+    When several qualify, a conventional name (``main``, ``manuscript``, ``ms``,
+    ``paper``) wins, then the shortest path (a root file over one nested in a
+    subdirectory).
+    """
+    roots = []
+    for tex in tex_files:
+        try:
+            if _DOCUMENTCLASS.search(_strip_tex_comments(tex.read_text("utf-8", "replace"))):
+                roots.append(tex)
+        except OSError:
+            continue
+    if not roots:
+        return None
+    roots.sort(key=lambda p: (not re.search(r"\b(main|manuscript|ms|paper)\b", p.stem, re.IGNORECASE), len(p.parts), str(p)))
+    return roots[0]
+
+
+def tex_toolchain() -> str | None:
+    """Name of the available TeX build tool (``latexmk`` or ``pdflatex``), or None."""
+    for tool in ("latexmk", "pdflatex"):
+        if shutil.which(tool):
+            return tool
     return None
+
+
+def _run(cmd: list[str], cwd: Path, env: dict[str, str], timeout: float) -> bool:
+    try:
+        proc = subprocess.run(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        logger.debug("%s failed to run: %s", cmd[0], exc)
+        return False
+    if proc.returncode != 0:
+        tail = proc.stdout.decode("utf-8", "replace")[-2000:]
+        logger.debug("%s exited %d:\n%s", cmd[0], proc.returncode, tail)
+    return proc.returncode == 0
+
+
+def _compile(main: Path, outdir: Path) -> Path | None:
+    """Compile ``main`` into ``outdir`` and return the PDF path, or None.
+
+    Prefers ``latexmk`` (which reruns pdflatex/bibtex/biber as needed); falls
+    back to pdflatex twice around a bibtex pass when only pdflatex is present.
+    A non-zero exit still yields the PDF when one was produced -- a stray
+    overfull box or a missing citation does not change the page count enough to
+    matter, and a partial render beats no measurement at all.
+    """
+    env = dict(os.environ)
+    # Let \input/\include and \bibliography find the source tree from the
+    # output directory, whichever tool runs.
+    src = str(main.parent)
+    for var in ("TEXINPUTS", "BIBINPUTS", "BSTINPUTS"):
+        env[var] = src + os.pathsep + env.get(var, "") + os.pathsep
+    env.setdefault("max_print_line", "1000")
+    pdf = outdir / (main.stem + ".pdf")
+    tool = tex_toolchain()
+    if tool == "latexmk":
+        _run(["latexmk", "-pdf", "-interaction=nonstopmode", "-halt-on-error", "-f", f"-outdir={outdir}", main.name], main.parent, env, BUILD_TIMEOUT_S)
+    elif tool == "pdflatex":
+        pdflatex = ["pdflatex", "-interaction=nonstopmode", f"-output-directory={outdir}", main.name]
+        _run(pdflatex, main.parent, env, BUILD_TIMEOUT_S / 3)
+        if shutil.which("bibtex") and (outdir / (main.stem + ".aux")).exists():
+            _run(["bibtex", main.stem], outdir, env, 60)
+        _run(pdflatex, main.parent, env, BUILD_TIMEOUT_S / 3)
+        _run(pdflatex, main.parent, env, BUILD_TIMEOUT_S / 3)
+    else:
+        return None
+    return pdf if pdf.is_file() and pdf.stat().st_size > 0 else None
+
+
+def build_pdf(path: Path) -> Path | None:
+    """Compile a ``.tex`` file or ``.zip`` LaTeX bundle to a scratch PDF.
+
+    Returns the path of the rendered PDF in a temporary directory, or None when
+    no TeX toolchain is installed, the bundle has no root ``.tex``, or the build
+    produced no PDF. The result is cached per (path, size, mtime) for the
+    process, so repeated measurements of one manuscript compile once. The
+    source directory is never modified: all build products go to the scratch
+    directory, which is removed at exit.
+    """
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    key = (str(path.resolve()), stat.st_size, int(stat.st_mtime))
+    if key in _BUILD_CACHE:
+        return _BUILD_CACHE[key]
+    result: Path | None = None
+    if tex_toolchain() is None:
+        logger.info("No TeX toolchain (latexmk/pdflatex) found; cannot render %s for a page count", path.name)
+    else:
+        outdir = _new_build_dir()
+        suffix = path.suffix.lower()
+        try:
+            if suffix == ".tex":
+                logger.info("Compiling %s to a scratch PDF for page counting", path.name)
+                result = _compile(path, outdir)
+            elif suffix == ".zip":
+                srcdir = outdir / "src"
+                with zipfile.ZipFile(path) as zf:
+                    zf.extractall(srcdir)
+                main = _main_tex(sorted(srcdir.rglob("*.tex")))
+                if main is None:
+                    logger.info("%s holds no .tex with \\documentclass; cannot render it", path.name)
+                else:
+                    logger.info("Compiling %s (from %s) to a scratch PDF for page counting", main.name, path.name)
+                    (outdir / "out").mkdir(exist_ok=True)
+                    result = _compile(main, outdir / "out")
+        except (zipfile.BadZipFile, OSError) as exc:
+            logger.debug("Could not build %s: %s", path, exc)
+            result = None
+        if result is None:
+            logger.warning("Could not render %s to PDF; its page count was not checked", path.name)
+    _BUILD_CACHE[key] = result
+    return result
+
+
+def _as_pdf(path: Path) -> Path | None:
+    """``path`` itself for a PDF, a scratch build for LaTeX, None otherwise."""
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        return path
+    if suffix in (".tex", ".zip"):
+        return build_pdf(path)
+    return None
+
+
+# --- structure: headings, references, title page ---------------------------
+
+# A LaTeX sectioning command and its title argument (one level of nested braces).
+_TEX_SECTION = re.compile(r"\\(?:part|chapter|section|subsection|subsubsection|paragraph)\*?\s*(?:\[[^\]]*\])?\s*\{((?:[^{}]|\{[^{}]*\})*)\}")
+# Leading section designators a heading line may carry: "2.", "II.", "A.", "2.1".
+_HEADING_PREFIX = re.compile(r"^\s*(?:(?:\d+(?:\.\d+)*\.?|[ivxlcIVXLC]+\.|[A-Z]\.)\s+)?")
+# Longest line that can still be a heading, in words.
+_HEADING_MAX_WORDS = 8
+
+
+def normalize_heading(line: str) -> str:
+    """A heading line reduced to its lower-cased wording.
+
+    Drops a leading section designator, trailing punctuation, and (for LaTeX)
+    residual markup, so ``"2. Materials and Methods:"`` and ``"MATERIALS AND
+    METHODS"`` both become ``"materials and methods"``.
+    """
+    text = _HEADING_PREFIX.sub("", line.strip(), count=1)
+    text = re.sub(r"\\[a-zA-Z@]+\*?", " ", text)
+    text = re.sub(r"[{}]", "", text)
+    text = text.rstrip(" .:;-\u2013\u2014")
+    text = re.sub(r"\s+", " ", text)
+    return text.strip().lower()
+
+
+def _raw_tex_source(path: Path) -> str | None:
+    """The comment-stripped LaTeX source of a ``.tex`` file or ``.zip`` bundle."""
+    suffix = path.suffix.lower()
+    try:
+        if suffix == ".tex":
+            return _strip_tex_comments(path.read_text("utf-8", "replace"))
+        if suffix == ".zip":
+            with zipfile.ZipFile(path) as zf:
+                names = [n for n in zf.namelist() if n.lower().endswith(".tex")]
+                names.sort(key=lambda n: (not re.search(r"\b(main|manuscript|ms|paper)\b", n, re.IGNORECASE), n))
+                return "\n".join(_strip_tex_comments(zf.read(n).decode("utf-8", "replace")) for n in names)
+    except (OSError, zipfile.BadZipFile) as exc:
+        logger.debug("Could not read LaTeX source %s: %s", path, exc)
+    return None
+
+
+def headings(path: Path) -> list[str] | None:
+    """Candidate section headings of a manuscript, normalised, in order.
+
+    For LaTeX source these are the sectioning commands' titles. For a PDF or
+    Word file -- where a heading is just a short line of its own -- every line
+    of at most :data:`_HEADING_MAX_WORDS` words is a candidate; the caller
+    matches them against the wordings it is looking for, so the over-inclusion
+    is harmless. Returns None when the file cannot be read as text.
+    """
+    if path.suffix.lower() in (".tex", ".zip"):
+        source = _raw_tex_source(path)
+        if source is None:
+            return None
+        found = [normalize_heading(m.group(1)) for m in _TEX_SECTION.finditer(source)]
+        # Statements are often set as \paragraph{} or as bold run-in text
+        # (\textbf{Data availability.}) rather than sections; include those.
+        for m in re.finditer(r"\\(?:textbf|textit|emph|noindent\s*\\textbf)\s*\{([^{}]{3,60})\}", source):
+            found.append(normalize_heading(m.group(1)))
+        return [h for h in found if h]
+    text = manuscript_text(path)
+    if text is None:
+        return None
+    found = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or len(stripped.split()) > _HEADING_MAX_WORDS:
+            continue
+        # A sentence ending in a full stop is prose, not a heading -- but a
+        # run-in heading ("Data availability. The data are...") is caught by
+        # taking the text before the first sentence break too.
+        head = normalize_heading(stripped)
+        if head:
+            found.append(head)
+        if "." in stripped[:-1]:
+            first = normalize_heading(stripped.split(".", 1)[0])
+            if first and first != head:
+                found.append(first)
+    return found
+
+
+# One reference entry in an extracted reference list: "1. ", "[1] ", "1) ".
+_NUMBERED_REF = re.compile(r"^\s*(?:\[(\d{1,4})\]|(\d{1,4})[.)])\s+\S", re.MULTILINE)
+# An author-year entry: starts with a capitalised surname and holds a year.
+_AUTHOR_YEAR_REF = re.compile(r"^[A-Z][^\n]{3,200}?\(?(?:19|20)\d{2}[a-z]?\)?[.,:]", re.MULTILINE)
+_BIB_ENTRY = re.compile(r"^\s*@(?!string\b|comment\b|preamble\b)[A-Za-z]+\s*[{(]", re.MULTILINE | re.IGNORECASE)
+
+
+def _bib_entry_count(main_tex: Path, source: str) -> int | None:
+    """Entries in the ``.bib`` files a LaTeX source names, or None if none found."""
+    names: list[str] = []
+    for m in re.finditer(r"\\(?:bibliography|addbibresource)\s*\{([^}]*)\}", source):
+        names.extend(n.strip() for n in m.group(1).split(","))
+    if not names:
+        return None
+    total = 0
+    found = False
+    for name in names:
+        candidate = main_tex.parent / (name if name.lower().endswith(".bib") else name + ".bib")
+        try:
+            total += len(_BIB_ENTRY.findall(candidate.read_text("utf-8", "replace")))
+            found = True
+        except OSError:
+            continue
+    return total if found else None
+
+
+def reference_count(path: Path) -> int | None:
+    """Approximate number of entries in the manuscript's reference list, or None.
+
+    LaTeX: the ``\\bibitem`` entries of an inline bibliography, else the
+    entries of the ``.bib`` file(s) the source names (an upper bound: unused
+    entries count too). PDF/Word: the numbered entries after the references
+    heading, else the author-year entries. None when no reference list is
+    found, so the caller does not treat "unmeasured" as "within limit".
+    """
+    if path.suffix.lower() in (".tex", ".zip"):
+        source = _raw_tex_source(path)
+        if source is None:
+            return None
+        items = len(re.findall(r"\\bibitem\b", source))
+        if items:
+            return items
+        if path.suffix.lower() == ".tex":
+            return _bib_entry_count(path, source)
+        return None
+    text = manuscript_text(path)
+    if text is None:
+        return None
+    match = _REFERENCE_HEADING.search(text)
+    if match is None:
+        return None
+    tail = text[match.end() :]
+    numbered = _NUMBERED_REF.findall(tail)
+    if numbered:
+        # Use the highest number rather than the match count: a line-wrapped
+        # entry can hide its number from the line-anchored pattern.
+        highest = max(int(a or b) for a, b in numbered)
+        return max(highest, len(numbered)) if highest <= len(numbered) * 3 else len(numbered)
+    author_year = len(_AUTHOR_YEAR_REF.findall(tail))
+    return author_year or None
+
+
+# Lines of extracted text that make up the "title page" of a PDF/Word manuscript.
+_TITLE_PAGE_LINES = 80
+
+
+def title_page_text(path: Path) -> str | None:
+    """The front matter of a manuscript, where title-page items live.
+
+    For a PDF this is the first two pages' text; for a Word file the first
+    lines; for LaTeX the source before the first sectioning command (the
+    ``\\title``/``\\author``/``\\affil``/``\\email`` block plus the abstract),
+    kept raw so command names like ``\\orcid`` can be matched too. None when
+    the file cannot be read as text.
+    """
+    suffix = path.suffix.lower()
+    if suffix in (".tex", ".zip"):
+        source = _raw_tex_source(path)
+        if source is None:
+            return None
+        cut = _TEX_SECTION.search(source)
+        return source[: cut.start()] if cut else source
+    if suffix == ".pdf":
+        pages = _pdf_pages(path)
+        if pages is None:
+            return None
+        return "\n".join(pages[:2])
+    text = manuscript_text(path)
+    if text is None:
+        return None
+    return "\n".join(text.splitlines()[:_TITLE_PAGE_LINES])

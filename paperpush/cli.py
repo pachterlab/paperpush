@@ -9,6 +9,7 @@ Implemented so far:
     paperpush autofill <subfile> -d <dir>
                                       fill a .sub from a manuscript directory
     paperpush validate <subfile>  run the pre-submission checks on a .sub
+    paperpush requirements <venue>  show what the venue's author guidelines require of the manuscript
                                       (scans referenced files for secrets, GPS
                                       metadata, LaTeX comments, broken links, and
                                       references whose DOI points at a different
@@ -495,7 +496,7 @@ def _populate_orcid_into(sub_path: str, venue, profile) -> None:
     print(f"  Updated {sub_path}: filled ORCID details for author '{matched}'.")
 
 
-def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True) -> list:
+def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True, check_manuscript: bool = True) -> list:
     """Validate a loaded .sub against its venue and print the findings.
 
     Runs the same checks ``submit`` performs before opening a browser --
@@ -513,10 +514,14 @@ def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive
     When ``check_sensitive`` is set, those files are additionally scanned for
     information not meant to be published (secrets, GPS metadata,
     editable-document links, LaTeX comments); all surface as advisory warnings.
+    When ``check_manuscript`` is set (the default), the manuscript and other
+    uploads are measured against the venue's author guidelines
+    (``manuscript_requirements.json``): formats, length, required sections and
+    statements, title-page items, figure resolution, reference count.
     """
     from .validate import validate
 
-    issues = validate(subfile, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references)
+    issues = validate(subfile, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript)
     errors = [i for i in issues if i.is_error]
     warnings = [i for i in issues if not i.is_error]
     for issue in warnings:
@@ -569,6 +574,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         check_sensitive=getattr(args, "check_sensitive", True),
         check_links=getattr(args, "check_links", True),
         check_references=getattr(args, "check_references", True),
+        check_manuscript=getattr(args, "check_manuscript", True),
     )
     if errors:
         print("\nFix the items above, then run 'paperpush validate' again.", file=sys.stderr)
@@ -927,6 +933,68 @@ def _cmd_schema(args: argparse.Namespace) -> int:
 
 
 @_validate
+def _cmd_requirements(args: argparse.Namespace) -> int:
+    """Print what a venue's author guidelines require of the manuscript.
+
+    Reads ``manuscript_requirements.json`` -- the companion to ``venues.json``
+    that ``validate`` measures the uploads against -- and prints the venue's
+    rules, either as a readable summary grouped by section (manuscript, title
+    page, abstract, figures, ...) or as JSON with ``--json``. With
+    ``--article-type`` the per-type overrides for that type are applied first.
+    Exits 2 when the venue is unknown and 1 when no requirements are recorded.
+    """
+    from .requirements import get_requirements, resolve
+
+    try:
+        venue = get_venue(args.venue)
+    except KeyError:
+        print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
+        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        return 2
+    reqs = get_requirements(venue.slug)
+    if reqs is None:
+        print(f"No manuscript requirements are recorded for {venue.slug}.", file=sys.stderr)
+        return 1
+    article_types = sorted(reqs.article_types)
+    if args.article_type:
+        if reqs.article_type_field:
+            reqs = resolve(reqs, {reqs.article_type_field: args.article_type})
+        if args.article_type not in article_types:
+            print(f"warning: {venue.slug} records no article-type overrides for '{args.article_type}'; showing the default rules", file=sys.stderr)
+    data = reqs.to_dict()
+    if args.json:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        return 0
+
+    print(f"Manuscript requirements for {venue.name} ({venue.slug})")
+    if reqs.retrieved:
+        print(f"  read from the author guidelines on {reqs.retrieved}")
+    for url in reqs.source_urls:
+        print(f"  {url}")
+    if reqs.inherits:
+        print(f"  (starts from {reqs.inherits}'s rules)")
+    if article_types and not args.article_type:
+        print(f"  article types with their own rules: {', '.join(article_types)} (use --article-type)")
+    for section in ("manuscript", "title_page", "abstract", "keywords", "sections", "statements", "figures", "tables", "supplementary", "references", "cover_letter", "upload"):
+        rules = data.get(section)
+        if not rules:
+            continue
+        print(f"\n{section.replace('_', ' ')}:")
+        notes = rules.pop("notes", [])
+        for key, value in rules.items():
+            if isinstance(value, list):
+                value = ", ".join(str(v) for v in value)
+            print(f"  {key.replace('_', ' ')}: {value}")
+        for note in notes:
+            print(f"  - {note}")
+    if reqs.notes:
+        print("\nnotes:")
+        for note in reqs.notes:
+            print(f"  - {note}")
+    return 0
+
+
+@_validate
 def _cmd_options(args: argparse.Namespace) -> int:
     """Print the allowed values for a field, one per line.
 
@@ -1009,7 +1077,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # metavar lists only the public commands; the internal 'schema' command is
     # registered below but deliberately left out so it does not appear in --help.
-    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,login,submit}")
+    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,requirements,login,submit}")
 
     p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub submission template")
     p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv")
@@ -1078,7 +1146,26 @@ def build_parser() -> argparse.ArgumentParser:
         "title, author, or year than the reference claims -- the usual sign of "
         "a DOI copied from the wrong reference. Requires network access.",
     )
-    p_validate.set_defaults(func=_cmd_validate, check_links=True, check_sensitive=True, check_references=True)
+    p_validate.add_argument(
+        "--dont-check-manuscript",
+        dest="check_manuscript",
+        action="store_false",
+        help="skip measuring the uploads against the venue's author guidelines. "
+        "By default validate reads manuscript_requirements.json for the venue "
+        "and checks the manuscript's format, word/page count (compiling LaTeX "
+        "source to a scratch PDF with latexmk/pdflatex when installed), "
+        "required section headings and declarations, title-page items, "
+        "abstract/title/keyword limits, figure format, resolution, and count, "
+        "supplementary-file rules, and the number of references. See "
+        "'paperpush requirements VENUE' for the rules applied.",
+    )
+    p_validate.set_defaults(func=_cmd_validate, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True)
+
+    p_requirements = sub.add_parser("requirements", parents=[verbosity], help="show the manuscript requirements recorded for a venue's author guidelines")
+    p_requirements.add_argument("venue", help="venue slug, e.g. nature")
+    p_requirements.add_argument("--article-type", dest="article_type", metavar="TYPE", help="show the rules for this article type (the venue's article-type option string) instead of the default research article")
+    p_requirements.add_argument("--json", action="store_true", help="print the requirements as JSON instead of a readable summary")
+    p_requirements.set_defaults(func=_cmd_requirements)
 
     p_login = sub.add_parser("login", parents=[verbosity], help="store credentials for a venue submission system")
     p_login.add_argument("venue", nargs="?", help="venue slug, e.g. biorxiv (omit with --list)")

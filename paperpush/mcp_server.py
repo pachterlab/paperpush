@@ -213,8 +213,12 @@ def describe_venue(venue: str) -> dict[str, Any]:
     policy/consent field a human must set). Constraints -- option lists,
     accepted file extensions, word and character caps, item counts -- come
     along too, so a caller can propose values that will pass validation.
+    `manuscript_requirements` carries what the venue's author guidelines
+    demand of the manuscript itself (formats, length, sections, statements,
+    title page, figures, references); `validate_subfile` checks against it.
 
-    This is the same data `paperpush schema <venue>` prints.
+    This is the same data `paperpush schema <venue>` prints, plus the
+    requirements `paperpush requirements <venue>` prints.
     """
     resolved = _venue_or_error(venue)
     return {
@@ -231,7 +235,16 @@ def describe_venue(venue: str) -> dict[str, Any]:
         "file_type_options": resolved.file_type_options,
         "default_subfile_name": default_filename(resolved),
         "fields": field_schema(resolved),
+        "manuscript_requirements": _requirements_dict(resolved.slug),
     }
+
+
+def _requirements_dict(slug: str) -> Optional[dict[str, Any]]:
+    """The venue's manuscript requirements as plain data, or None if none are recorded."""
+    from .requirements import get_requirements
+
+    reqs = get_requirements(slug)
+    return None if reqs is None else reqs.to_dict()
 
 
 def field_options(venue: str, field: str, path: Optional[list[str]] = None) -> dict[str, Any]:
@@ -335,6 +348,7 @@ def validate_subfile(
     check_links: bool = True,
     check_sensitive: bool = True,
     check_references: bool = True,
+    check_manuscript: bool = True,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file.
 
@@ -351,12 +365,17 @@ def validate_subfile(
     network);
     `check_sensitive` scans the referenced files for API keys, passwords,
     private keys, GPS data in figures, and LaTeX source comments.
+    `check_manuscript` measures the uploads against the venue's author
+    guidelines (`manuscript_requirements.json`, also returned by
+    `describe_venue`): manuscript format and length (LaTeX is compiled for a
+    page count), required sections and statements, title-page items, figure
+    format/resolution/count, supplementary rules, and reference count.
 
     `errors` block submission; `warnings` are advisory. `ok` is true when there
     are no errors.
     """
     path, text, venue = _load_subfile(subfile, manuscript_dir)
-    issues = _run_validate(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references)
+    issues = _run_validate(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript)
     errors = [i for i in issues if i.is_error]
     warnings = [i for i in issues if not i.is_error]
     return {

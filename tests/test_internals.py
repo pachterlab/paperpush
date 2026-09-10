@@ -251,9 +251,45 @@ def test_tex_cuts_at_references_section(tmp_path):
     assert m.words_before_references(tex) == 3
 
 
-def test_tex_has_no_page_count(tmp_path):
+def test_tex_has_no_page_count_without_a_toolchain(tmp_path, monkeypatch):
+    # A page count of LaTeX source needs a render; with no TeX toolchain the
+    # measure is unavailable rather than guessed.
+    monkeypatch.setattr(m, "tex_toolchain", lambda: None)
     tex = _tex("body text\n", tmp_path)
     assert m.pages_before_references(tex) is None
+
+
+_HAS_TEX = m.tex_toolchain() is not None
+
+
+@pytest.mark.skipif(not _HAS_TEX, reason="needs latexmk or pdflatex")
+def test_tex_is_rendered_for_a_page_count(tmp_path):
+    """With a TeX toolchain, a .tex manuscript is compiled to a scratch PDF and
+    its pages counted -- both before the references and in total -- without
+    writing anything next to the source."""
+    tex = tmp_path / "main.tex"
+    tex.write_text("\\documentclass{article}\n\\begin{document}\n" + "Body text. " * 40 + "\n\\newpage More body.\n\\newpage\n\\section*{References}\n[1] A ref.\n\\end{document}\n", encoding="utf-8")
+    before = {p.name for p in tmp_path.iterdir()}
+    assert m.total_pages(tex) == 3
+    assert m.pages_before_references(tex) == 3
+    assert {p.name for p in tmp_path.iterdir()} == before, "the build must not write into the source directory"
+    built = m.build_pdf(tex)
+    assert built is not None and built.suffix == ".pdf" and built.is_file()
+    assert m.build_pdf(tex) is built, "a second measure reuses the cached build"
+
+
+@pytest.mark.skipif(not _HAS_TEX, reason="needs latexmk or pdflatex")
+def test_zip_bundle_is_rendered_for_a_page_count(samples):
+    bundle = samples.latex_bundle()
+    assert m.total_pages(bundle) is not None and m.total_pages(bundle) >= 1
+
+
+def test_unbuildable_tex_has_no_page_count(tmp_path, monkeypatch):
+    # A source that fails to compile (or a broken toolchain) yields no count
+    # rather than an exception, so validate can warn that the limit went unchecked.
+    monkeypatch.setattr(m, "_compile", lambda main, outdir: None)
+    tex = _tex("\\documentclass{article}\n\\begin{document}x\\end{document}\n", tmp_path)
+    assert m.total_pages(tex) is None
 
 
 # --- DOCX ------------------------------------------------------------------
@@ -321,7 +357,8 @@ def test_pdf_page_count_stops_at_references(tmp_path):
     assert m.pages_before_references(path) == 1
 
 
-def test_non_pdf_returns_none_pages_even_if_supported_for_words(tmp_path):
+def test_non_pdf_returns_none_pages_even_if_supported_for_words(tmp_path, monkeypatch):
+    monkeypatch.setattr(m, "tex_toolchain", lambda: None)
     tex = _tex("body\n", tmp_path)
     assert m.words_before_references(tex) is not None
     assert m.pages_before_references(tex) is None
@@ -393,9 +430,11 @@ def test_total_pages_docx_without_cached_count_is_none(tmp_path):
     assert m.total_pages(path) is None
 
 
-def test_total_pages_unsupported_format_is_none(tmp_path):
+def test_total_pages_unsupported_format_is_none(tmp_path, monkeypatch):
+    monkeypatch.setattr(m, "tex_toolchain", lambda: None)
     tex = _tex("body\n", tmp_path)
     assert m.total_pages(tex) is None
+    assert m.total_pages(tmp_path / "x.doc") is None
 
 
 # --- unsupported formats ---------------------------------------------------

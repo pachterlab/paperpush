@@ -9,6 +9,7 @@ Run the pre-submission checks on a filled ``.sub`` file. Run this before
    usage: paperpush validate [-h] [-v] [-q] [--dont-check-links]
                              [--dont-check-for-sensitive-info]
                              [--dont-check-references]
+                             [--dont-check-manuscript]
                              subfile
 
 Synopsis
@@ -58,8 +59,37 @@ What it checks
 - **Nothing private is about to be published** — the uploaded files are scanned
   for API keys, passwords, private keys, GPS coordinates in figures,
   editable-document links, and LaTeX source comments.
+- **The manuscript meets the venue's author guidelines** — the uploads are
+  measured against the rules recorded for the venue in
+  ``manuscript_requirements.json`` (see :doc:`requirements` to print them):
 
-The last three passes make network requests or read every uploaded file; each
+  - the manuscript file's format and size, and its word and page count against
+    the venue's limits, for the article type selected in the ``.sub``. A
+    ``.tex`` manuscript (or a ``.zip`` LaTeX bundle) is compiled to a scratch
+    PDF with ``latexmk`` or ``pdflatex`` for its page count; the source
+    directory is never written to, and without a TeX toolchain the page limit
+    is reported as unchecked;
+  - the section headings and declarations the venue requires (Introduction,
+    Methods, Results, ...; data availability, competing interests, author
+    contributions, ...), found in the manuscript text under any of their usual
+    wordings;
+  - title-page items that leave a trace in the front matter — the title, a
+    corresponding e-mail, an ORCID, a keywords line, a running title, a word
+    count;
+  - abstract, title, running-title, and keyword limits read from the ``.sub``;
+  - each figure's format, file size, resolution (from its metadata, or judged
+    from its pixel width at the venue's print width), colour mode, and print
+    dimensions, and the number of figures, tables, and display items;
+  - supplementary-file format, size, and single-PDF rules; the cover letter;
+    the reference count; the total upload size.
+
+  Measured numbers that exceed a limit are errors; anything that depends on
+  extracting text from a PDF or reading an image is a warning. A rule the
+  portal already enforces through ``venues.json`` (an ``accept`` list, a
+  per-file size cap, a word limit on the field) is reported once, by that
+  check, not again here.
+
+The last four passes make network requests or read every uploaded file; each
 can be turned off with its ``--dont-check-*`` flag below.
 
 Arguments
@@ -77,6 +107,10 @@ Arguments
 
 ``--dont-check-for-sensitive-info``
    Skip scanning the uploaded files for information not meant to be published.
+
+``--dont-check-manuscript``
+   Skip measuring the uploads against the venue's author guidelines. Also
+   skips compiling a LaTeX manuscript for its page count.
 
 Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags. Use ``-v``
 to see the checks as they run.
@@ -104,4 +138,6 @@ See also
 --------
 
 - :doc:`options` — look up the valid values for a field flagged as invalid.
+- :doc:`requirements` — print the author-guideline rules the manuscript is
+  measured against.
 - :doc:`submit` — the next step once validation passes.

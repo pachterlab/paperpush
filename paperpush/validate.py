@@ -530,11 +530,12 @@ def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> 
     document (``max_words`` / ``max_pages``). Any limit may instead be selected
     by a sibling field's value through its ``*_by`` companion (e.g. a page cap
     that varies with the article type); see :func:`_resolve_conditional`. The
-    uploaded file is parsed and measured (see :mod:`paperpush.manuscript`).
-    When the measure cannot be taken for the file's format -- a word count of a
-    ``.doc`` binary, or a page count of a format without fixed pagination -- the
-    limit is reported as unchecked (a WARNING) rather than assumed satisfied or
-    violated.
+    uploaded file is parsed and measured (see :mod:`paperpush.manuscript`); a
+    LaTeX source is compiled to a scratch PDF for its page count when a TeX
+    toolchain is installed. When the measure cannot be taken for the file's
+    format -- a word count of a ``.doc`` binary, or a page count of a format
+    without fixed pagination -- the limit is reported as unchecked (a WARNING)
+    rather than assumed satisfied or violated.
     """
     word_before = _resolve_conditional(field.max_words_before_refs, field.max_words_before_refs_by, values)
     page_before = _resolve_conditional(field.max_pages_before_refs, field.max_pages_before_refs_by, values)
@@ -587,8 +588,8 @@ def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> 
                 )
             )
     for limit, count, scope, unsupported in (
-        (page_before, _pages_before, scope_before, "page counts can only be verified for PDF"),
-        (page_total, manuscript.total_pages, "", "page counts can only be verified for PDF or a Word (.docx) file with a saved page count"),
+        (page_before, _pages_before, scope_before, "page counts can only be verified for PDF or LaTeX source rendered with latexmk/pdflatex"),
+        (page_total, manuscript.total_pages, "", "page counts can only be verified for PDF, LaTeX source rendered with latexmk/pdflatex, or a Word (.docx) file with a saved page count"),
     ):
         if limit is None:
             continue
@@ -692,6 +693,21 @@ def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     return issues
 
 
+def _manuscript_requirement_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
+    """Measure the uploads against the venue's author guidelines.
+
+    Delegates to :func:`paperpush.requirements_check.check_manuscript_requirements`,
+    which reads ``manuscript_requirements.json`` -- the companion to
+    ``venues.json`` that records what the guidelines demand of the manuscript
+    itself (formats, length, sections, statements, title page, figures,
+    references). Runs by default (disable with ``--dont-check-manuscript``).
+    Reads and, for LaTeX, compiles the manuscript; makes no network requests.
+    """
+    from .requirements_check import check_manuscript_requirements
+
+    return check_manuscript_requirements(venue, values)
+
+
 # Scan categories that mean an arXiv source bundle still carries author-only
 # content -- i.e. arxiv_latex_cleaner (or an equivalent) has not been run.
 _UNCLEANED_LATEX = {"LaTeX comments", "LaTeX note comment", "unnecessary file"}
@@ -726,7 +742,7 @@ def _arxiv_cleaner_reminder(venue: Venue, findings) -> list[Issue]:
     ]
 
 
-def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True) -> list[Issue]:
+def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True, check_manuscript: bool = True) -> list[Issue]:
     """Return all issues found in ``subfile`` against ``venue``.
 
     Combines schema-level checks (allowed options, file types, booleans, and
@@ -744,15 +760,22 @@ def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, ch
     the default), the DOIs in the submission's bibliography -- its ``.bib``
     files and the manuscript's own reference list -- are resolved and compared
     against the title, author, and year each reference claims (see
-    :func:`_reference_issues`). Both make network requests.
+    :func:`_reference_issues`). Both make network requests. When
+    ``check_manuscript`` is set (also the default), the manuscript, figures,
+    and other uploads are measured against the venue's author guidelines as
+    recorded in ``manuscript_requirements.json`` -- formats, length, required
+    sections and statements, title-page items, figure resolution, reference
+    count (see :mod:`paperpush.requirements_check`); a LaTeX manuscript is
+    compiled to a scratch PDF for its page count.
     """
     logger.info(
-        "Validating %s: %d field(s) (sensitive-scan=%s, link-check=%s, reference-check=%s)",
+        "Validating %s: %d field(s) (sensitive-scan=%s, link-check=%s, reference-check=%s, manuscript-check=%s)",
         venue.slug,
         len(venue.fields),
         check_sensitive,
         check_links,
         check_references,
+        check_manuscript,
     )
     issues: list[Issue] = list(_schema_issues(venue, subfile.values))
     values = subfile.values
@@ -764,6 +787,8 @@ def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, ch
         issues.extend(_reference_issues(venue, values))
     if check_sensitive:
         issues.extend(_sensitive_issues(venue, values))
+    if check_manuscript:
+        issues.extend(_manuscript_requirement_issues(venue, values))
 
     for field in venue.fields:
         raw = values.get(field.id, "")

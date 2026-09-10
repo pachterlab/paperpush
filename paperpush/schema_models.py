@@ -20,6 +20,11 @@ JSON Schema needs that a flat dataclass cannot express on its own:
 
 Run ``python scripts/gen_venues_schema.py`` to regenerate the committed schema;
 CI drift-checks it with ``--check``.
+
+The same script also regenerates ``manuscript_requirements.schema.json`` for
+the companion database of author-guideline rules (see
+:func:`build_requirements_schema`), built from the section dataclasses in
+:mod:`paperpush.requirements`.
 """
 
 from __future__ import annotations
@@ -30,6 +35,7 @@ from typing import Any
 from pydantic import TypeAdapter
 
 from paperpush.database import Field, Venue
+from paperpush.requirements import SECTION_TYPES, ManuscriptRequirements
 
 _SCHEMA_ID = "https://paperpush.org/schemas/venues.schema.json"
 _TITLE = "paperpush venue database"
@@ -203,4 +209,77 @@ def build_schema() -> dict[str, Any]:
             "venue": venue,
             **nested_defs,
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# manuscript_requirements.schema.json
+# ---------------------------------------------------------------------------
+
+_REQ_SCHEMA_ID = "https://paperpush.org/schemas/manuscript_requirements.schema.json"
+_REQ_TITLE = "paperpush manuscript requirements database"
+_REQ_DESCRIPTION = "Schema for manuscript_requirements.json. The top-level object maps a venue slug to " "what its author guidelines require of the manuscript, grouped into shared sections " "(manuscript, title_page, abstract, keywords, sections, statements, figures, tables, " "supplementary, references, cover_letter, upload). Generated from the dataclasses in " "paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate."
+
+
+def _requirements_section_schema(typ: type) -> dict[str, Any]:
+    """Schema for one section (e.g. ``figures``): every key optional and nullable.
+
+    Nullable because an inheriting entry or an ``article_types`` override may
+    set an inherited key to ``null`` to drop it (see
+    :func:`paperpush.requirements.merge_entries`).
+    """
+    schema = _strip_model_description(_clean(TypeAdapter(typ).json_schema()))
+    schema["properties"] = {name: _nullable(prop) for name, prop in schema["properties"].items()}
+    schema.pop("required", None)
+    schema["additionalProperties"] = False
+    return schema
+
+
+def build_requirements_schema() -> dict[str, Any]:
+    """Assemble the JSON Schema (draft 2020-12) for ``manuscript_requirements.json``."""
+    sections = {key: _requirements_section_schema(typ) for key, typ in SECTION_TYPES.items()}
+    top = _strip_model_description(_clean(TypeAdapter(ManuscriptRequirements).json_schema()))
+    top.pop("$defs", None)
+    properties = top["properties"]
+    properties.pop("slug", None)
+    for key in SECTION_TYPES:
+        properties[key] = {"anyOf": [{"$ref": f"#/$defs/{key}"}, {"type": "null"}]}
+    # The per-type overrides carry the same section keys as the entry itself.
+    properties["article_types"] = {
+        "type": "object",
+        "description": properties["article_types"].get("description", ""),
+        "additionalProperties": {"$ref": "#/$defs/rules"},
+    }
+    top["additionalProperties"] = False
+    top.pop("required", None)
+
+    # The section keys plus notes, reusable for an article-type override.
+    rules = {
+        "type": "object",
+        "description": "Per-article-type overrides: the same section keys as a venue entry.",
+        "properties": {**{key: properties[key] for key in SECTION_TYPES}, "notes": {"type": "array", "items": {"type": "string"}}},
+        "additionalProperties": False,
+    }
+
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": _REQ_SCHEMA_ID,
+        "title": _REQ_TITLE,
+        "description": _REQ_DESCRIPTION,
+        "type": "object",
+        "properties": {
+            "$schema": {"type": "string"},
+            "$aliases": {
+                "type": "object",
+                "description": "Heading wordings that count as each canonical section / statement " "name when the manuscript text is searched. Keys: sections, statements; " "each maps a canonical name to a list of alternative headings.",
+                "properties": {
+                    "sections": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}},
+                    "statements": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}},
+                },
+                "additionalProperties": False,
+            },
+        },
+        "patternProperties": {"^[A-Za-z0-9_]+$": {"$ref": "#/$defs/venue"}},
+        "additionalProperties": False,
+        "$defs": {"venue": top, "rules": rules, **sections},
     }

@@ -14,6 +14,10 @@
     {
       "fileMatch": ["paperpush/venues.json"],
       "url": "./paperpush/venues.schema.json"
+    },
+    {
+      "fileMatch": ["paperpush/manuscript_requirements.json"],
+      "url": "./paperpush/manuscript_requirements.schema.json"
     }
   ],
 

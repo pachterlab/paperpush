@@ -7,7 +7,7 @@ the submission workflow. This section documents every command in detail.
 .. code-block:: text
 
    usage: paperpush [-h] [--version] [--venues]
-                    {subfile,options,autofill,validate,login,submit} ...
+                    {subfile,options,autofill,validate,requirements,login,submit} ...
 
 Global options
 --------------
@@ -44,5 +44,6 @@ The commands, in workflow order
    options
    autofill
    validate
+   requirements
    login
    submit

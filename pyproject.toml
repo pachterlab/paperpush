@@ -59,7 +59,7 @@ include = ["paperpush*"]
 # "_docs/*.md" carries the agent-facing guide (mirrored from the repo root by
 # scripts/sync_agent_docs.py) so `paperpush --agent-guide` works from a plain pip
 # install, where the repo's AGENTS.md is not present.
-paperpush = ["venues.json", "venues.schema.json", "subfile_templates/*.sub", "_docs/*.md"]
+paperpush = ["venues.json", "venues.schema.json", "manuscript_requirements.json", "manuscript_requirements.schema.json", "subfile_templates/*.sub", "_docs/*.md"]
 "paperpush.venues" = ["_assets/*"]
 
 [tool.black]

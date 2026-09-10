@@ -592,5 +592,5 @@ def test_build_server_exposes_typed_arguments():
     tool = by_name["validate_subfile"]
     # Renamed from inputSchema to input_schema in MCP SDK 2.0.
     schema = getattr(tool, "input_schema", None) or tool.inputSchema
-    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references"}
+    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references", "check_manuscript"}
     assert schema["required"] == ["subfile"]
