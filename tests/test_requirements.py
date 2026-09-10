@@ -9,8 +9,10 @@ Covers three layers:
    venues and sample files (formats, sizes, length, sections, statements,
    title page, figures, references, .sub text fields), and the "do not
    double-report a limit the field already enforces" contract.
-3. The shipped database -- every supported venue has an entry, the file
-   conforms to its generated schema, and the schema is up to date.
+3. The shipped database -- the file conforms to its generated schema, the
+   schema is up to date, and each entry loads and matches its venue's form
+   (an entry is optional per venue; a venue without one gets no manuscript
+   checks).
 
 The checks run against an injected in-memory database (see ``_use``), so each
 test pins one rule without depending on what the shipped file says about a
@@ -27,7 +29,7 @@ from jsonschema import Draft202012Validator
 
 from paperpush import manuscript as m
 from paperpush import requirements as r
-from paperpush.database import Field, Venue, list_venues
+from paperpush.database import Field, Venue
 from paperpush.requirements_check import check_manuscript_requirements
 from paperpush.schema_models import build_requirements_schema
 from paperpush.validate import ERROR, WARNING, validate
@@ -470,12 +472,6 @@ def test_schema_rejects_unknown_section_key():
     assert list(validator.iter_errors({"j": {"figures": {"min_dpis": 300}}}))
     assert list(validator.iter_errors({"j": {"figurez": {}}}))
     assert not list(validator.iter_errors({"j": {"inherits": "k", "figures": {"min_dpi": None}, "article_types": {"Note": {"manuscript": {"max_pages": 6}}}}}))
-
-
-def test_every_supported_venue_has_requirements():
-    shipped = _shipped()
-    missing = [v.slug for v in list_venues() if v.slug not in shipped]
-    assert not missing, f"venues without manuscript requirements: {missing}"
 
 
 def test_shipped_entries_load_and_resolve():

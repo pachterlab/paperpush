@@ -97,7 +97,7 @@ For more details, see [`venues.md`](venues.md)
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for instructions on adding new venues. See [`DEVELOPMENT.md`](DEVELOPMENT.md) for tips on adding new venues and running unit tests.
 
-Each venue has two data entries: its submission form in `paperpush/venues.json` (the fields the portal asks for) and its manuscript requirements in `paperpush/manuscript_requirements.json` (what the venue's author guidelines demand of the manuscript: file formats and sizes, word/page limits, required sections and statements, title-page items, figure resolution and dimensions, reference rules). Both use a shared vocabulary across venues, each has a generated JSON schema, and `paperpush validate` checks a `.sub` against both.
+Each venue has a submission-form entry in `paperpush/venues.json` (the fields the portal asks for) and, optionally, a manuscript-requirements entry in `paperpush/manuscript_requirements.json` (what the venue's author guidelines demand of the manuscript: file formats and sizes, word/page limits, required sections and statements, title-page items, figure resolution and dimensions, reference rules). Both use a shared vocabulary across venues, each has a generated JSON schema, and `paperpush validate` checks a `.sub` against both (a venue without a requirements entry gets only the form checks).
 
 ## For AI agents
 

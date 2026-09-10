@@ -4,11 +4,11 @@
 
 See the YouTube tutorial [PaperPush Contributor Tutorial](https://youtu.be/hn1RNcvHuYw)
 
-To add support for a venue (journal, preprint server, conference, or other), provide the following four components:
+To add support for a venue (journal, preprint server, conference, or other), provide the following components (the third is optional):
 
 1. Login and submit scripts: a `Venue` subclass in `paperpush/venues/<portal>/<venue>.py`, exposing one module-level `VENUE` instance.
 2. Venue data: an entry in `paperpush/venues.json` with the submission fields and constraints.
-3. Manuscript requirements: an entry in `paperpush/manuscript_requirements.json` with what the venue's author guidelines require of the manuscript itself (formats, length limits, required sections and statements, title-page items, figure rules, references), read from the guidelines pages and cited in `source_urls`. See "Manuscript requirements" in [DEVELOPMENT.md](DEVELOPMENT.md) for the shared keys; `tests/test_requirements.py` fails for a supported venue without an entry.
+3. Manuscript requirements (optional): an entry in `paperpush/manuscript_requirements.json` with what the venue's author guidelines require of the manuscript itself (formats, length limits, required sections and statements, title-page items, figure rules, references, etc.).
 4. Unit test(s): an entry named <slug> in `tests/sample_subfiles.json` to generate a sample submission file for unit testing. Optionally, more subfiles can be created for additional unit testing.
 
 Each `Venue` subclass must implement the following:
@@ -16,12 +16,6 @@ Each `Venue` subclass must implement the following:
 - implement **`submit()`**: drive the submission wizard, stopping before the final submit.
 - for a portal that requires an account, set `logged_in_names` to accessible names of a signed-in-only control and implement **`login()`** to drive the login process.
 - for a public portal with no author login, set `requires_login = False` and `supports_session_capture = False`; keep a `login()` method that raises `NotImplementedError` so the uniform venue interface remains explicit. The CLI and MCP server then skip credentials automatically. See `paperpush/venues/editflow/main.py`.
-
-Signing in stays one method. If the venue's sign-in page also offers a "Sign in with ORCID" button, handle it inside `login()` rather than adding a second entry point:
-- take an `orcid: bool = False` keyword on `login()`, and when it is set drive that button — click through to ORCID's popup, type the author's ORCID iD and ORCID password, and return once the portal is signed in. Keep the shared parts (loading the page, dismissing cookie banners, the final signed-in check) outside the branch; if the ORCID half is long, put it in a private `_login_orcid()` helper.
-- set `supports_orcid_login = True`.
-- Do neither otherwise. Callers check `supports_orcid_login` and refuse before signing in, so a venue with no ORCID branch is never passed `orcid=True` and does not need the parameter at all. `paperpush/venues/editorialmanager/main.py` has a worked example.
-- Whether the `--orcid` *option* is offered for a venue at all is separate, and comes from its `venue_type` (journals only) plus the exclusions in `paperpush/venues/__init__.py`.
 
 See `paperpush/venues/template/template.py` for a copy-ready starting point.
 

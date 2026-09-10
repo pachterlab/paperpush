@@ -74,6 +74,9 @@ venue's author guidelines require of the manuscript itself. `paperpush validate`
 measures the files a `.sub` names against it (`paperpush/requirements_check.py`),
 and `paperpush requirements VENUE` prints it. It is the companion of
 `venues.json`: that file describes the portal's form, this one the guidelines.
+An entry is optional: a venue without one is still fully supported, `validate`
+simply has no manuscript rules to apply, and `paperpush requirements VENUE`
+says so. Add one whenever the guidelines are available.
 
 Every entry uses the same section keys, and each key is optional -- record only
 what the guidelines state, and put rules with no structured key in that
