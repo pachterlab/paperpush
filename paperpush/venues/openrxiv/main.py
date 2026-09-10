@@ -20,8 +20,7 @@ from ...database import get_venue
 from ...validate import parse_authors
 from ..base import Venue
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts
-from ..common import \
-    declares_no_competing_interest as _declares_no_competing_interest
+from ..common import declares_no_competing_interest as _declares_no_competing_interest
 from ..common import hold_open, hold_open_on_failure, open_run_context
 from ..common import parse_pipe_file_list as _parse_file_list
 from ..common import parse_pipe_funders as _parse_funders
@@ -36,7 +35,7 @@ class OpenRxivLoginError(VenueLoginError):
     """Raised when the automatic credential sign-in could not complete (message names ``cfg.name``)."""
 
 
-#* sign-in form selectors (targeted by accessible role/name; the host differs per variant)
+# * sign-in form selectors (targeted by accessible role/name; the host differs per variant)
 LOGIN_EMAIL_LABEL = "Email:"
 LOGIN_PASSWORD_LABEL = "Password:"  # form label, not a credential  # nosec B105
 LOGIN_BUTTON_NAME = "Sign in"
@@ -45,7 +44,7 @@ LOGIN_BUTTON_NAME = "Sign in"
 # login_orcid helper detects that, so only the control's name is declared here.
 LOGIN_ORCID_BUTTON_NAME = "ORCID logo Log in with ORCiD"
 
-#* shared selectors -- the runner and the interface checker share these, so one fix corrects both
+# * shared selectors -- the runner and the interface checker share these, so one fix corrects both
 
 # Buttons / links, identified by their visible accessible name.
 BTN_SUBMIT_NEW = "Submit a new manuscript"  # link on the queue page
@@ -655,17 +654,8 @@ class OpenRxivVenue(Venue):
             page.goto(cfg.queues_url)
             if not self.is_logged_in(page, timeout_ms=timeout_ms):
                 if orcid:
-                    raise OpenRxivLoginError(
-                        f"signed in to ORCID but the {cfg.name} submission queue did not "
-                        "load -- the ORCID iD or password may be wrong, or the ORCID "
-                        f"account may not be linked to a {cfg.name} account yet (link it "
-                        "once by signing in by hand)"
-                    )
-                raise OpenRxivLoginError(
-                    f"submitted the credentials but the signed-in {cfg.name} submission "
-                    "queue did not load -- the email or password may be wrong, or "
-                    f"{cfg.name} added a step (CAPTCHA / two-factor) that can't be automated"
-                )
+                    raise OpenRxivLoginError(f"signed in to ORCID but the {cfg.name} submission queue did not " "load -- the ORCID iD or password may be wrong, or the ORCID " f"account may not be linked to a {cfg.name} account yet (link it " "once by signing in by hand)")
+                raise OpenRxivLoginError(f"submitted the credentials but the signed-in {cfg.name} submission " "queue did not load -- the email or password may be wrong, or " f"{cfg.name} added a step (CAPTCHA / two-factor) that can't be automated")
 
 
 @dataclass

@@ -122,6 +122,23 @@ if git diff --cached --name-only --diff-filter=ACM -z \
 fi
 
 # ---------------------------------------------------------------------------
+# Keep the docs' schema reference pages (docs/schemas/*.md) in sync with the
+# JSON schemas whenever a schema is part of this commit.
+# ---------------------------------------------------------------------------
+if git diff --cached --name-only --diff-filter=ACM -z \
+    | tr '\0' '\n' | grep -qE '^paperpush/(venues|manuscript_requirements)\.schema\.json$'; then
+    if python scripts/gen_schema_docs.py; then
+        if ! git diff --quiet -- docs/schemas; then
+            git add docs/schemas
+            echo "pre-commit: regenerated docs/schemas reference pages and re-staged them."
+        fi
+    else
+        echo "pre-commit: failed to regenerate docs/schemas reference pages." >&2
+        status=1
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Keep the packaged copy of AGENTS.md in sync with the root file. The root copy
 # is canonical (agent tooling looks for it there); the copy under
 # paperpush/_docs/ is what ships in the wheel and backs `paperpush

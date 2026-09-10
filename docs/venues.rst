@@ -11,7 +11,10 @@ authoritative, always-current list is available on the command line:
 
 The venues supported at the time of writing are below. For a complete
 description of each venue's fields and portal, see ``venues.md`` in the
-repository.
+repository. The keys a venue entry may carry are documented in the
+:doc:`venues.json reference <schemas/venues>`, and what each venue's author
+guidelines require of the manuscript in the
+:doc:`manuscript_requirements.json reference <schemas/manuscript_requirements>`.
 
 Preprint servers
 ----------------

@@ -8,8 +8,7 @@ default deployment) and exposes the uniform ``VENUE`` object.
 from __future__ import annotations
 
 from . import main
-from .main import (  # noqa: F401 -- re-exported as this module's public API
-    EditorialManagerLoginError, Variant)
+from .main import EditorialManagerLoginError, Variant  # noqa: F401 -- re-exported as this module's public API
 
 
 class CellVenue(main.EditorialManagerVenue):

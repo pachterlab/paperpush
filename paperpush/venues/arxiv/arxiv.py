@@ -8,8 +8,7 @@ from playwright.sync_api import sync_playwright
 from ...database import get_venue
 from ...validate import _truthy_bool, parse_authors
 from ..base import Venue
-from ..common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                      hold_open, hold_open_on_failure, open_run_context, _try)
+from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context, _try
 from ..login import VenueLoginError, login_orcid
 
 logger = logging.getLogger(__name__)

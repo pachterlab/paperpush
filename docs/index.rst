@@ -43,6 +43,8 @@ The workflow is five short commands:
    :caption: Reference
 
    venues
+   schemas/venues
+   schemas/manuscript_requirements
    api
    example-session
 

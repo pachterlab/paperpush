@@ -9,8 +9,7 @@ uniform ``VENUE`` object plus the ``check_biorxiv`` interface checker. See
 from __future__ import annotations
 
 from . import main
-from .main import (  # noqa: F401 -- re-exported as this module's public API
-    CheckReport, OpenRxivLoginError, StepResult, Variant)
+from .main import CheckReport, OpenRxivLoginError, StepResult, Variant  # noqa: F401 -- re-exported as this module's public API
 
 
 class BiorxivVenue(main.OpenRxivVenue):

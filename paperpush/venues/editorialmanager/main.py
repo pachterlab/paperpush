@@ -30,8 +30,7 @@ from ... import credentials
 from ...database import get_venue
 from ...validate import parse_authors
 from ..base import Venue
-from ..common import (DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts,
-                      hold_open, hold_open_on_failure, open_run_context)
+from ..common import DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
 from ..common import parse_pipe_funders as _parse_funders
 from ..common import save_storage
 from ..common import split_name_first_last as _split_name
@@ -881,8 +880,7 @@ def _answer_declarations_plos(
         _try(lambda: cf.locator("#QR23_1_Q46909_Q46910_RSP_46910").fill(preprint_doi), "related manuscript DOI")
     else:
         _try(lambda: cf.locator("#QR23_1_Q46909_RSP_46909").select_option("324171"), "related manuscript = no")
-        _try(lambda: cf.locator("#QR23_1_Q46909_Q46911_RSP_46911").select_option("324173"),"bioRxiv posting = no")
-
+        _try(lambda: cf.locator("#QR23_1_Q46909_Q46911_RSP_46911").select_option("324173"), "bioRxiv posting = no")
 
     # Closing agreement radio and policy drop-down (replayed from the recording).
     _try(lambda: cf.get_by_role("radio", name="No - I do not agree to").check(), "plos agreement radio")
@@ -1484,9 +1482,9 @@ class EditorialManagerVenue(Venue):
                 # sometimes I must try one more time to click on the ORCID link
                 _try(lambda: _content(page).get_by_role("button", name="Log In").click(timeout=5000), "reveal login form")
                 with page.expect_popup() as page1_info:
-                    _try(lambda: page.locator("iframe[name=\"content\"]").content_frame.get_by_role("link", name="Login using ORCID").click(timeout=2000), "try orcid again")  # works for Cell family
-                    _try(lambda: page.locator("iframe[name=\"content\"]").content_frame.locator("iframe[name=\"login\"]").content_frame.get_by_role("link", name="Login using ORCID").click(timeout=2000), "try orcid again")  # works for PLOS family
-                    
+                    _try(lambda: page.locator('iframe[name="content"]').content_frame.get_by_role("link", name="Login using ORCID").click(timeout=2000), "try orcid again")  # works for Cell family
+                    _try(lambda: page.locator('iframe[name="content"]').content_frame.locator('iframe[name="login"]').content_frame.get_by_role("link", name="Login using ORCID").click(timeout=2000), "try orcid again")  # works for PLOS family
+
                 if not self.is_logged_in(page, timeout_ms=timeout_ms):
                     raise EditorialManagerLoginError(f"signed in to ORCID but the {cfg.name} author area did not load -- the " "ORCID iD or password may be wrong, or the ORCID account may not be " f"linked to a {cfg.name} account yet (link it once by signing in by hand)")
             raise EditorialManagerLoginError(f"submitted the credentials but the signed-in {cfg.name} author area did " f"not load -- the username or password may be wrong (for the Cell Press " "journals the pair is either an Editorial Manager username/password or " f"an Elsevier account email/password), or {cfg.name} added a step " "(CAPTCHA / two-factor) that can't be automated")

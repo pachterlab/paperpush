@@ -25,8 +25,7 @@ from ...database import get_venue
 from ...validate import parse_authors
 from .. import get_venue_impl
 from ..base import Venue
-from ..common import (DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts,
-                      hold_open, hold_open_on_failure, open_run_context)
+from ..common import DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
 from ..common import session_path as _session_path
 from ..common import split_name_first_last as _split_name
 from ..login import VenueLoginError
@@ -744,8 +743,7 @@ def _select_manuscript_type(page, label: str) -> None:
         page.locator(SEL_MS_TYPE_RADIO).first.wait_for(state="attached", timeout=20000)
     except Exception:
         pass
-    options = page.locator(SEL_MS_TYPE_RADIO).evaluate_all(
-        """els => els.map(e => {
+    options = page.locator(SEL_MS_TYPE_RADIO).evaluate_all("""els => els.map(e => {
             const clean = s => (s || '').replace(/\\s+/g, ' ').trim();
             // 1) associated or wrapping <label>.
             let lab = e.closest('label');
@@ -767,8 +765,7 @@ def _select_manuscript_type(page, label: str) -> None:
             const row = e.closest('tr');
             if (row && clean(row.textContent)) return {value: e.value, text: row.textContent};
             return {value: e.value, text: e.parentElement ? e.parentElement.textContent : ''};
-        })"""
-    )
+        })""")
     logger.debug("manuscript-type options offered by eJP: %s", [(o["value"], _normalize_type_label(o["text"])) for o in options])
     want = _normalize_type_label(label)
     # Prefer an exact normalized match; fall back to a containment match so a
@@ -1376,11 +1373,7 @@ class EJPVenue(Venue):
         user_box = _find_field(page, LOGIN_USERNAME_LABELS, LOGIN_USERNAME_SELECTORS, timeout_ms)
         pwd_box = _find_field(page, LOGIN_PASSWORD_LABELS, LOGIN_PASSWORD_SELECTORS, timeout_ms)
         if user_box is None or pwd_box is None:
-            raise NatureLoginError(
-                f"could not find the login/password fields on the {cfg.name} sign-in page "
-                "(the eJournalPress form may have changed); re-capture the selectors "
-                "with 'playwright codegen %s'" % login_url
-            )
+            raise NatureLoginError(f"could not find the login/password fields on the {cfg.name} sign-in page " "(the eJournalPress form may have changed); re-capture the selectors " "with 'playwright codegen %s'" % login_url)
 
         _type_into(user_box, username)
         _type_into(pwd_box, password)
@@ -1396,8 +1389,4 @@ class EJPVenue(Venue):
         # A successful sign-in lands on the dashboard; if the log-out control
         # never appears, the sign-in did not take.
         if not self.is_logged_in(page, timeout_ms=timeout_ms):
-            raise NatureLoginError(
-                f"submitted the credentials but the signed-in {cfg.name} dashboard did not "
-                f"load -- the login or password may be wrong, or {cfg.name} added a step "
-                "(CAPTCHA / two-factor) that can't be automated"
-            )
+            raise NatureLoginError(f"submitted the credentials but the signed-in {cfg.name} dashboard did not " f"load -- the login or password may be wrong, or {cfg.name} added a step " "(CAPTCHA / two-factor) that can't be automated")

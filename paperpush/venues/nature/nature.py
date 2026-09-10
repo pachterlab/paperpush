@@ -8,10 +8,7 @@ Variant and exposes the package's ``VENUE`` object plus the ``login_nature`` /
 from __future__ import annotations
 
 from . import main
-from .main import (  # noqa: F401 -- re-exported as this module's public API
-    FIELD_OPTION_LISTERS, FIELD_VALIDATORS, CategoryCheckReport,
-    NatureLoginError, Variant, convert_scraped_categories,
-    list_nature_categories)
+from .main import FIELD_OPTION_LISTERS, FIELD_VALIDATORS, CategoryCheckReport, NatureLoginError, Variant, convert_scraped_categories, list_nature_categories  # noqa: F401 -- re-exported as this module's public API
 
 
 class NatureVenue(main.EJPVenue):

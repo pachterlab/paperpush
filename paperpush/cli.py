@@ -650,33 +650,15 @@ def _cmd_submit(args: argparse.Namespace) -> int:
     if args.debug:
         print(f"Opening {venue} in debug mode for {args.subfile}…")
         if needs_login:
-            print(
-                "The Playwright Inspector opens at the first step; use 'Step "
-                "over' to walk the wizard line by line. If a saved session "
-                "exists (from an earlier submit run) you start signed in; "
-                "otherwise sign in in the browser, then resume."
-            )
+            print("The Playwright Inspector opens at the first step; use 'Step " "over' to walk the wizard line by line. If a saved session " "exists (from an earlier submit run) you start signed in; " "otherwise sign in in the browser, then resume.")
         else:
-            print(
-                "The Playwright Inspector opens at the first step; use 'Step "
-                "over' to walk the wizard line by line. This public portal "
-                "does not require sign-in."
-            )
+            print("The Playwright Inspector opens at the first step; use 'Step " "over' to walk the wizard line by line. This public portal " "does not require sign-in.")
     elif needs_login:
         print(f"Opening {venue} to run the submission for {args.subfile}…")
-        print(
-            "Sign-in is automatic when possible: a saved session is reused, "
-            f"else your 'paperpush login {venue}' credentials are "
-            "filled in (and the session saved); otherwise sign in by hand. "
-            "Field values come from the .sub file; the wizard stops before "
-            "the final submit."
-        )
+        print("Sign-in is automatic when possible: a saved session is reused, " f"else your 'paperpush login {venue}' credentials are " "filled in (and the session saved); otherwise sign in by hand. " "Field values come from the .sub file; the wizard stops before " "the final submit.")
     else:
         print(f"Opening {venue} to run the submission for {args.subfile}…")
-        print(
-            "This portal does not require login. Field values come from the "
-            ".sub file; the wizard stops before the final submit."
-        )
+        print("This portal does not require login. Field values come from the " ".sub file; the wizard stops before the final submit.")
     logger.info("submit: launching %s runner (headless=%s, debug=%s, timeout=%ss, " "keep_open_on_failure=%s)", venue, args.headless, args.debug, args.timeout, not args.close_on_failure)
     run(subfile.values, headless=args.headless, debug=args.debug, new_session=args.new_session, timeout=args.timeout, keep_open_on_failure=not args.close_on_failure)
     logger.info("submit: %s runner returned", venue)
@@ -716,16 +698,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
 
     if args.engine == "manual" and not args.values:
         print(
-            "error: --values FILE is required with the manual engine.\n"
-            "\n"
-            "The manual engine applies field values that you extract yourself --\n"
-            "it does not call any API. To produce them:\n"
-            "  1. Run 'paperpush schema <venue>' to list the fields and roles.\n"
-            "  2. Read the manuscript files and write a values.json (AGENTS.md has\n"
-            "     the exact schema).\n"
-            "  3. Re-run with --values values.json.\n"
-            "Use '--engine api' instead only if ANTHROPIC_API_KEY is set and you\n"
-            "want the Anthropic API to do the extraction.",
+            "error: --values FILE is required with the manual engine.\n" "\n" "The manual engine applies field values that you extract yourself --\n" "it does not call any API. To produce them:\n" "  1. Run 'paperpush schema <venue>' to list the fields and roles.\n" "  2. Read the manuscript files and write a values.json (AGENTS.md has\n" "     the exact schema).\n" "  3. Re-run with --values values.json.\n" "Use '--engine api' instead only if ANTHROPIC_API_KEY is set and you\n" "want the Anthropic API to do the extraction.",
             file=sys.stderr,
         )
         return 1
@@ -1118,46 +1091,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--dont-check-links",
         dest="check_links",
         action="store_false",
-        help="skip checking that the URLs cited in the manuscript files are "
-        "reachable. By default validate probes them and warns about broken "
-        "links (404/gone, including still-private GitHub repos), which requires "
-        "network access.",
+        help="skip checking that the URLs cited in the manuscript files are " "reachable. By default validate probes them and warns about broken " "links (404/gone, including still-private GitHub repos), which requires " "network access.",
     )
     p_validate.add_argument(
         "--dont-check-for-sensitive-info",
         dest="check_sensitive",
         action="store_false",
-        help="skip scanning the referenced files for information not meant to "
-        "be published. By default validate scans them for API keys, passwords, "
-        "private keys, GPS coordinates in figures, editable-document links, and "
-        "LaTeX source comments, nudges when no public code repository is linked, "
-        "and reminds arXiv submitters to run arxiv_latex_cleaner on unclean "
-        "source. Reported as advisory warnings.",
+        help="skip scanning the referenced files for information not meant to " "be published. By default validate scans them for API keys, passwords, " "private keys, GPS coordinates in figures, editable-document links, and " "LaTeX source comments, nudges when no public code repository is linked, " "and reminds arXiv submitters to run arxiv_latex_cleaner on unclean " "source. Reported as advisory warnings.",
     )
     p_validate.add_argument(
         "--dont-check-references",
         dest="check_references",
         action="store_false",
-        help="skip checking the references against the DOI registry. By "
-        "default validate reads the submission's bibliography -- its .bib "
-        "files, and the reference list in the manuscript itself -- resolves "
-        "each DOI through doi.org, and warns when one is "
-        "malformed, duplicated, unregistered, or registered to a different "
-        "title, author, or year than the reference claims -- the usual sign of "
-        "a DOI copied from the wrong reference. Requires network access.",
+        help="skip checking the references against the DOI registry. By " "default validate reads the submission's bibliography -- its .bib " "files, and the reference list in the manuscript itself -- resolves " "each DOI through doi.org, and warns when one is " "malformed, duplicated, unregistered, or registered to a different " "title, author, or year than the reference claims -- the usual sign of " "a DOI copied from the wrong reference. Requires network access.",
     )
     p_validate.add_argument(
         "--dont-check-manuscript",
         dest="check_manuscript",
         action="store_false",
-        help="skip measuring the uploads against the venue's author guidelines. "
-        "By default validate reads manuscript_requirements.json for the venue "
-        "and checks the manuscript's format, word/page count (compiling LaTeX "
-        "source to a scratch PDF with latexmk/pdflatex when installed), "
-        "required section headings and declarations, title-page items, "
-        "abstract/title/keyword limits, figure format, resolution, and count, "
-        "supplementary-file rules, and the number of references. See "
-        "'paperpush requirements VENUE' for the rules applied.",
+        help="skip measuring the uploads against the venue's author guidelines. " "By default validate reads manuscript_requirements.json for the venue " "and checks the manuscript's format, word/page count (compiling LaTeX " "source to a scratch PDF with latexmk/pdflatex when installed), " "required section headings and declarations, title-page items, " "abstract/title/keyword limits, figure format, resolution, and count, " "supplementary-file rules, and the number of references. See " "'paperpush requirements VENUE' for the rules applied.",
     )
     p_validate.set_defaults(func=_cmd_validate, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True)
 
@@ -1173,9 +1125,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_login.add_argument("-u", "--username", help="username or email (otherwise you are prompted or it looks " "for the PAPERPUSH_USERNAME environment variable)")
     p_login.add_argument(
         "--password",
-        help="password (otherwise you are prompted or it looks for the "
-        "PAPERPUSH_PASSWORD environment variable). WARNING: exposes "
-        "the password as plain text in the process list and shell history",
+        help="password (otherwise you are prompted or it looks for the " "PAPERPUSH_PASSWORD environment variable). WARNING: exposes " "the password as plain text in the process list and shell history",
     )
     p_login.add_argument(
         "--confirm-password",
@@ -1192,9 +1142,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_login.add_argument("--into", metavar="SUBFILE", help="after an ORCID login, fill the matching author's " "ORCID/name/affiliation in this .sub file, read from " "their public ORCID record")
     p_login.add_argument("--status", action="store_true", help="show whether credentials are stored, then exit")
     p_login.add_argument("--logout", action="store_true", help="remove stored credentials for the venue")
-    p_login.add_argument(
-        "--no-verify", dest="no_verify", action="store_true", help="store the credentials without checking them against " "the venue's sign-in (the default opens a browser and " "verifies first)"
-    )
+    p_login.add_argument("--no-verify", dest="no_verify", action="store_true", help="store the credentials without checking them against " "the venue's sign-in (the default opens a browser and " "verifies first)")
     p_login.add_argument("--verify-headless", dest="verify_headless", action="store_true", help="run the verification browser headless (no window; " "cannot complete a CAPTCHA or two-factor prompt)")
     p_login.add_argument(
         "--timeout",
@@ -1208,9 +1156,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_submit = sub.add_parser("submit", parents=[verbosity], help="open the venue submission portal and run the submission click-through")
     p_submit.add_argument("subfile", help="path to the .sub file")
     p_submit.add_argument("--headless", action="store_true", help="run the browser headless (default: headed, so you " "can sign in and review)")
-    p_submit.add_argument(
-        "--debug", action="store_true", help="open the Playwright Inspector at the first step " "to walk the wizard line by line; reuses a saved " "session from an earlier run to skip sign-in"
-    )
+    p_submit.add_argument("--debug", action="store_true", help="open the Playwright Inspector at the first step " "to walk the wizard line by line; reuses a saved " "session from an earlier run to skip sign-in")
     p_submit.add_argument("--new-session", action="store_true", help="discard any saved browser session and sign in " "fresh (use after switching accounts)")
     p_submit.add_argument(
         "--timeout",

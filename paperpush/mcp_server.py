@@ -619,11 +619,7 @@ def login(
             "venue": resolved.slug,
             "credential_stored_under": base,
             "command": display_command,
-            "reason": (
-                f"No credentials are stored for {base} and signing in needs a username and "
-                "password. Ask the user to run this command in their own terminal -- it will "
-                "prompt them, and the password never passes through this conversation."
-            ),
+            "reason": (f"No credentials are stored for {base} and signing in needs a username and " "password. Ask the user to run this command in their own terminal -- it will " "prompt them, and the password never passes through this conversation."),
         }
 
     logger.info("login: running %s for %s", display_command, base)
@@ -646,12 +642,7 @@ def login(
             "venue": resolved.slug,
             "credential_stored_under": base,
             "command": display_command,
-            "reason": (
-                f"`{display_command}` did not finish within {timeout_seconds:g}s. The sign-in "
-                "check may be waiting on a CAPTCHA or two-factor prompt. Ask the user to run "
-                "the command themselves, or retry with verify=false to store the credentials "
-                "without checking them."
-            ),
+            "reason": (f"`{display_command}` did not finish within {timeout_seconds:g}s. The sign-in " "check may be waiting on a CAPTCHA or two-factor prompt. Ask the user to run " "the command themselves, or retry with verify=false to store the credentials " "without checking them."),
         }
     except OSError as exc:
         raise ValueError(f"could not run {display_command}: {exc}") from exc
@@ -795,11 +786,7 @@ def submit(
             "credential_stored_under": base,
             "subfile": str(path),
             "command": f"paperpush login {base}",
-            "reason": (
-                f"No credentials are stored for {base}. Submitting would stall on a sign-in "
-                "prompt with no terminal to answer it, so nothing was launched. Ask the user "
-                "to run this command in their own terminal first."
-            ),
+            "reason": (f"No credentials are stored for {base}. Submitting would stall on a sign-in " "prompt with no terminal to answer it, so nothing was launched. Ask the user " "to run this command in their own terminal first."),
         }
 
     command = _paperpush_command("submit", str(path))
@@ -844,12 +831,7 @@ def submit(
         "subfile": str(path),
         "log_path": str(log_path),
         "headless": headless,
-        "next_step": (
-            "The browser is opening and the wizard will fill itself in from the .sub file. "
-            "Poll submit_status for progress. It stops before the final submit -- tell the "
-            "user to review the form in the browser and click submit themselves, then call "
-            "submit_close to shut the browser."
-        ),
+        "next_step": ("The browser is opening and the wizard will fill itself in from the .sub file. " "Poll submit_status for progress. It stops before the final submit -- tell the " "user to review the form in the browser and click submit themselves, then call " "submit_close to shut the browser."),
     }
 
 
@@ -981,23 +963,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(
-            f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n"
-            "Typical flow: list_supported_venues -> describe_venue -> create_subfile -> "
-            "autofill_subfile (you extract the values from the manuscript; the tool applies "
-            "them) -> validate_subfile -> login_status -> submit.\n\n"
-            "Pass absolute paths: this server has its own working directory, so a relative "
-            "path means something different here than it does to you. Tools that take a "
-            "manuscript_dir resolve relative paths against it.\n\n"
-            "submit fills the venue's form and stops before the final submit button, leaving "
-            "the browser open for the author to review and send themselves -- so it returns a "
-            "pid, not a finished run. Follow it with submit_status; call submit_close when the "
-            "author says they are done. It needs a .sub file that passes validation and, for "
-            "portals that require authentication, a stored login (check login_status first); "
-            "it refuses rather than opening a browser otherwise.\n\n"
-            "Signing in is the one step you cannot do for the user: login hands back a "
-            "`paperpush login <venue>` command for them to run in their own terminal."
-        ),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; call submit_close when the " "author says they are done. It needs a .sub file that passes validation and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
     )
     for tool in TOOLS:
         server.tool()(tool)

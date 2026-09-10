@@ -162,6 +162,8 @@ class AbstractRules:
 
 @dataclass(frozen=True)
 class KeywordRules:
+    """How many keywords the manuscript must list."""
+
     min: Annotated[Optional[int], PField(description="Minimum number of keywords.")] = None
     max: Annotated[Optional[int], PField(description="Maximum number of keywords.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()
@@ -216,6 +218,8 @@ class FigureRules:
 
 @dataclass(frozen=True)
 class TableRules:
+    """Table file format, editability, count, and placement."""
+
     formats: Annotated[Optional[list[str]], PField(description="Accepted table file extensions.")] = None
     editable: Annotated[Optional[bool], PField(description="Tables must be editable text, not images.")] = None
     max_count: Annotated[Optional[int], PField(description="Maximum number of main-text tables.")] = None
@@ -225,6 +229,8 @@ class TableRules:
 
 @dataclass(frozen=True)
 class SupplementaryRules:
+    """Supplementary-file format, size, count, and bundling."""
+
     formats: Annotated[Optional[list[str]], PField(description="Accepted supplementary file extensions.")] = None
     max_file_size_mb: Annotated[Optional[float], PField(description="Maximum size of each supplementary file in MB.")] = None
     max_count: Annotated[Optional[int], PField(description="Maximum number of supplementary files.")] = None
@@ -234,6 +240,8 @@ class SupplementaryRules:
 
 @dataclass(frozen=True)
 class ReferenceRules:
+    """Reference style and count."""
+
     style: Annotated[Optional[str], PField(description="Reference style, in words.")] = None
     numbered: Annotated[Optional[bool], PField(description="Numbered (true) vs author-year (false) citations.")] = None
     max_count: Annotated[Optional[int], PField(description="Maximum number of references.")] = None
@@ -246,6 +254,8 @@ class ReferenceRules:
 
 @dataclass(frozen=True)
 class CoverLetterRules:
+    """Whether a cover letter is required and how it is supplied."""
+
     required: Annotated[Optional[bool], PField(description="A cover letter is required.")] = None
     formats: Annotated[Optional[list[str]], PField(description="Accepted cover letter file extensions.")] = None
     max_words: Annotated[Optional[int], PField(description="Maximum cover letter length in words.")] = None
@@ -254,6 +264,8 @@ class CoverLetterRules:
 
 @dataclass(frozen=True)
 class UploadRules:
+    """Size caps on the submission's uploads as a whole."""
+
     max_total_mb: Annotated[Optional[float], PField(description="Maximum combined size of one submission's uploads in MB.")] = None
     max_file_mb: Annotated[Optional[float], PField(description="Per-file size cap that applies to every upload, in MB.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()

@@ -35,8 +35,11 @@ jobs:
       - name: Check README venues table is in sync with venues.json
         run: python scripts/gen_readme_venues.py --check
 
-      - name: Check venues.schema.json is in sync with the schema models
+      - name: Check venues.schema.json and manuscript_requirements.schema.json are in sync with the schema models
         run: python scripts/gen_venues_schema.py --check
+
+      - name: Check the docs' schema reference pages are in sync with the schemas
+        run: python scripts/gen_schema_docs.py --check
 
       - name: Check .sub templates are in sync with venues.json
         run: python scripts/gen_subfile_templates.py --check

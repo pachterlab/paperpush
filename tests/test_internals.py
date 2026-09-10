@@ -58,6 +58,18 @@ def test_schema_file_is_up_to_date():
     assert actual == expected, "venues.schema.json is out of date; run " "`python scripts/gen_venues_schema.py`"
 
 
+def test_schema_docs_pages_are_up_to_date():
+    """The Markdown reference pages under docs/schemas equal what the schemas
+    render to (run scripts/gen_schema_docs.py to refresh)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("gen_schema_docs", Path(__file__).resolve().parent.parent / "scripts" / "gen_schema_docs.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    for path, render in module.PAGES:
+        assert path.read_text(encoding="utf-8") == render(), f"{path.name} is out of date; run `python scripts/gen_schema_docs.py`"
+
+
 def test_schema_is_well_formed():
     Draft202012Validator.check_schema(json.loads(SCHEMA_PATH.read_text()))
 

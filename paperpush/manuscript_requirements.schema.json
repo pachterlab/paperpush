@@ -77,7 +77,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Rules for the main manuscript file: format, size, length, and layout."
         },
         "title_page": {
           "anyOf": [
@@ -87,7 +88,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "What the title page must carry."
         },
         "abstract": {
           "anyOf": [
@@ -97,7 +99,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Abstract length and structure."
         },
         "keywords": {
           "anyOf": [
@@ -107,7 +110,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "How many keywords the manuscript must list."
         },
         "sections": {
           "anyOf": [
@@ -117,7 +121,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Section headings the manuscript body must (or may) carry."
         },
         "statements": {
           "anyOf": [
@@ -127,7 +132,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Declarations that must appear in the manuscript text."
         },
         "figures": {
           "anyOf": [
@@ -137,7 +143,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Figure file format, resolution, dimensions, and count."
         },
         "tables": {
           "anyOf": [
@@ -147,7 +154,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Table file format, editability, count, and placement."
         },
         "supplementary": {
           "anyOf": [
@@ -157,7 +165,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Supplementary-file format, size, count, and bundling."
         },
         "references": {
           "anyOf": [
@@ -167,7 +176,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Reference style and count."
         },
         "cover_letter": {
           "anyOf": [
@@ -177,7 +187,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Whether a cover letter is required and how it is supplied."
         },
         "upload": {
           "anyOf": [
@@ -187,7 +198,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Size caps on the submission's uploads as a whole."
         },
         "notes": {
           "description": "Venue-wide rules that fit no section.",
@@ -212,7 +224,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Rules for the main manuscript file: format, size, length, and layout."
         },
         "title_page": {
           "anyOf": [
@@ -222,7 +235,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "What the title page must carry."
         },
         "abstract": {
           "anyOf": [
@@ -232,7 +246,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Abstract length and structure."
         },
         "keywords": {
           "anyOf": [
@@ -242,7 +257,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "How many keywords the manuscript must list."
         },
         "sections": {
           "anyOf": [
@@ -252,7 +268,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Section headings the manuscript body must (or may) carry."
         },
         "statements": {
           "anyOf": [
@@ -262,7 +279,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Declarations that must appear in the manuscript text."
         },
         "figures": {
           "anyOf": [
@@ -272,7 +290,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Figure file format, resolution, dimensions, and count."
         },
         "tables": {
           "anyOf": [
@@ -282,7 +301,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Table file format, editability, count, and placement."
         },
         "supplementary": {
           "anyOf": [
@@ -292,7 +312,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Supplementary-file format, size, count, and bundling."
         },
         "references": {
           "anyOf": [
@@ -302,7 +323,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Reference style and count."
         },
         "cover_letter": {
           "anyOf": [
@@ -312,7 +334,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Whether a cover letter is required and how it is supplied."
         },
         "upload": {
           "anyOf": [
@@ -322,7 +345,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Size caps on the submission's uploads as a whole."
         },
         "notes": {
           "type": "array",

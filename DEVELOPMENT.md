@@ -97,7 +97,11 @@ section's `notes` list (one factual sentence each):
 The full key list with descriptions is the generated
 `paperpush/manuscript_requirements.schema.json` (from the dataclasses in
 `paperpush/requirements.py`; regenerate with `python scripts/gen_venues_schema.py`).
-The editor picks it up automatically through `.vscode/settings.json`.
+The editor picks it up automatically through `.vscode/settings.json`, and
+`python scripts/gen_schema_docs.py` renders both this schema and
+`venues.schema.json` as the Markdown reference tables under `docs/schemas/`
+(CI checks they are in sync; the pre-commit hook regenerates them when a schema
+is committed).
 
 Every entry also carries `source_urls` (the guideline pages it was read from)
 and `retrieved` (the date, `YYYY-MM-DD`). Two mechanisms keep entries short:

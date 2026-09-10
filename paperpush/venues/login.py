@@ -18,8 +18,7 @@ from playwright.sync_api import TimeoutError as PWTimeout
 from playwright.sync_api import sync_playwright
 
 from . import submission_base, try_get_venue_impl
-from .common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                     save_storage, session_path, wait_for_human, _try)
+from .common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, save_storage, session_path, wait_for_human, _try
 
 logger = logging.getLogger(__name__)
 

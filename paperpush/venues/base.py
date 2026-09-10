@@ -54,8 +54,7 @@ from playwright.sync_api import sync_playwright
 
 from .. import credentials
 from ..database import get_venue
-from .common import (DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts,
-                     save_storage)
+from .common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, save_storage
 from .common import session_path as _slug_session_path
 from .common import wait_for_human
 from .login import VenueLoginError, first_visible, orcid_unsupported

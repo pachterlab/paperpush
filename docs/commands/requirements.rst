@@ -53,7 +53,8 @@ entry uses the same section keys (``manuscript``, ``title_page``, ``abstract``,
 ``supplementary``, ``references``, ``cover_letter``, ``upload``) so the same
 vocabulary describes every venue, and records only what the guidelines state.
 Each entry names the pages it was read from (``source_urls``) and when
-(``retrieved``).
+(``retrieved``). Every key is documented in the
+:doc:`manuscript_requirements.json reference <../schemas/manuscript_requirements>`.
 
 Two mechanisms keep entries short: ``inherits`` lets one venue start from
 another's rules and override a few keys, and ``article_types`` holds

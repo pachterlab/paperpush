@@ -345,7 +345,7 @@ class ScholarOneVenue(Venue):
     #: ScholarOne's recorded flow can't script a fresh sign-in; disable capture.
     supports_session_capture = False
 
-    #* login
+    # * login
     def login(self, page, username: str, password: str, *, timeout_ms: int = 15000) -> None:
         """Fill and submit the ScholarOne sign-in form from stored credentials.
 
@@ -365,8 +365,4 @@ class ScholarOneVenue(Venue):
         )
         # A successful sign-in lands on the author dashboard (" Author" link).
         if not self.is_logged_in(page, timeout_ms=timeout_ms):
-            raise ScholarOneLoginError(
-                "submitted the credentials but the signed-in author dashboard did "
-                "not load -- the username or password may be wrong, or ScholarOne "
-                "added a step (CAPTCHA / two-factor) that can't be automated"
-            )
+            raise ScholarOneLoginError("submitted the credentials but the signed-in author dashboard did " "not load -- the username or password may be wrong, or ScholarOne " "added a step (CAPTCHA / two-factor) that can't be automated")

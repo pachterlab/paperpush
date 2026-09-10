@@ -242,8 +242,10 @@ def build_requirements_schema() -> dict[str, Any]:
     top.pop("$defs", None)
     properties = top["properties"]
     properties.pop("slug", None)
-    for key in SECTION_TYPES:
-        properties[key] = {"anyOf": [{"$ref": f"#/$defs/{key}"}, {"type": "null"}]}
+    for key, typ in SECTION_TYPES.items():
+        # The section's one-line class docstring doubles as its description.
+        summary = (typ.__doc__ or "").strip().splitlines()[0] if typ.__doc__ else ""
+        properties[key] = {"anyOf": [{"$ref": f"#/$defs/{key}"}, {"type": "null"}], "description": summary}
     # The per-type overrides carry the same section keys as the entry itself.
     properties["article_types"] = {
         "type": "object",

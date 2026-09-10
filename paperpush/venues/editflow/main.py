@@ -44,9 +44,7 @@ def _select_label_or_value(select, choice: str) -> None:
         select.select_option(value=choice, force=True)
 
 
-def _fill_final_page(
-    page, *, handling_editor: str, arxiv_reference: str, abstract: str, manuscript_file: Path
-) -> None:
+def _fill_final_page(page, *, handling_editor: str, arxiv_reference: str, abstract: str, manuscript_file: Path) -> None:
     """Wait for EditFlow Step 4, then fill its metadata and PDF controls."""
     editor_select = page.locator('[id="editor[]"]')
     # The URL stays fixed while EditFlow posts the step. Waiting for the visible

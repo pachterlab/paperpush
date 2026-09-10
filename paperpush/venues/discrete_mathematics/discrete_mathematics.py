@@ -17,9 +17,7 @@ from playwright.sync_api import sync_playwright
 from ...database import get_venue
 from ...validate import parse_authors
 from ..base import Venue
-from ..common import (DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts,
-                      hold_open, hold_open_on_failure, open_run_context,
-                      split_name_first_last)
+from ..common import DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context, split_name_first_last
 from ..login import VenueLoginError
 
 logger = logging.getLogger(__name__)
@@ -391,7 +389,7 @@ class DiscreteMathematicsVenue(Venue):
         _try(lambda: page.get_by_role("button", name="Continue").click(), "continue past email")
         if signed_in("the email step"):
             return
-        
+
         password_box = page.get_by_role("textbox", name="Password")
         if password_box.count() > 0:
             password_box.first.fill(password)

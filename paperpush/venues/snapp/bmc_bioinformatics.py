@@ -10,8 +10,7 @@ gateway URL) and exposes the uniform ``VENUE`` object plus the
 from __future__ import annotations
 
 from . import main
-from .main import (  # noqa: F401 -- re-exported as this module's public API
-    SnappLoginError, Variant)
+from .main import SnappLoginError, Variant  # noqa: F401 -- re-exported as this module's public API
 
 
 class BmcBioinformaticsVenue(main.SnappVenue):

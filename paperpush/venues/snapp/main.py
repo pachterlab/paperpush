@@ -27,8 +27,7 @@ from playwright.sync_api import sync_playwright
 from ...database import _load_options_file, get_venue
 from ...validate import parse_authors
 from ..base import Venue
-from ..common import (DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts,
-                      hold_open, hold_open_on_failure, open_run_context)
+from ..common import DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
 from ..common import session_path as _session_path
 from ..common import split_name_first_last as _split_name
 from ..login import VenueLoginError, login_orcid
@@ -43,15 +42,7 @@ LOGIN_ORCID_LINK_NAME = "Continue with ORCID"
 # The Springer Nature IDP gateway used by venues that sign in directly rather than
 # via a portal redirect; it scopes the flow to the venue's context code. Re-capture
 # from a live sign-in if Springer Nature rotates the gateway parameters.
-_BMC_BIOINFORMATICS_LOGIN_URL = (
-    "https://idp-personal-authenticator.springernature.com/gateway"
-    "?response_type=code"
-    "&redirect_uri=https%3A%2F%2Fidp.springernature.com%2Fauthed%2Fpersonal"
-    "&state=bd6fbfe3-77fe-4065-a1b0-c020912c465a"
-    "&context_code=12859"
-    "&target_redirect_uri=https%3A%2F%2Fsubmission.springernature.com%2Fnew-submission%2F12859%2F3"
-    "&context_type=submission"
-)
+_BMC_BIOINFORMATICS_LOGIN_URL = "https://idp-personal-authenticator.springernature.com/gateway" "?response_type=code" "&redirect_uri=https%3A%2F%2Fidp.springernature.com%2Fauthed%2Fpersonal" "&state=bd6fbfe3-77fe-4065-a1b0-c020912c465a" "&context_code=12859" "&target_redirect_uri=https%3A%2F%2Fsubmission.springernature.com%2Fnew-submission%2F12859%2F3" "&context_type=submission"
 
 
 @dataclass(frozen=True)
@@ -420,7 +411,7 @@ def _enter_authors(page, authors: list[dict], author_contributions: str, allowed
     the author rows, then the corresponding author (marked ``corresponding=yes``,
     defaulting to the first), then the contributions statement.
     """
-    entered_institutions = page.locator('#institution-list strong').all_text_contents()
+    entered_institutions = page.locator("#institution-list strong").all_text_contents()
     for institution, department, city, country in _affiliations_from_authors(authors):
         if institution in entered_institutions:
             logger.info("Affiliation %r already entered; skipping", institution)
@@ -443,10 +434,10 @@ def _enter_authors(page, authors: list[dict], author_contributions: str, allowed
     if not corresponding_selected:
         page.wait_for_timeout(1000)  # wait for the author rows to be added
         corresponding_index = next((i for i, a in enumerate(authors) if _is_yes(a.get("corresponding"))), 0)
-        _try(lambda: page.locator("[data-test=\"primary-corresponding-author-select\"]").select_option(str(corresponding_index)), "corresponding author")
+        _try(lambda: page.locator('[data-test="primary-corresponding-author-select"]').select_option(str(corresponding_index)), "corresponding author")
 
     if author_contributions:
-        _try(lambda: page.locator("[data-test=\"author-contributions\"]").fill(author_contributions), "author contributions")
+        _try(lambda: page.locator('[data-test="author-contributions"]').fill(author_contributions), "author contributions")
 
 
 def _enter_declarations(page, values: dict) -> None:
@@ -677,11 +668,7 @@ class SnappVenue(Venue):
             try:
                 page.get_by_role("link", name=link_name).click(timeout=timeout_ms)
             except PWTimeout as exc:
-                raise SnappLoginError(
-                    f"could not find the {link_name!r} link on {login_url} "
-                    "(the journal homepage may have changed); re-capture the "
-                    f"selectors with 'playwright codegen {login_url}'"
-                ) from exc
+                raise SnappLoginError(f"could not find the {link_name!r} link on {login_url} " "(the journal homepage may have changed); re-capture the " f"selectors with 'playwright codegen {login_url}'") from exc
             _dismiss_cookies(page)
 
         if orcid:
@@ -697,22 +684,13 @@ class SnappVenue(Venue):
             )
             if self.is_logged_in(page, timeout_ms=8000):
                 return
-            raise SnappLoginError(
-                f"signed in to ORCID but the {cfg.name} portal did not load -- the "
-                "ORCID iD or password may be wrong, or the ORCID account may not be "
-                "linked to a Springer Nature account yet (link it once by signing in "
-                "by hand)"
-            )
+            raise SnappLoginError(f"signed in to ORCID but the {cfg.name} portal did not load -- the " "ORCID iD or password may be wrong, or the ORCID account may not be " "linked to a Springer Nature account yet (link it once by signing in " "by hand)")
 
         email = page.get_by_role("textbox", name="Email address")
         try:
             email.wait_for(state="visible", timeout=timeout_ms)
         except PWTimeout as exc:
-            raise SnappLoginError(
-                "could not find the email field on the Springer Nature sign-in page "
-                "(the identity-provider form may have changed); re-capture the "
-                f"selectors with 'playwright codegen {login_url}'"
-            ) from exc
+            raise SnappLoginError("could not find the email field on the Springer Nature sign-in page " "(the identity-provider form may have changed); re-capture the " f"selectors with 'playwright codegen {login_url}'") from exc
 
         for attempt in range(1, _LOGIN_ATTEMPTS + 1):
             _submit_credentials(page, username, password, timeout_ms)
@@ -725,8 +703,4 @@ class SnappVenue(Venue):
                 print(f"Sign-in bounced back to the email page (attempt {attempt}/{_LOGIN_ATTEMPTS}); retrying…")
                 _try(lambda: email.wait_for(state="visible", timeout=timeout_ms), "wait for the email field to return")
 
-        raise SnappLoginError(
-            "submitted the credentials but the signed-in Springer Nature portal "
-            "did not load -- the email or password may be wrong, or the identity "
-            "provider added a step (CAPTCHA / two-factor) that can't be automated"
-        )
+        raise SnappLoginError("submitted the credentials but the signed-in Springer Nature portal " "did not load -- the email or password may be wrong, or the identity " "provider added a step (CAPTCHA / two-factor) that can't be automated")

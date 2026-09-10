@@ -22,7 +22,6 @@ import pytest
 from paperpush import sensitive
 from paperpush.sensitive import Finding, scan_file, scan_paths
 
-
 # Captured at import time, before conftest's autouse fixture stubs the probe out
 # to keep the suite offline; the tests below exercise the real request logic
 # against a patched ``urlopen``.

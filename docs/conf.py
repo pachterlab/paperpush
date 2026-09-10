@@ -50,6 +50,9 @@ myst_enable_extensions = [
     "deflist",
     "fieldlist",
 ]
+# Auto-generate anchors for h1-h3 so the generated schema reference pages
+# (docs/schemas/*.md) can link between their tables with `[name](#anchor)`.
+myst_heading_anchors = 3
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]

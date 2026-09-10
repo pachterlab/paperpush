@@ -467,7 +467,6 @@
       "Original Paper": {
         "manuscript": {
           "max_pages": 7,
-          "max_words_before_refs": 5000,
           "count_excludes": [
             "figures"
           ]
@@ -504,8 +503,7 @@
       },
       "Applications Note": {
         "manuscript": {
-          "max_pages": 4,
-          "max_words_before_refs": 2600
+          "max_pages": 4
         },
         "abstract": {
           "structured": true,
@@ -535,7 +533,6 @@
       "Review": {
         "manuscript": {
           "max_pages": 8,
-          "max_words_before_refs": 6000,
           "count_excludes": [
             "figures"
           ]
@@ -574,7 +571,6 @@
         ".pdf",
         ".tex"
       ],
-      "max_words_before_refs": 5000,
       "max_pages": 7,
       "count_excludes": [
         "figures"

@@ -154,8 +154,7 @@ def test_venue_has_submission_runner(scenario):
 
 
 def _discrete_mathematics_runner():
-    from paperpush.venues.discrete_mathematics.discrete_mathematics import \
-        DiscreteMathematicsVenue
+    from paperpush.venues.discrete_mathematics.discrete_mathematics import DiscreteMathematicsVenue
 
     return DiscreteMathematicsVenue()
 
