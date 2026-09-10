@@ -63,6 +63,10 @@ the tool list and the contract agents should follow.
 4. `paperpush login VENUE`: log in to the VENUE submission portal.
 5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
 
+Helper commands:
+- `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
+- `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
+
 See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 
 ## Run the whole pipeline at once
