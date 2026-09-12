@@ -30,7 +30,7 @@ tldr:
 abstract: |
   Abstract goes here. It's a really good abstract.
 
-# PDF (file, REQUIRED)
+# PDF (file, optional)
 #   The paper PDF, at most 50 MB. The main text must fit in 9 pages; page counting stops at the first heading ICLR excludes from that limit -- the references, the reproducibility / ethics / AI-use statements, the acknowledgements, or the appendix -- so everything from there on is unlimited. The headings are matched by name (see main_text_end_headings), so an unusually worded one is counted as main text; check the page count yourself if validation flags a paper you believe is within the limit.
 #   at most 9 pages in the main text
 #   each file at most 50 MB
