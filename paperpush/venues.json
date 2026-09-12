@@ -1001,7 +1001,7 @@
         "required": true,
         "max_pages_by": null,
         "type": "file",
-        "accept": ["pdf"],
+        "accept": [".pdf"],
         "help": "Manuscript document. Initial submission requires PDF, revision requires .docx, .rtf, or .tex (NOT PDF)"
       },
       {
@@ -3002,7 +3002,7 @@
         "autofill": "filemap",
         "label": "PDF",
         "type": "file",
-        "required": true,
+        "required": false,
         "max_file_size_mb": 50,
         "max_pages_before_refs": 9,
         "main_text_end_headings": [
