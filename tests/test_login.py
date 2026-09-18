@@ -11,7 +11,14 @@ Covers four areas:
   iD-and-password collection that mirrors the username/password path,
   verification down the venue's ORCID branch, public record parsing, and
   filling an author block from a fetched profile;
-* which venues offer ORCID at all, and which can actually drive it.
+* which venues offer ORCID at all, and which can actually drive it;
+* credential-storage branches -- the OS-keyring paths of
+  ``save_credential`` / ``get_credential`` / ``delete_credential``, the file
+  fallback, and the corrupted-store / incomplete-entry handling;
+* the ``verify_login`` driver -- its browser control flow (success, headless
+  and headed failure, the ORCID branch, saved-session reuse) exercised
+  against a stub Playwright stack, plus the shared ``first_present`` /
+  ``first_visible`` / ``fill_login_form`` helpers.
 
 Credential storage is kept off the real keychain/config by the autouse
 ``_isolate_user_state`` fixture in ``conftest.py``.
@@ -362,6 +369,207 @@ def test_credentials_roundtrip_with_email_identity(tmp_path, monkeypatch):
     assert cred.password == _PASSWORD
 
 
+# --- credential-storage branches --------------------------------------------
+#
+# The roundtrips above always hit the file backend (the autouse fixture sets
+# PAPERPUSH_KEYRING=0). These cover the OS-keyring paths and the odd states of
+# the file store, driving them with a fake keyring so no real secret store is
+# touched.
+
+
+class _FakeKeyring:
+    """A keyring substitute whose per-call failures toggle on request."""
+
+    def __init__(self, *, fail_set=False, fail_get=False, fail_delete=False):
+        self.store = {}
+        self.fail_set = fail_set
+        self.fail_get = fail_get
+        self.fail_delete = fail_delete
+
+    def set_password(self, service, username, password):
+        if self.fail_set:
+            raise RuntimeError("keyring locked")
+        self.store[(service, username)] = password
+
+    def get_password(self, service, username):
+        if self.fail_get:
+            raise RuntimeError("keyring locked")
+        return self.store.get((service, username))
+
+    def delete_password(self, service, username):
+        if self.fail_delete:
+            raise RuntimeError("keyring locked")
+        self.store.pop((service, username), None)
+
+
+def _use_keyring(monkeypatch, keyring):
+    """Make ``credentials`` resolve keyring calls to a fake backend."""
+    monkeypatch.setattr(credentials, "_get_keyring", lambda: keyring)
+
+
+def test_credential_saved_to_keyring_keeps_password_out_of_file(monkeypatch):
+    # The password goes to the secret store and is never written to the file;
+    # the file records only the non-secret fields, so get_credential goes back
+    # to the keyring for the password and reports the entry as keyring-backed.
+    keyring = _FakeKeyring()
+    _use_keyring(monkeypatch, keyring)
+
+    assert credentials.save_credential("cell", _USERNAME, _PASSWORD) is True
+
+    cred = credentials.get_credential("cell")
+    assert cred.username == _USERNAME
+    assert cred.password == _PASSWORD
+    assert keyring.store == {("paperpush:cell", _USERNAME): _PASSWORD}
+    assert credentials._read_file_store()["cell"] == {"username": _USERNAME}
+    assert credentials.credential_location("cell") == "keyring"
+    assert credentials.using_keyring() is True
+
+
+def test_credential_keyring_write_failure_falls_back_to_file(monkeypatch):
+    # A keyring backend that is advertised but rejects the password at write
+    # time (a locked Secret Service, say) degrades to the file store, whose
+    # password then satisfies later reads.
+    keyring = _FakeKeyring(fail_set=True)
+    _use_keyring(monkeypatch, keyring)
+
+    assert credentials.save_credential("cell", _USERNAME, _PASSWORD) is False
+    assert keyring.store == {}
+
+    cred = credentials.get_credential("cell")
+    assert cred.password == _PASSWORD
+    assert credentials.credential_location("cell") == "file"
+
+
+def test_credential_keyring_read_failure_falls_back_to_file_password(monkeypatch):
+    # The keyring becoming unreadable later (it was usable when the password
+    # was saved) never strands an author: the file-stored password takes over.
+    keyring = _FakeKeyring(fail_set=True)
+    _use_keyring(monkeypatch, keyring)
+    assert credentials.save_credential("cell", _USERNAME, _PASSWORD) is False
+
+    keyring.fail_set = False
+    keyring.fail_get = True  # now the keyring is present but unreadable
+
+    cred = credentials.get_credential("cell")
+    assert cred.password == _PASSWORD
+    assert credentials.credential_location("cell") == "file"
+
+
+def test_delete_credential_clears_keyring_and_file_entry(monkeypatch):
+    keyring = _FakeKeyring()
+    _use_keyring(monkeypatch, keyring)
+    credentials.save_credential("cell", _USERNAME, _PASSWORD)
+
+    assert credentials.delete_credential("cell") is True
+    assert keyring.store == {}
+    assert credentials.get_credential("cell") is None
+    assert credentials.delete_credential("cell") is False
+
+
+def test_incomplete_file_entry_treated_as_absent(monkeypatch):
+    # A file entry without a password (the keyring holds it, or storage broke)
+    # cannot satisfy get_credential on its own.
+    credentials._write_file_store({"cell": {"username": _USERNAME}})
+    assert credentials.get_credential("cell") is None
+
+
+def test_corrupt_file_store_treated_as_empty(monkeypatch):
+    # A truncated or hand-edited store must not crash login: read as empty,
+    # so the next save starts fresh rather than failing.
+    path = credentials._file_store_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{not json")
+    assert credentials._read_file_store() == {}
+
+    _use_keyring(monkeypatch, _FakeKeyring())
+    assert credentials.save_credential("cell", _USERNAME, _PASSWORD) is True
+    assert credentials.get_credential("cell") is not None
+
+
+def test_credential_unknown_location_is_none(monkeypatch):
+    _use_keyring(monkeypatch, _FakeKeyring())
+    assert credentials.credential_location("never_stored") is None
+
+
+def test_service_name_lowercases_the_slug():
+    assert credentials._service_name("Cell") == "paperpush:cell"
+
+
+def test_using_keyring_reflects_the_backend(monkeypatch):
+    monkeypatch.setattr(credentials, "_get_keyring", lambda: _FakeKeyring())
+    assert credentials.using_keyring() is True
+
+
+def test_using_keyring_false_without_a_backend(monkeypatch):
+    monkeypatch.setattr(credentials, "_get_keyring", lambda: None)
+    assert credentials.using_keyring() is False
+
+
+def _fake_keyring_modules(monkeypatch):
+    """Install a stand-in ``keyring`` package into sys.modules.
+
+    Returns the fake ``keyring`` module and its ``FailKeyring`` marker class so
+    a test can point ``get_keyring`` at whatever backend it wants. monkeypatch
+    restores the real modules afterwards.
+    """
+    import sys
+    import types
+    from types import SimpleNamespace
+
+    keyring_mod = types.ModuleType("keyring")
+    fail_mod = types.ModuleType("keyring.backends.fail")
+
+    class _FailBackend:
+        pass
+
+    fail_mod.Keyring = _FailBackend
+    keyring_mod.backends = SimpleNamespace(fail=fail_mod)
+    monkeypatch.setitem(sys.modules, "keyring", keyring_mod)
+    monkeypatch.setitem(sys.modules, "keyring.backends", keyring_mod.backends)
+    monkeypatch.setitem(sys.modules, "keyring.backends.fail", fail_mod)
+    return keyring_mod, _FailBackend
+
+
+def test_get_keyring_returns_none_when_keyring_missing(monkeypatch):
+    import builtins
+
+    monkeypatch.setenv("PAPERPUSH_KEYRING", "1")
+    real_import = builtins.__import__
+
+    def _no_keyring(name, *args, **kwargs):
+        if name == "keyring" or name.startswith("keyring."):
+            raise ImportError("no keyring installed")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _no_keyring)
+    assert credentials._get_keyring() is None
+
+
+def test_get_keyring_returns_none_when_backend_query_fails(monkeypatch):
+    monkeypatch.setenv("PAPERPUSH_KEYRING", "1")
+    keyring_mod, _ = _fake_keyring_modules(monkeypatch)
+
+    def _boom():
+        raise RuntimeError("no backend")
+
+    keyring_mod.get_keyring = _boom
+    assert credentials._get_keyring() is None
+
+
+def test_get_keyring_returns_none_for_the_fail_backend(monkeypatch):
+    monkeypatch.setenv("PAPERPUSH_KEYRING", "1")
+    keyring_mod, fail = _fake_keyring_modules(monkeypatch)
+    keyring_mod.get_keyring = lambda: fail()
+    assert credentials._get_keyring() is None
+
+
+def test_get_keyring_accepts_a_working_backend(monkeypatch):
+    monkeypatch.setenv("PAPERPUSH_KEYRING", "1")
+    keyring_mod, _ = _fake_keyring_modules(monkeypatch)
+    keyring_mod.get_keyring = lambda: object()
+    assert credentials._get_keyring() is keyring_mod
+
+
 def test_login_orcid_stores_id_and_password(monkeypatch, capsys):
     # The command prompts for an ORCID iD and password (env vars stand in for the
     # prompts here) and stores them; --no-verify skips the browser check.
@@ -530,7 +738,7 @@ class _FakePage:
     """A page whose ORCID controls all exist; ``popup`` picks the hand-off shape."""
 
     def __init__(self, *, popup=False, missing=()):
-        self.popup_page = _FakePage() if popup else None
+        self.popup_page = _FakePage(missing=missing) if popup else None
         self.missing = set(missing)
         self.actions = []
         self.goto_urls = []
@@ -761,3 +969,294 @@ def test_replace_block_preserves_other_content():
     assert "@venue: biorxiv" in updated
     assert "# Manuscript title" in updated
     assert subfile.parse(updated).values["authors"] == block
+
+
+# --- the verify_login driver ------------------------------------------------
+#
+# verify_login is the browser-launching gate behind ``paperpush login``. These
+# replace the whole Playwright stack with stubs so the driver's control flow --
+# success, headless vs headed failure, the ORCID branch, saved-session reuse --
+# is exercised without opening a browser.
+
+
+class _FakeVerifyLoginModule:
+    """A venue implementation whose ``login``/``is_logged_in`` record calls."""
+
+    slug = "cell"  # a real slug, so orcid_unsupported can name the venue
+    display_name = "Cell"
+
+    def __init__(self, *, orcid_ok=False, login_error=None, logged_in=True):
+        self.supports_orcid_login = orcid_ok
+        self._login_error = login_error
+        self.logged_in = logged_in
+        self.login_calls = []
+        self.is_logged_in_calls = 0
+
+    def is_logged_in(self, page):
+        self.is_logged_in_calls += 1
+        return self.logged_in
+
+    def login(self, page, username, password, *, orcid=False, timeout_ms=15000):
+        self.login_calls.append((username, password, orcid))
+        if self._login_error is not None:
+            raise self._login_error
+
+
+def _stub_verify_login(monkeypatch, module):
+    """Point verify_login's browser and venue at stubs; record the actions."""
+    from pathlib import Path
+
+    from paperpush.venues import login as controls
+
+    captured = {
+        "headless": None,
+        "save_calls": [],
+        "human_prompts": [],
+        "closed": [],
+    }
+
+    class _Chromium:
+        @staticmethod
+        def launch(headless=False):
+            captured["headless"] = headless
+            return _Browser()
+
+    class _Browser:
+        def new_context(self):
+            return _Context()
+
+        def close(self):
+            captured["closed"].append("browser")
+
+    class _Context:
+        def new_page(self):
+            return object()
+
+        def close(self):
+            captured["closed"].append("context")
+
+    class _Playwright:
+        chromium = _Chromium()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(controls, "sync_playwright", lambda: _Playwright())
+    monkeypatch.setattr(controls, "_login_supported", lambda slug: module)
+    monkeypatch.setattr(controls, "submission_base", lambda slug: slug)
+    monkeypatch.setattr(controls, "apply_default_timeouts", lambda *a, **k: None)
+    monkeypatch.setattr(controls, "save_storage", lambda context, session: captured["save_calls"].append(str(session)))
+    monkeypatch.setattr(controls, "session_path", lambda slug: Path(f"/tmp/session-{slug}"))
+    monkeypatch.setattr(controls, "wait_for_human", lambda prompt: captured["human_prompts"].append(prompt))
+    return captured
+
+
+def test_verify_login_signs_in_and_saves_the_session(monkeypatch):
+    from paperpush.venues.login import verify_login
+
+    module = _FakeVerifyLoginModule()
+    captured = _stub_verify_login(monkeypatch, module)
+
+    verify_login("cell", _USERNAME, _PASSWORD)
+
+    assert module.login_calls == [(_USERNAME, _PASSWORD, False)]
+    assert captured["headless"] is False
+    assert captured["save_calls"] == ["/tmp/session-cell"]
+    assert captured["human_prompts"] == []
+    assert captured["closed"] == ["context", "browser"]
+
+
+def test_verify_login_passes_headless_through(monkeypatch):
+    from paperpush.venues.login import verify_login
+
+    module = _FakeVerifyLoginModule()
+    captured = _stub_verify_login(monkeypatch, module)
+
+    verify_login("cell", _USERNAME, _PASSWORD, headless=True)
+
+    assert captured["headless"] is True
+    assert module.login_calls == [(_USERNAME, _PASSWORD, False)]
+
+
+def test_verify_login_orcid_branch_uses_the_venue_level_flag(monkeypatch):
+    from paperpush.venues.login import verify_login
+
+    module = _FakeVerifyLoginModule(orcid_ok=True)
+    _stub_verify_login(monkeypatch, module)
+
+    verify_login("cell", VALID_ID, _PASSWORD, method="orcid")
+
+    assert module.login_calls == [(VALID_ID, _PASSWORD, True)]
+
+
+def test_verify_login_no_automated_sign_in_raises(monkeypatch):
+    from paperpush.venues.login import LoginVerificationError, verify_login
+
+    captured = _stub_verify_login(monkeypatch, None)
+
+    with pytest.raises(LoginVerificationError, match="no automated sign-in"):
+        verify_login("cell", _USERNAME, _PASSWORD)
+    assert captured["headless"] is None  # never launched a browser
+
+
+def test_verify_login_orcid_not_offered_raises_not_implemented(monkeypatch):
+    from paperpush.venues.login import verify_login
+
+    module = _FakeVerifyLoginModule(orcid_ok=False)
+    captured = _stub_verify_login(monkeypatch, module)
+
+    with pytest.raises(NotImplementedError, match="not implemented"):
+        verify_login("cell", VALID_ID, _PASSWORD, method="orcid")
+    assert captured["headless"] is None  # refused before opening a browser
+
+
+def test_verify_login_headless_failure_raises_login_error(monkeypatch):
+    from paperpush.venues.login import LoginVerificationError, verify_login
+
+    module = _FakeVerifyLoginModule(login_error=RuntimeError("bad sign-in"))
+    _stub_verify_login(monkeypatch, module)
+
+    with pytest.raises(LoginVerificationError, match="bad sign-in"):
+        verify_login("cell", _USERNAME, _PASSWORD, headless=True)
+
+
+def test_verify_login_headed_failure_lets_the_human_finish(monkeypatch):
+    # A headed failure (CAPTCHA, two-factor, a changed field) pauses for the
+    # author to finish by hand, then re-checks before declaring the sign-in in.
+    from paperpush.venues.login import verify_login
+
+    module = _FakeVerifyLoginModule(login_error=RuntimeError("captcha"))
+    captured = _stub_verify_login(monkeypatch, module)
+
+    verify_login("cell", _USERNAME, _PASSWORD)
+
+    assert captured["human_prompts"]
+    assert captured["save_calls"] == ["/tmp/session-cell"]
+    assert module.is_logged_in_calls == 1  # the re-check after the manual step
+
+
+def test_verify_login_reports_a_sign_in_that_did_not_take(monkeypatch):
+    from paperpush.venues.login import LoginVerificationError, verify_login
+
+    module = _FakeVerifyLoginModule(logged_in=False)
+    captured = _stub_verify_login(monkeypatch, module)
+
+    with pytest.raises(LoginVerificationError, match="did not take"):
+        verify_login("cell", _USERNAME, _PASSWORD)
+    assert captured["human_prompts"] == []  # no exception, so no manual step
+    assert captured["save_calls"] == []
+
+
+def test_verify_login_propagates_not_implemented(monkeypatch):
+    from paperpush.venues.login import verify_login
+
+    module = _FakeVerifyLoginModule(login_error=NotImplementedError("no orcid flow"))
+    _stub_verify_login(monkeypatch, module)
+
+    with pytest.raises(NotImplementedError, match="no orcid flow"):
+        verify_login("cell", _USERNAME, _PASSWORD)
+
+
+# --- the shared login helpers -----------------------------------------------
+#
+# first_present / first_visible / fill_login_form are the building blocks the
+# portal login methods are written from; like login_orcid above, they are
+# exercised against stub pages.
+
+
+def test_first_present_returns_the_first_visible_locator():
+    from paperpush.venues.login import first_present
+
+    visible = _FakeLocator(None, "alpha", visible=True)
+    hidden = _FakeLocator(None, "beta", visible=False)
+    assert first_present([visible, hidden], 1000) is visible
+
+
+def test_first_present_returns_none_when_nothing_is_visible():
+    from paperpush.venues.login import first_present
+
+    assert first_present([_FakeLocator(None, "alpha", visible=False)], 1000) is None
+
+
+def test_first_present_waits_for_a_locator_that_appears():
+    from paperpush.venues.login import first_present
+
+    class _Appears:
+        @property
+        def first(self):
+            return self
+
+        def is_visible(self):
+            return False
+
+        def wait_for(self, **kwargs):
+            pass  # appears within the wait budget
+
+    loc = _Appears()
+    assert first_present([loc], 1000) is loc
+
+
+def test_first_present_empty_list_returns_none():
+    from paperpush.venues.login import first_present
+
+    assert first_present([], 5000) is None
+
+
+def test_first_visible_searches_the_names_in_order():
+    from paperpush.venues.login import first_visible
+
+    page = _FakePage()
+    found = first_visible(page, "button", ["Sign out", "Logout"], 1000)
+    assert found is not None
+    assert found.key == "Sign out"
+
+
+def test_first_visible_returns_none_when_no_name_matches():
+    from paperpush.venues.login import first_visible
+
+    page = _FakePage(missing={"neither", "nor"})
+    assert first_visible(page, "button", ["neither", "nor"], 1000) is None
+
+
+class _SigninForm:
+    """A stub page whose locator() calls are recorded like the real form's."""
+
+    def __init__(self, *, visible=True):
+        self.actions = []
+        self._visible = visible
+
+    def locator(self, sel):
+        return _FakeLocator(self, sel, visible=self._visible)
+
+
+def test_fill_login_form_fills_and_submits_the_three_field_form():
+    from paperpush.venues.login import fill_login_form
+
+    form = _SigninForm()
+    fill_login_form(form, _USERNAME, _PASSWORD, userid_sel="#user", password_sel="#password", submit_sel="#signin")
+
+    assert ("fill", "#user", _USERNAME) in form.actions
+    assert ("fill", "#password", _PASSWORD) in form.actions
+    assert ("click", "#signin") in form.actions
+
+
+def test_fill_login_form_raises_when_a_field_is_missing():
+    from paperpush.venues.login import VenueLoginError, fill_login_form
+
+    form = _SigninForm(visible=False)
+    with pytest.raises(VenueLoginError, match="could not find"):
+        fill_login_form(form, _USERNAME, _PASSWORD, userid_sel="#user", password_sel="#password", submit_sel="#signin")
+
+
+def test_login_orcid_raises_when_the_orcid_form_field_is_missing():
+    # The control was found and the popup opened, but ORCID's own form is not
+    # where it should be -- the sign-in cannot be completed.
+    from paperpush.venues.login import VenueLoginError
+
+    page = _FakePage(popup=True, missing={"Email  or  ORCID iD"})
+    with pytest.raises(VenueLoginError, match="could not complete the ORCID sign-in"):
+        _run_login_orcid(page)
+    assert page.popup_page.closed is True  # the popup is still cleaned up
