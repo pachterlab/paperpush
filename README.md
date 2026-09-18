@@ -19,7 +19,7 @@ playwright install chromium
 ## Use with AI
 
 ```bash
-git clone https://github.com/paperpush/paperpush.git
+git clone https://github.com/pachterlab/paperpush.git
 cd paperpush
 ```
 
