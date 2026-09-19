@@ -3,6 +3,7 @@
 Implemented so far:
 
     paperpush --venues          list supported venues
+    paperpush pick-venue <terms> find a venue slug from a loose query
     paperpush subfile <venue>   create a <venue>.sub template
     paperpush options <venue>.<field>
                                       list the allowed values for a field
@@ -144,6 +145,47 @@ def _cmd_update_venues(args: argparse.Namespace) -> int:
     print(f"In use: {source.describe()}")
     if source.kind != "bundled":
         print(f"Files: {source.root}")
+    return 0
+
+
+@_validate
+def _cmd_pick_venue(args: argparse.Namespace) -> int:
+    from .venue_select import format_hits, pick_venues
+
+    query = " ".join(args.query).strip()
+    if not query and not args.types and not args.portal:
+        print("error: pick-venue needs a query, --type, or --portal", file=sys.stderr)
+        print("Run 'paperpush pick-venue --help' for usage.", file=sys.stderr)
+        return 2
+
+    hits = pick_venues(query, venue_types=tuple(args.types or ()), portals=tuple(args.portal or ()))
+
+    if not hits:
+        # A query with no tokens is rejected above, so reaching here with no
+        # hits means the input matched nothing -- an unusable answer for both
+        # humans and agents, hence a failing exit code rather than an empty
+        # list.
+        what = f" {query!r}" if query else " the given filters"
+        print(f"error: no venues matched{what}", file=sys.stderr)
+        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        return 1
+
+    if args.json:
+        json.dump(
+            [{"slug": hit.venue.slug, "name": hit.venue.name, "venue_type": hit.venue.venue_type, "portal": hit.portal, "score": hit.score} for hit in hits],
+            sys.stdout,
+            indent=2,
+        )
+        print()
+        return 0
+
+    shown = hits if args.all else hits[: max(args.limit, 0)]
+    for line in format_hits(shown):
+        print(line)
+
+    # The subfile hint always names the top-ranked hit, even when --limit
+    # hides it, so a scripted run stays actionable with a single glance.
+    print(f"\nUse 'paperpush subfile {hits[0].venue.slug}' to create its submission template.")
     return 0
 
 
@@ -1096,6 +1138,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_options = sub.add_parser("options", parents=[verbosity], help="list the allowed values for a field (VENUE.FIELD)")
     p_options.add_argument("field", metavar="VENUE.FIELD", help="the field to list, e.g. arxiv.crosslist_categories")
     p_options.add_argument("path", nargs="*", metavar="PATH", help="for a drill-down field (e.g. nature.subject_level), the category " "names to descend before listing the next level")
+
+    p_pick = sub.add_parser("pick-venue", parents=[verbosity], help="find a venue slug from a loose query")
+    p_pick.add_argument("query", nargs="*", metavar="QUERY", help="free-text terms: slug, name, topic, or portal (e.g. 'bio', 'nature', 'openreview')")
+    p_pick.add_argument("-t", "--type", dest="types", action="append", choices=["preprint", "journal", "conference"], metavar="TYPE", help="only venues of this kind (repeatable)")
+    p_pick.add_argument("--portal", dest="portal", action="append", metavar="PORTAL", help="only venues submitting through this portal (repeatable), e.g. openreview")
+    p_pick.add_argument("-n", "--limit", type=int, default=5, metavar="N", help="show at most N matches (default: 5)")
+    p_pick.add_argument("--all", action="store_true", help="show every match instead of limiting")
+    p_pick.add_argument("--json", action="store_true", help="print matches as JSON (slug, name, venue_type, portal, score) for agents")
+    p_pick.set_defaults(func=_cmd_pick_venue)
     p_options.set_defaults(func=_cmd_options)
 
     p_autofill = sub.add_parser("autofill", parents=[verbosity], help="fill a .sub file from a directory of manuscript files")
