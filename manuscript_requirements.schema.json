@@ -1,0 +1,1679 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paperpush.org/schemas/manuscript_requirements.schema.json",
+  "title": "paperpush manuscript requirements database",
+  "description": "Schema for manuscript_requirements.json. The top-level object maps a venue slug to what its author guidelines require of the manuscript, grouped into shared sections (manuscript, title_page, abstract, keywords, sections, statements, figures, tables, supplementary, references, cover_letter, upload). Generated from the dataclasses in paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "$aliases": {
+      "type": "object",
+      "description": "Heading wordings that count as each canonical section / statement name when the manuscript text is searched. Keys: sections, statements; each maps a canonical name to a list of alternative headings.",
+      "properties": {
+        "sections": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "statements": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "patternProperties": {
+    "^[A-Za-z0-9_]+$": {
+      "$ref": "#/$defs/venue"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "venue": {
+      "properties": {
+        "source_urls": {
+          "description": "Guideline pages the entry was taken from.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "retrieved": {
+          "description": "Date (YYYY-MM-DD) the guidelines were last read.",
+          "type": "string"
+        },
+        "inherits": {
+          "description": "Slug whose requirements this entry starts from. Empty for a standalone entry.",
+          "type": "string"
+        },
+        "article_type_field": {
+          "description": "Id of the .sub field whose value selects an `article_types` override.",
+          "type": "string"
+        },
+        "article_types": {
+          "type": "object",
+          "description": "Per-article-type overrides, keyed by the exact option string; each value carries the same section keys as the top level.",
+          "additionalProperties": {
+            "$ref": "#/$defs/rules"
+          }
+        },
+        "manuscript": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/manuscript"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules for the main manuscript file: format, size, length, and layout."
+        },
+        "title_page": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/title_page"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the title page must carry."
+        },
+        "abstract": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/abstract"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Abstract length and structure."
+        },
+        "keywords": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/keywords"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How many keywords the manuscript must list."
+        },
+        "sections": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sections"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Section headings the manuscript body must (or may) carry."
+        },
+        "statements": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/statements"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Declarations that must appear in the manuscript text."
+        },
+        "figures": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/figures"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Figure file format, resolution, dimensions, and count."
+        },
+        "tables": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tables"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Table file format, editability, count, and placement."
+        },
+        "supplementary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/supplementary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Supplementary-file format, size, count, and bundling."
+        },
+        "references": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/references"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reference style and count."
+        },
+        "cover_letter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/cover_letter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether a cover letter is required and how it is supplied."
+        },
+        "upload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/upload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Size caps on the submission's uploads as a whole."
+        },
+        "notes": {
+          "description": "Venue-wide rules that fit no section.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "object",
+      "description": "Per-article-type overrides: the same section keys as a venue entry.",
+      "properties": {
+        "manuscript": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/manuscript"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules for the main manuscript file: format, size, length, and layout."
+        },
+        "title_page": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/title_page"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the title page must carry."
+        },
+        "abstract": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/abstract"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Abstract length and structure."
+        },
+        "keywords": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/keywords"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How many keywords the manuscript must list."
+        },
+        "sections": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sections"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Section headings the manuscript body must (or may) carry."
+        },
+        "statements": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/statements"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Declarations that must appear in the manuscript text."
+        },
+        "figures": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/figures"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Figure file format, resolution, dimensions, and count."
+        },
+        "tables": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/tables"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Table file format, editability, count, and placement."
+        },
+        "supplementary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/supplementary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Supplementary-file format, size, count, and bundling."
+        },
+        "references": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/references"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reference style and count."
+        },
+        "cover_letter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/cover_letter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether a cover letter is required and how it is supplied."
+        },
+        "upload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/upload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Size caps on the submission's uploads as a whole."
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "manuscript": {
+      "properties": {
+        "formats": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "File extensions accepted for the main manuscript upload (lowercase, with dot)."
+        },
+        "max_file_size_mb": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum size of the manuscript file in MB."
+        },
+        "max_words": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum word count of the whole document, references included."
+        },
+        "max_words_before_refs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum word count of the main text (before the reference list)."
+        },
+        "max_pages": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum page count of the whole document."
+        },
+        "max_pages_before_refs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum page count of the main text (before the reference list)."
+        },
+        "main_text_end_headings": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Headings other than the reference list that end the main text for the before-refs limits (e.g. Appendix)."
+        },
+        "count_excludes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Parts of the manuscript the venue leaves out of its word/page count (informational)."
+        },
+        "count_includes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Parts the venue explicitly counts that authors might not expect (informational)."
+        },
+        "max_display_items": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of figures and tables combined."
+        },
+        "line_numbers": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Continuous line numbers required."
+        },
+        "double_spacing": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Double line spacing required."
+        },
+        "page_numbers": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page numbers required."
+        },
+        "font": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Mandated body font, if any."
+        },
+        "font_size_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Mandated body font size in points, if any."
+        },
+        "margins_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Mandated page margins in mm, if any."
+        },
+        "page_size": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Mandated page size (A4, US Letter), if any."
+        },
+        "single_file": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Manuscript must be a single file holding text, figures, and tables."
+        },
+        "figures_placement": {
+          "anyOf": [
+            {
+              "enum": [
+                "end",
+                "inline",
+                "separate",
+                "end_or_inline"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where figures go relative to the main manuscript file."
+        },
+        "tables_placement": {
+          "anyOf": [
+            {
+              "enum": [
+                "end",
+                "inline",
+                "separate",
+                "end_or_inline"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where tables go relative to the main manuscript file."
+        },
+        "anonymized": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Double-blind: no author names or affiliations in the manuscript."
+        },
+        "template_required": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Must use the venue's style file or template."
+        },
+        "template_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the venue's template."
+        },
+        "latex_class": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Required LaTeX document class or style file."
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Mandated language variant, if any."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key, one per string."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "title_page": {
+      "properties": {
+        "required_items": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "title",
+                  "authors",
+                  "affiliations",
+                  "corresponding_author",
+                  "corresponding_email",
+                  "orcid",
+                  "keywords",
+                  "running_title",
+                  "word_count",
+                  "figure_count",
+                  "table_count",
+                  "author_contributions",
+                  "funding",
+                  "competing_interests",
+                  "abstract",
+                  "postal_address",
+                  "phone",
+                  "one_sentence_summary",
+                  "classification",
+                  "author_footnotes"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical ids of the items the title page must carry."
+        },
+        "separate_file": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Title page is uploaded as its own file (double-blind venues)."
+        },
+        "title_max_characters": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum title length in characters (spaces included)."
+        },
+        "title_max_words": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum title length in words."
+        },
+        "running_title_max_characters": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum running/short title length in characters."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "abstract": {
+      "properties": {
+        "max_words": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum abstract length in words."
+        },
+        "min_words": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Minimum abstract length in words."
+        },
+        "max_characters": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum abstract length in characters."
+        },
+        "structured": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Abstract must be structured into labelled subsections."
+        },
+        "structured_headings": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The subsection labels a structured abstract must carry."
+        },
+        "no_references": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Abstract must not cite references."
+        },
+        "no_abbreviations": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Undefined abbreviations are banned in the abstract."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "keywords": {
+      "properties": {
+        "min": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Minimum number of keywords."
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of keywords."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "sections": {
+      "properties": {
+        "required": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical section names the manuscript must contain (matched via $aliases)."
+        },
+        "optional": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical section names the venue allows but does not require."
+        },
+        "order": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Prescribed section order, if the venue states one."
+        },
+        "combined_allowed": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Combined headings the venue accepts (e.g. Results and Discussion)."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "statements": {
+      "properties": {
+        "required": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "data_availability",
+                  "code_availability",
+                  "competing_interests",
+                  "author_contributions",
+                  "funding",
+                  "acknowledgements",
+                  "ethics_approval",
+                  "consent_to_participate",
+                  "consent_to_publish",
+                  "materials_availability",
+                  "lead_contact",
+                  "inclusion_and_diversity",
+                  "ai_use",
+                  "reproducibility",
+                  "ethics_statement",
+                  "clinical_trial_registration",
+                  "reporting_guidelines"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Canonical ids of the declarations the manuscript must contain (matched via $aliases)."
+        },
+        "optional": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "data_availability",
+                  "code_availability",
+                  "competing_interests",
+                  "author_contributions",
+                  "funding",
+                  "acknowledgements",
+                  "ethics_approval",
+                  "consent_to_participate",
+                  "consent_to_publish",
+                  "materials_availability",
+                  "lead_contact",
+                  "inclusion_and_diversity",
+                  "ai_use",
+                  "reproducibility",
+                  "ethics_statement",
+                  "clinical_trial_registration",
+                  "reporting_guidelines"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Declarations the venue accepts but does not require."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "figures": {
+      "properties": {
+        "formats": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Accepted figure file extensions."
+        },
+        "vector_formats": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Formats preferred for line art / vector figures."
+        },
+        "min_dpi": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Minimum resolution for halftone/photographic figures."
+        },
+        "min_dpi_line_art": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Minimum resolution for line art."
+        },
+        "min_dpi_combination": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Minimum resolution for combination (halftone + line) figures."
+        },
+        "max_file_size_mb": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum size of each figure file in MB."
+        },
+        "max_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of main-text figures."
+        },
+        "single_column_width_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Single-column figure width in mm."
+        },
+        "double_column_width_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Double-column figure width in mm."
+        },
+        "max_width_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum figure width in mm."
+        },
+        "max_height_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum figure height in mm."
+        },
+        "color_mode": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Accepted colour spaces (RGB, CMYK, grayscale)."
+        },
+        "min_font_size_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Minimum font size for figure lettering, in points."
+        },
+        "max_font_size_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum font size for figure lettering, in points."
+        },
+        "font": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Mandated or recommended figure font."
+        },
+        "legend_max_words": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum words per figure legend."
+        },
+        "legends_location": {
+          "anyOf": [
+            {
+              "enum": [
+                "end_of_manuscript",
+                "with_figure",
+                "after_references"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where figure legends go."
+        },
+        "multipanel_labels": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Required style of panel labels."
+        },
+        "color_charge": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Colour figures carry a charge."
+        },
+        "placement": {
+          "anyOf": [
+            {
+              "enum": [
+                "separate_files",
+                "end_of_manuscript",
+                "inline",
+                "end_or_inline"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where figures go for the initial submission."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "tables": {
+      "properties": {
+        "formats": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Accepted table file extensions."
+        },
+        "editable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Tables must be editable text, not images."
+        },
+        "max_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of main-text tables."
+        },
+        "placement": {
+          "anyOf": [
+            {
+              "enum": [
+                "separate_files",
+                "end_of_manuscript",
+                "inline",
+                "end_or_inline"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where tables go for the initial submission."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "supplementary": {
+      "properties": {
+        "formats": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Accepted supplementary file extensions."
+        },
+        "max_file_size_mb": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum size of each supplementary file in MB."
+        },
+        "max_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of supplementary files."
+        },
+        "combined_single_pdf": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Supplementary text, figures, and tables must be combined into one PDF."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "references": {
+      "properties": {
+        "style": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reference style, in words."
+        },
+        "numbered": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Numbered (true) vs author-year (false) citations."
+        },
+        "max_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum number of references."
+        },
+        "include_titles": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Article titles are required in reference entries."
+        },
+        "doi_required": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "DOIs are required in reference entries."
+        },
+        "unpublished_allowed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Unpublished work may be cited in the list."
+        },
+        "preprints_allowed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Preprints may be cited in the list."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "cover_letter": {
+      "properties": {
+        "required": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A cover letter is required."
+        },
+        "formats": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Accepted cover letter file extensions."
+        },
+        "max_words": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum cover letter length in words."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "upload": {
+      "properties": {
+        "max_total_mb": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum combined size of one submission's uploads in MB."
+        },
+        "max_file_mb": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Per-file size cap that applies to every upload, in MB."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  }
+}

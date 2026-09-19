@@ -1,0 +1,28 @@
+{
+  "data_format": 1,
+  "commit": "99ef9078d7c20d773efb45e4cbabfa01135403c1",
+  "published_at": "2026-09-19T01:53:38-07:00",
+  "files": {
+    "_assets/aaai_2027_countries.txt": "1d4f026a58ba8487655950050e6083e901527f7bbd52d66e458fd4dbe8adcbb0",
+    "_assets/aaai_2027_topics.txt": "5590bec01e7be137d7f5bd8bb07aeb155499de071d33bc356da88e1bb38baf9a",
+    "_assets/arxiv_categories.txt": "fbdc1bf97275c57b5450fb2e824e7ab78dedebfbfb078e92bf5945c6ee3ed11c",
+    "_assets/bioinformatics_keywords.txt": "d3ed22caaa3fdb4a30489354691128f06180ffd0081ad8911b4080d01da32674",
+    "_assets/genome_biology_institution_countries.txt": "3525658fd16e2e997f3e1cbcf29b31f74bca9c8295c639f3c5ce58772e6a6100",
+    "_assets/iclr_2027_primary_areas.txt": "7b571cc398e9dce233c84d31a57a13aed846e181451986290e605df57ea58450",
+    "_assets/nature_biotech_categories.json": "fa01a7c1286cd3e962a182b586dffcdf6e111664eda3901146ea73aecc19ddfe",
+    "_assets/nature_categories.json": "bc719916eecdf8ea8e9fef0c39c52ef72a4f7fa79e6dbf101d15a6d9999fc46b",
+    "_assets/nature_methods_categories.json": "bc719916eecdf8ea8e9fef0c39c52ef72a4f7fa79e6dbf101d15a6d9999fc46b",
+    "_assets/plos_compbio_classifications.txt": "a1a37e76e27a0257072842113932fe2333968e9e5b1b93e4aeb8d77366fdd0e1",
+    "_assets/plos_compbio_funding_countries.txt": "4baf517b04562967c107db4419b602ad4da61af5a08bcd1ee5ef8bfb64d5d1aa",
+    "_assets/science_advances_subjects.txt": "9fb590f1787177dd6045fa2a4ac426dff43bbddda49d6b4b122a6daeafe915b8",
+    "_assets/science_immunology_subjects.txt": "64beefee727485700dab664e4382ab37913041fa3ea9f33beaa9a04d9f1f99b7",
+    "_assets/science_robotics_subjects.txt": "ec2d64b088fb03a1c68fa0f378e86eb1a0a875b6e3b0fcf45a75993d61fbc8ed",
+    "_assets/science_signaling_subjects.txt": "5842a971be87377ff86ffb77e1fffa1eae6b392d3718d71af3ea72b51ea21c79",
+    "_assets/science_subjects.txt": "c40afa2c15ce65164f43216c80ed26cef3c040017036e456322734d3dfbcb670",
+    "_assets/science_translational_medicine_subjects.txt": "b13c4d61625c528587c85baf8b25cbe81501dd9d55f1ae92e3cf0333e5b29760",
+    "manuscript_requirements.json": "8a784c2b5086098e167560f37b3b66ff20e162260e52903e3712a0cb3081aa7a",
+    "manuscript_requirements.schema.json": "5ed9e97f3a7a96b557552d6e901de90a7d4eb8bdbb6de1d88226fbbd1d204145",
+    "venues.json": "397332b7a08edbede8922d30451b04c2584436b6061fff2b43643fa6ec6eeff0",
+    "venues.schema.json": "04176eaa183d69d7f910d82ee76ddd0d1eb3d9542b402c040c1d8a56566d4a4f"
+  }
+}

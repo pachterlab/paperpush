@@ -1,0 +1,58 @@
+Agriculture
+Anthropology
+Applied ecology
+Applied physics
+Astronomy
+Atmospheric science
+Biochemistry
+Biophysics
+Cancer
+Cell biology
+Cellular neuroscience
+Chemical physics
+Chemistry
+Climatology
+Cognitive neuroscience
+Computer science
+Condensed matter physics
+Developmental biology
+Developmental neuroscience
+Diseases and disorders
+Ecology
+Economics
+Electrochemistry
+Engineering
+Epidemiology
+Evolutionary biology
+Genetics
+Geology
+Geophysics
+Health and medicine
+Human genetics
+Immunology
+Materials science
+Mathematics
+Microbiology
+Molecular biology
+Network science
+Neurophysiology
+Oceanography
+Optics
+Organic chemistry
+Organismal biology
+Paleontology
+Physics
+Physiology
+Planetary science
+Plant sciences
+Psychological Science
+Research methods
+Science policy
+Scientific community
+Signal transduction
+Social sciences
+Structural biology
+Surface chemistry
+Synthetic biology
+Systems biology
+Virology
