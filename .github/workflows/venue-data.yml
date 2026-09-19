@@ -1,0 +1,84 @@
+name: Publish venue data
+
+# Publishes the venue data (venues.json, manuscript_requirements.json, their
+# schemas and venues/_assets) to the `venue-data` branch, which installed copies
+# of paperpush fetch at runtime (paperpush/venue_data.py). This is how a data fix
+# reaches users without a PyPI release.
+#
+# Runs only after CI passes on main, so the published data has been through the
+# full test suite. A commit is pushed only when a data file actually changed.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: venue-data
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    env:
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      REPO_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+
+      # A CI run that finishes after a newer push must not publish older data;
+      # the newer commit's own run will publish.
+      - name: Skip unless this is still the tip of main
+        id: tip
+        run: |
+          git fetch -q origin main
+          if [ "$(git rev-parse origin/main)" = "$HEAD_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "main has moved past $HEAD_SHA; skipping."
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.tip.outputs.current == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Build the data set
+        if: steps.tip.outputs.current == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          python scripts/build_venue_data.py "$RUNNER_TEMP/venue-data"
+
+      - name: Commit to the venue-data branch if the data changed
+        if: steps.tip.outputs.current == 'true'
+        working-directory: ${{ runner.temp }}/venue-data
+        run: |
+          git init -q
+          git checkout -q -b venue-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads "$REPO_URL" venue-data >/dev/null; then
+            git fetch -q --depth 1 "$REPO_URL" venue-data
+            git reset -q --soft FETCH_HEAD
+          fi
+          git add -A
+          # manifest.json names the source commit, so it changes on every push;
+          # publish only when a data file itself changed.
+          if git rev-parse -q --verify HEAD >/dev/null && git diff --cached --quiet HEAD -- . ':!manifest.json'; then
+            echo "Venue data unchanged; nothing to publish."
+            exit 0
+          fi
+          git commit -q -m "Venue data from ${HEAD_SHA}"
+          git push -q "$REPO_URL" venue-data
+          echo "Published venue data from ${HEAD_SHA}."

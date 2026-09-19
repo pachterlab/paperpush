@@ -22,6 +22,7 @@ keywords:
 
 # TL;DR (text, optional)
 #   Optional. A one-sentence summary of the paper ("too long; didn't read").
+#   at most 250 characters
 tldr: 
 
 # Abstract (textarea, REQUIRED)

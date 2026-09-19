@@ -25,10 +25,16 @@ import zipfile
 from io import BytesIO
 from pathlib import Path
 
-import pytest
-from PIL import Image, ImageDraw, ImageFont
+# Read only the venue data shipped in this checkout: never a cached or freshly
+# fetched published copy (paperpush.venue_data), which would make results depend
+# on the machine and the network. Set before paperpush is imported. Tests of the
+# publishing path override it per test.
+os.environ["PAPERPUSH_VENUE_DATA"] = "bundled"
 
-from paperpush.database import list_venues
+import pytest  # noqa: E402
+from PIL import Image, ImageDraw, ImageFont  # noqa: E402
+
+from paperpush.database import list_venues  # noqa: E402
 
 # --- opt-in real-portal tests ----------------------------------------------
 #

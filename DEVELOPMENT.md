@@ -134,6 +134,52 @@ never writing next to the source, and caches the build for the process. With
 no TeX toolchain the limit is reported as unchecked. Tests that need a
 toolchain are skipped when none is installed.
 
+## Venue data updates without a release
+
+The venue data -- `venues.json`, `manuscript_requirements.json`, their two
+schemas, and `paperpush/venues/_assets/*` -- is published on its own, so a data
+fix reaches installed copies without a PyPI release:
+
+1. After `ci.yml` passes on `main`, `venue-data.yml` runs
+   `scripts/build_venue_data.py`, which validates the data against its schemas,
+   loads it with the package's own loader, and writes it with a `manifest.json`
+   (data format, source commit, sha256 of every file). If a data file changed,
+   the result is committed to the `venue-data` branch.
+2. Installed copies fetch that branch (`paperpush/venue_data.py`) at most once a
+   day, verify every hash, check that the set loads, and cache it in
+   `~/.cache/paperpush/venue-data`. `paperpush update-venues` refreshes the
+   cache right away, and `paperpush --venues` shows which copy is in use. With
+   no network or no cache, the bundled copy is used.
+
+Each installed version takes, entry by entry, only what its code can use. An
+entry it can't use keeps its bundled version, and so does any entry that
+inherits from it:
+
+- `venues.json` (`merge_published` in `paperpush/database.py`): a runner is
+  written against its venue's field ids and types. So labels, help text,
+  options, limits, `required` and URLs reach users without a release. New
+  venues, and adding, removing, renaming, reordering or retyping a field, wait
+  for the next release.
+- `manuscript_requirements.json` (`merge_published` in
+  `paperpush/requirements.py`): no runner depends on these rules, so the
+  published copy can change, add or drop any entry. But `validate` can only
+  apply rules it knows. So an entry that uses a rule key or section this
+  version's dataclasses lack, or a value of a different type, waits for the next
+  release.
+- The `_assets` vocabulary files are data only and always reach users.
+
+Bump `DATA_FORMAT` in `paperpush/venue_data.py` when a data change needs new
+code to be *read* correctly (a new key the loader must understand, a changed
+merge rule). Installed versions with the old format then keep their bundled data
+until they upgrade.
+
+In a source checkout, paperpush always reads the files in the checkout, so your
+edits are what you see, test and generate from. Set `PAPERPUSH_VENUE_DATA` to
+change the source: `remote` fetches the published copy even in a checkout,
+`bundled` uses only the packaged files, and a directory path reads the files
+from there. `PAPERPUSH_OFFLINE=1` uses the cache but never fetches, and
+`PAPERPUSH_VENUE_DATA_URL` points at another published copy.
+
 ## Formatting
 
 ```bash
@@ -142,9 +188,9 @@ black . -l 99999
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/`). Both workflows run on every push and pull
-request, and allow manual runs from the Actions tab. Neither touches a live
-portal, so no session secret is needed.
+GitHub Actions (`.github/workflows/`). `ci.yml` and `docs.yml` run on every
+push and pull request, and all three allow manual runs from the Actions tab.
+None touches a live portal, so no session secret is needed.
 
 - `ci.yml` — runs `pytest` (real-portal tests are skipped) and checks that
   `venues.md` / `README.md` and `venues.schema.json` are in sync with their
@@ -155,6 +201,9 @@ portal, so no session secret is needed.
   via a webhook, outside of Actions. Read the Docs sets `fail_on_warning` too,
   but a failure there does not block a PR — `docs.yml` is what turns broken docs
   into a red check before the merge.
+- `venue-data.yml` — after `ci.yml` passes on `main`, publishes the venue data
+  to the `venue-data` branch that installed copies fetch (see "Venue data
+  updates without a release" above).
 
 **Portal health is checked locally, not in CI.** The scheduled workflows that
 drove live portals (`submit.yml`, `fingerprint.yml`, `nature-categories.yml`)

@@ -2987,6 +2987,7 @@
         "label": "TL;DR",
         "type": "text",
         "required": false,
+        "character_count": 250,
         "help": "Optional. A one-sentence summary of the paper (\"too long; didn't read\")."
       },
       {

@@ -3,6 +3,11 @@
 The database is a single JSON file (``venues.json``) shipped with the
 package. Each top-level key is a venue slug (e.g. ``"biorxiv"``) mapping to a
 venue definition that lists the fields required for submission.
+
+A newer copy may also be published separately from releases and cached locally
+(see :mod:`paperpush.venue_data`). The bundled file is always the baseline: a
+published entry replaces a bundled one only when the installed runner can
+drive it (see :func:`merge_published`).
 """
 
 from __future__ import annotations
@@ -18,8 +23,12 @@ from typing import Annotated, Any, Literal, Optional
 
 from pydantic import Field as PField
 
+from . import venue_data
+
 logger = logging.getLogger(__name__)
 
+# The copies shipped with the package. The files actually read may come from a
+# published copy instead; see paperpush.venue_data.
 DATABASE_PATH = Path(__file__).with_name("venues.json")
 
 # Directory holding shared keyword/vocabulary lists that a field can pull in via
@@ -36,7 +45,10 @@ def _load_options_file(name: str) -> list[str]:
     portal keywords or the PLOS Computational Biology classifications) lives in
     one shared file rather than being inlined in ``venues.json``.
     """
-    path = ASSETS_DIR / name
+    # A published copy may add or update a vocabulary; the bundled one backs it.
+    path = venue_data.active_source().assets / name
+    if not path.is_file():
+        path = ASSETS_DIR / name
     logger.debug("Loading field options from %s", path)
     lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()]
     return [line for line in lines if line]
@@ -444,13 +456,116 @@ class Venue:
         )
 
 
+def _read_database(path: Path) -> dict[str, Any]:
+    logger.debug("Loading venue database from %s", path)
+    with path.open(encoding="utf-8") as fh:
+        return json.load(fh)
+
+
 @lru_cache(maxsize=1)
 def _load_raw() -> dict[str, Any]:
-    logger.debug("Loading venue database from %s", DATABASE_PATH)
-    with DATABASE_PATH.open(encoding="utf-8") as fh:
-        data = json.load(fh)
-    logger.info("Loaded %d venue entr(y/ies) from the database", len(data))
+    source = venue_data.active_source()
+    bundled = _read_database(DATABASE_PATH)
+    if source.kind == "bundled":
+        data = bundled
+    else:
+        try:
+            published = _read_database(source.path(venue_data.VENUES_FILE))
+        except (OSError, ValueError) as exc:
+            logger.warning("Could not read the venue data from %s (%s); using the bundled copy", source.root, exc)
+            published = bundled
+        # A local override is the author's own data, used as is; a published
+        # copy is merged venue by venue onto what this version can drive.
+        data = published if source.kind == "override" else merge_published(bundled, published)
+    logger.info("Loaded %d venue entr(y/ies) from the database (%s)", len(data), source.describe())
     return data
+
+
+def _field_shape(slug: str, raw: dict[str, Any]) -> list[tuple[str, str]]:
+    """The (id, type) of each field of ``slug``, after inheritance, in order.
+
+    This is what a venue's runner is written against: it reads fields by id and
+    fills each according to its type. Everything else about a field -- label,
+    help, options, limits, whether it is required -- is data the runner does not
+    hard-code, so it can change without a code release.
+    """
+    return [(f.get("id", ""), f.get("type", "text")) for f in _resolve_entry(slug, raw).get("fields", [])]
+
+
+def merge_published(bundled: dict[str, Any], published: dict[str, Any]) -> dict[str, Any]:
+    """Overlay a published venue database onto the bundled one, venue by venue.
+
+    A published entry replaces the bundled entry only when
+
+    * the bundled database has the venue (a new venue needs its runner, which
+      only a release can bring),
+    * its fields keep the bundled shape (:func:`_field_shape`) -- adding,
+      removing, renaming, reordering or retyping a field needs runner changes,
+    * it resolves (e.g. its ``inherits`` base exists), and
+    * any venue it inherits from is itself taken from the published copy, so an
+      entry is never resolved against a mix of old and new bases.
+
+    Every other venue keeps its bundled entry, and a note is logged so a user on
+    an old version knows an upgrade would bring more.
+    """
+    accepted: set[str] = set()
+    for slug in bundled:
+        if slug not in published:
+            continue
+        try:
+            if _field_shape(slug, published) == _field_shape(slug, bundled):
+                accepted.add(slug)
+        except KeyError as exc:
+            logger.warning("Published venue data: %s does not resolve (%s); keeping the bundled entry", slug, exc)
+
+    # Drop entries whose base was not accepted, until nothing changes (a chain
+    # of inheritance can take several passes).
+    changed = True
+    while changed:
+        changed = False
+        for slug in sorted(accepted):
+            base = str(published[slug].get("inherits", "") or "")
+            if base and base not in accepted and base.lower() not in accepted:
+                accepted.discard(slug)
+                changed = True
+
+    held_back = sorted(set(published) - accepted)
+    if held_back:
+        logger.info("Published venue data for %s needs a newer paperpush; using the bundled entries. " "Run 'pip install -U paperpush' to get them.", ", ".join(held_back))
+    return {slug: published[slug] if slug in accepted else entry for slug, entry in bundled.items()}
+
+
+def check_venue_data(root: Path) -> None:
+    """Raise if the venue data in directory ``root`` does not load.
+
+    Run on a downloaded copy before it replaces the cache: every venue must
+    resolve and build, every ``options_file`` it names must exist, and the
+    manuscript requirements must load too.
+    """
+    from .requirements import check_requirements_file
+
+    raw = _read_database(root / venue_data.VENUES_FILE)
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError("venues.json holds no venues")
+    for slug in raw:
+        entry = _resolve_entry(slug, raw)
+        Venue.from_dict(slug, {**entry, "fields": []})
+        for f in entry.get("fields", []):
+            name = f.get("options_file")
+            if name and not (root / venue_data.ASSETS_SUBDIR / name).is_file() and not (ASSETS_DIR / name).is_file():
+                raise ValueError(f"{slug}.{f.get('id')} names a missing options_file {name!r}")
+            Field.from_dict({k: v for k, v in f.items() if k != "options_file"})
+    check_requirements_file(root / venue_data.REQUIREMENTS_FILE)
+
+
+def reload() -> None:
+    """Re-resolve the venue data source and drop every cached load of it."""
+    from . import requirements
+
+    venue_data.reset()
+    _load_raw.cache_clear()
+    _load_options_file.cache_clear()
+    requirements._load_raw.cache_clear()
 
 
 # Keys an inheriting entry uses to declare how it derives from its base rather

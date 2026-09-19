@@ -40,9 +40,14 @@ from pathlib import Path
 from typing import Annotated, Any, Literal, Optional
 
 from pydantic import Field as PField
+from pydantic import TypeAdapter, ValidationError
+
+from . import venue_data
 
 logger = logging.getLogger(__name__)
 
+# The copy shipped with the package; the file actually read may be a newer
+# published copy (see paperpush.venue_data).
 REQUIREMENTS_PATH = Path(__file__).with_name("manuscript_requirements.json")
 
 # Where figures/tables sit for the initial submission.
@@ -383,14 +388,34 @@ def _section_to_dict(section) -> dict[str, Any]:
     return out
 
 
+def _read_requirements(path: Path) -> dict[str, Any]:
+    logger.debug("Loading manuscript requirements from %s", path)
+    with path.open(encoding="utf-8") as fh:
+        data = json.load(fh)
+    if not isinstance(data, dict):
+        raise ValueError(f"{path} is not a JSON object")
+    return data
+
+
 @lru_cache(maxsize=1)
 def _load_raw() -> dict[str, Any]:
-    logger.debug("Loading manuscript requirements from %s", REQUIREMENTS_PATH)
+    source = venue_data.active_source()
     if not REQUIREMENTS_PATH.exists():
         logger.warning("No manuscript requirements database at %s", REQUIREMENTS_PATH)
-        return {}
-    with REQUIREMENTS_PATH.open(encoding="utf-8") as fh:
-        data = json.load(fh)
+        bundled: dict[str, Any] = {}
+    else:
+        bundled = _read_requirements(REQUIREMENTS_PATH)
+    data = bundled
+    if source.kind != "bundled":
+        path = source.path(venue_data.REQUIREMENTS_FILE)
+        try:
+            published = _read_requirements(path)
+        except (OSError, ValueError) as exc:
+            logger.warning("Could not read %s (%s); using the bundled copy", path, exc)
+        else:
+            # A local override is the author's own data, used as is; a published
+            # copy is merged entry by entry onto what this version can read.
+            data = published if source.kind == "override" else merge_published(bundled, published)
     logger.info("Loaded %d manuscript requirement entr(y/ies)", sum(1 for k in data if not k.startswith("$")))
     return data
 
@@ -460,6 +485,144 @@ def _resolve_entry(slug: str, raw: dict[str, Any], seen: tuple[str, ...] = ()) -
     merged = merge_entries(base, {k: v for k, v in data.items() if k != "inherits"})
     merged["inherits"] = base_slug
     return merged
+
+
+# Keys an entry may carry at its top level (``slug`` is the database key, not a
+# key inside the entry), and keys an ``article_types`` override may carry.
+_ENTRY_KEYS = frozenset(f.name for f in dataclass_fields(ManuscriptRequirements)) - {"slug"}
+_OVERRIDE_KEYS = frozenset(SECTION_TYPES) | {"notes"}
+_ALIASES_ADAPTER = TypeAdapter(dict[str, dict[str, list[str]]])
+
+
+@lru_cache(maxsize=None)
+def _adapter(typ: type) -> TypeAdapter:
+    return TypeAdapter(typ)
+
+
+def _without_nulls(section: dict[str, Any]) -> dict[str, Any]:
+    # A null drops an inherited key (see merge_entries), so it is always allowed.
+    return {k: v for k, v in section.items() if v is not None}
+
+
+def _rules_problem(rules: Any, allowed: frozenset[str], where: str) -> Optional[str]:
+    """Why this version cannot read ``rules`` (an entry or an override), or None."""
+    if not isinstance(rules, dict):
+        return f"{where} is not an object"
+    unknown = sorted(set(rules) - allowed)
+    if unknown:
+        return f"{where} has key(s) this version does not know: {', '.join(unknown)}"
+    for key, typ in SECTION_TYPES.items():
+        section = rules.get(key)
+        if section is None:
+            continue
+        if not isinstance(section, dict):
+            return f"{where}.{key} is not an object"
+        known = {f.name for f in dataclass_fields(typ)}
+        unknown = sorted(set(section) - known)
+        if unknown:
+            return f"{where}.{key} has rule(s) this version does not know: {', '.join(unknown)}"
+        try:
+            _adapter(typ).validate_python(_without_nulls(section))
+        except ValidationError as exc:
+            return f"{where}.{key} does not match this version's rule types ({exc.errors()[0]['msg']})"
+    if not isinstance(rules.get("notes") or [], list):
+        return f"{where}.notes is not a list"
+    return None
+
+
+def _entry_problem(slug: str, entry: Any) -> Optional[str]:
+    """Why this version cannot apply the published ``entry``, or None if it can.
+
+    The rules are only data, but ``validate`` is code: it measures the uploads
+    against the keys and value types the installed section dataclasses define. A
+    newer copy may add a rule this version would silently skip, or change a
+    value's type in a way that would break the check at validation time, so
+    such an entry is caught here, when the copy is loaded, instead.
+    """
+    if slug.startswith("$"):
+        if slug == "$aliases":
+            try:
+                _ALIASES_ADAPTER.validate_python(entry)
+            except ValidationError as exc:
+                return f"$aliases does not match this version's shape ({exc.errors()[0]['msg']})"
+        return None
+    problem = _rules_problem(entry, _ENTRY_KEYS, slug)
+    if problem:
+        return problem
+    top = {k: entry[k] for k in ("source_urls", "retrieved", "inherits", "article_type_field", "notes") if entry.get(k) is not None}
+    try:
+        _adapter(ManuscriptRequirements).validate_python({"slug": slug, **top})
+    except ValidationError as exc:
+        return f"{slug} does not match this version's entry types ({exc.errors()[0]['msg']})"
+    overrides = entry.get("article_types") or {}
+    if not isinstance(overrides, dict):
+        return f"{slug}.article_types is not an object"
+    for name, override in overrides.items():
+        problem = _rules_problem(override, _OVERRIDE_KEYS, f"{slug}.article_types[{name!r}]")
+        if problem:
+            return problem
+    return None
+
+
+def merge_published(bundled: dict[str, Any], published: dict[str, Any]) -> dict[str, Any]:
+    """Overlay a published requirements database onto the bundled one, entry by entry.
+
+    The published copy is authoritative for the data: it may add, change, or
+    drop an entry (no runner depends on these rules, so, unlike a venue in
+    ``venues.json``, a new entry needs no release). Each entry is still checked
+    against this version's rule vocabulary (:func:`_entry_problem`). An entry
+    this version cannot read keeps its bundled version, if there is one. So does
+    an entry that inherits from a held-back or missing base, so an entry is never
+    resolved against a mix of old and new rules.
+    """
+    held_back: dict[str, str] = {}
+    accepted: set[str] = set()
+    for slug, entry in published.items():
+        problem = _entry_problem(slug, entry)
+        if problem:
+            held_back[slug] = problem
+        else:
+            accepted.add(slug)
+
+    # Drop entries whose base was not accepted, until nothing changes (a chain
+    # of inheritance can take several passes).
+    lowered = {s.lower(): s for s in accepted}
+    changed = True
+    while changed:
+        changed = False
+        for slug in sorted(accepted):
+            base = str(published[slug].get("inherits", "") or "") if not slug.startswith("$") else ""
+            if base and base.lower() not in lowered:
+                accepted.discard(slug)
+                lowered.pop(slug.lower(), None)
+                held_back[slug] = f"{slug} inherits from {base!r}, which is held back or missing"
+                changed = True
+
+    for slug, problem in sorted(held_back.items()):
+        logger.info("Published manuscript requirements: %s; using the bundled entry. " "Run 'pip install -U paperpush' to get it.", problem)
+
+    merged: dict[str, Any] = {}
+    for slug, entry in published.items():
+        if slug in accepted:
+            merged[slug] = entry
+        elif slug in bundled:
+            merged[slug] = bundled[slug]
+    return merged
+
+
+def check_requirements_file(path: Path) -> None:
+    """Raise if the requirements database at ``path`` does not load.
+
+    Checks the database this version would actually use -- the file merged onto
+    the bundled copy by :func:`merge_published` -- so every entry must resolve
+    and build.
+    """
+    published = _read_requirements(path)
+    bundled = _read_requirements(REQUIREMENTS_PATH) if REQUIREMENTS_PATH.exists() else {}
+    raw = merge_published(bundled, published)
+    for slug in raw:
+        if not slug.startswith("$"):
+            ManuscriptRequirements.from_dict(slug, _resolve_entry(slug, raw))
 
 
 def list_requirements() -> list[ManuscriptRequirements]:

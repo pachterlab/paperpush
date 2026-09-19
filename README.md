@@ -65,6 +65,7 @@ the tool list and the contract agents should follow.
 
 Helper commands:
 - `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
+- `paperpush update-venues`: Update venues.json and manuscript_requirements.json from the remote venue-data branch.
 - `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
 
 See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
@@ -90,6 +91,8 @@ See `python scripts/paperpush_pipeline.py --help` for the full list of options, 
 <!-- END SUPPORTED VENUES -->
 
 View the list on the command line with `paperpush --venues`.
+
+Venue details (field options, limits, author-guideline rules) are updated independently of releases: paperpush fetches the latest published data at most once a day, and `paperpush update-venues` fetches it right away. New venues arrive with new releases (`pip install -U paperpush`).
 
 For more details, see [`venues.md`](venues.md)
 

@@ -20,6 +20,7 @@ Implemented so far:
     paperpush login --orcid <j>   store an ORCID iD/password for a journal that
                                       offers "Sign in with ORCID"
     paperpush submit <subfile>    open bioRxiv and run the submission
+    paperpush update-venues       fetch the latest published venue data now
     paperpush --agent-guide       print the guide for AI agents (AGENTS.md)
 
 ``submit`` drives the bioRxiv wizard, typing in the field values read from the
@@ -40,7 +41,7 @@ from pathlib import Path
 
 from pydantic import ConfigDict, validate_call
 
-from . import __url__, __version__, credentials
+from . import __url__, __version__, credentials, venue_data
 from ._logging import configure_logging
 from .database import get_venue, list_venues
 from .subfile import default_filename, write_template
@@ -112,6 +113,37 @@ def _print_venues() -> int:
             print(f"  {venue.name} ({venue.slug})")
 
     print(f"\nFor more details, see {_VENUES_URL}")
+    print(f"Venue data: {venue_data.active_source().describe()} (refresh with 'paperpush update-venues')")
+    return 0
+
+
+@_validate
+def _cmd_update_venues(args: argparse.Namespace) -> int:
+    """Fetch the published venue data now, or clear the cached copy.
+
+    The data is otherwise refreshed on its own at most once a day; this is for
+    picking up a fix right away, and for seeing which copy is in use.
+    """
+    from .database import reload
+
+    if args.clear:
+        venue_data.clear_cache()
+        print(f"Removed the cached venue data; using the data {venue_data.bundled_source().describe()}.")
+        return 0
+
+    if not venue_data.uses_published():
+        print("note: published venue data is not used here (PAPERPUSH_VENUE_DATA, or a source " "checkout); fetching it into the cache anyway.", file=sys.stderr)
+    try:
+        result = venue_data.refresh(force=True)
+    except Exception as exc:
+        print(f"error: could not fetch the venue data from {venue_data.data_url()}: {exc}", file=sys.stderr)
+        return 1
+    reload()
+    print(result.message if result.status != "incompatible" else f"warning: {result.message}")
+    source = venue_data.active_source()
+    print(f"In use: {source.describe()}")
+    if source.kind != "bundled":
+        print(f"Files: {source.root}")
     return 0
 
 
@@ -946,6 +978,7 @@ def _cmd_requirements(args: argparse.Namespace) -> int:
         print(f"  {url}")
     if reqs.inherits:
         print(f"  (starts from {reqs.inherits}'s rules)")
+    print(f"  venue data: {venue_data.active_source().describe()}")
     if article_types and not args.article_type:
         print(f"  article types with their own rules: {', '.join(article_types)} (use --article-type)")
     for section in ("manuscript", "title_page", "abstract", "keywords", "sections", "statements", "figures", "tables", "supplementary", "references", "cover_letter", "upload"):
@@ -1050,7 +1083,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # metavar lists only the public commands; the internal 'schema' command is
     # registered below but deliberately left out so it does not appear in --help.
-    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,requirements,login,submit}")
+    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,requirements,login,submit,update-venues}")
 
     p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub submission template")
     p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv")
@@ -1171,6 +1204,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="close the browser when the run fails (default: leave the " "window open at the step that broke so you can see the page " "and finish by hand); --headless always closes",
     )
     p_submit.set_defaults(func=_cmd_submit)
+
+    p_update = sub.add_parser("update-venues", parents=[verbosity], help="fetch the latest published venue data (otherwise refreshed daily)")
+    p_update.add_argument("--clear", action="store_true", help="delete the cached copy and use the data bundled with this version")
+    p_update.set_defaults(func=_cmd_update_venues)
 
     # Internal command: the autofill front-ends (the Claude skill and the API
     # engine) read field roles from here. Hidden from --help (use 'subfile' to
