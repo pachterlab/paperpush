@@ -246,7 +246,7 @@ def _http_get(url: str, etag: Optional[str] = None) -> tuple[int, bytes, Optiona
     if etag:
         request.add_header("If-None-Match", etag)
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310 -- scheme checked above
+        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # scheme checked above  # nosec B310
             return response.status, response.read(), response.headers.get("ETag")
     except urllib.error.HTTPError as exc:
         if exc.code == 304:

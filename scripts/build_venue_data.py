@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import subprocess  # nosec B404 -- fixed git invocations only
+import subprocess  # fixed git invocations only  # nosec B404
 import sys
 from pathlib import Path
 

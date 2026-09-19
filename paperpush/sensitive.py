@@ -694,7 +694,7 @@ def _url_is_reachable(url: str, *, timeout: float = LINK_CHECK_TIMEOUT) -> bool 
     for method in ("HEAD", "GET"):
         req = urllib.request.Request(url, method=method, headers={"User-Agent": "paperpush-validate"})
         try:
-            with urllib.request.urlopen(req, timeout=timeout):  # nosec B310 - scheme constrained to http(s) by _URL_RE
+            with urllib.request.urlopen(req, timeout=timeout):  # scheme constrained to http(s) by _URL_RE  # nosec B310
                 return True
         except urllib.error.HTTPError as exc:
             if exc.code in _BROKEN_STATUS:

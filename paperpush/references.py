@@ -637,7 +637,7 @@ def _resolve_doi(doi: str, *, timeout: float = DOI_CHECK_TIMEOUT) -> tuple[str, 
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310 - scheme is a literal https above
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # scheme is a literal https above  # nosec B310
             payload = resp.read(MAX_TEXT_BYTES)
     except urllib.error.HTTPError as exc:
         if exc.code in _MISSING_STATUS:
