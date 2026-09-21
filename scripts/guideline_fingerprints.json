@@ -1,0 +1,527 @@
+{
+  "https://blog.iclr.cc/2026/09/02/submission-policies-for-iclr-2027/": {
+    "chars": 10595,
+    "recorded": "2026-09-21",
+    "sha256": "7315ed5334995867cb9374096d5a2f4fa0ecf3c2e1f3613316c40daebb2943a6"
+  },
+  "https://bmcbioinformatics.biomedcentral.com/submission-guidelines": {
+    "chars": 28048,
+    "recorded": "2026-09-21",
+    "sha256": "6281626b9f4bd68e4222d1d90b57935df0ead3fd8c743bbbf94921005a63a892"
+  },
+  "https://els-jbs-prod-cdn.jbs.elsevierhealth.com/pb-assets/journals/research/cell-genomics/cell-genomics_IfA-1592223534027.pdf": {
+    "chars": 58311,
+    "recorded": "2026-09-21",
+    "sha256": "543316031df4e4a0446f603b66eac97ee2cf4d6d9d49dc905dd9fac4cf2c9f43"
+  },
+  "https://genomebiology.biomedcentral.com/submission-guidelines": {
+    "chars": 27235,
+    "recorded": "2026-09-21",
+    "sha256": "c100d5570bf4657a2c31aaa023dc045b81d5fcfa44dd7ca2d2b79c20b4703a06"
+  },
+  "https://iclr.cc/Conferences/2027/AuthorGuidelines": {
+    "chars": 25551,
+    "recorded": "2026-09-21",
+    "sha256": "99728b432624ee281bdd3ea6198e42a525a825092e4ce04162465d063bf1d714"
+  },
+  "https://iclr.cc/Conferences/2027/CallForPapers": {
+    "chars": 4422,
+    "recorded": "2026-09-21",
+    "sha256": "b5cb7885af028985602116f2aa3a03d945d519871314e435c87c35c52033781d"
+  },
+  "https://info.arxiv.org/help/prep.html": {
+    "chars": 16729,
+    "recorded": "2026-09-21",
+    "sha256": "bfdb0854e88122eb306dcc6e4eec4ec9b441f54daf81b5d4ac21cc2e7aeb00f7"
+  },
+  "https://info.arxiv.org/help/sizes.html": {
+    "chars": 3796,
+    "recorded": "2026-09-21",
+    "sha256": "43904bfb55c0026f6e1404616f0ff018b8e6ff16870cecedf892654d794644d3"
+  },
+  "https://info.arxiv.org/help/submit/index.html": {
+    "chars": 8223,
+    "recorded": "2026-09-21",
+    "sha256": "4689e3303dacdc6590cfa553aa1e2ab65fe0e16d4ecf2ab29ff1119008b54e12"
+  },
+  "https://info.arxiv.org/help/submit_pdf.html": {
+    "chars": 7986,
+    "recorded": "2026-09-21",
+    "sha256": "958495c10fe548f54c654005b95d494c6a109ef06ef047e21cf4f3740d7e206b"
+  },
+  "https://info.arxiv.org/help/submit_tex.html": {
+    "chars": 16957,
+    "recorded": "2026-09-21",
+    "sha256": "4ae59328f16613e1cc16d617ee858cd63382826c6148a72393fbcab5e04048d5"
+  },
+  "https://journals.plos.org/ploscompbiol/s/figures": {
+    "chars": 27291,
+    "recorded": "2026-09-21",
+    "sha256": "3a30af66d146b901d2a32508679ab1cf2d53b0600994e58d50e56029622d6c57"
+  },
+  "https://journals.plos.org/ploscompbiol/s/journal-information": {
+    "chars": 10241,
+    "recorded": "2026-09-21",
+    "sha256": "99c129d7c9a8832fe3723172c3b190f2171d3cb48c2621220d69b5c542195df8"
+  },
+  "https://journals.plos.org/ploscompbiol/s/latex": {
+    "chars": 1532,
+    "recorded": "2026-09-21",
+    "sha256": "abcfc230595b6ee5a404720bd268e568aff1f1194223aad0d2d8bcfdd2a63a49"
+  },
+  "https://journals.plos.org/ploscompbiol/s/other-article-types": {
+    "chars": 8426,
+    "recorded": "2026-09-21",
+    "sha256": "fb0a875b4535b643e630cfeb155c5d63dd765bf18b9215dce3947ee81d99c1f0"
+  },
+  "https://journals.plos.org/ploscompbiol/s/submission-guidelines": {
+    "chars": 86059,
+    "recorded": "2026-09-21",
+    "sha256": "fa488c124cb5c956041c8f0d6d6e4ce5243fb61fb21becd90b9aef89e8001149"
+  },
+  "https://journals.plos.org/ploscompbiol/s/supporting-information": {
+    "chars": 5105,
+    "recorded": "2026-09-21",
+    "sha256": "67ac4d052598ee758725003f20e64bbdade3c621e6d5b83f6f8e5d2172a0385a"
+  },
+  "https://journals.plos.org/ploscompbiol/s/tables": {
+    "chars": 6933,
+    "recorded": "2026-09-21",
+    "sha256": "b263b61f68e26fe43e9e929f866106111af5c54529c14d64054b3dd8b7b92c7b"
+  },
+  "https://link.springer.com/journal/12859/submission-guidelines/database-article": {
+    "chars": 17144,
+    "recorded": "2026-09-21",
+    "sha256": "75986cc87e9fea4b23e3dfcf873c47ca3d2c57713763b4d0b11c3cb3ed5f751e"
+  },
+  "https://link.springer.com/journal/12859/submission-guidelines/matters-arising": {
+    "chars": 18253,
+    "recorded": "2026-09-21",
+    "sha256": "700e6fe0a2cce31c54f1898bec42fc941697afe59fd0467e896b2d2073dfd84c"
+  },
+  "https://link.springer.com/journal/12859/submission-guidelines/research-article": {
+    "chars": 18338,
+    "recorded": "2026-09-21",
+    "sha256": "89c8cc688702d48df2d75e4647ef919559fe332b17d75a8e8d42427478424d0b"
+  },
+  "https://link.springer.com/journal/12859/submission-guidelines/review-article": {
+    "chars": 15661,
+    "recorded": "2026-09-21",
+    "sha256": "83a055119eda902d5bb3f2dd4bb123db43df0cb651bd0b5ab949949042782d67"
+  },
+  "https://link.springer.com/journal/12859/submission-guidelines/software-article": {
+    "chars": 19084,
+    "recorded": "2026-09-21",
+    "sha256": "c641478abe3af58f038b765cdfb10e9059a0583b37add0b774c51f59385d1f00"
+  },
+  "https://link.springer.com/journal/13059/submission-guidelines/brief-report": {
+    "chars": 21973,
+    "recorded": "2026-09-21",
+    "sha256": "1315b31f6902d95c0339ec0acf51276334eae8a3af9d6c51fda7c30c17205f36"
+  },
+  "https://link.springer.com/journal/13059/submission-guidelines/correspondence": {
+    "chars": 1243,
+    "recorded": "2026-09-21",
+    "sha256": "383a88ab59c896a63be343f9106d98567dbc169c5c60ae9247626bd3f611a1f9"
+  },
+  "https://link.springer.com/journal/13059/submission-guidelines/database": {
+    "chars": 21143,
+    "recorded": "2026-09-21",
+    "sha256": "498d358583cd3ddcd2181ec9324210fc5b0a7711772cd98c9bd26167b1cf4129"
+  },
+  "https://link.springer.com/journal/13059/submission-guidelines/matters-arising": {
+    "chars": 22310,
+    "recorded": "2026-09-21",
+    "sha256": "9aa0ba02cbeee05e19b5f0e618408f0485fb970c610b5ba2ea63250eaefbfce5"
+  },
+  "https://link.springer.com/journal/13059/submission-guidelines/methodology": {
+    "chars": 22193,
+    "recorded": "2026-09-21",
+    "sha256": "743841c722af44fc3bf020d7ff9673df52f070a6975c546ad775880db18b718c"
+  },
+  "https://link.springer.com/journal/13059/submission-guidelines/research": {
+    "chars": 21537,
+    "recorded": "2026-09-21",
+    "sha256": "4f45077197db1664f613acbda176f529e6737219f629128cc026a0985e3a41e4"
+  },
+  "https://link.springer.com/journal/13059/submission-guidelines/review": {
+    "chars": 896,
+    "recorded": "2026-09-21",
+    "sha256": "63dc276db21d0d9fd7440f3f4090fa05fcfa872ffdde0c6bacb926d1d1080f59"
+  },
+  "https://link.springer.com/journal/13059/submission-guidelines/software": {
+    "chars": 22506,
+    "recorded": "2026-09-21",
+    "sha256": "c181b0f49a68ae84f8e58817e5596672043de27e58d727c4e20ba4ea0c21c54e"
+  },
+  "https://link.springer.com/journal/493/ethics-and-disclosures": {
+    "chars": 772,
+    "recorded": "2026-09-21",
+    "sha256": "45f5a735e45dcf42ce2ef813f66d143e96eb0760b1e4c866d375a36a53d520e9"
+  },
+  "https://link.springer.com/journal/493/submission-guidelines": {
+    "chars": 278,
+    "recorded": "2026-09-21",
+    "sha256": "eca0a1b995c7aeef68f689ca5de88d5e4a4ed6ed719322958269b569a6ee096b"
+  },
+  "https://media.springer.com/full/springer-instructions-for-authors-assets/pdf/95445_1085900_493_CCA_Instructions_to_authors_20240627.pdf": {
+    "chars": 2166,
+    "recorded": "2026-09-21",
+    "sha256": "351c607ecb6908b5940e36bc8c516f988cfad69a1b10acb55f8aa9201688bedc"
+  },
+  "https://web.archive.org/web/2024/https://www.sciencedirect.com/journal/discrete-mathematics/publish/guide-for-authors": {
+    "chars": 34336,
+    "recorded": "2026-09-21",
+    "sha256": "44dc2dde8cf032652a18076724ece80dda7c981f7559b160a0753fcc368418d8"
+  },
+  "https://www.biorxiv.org/about-biorxiv": {
+    "chars": 15171,
+    "recorded": "2026-09-21",
+    "sha256": "c6524e4e5edabc8ec38fd74723d081e345f41b28172cc8ac15e6432580e1c15c"
+  },
+  "https://www.biorxiv.org/about/FAQ": {
+    "chars": 28469,
+    "recorded": "2026-09-21",
+    "sha256": "81841a098f4acd9b2ba1626558902864064c886590598a76c0cd5dd7eb43d1e7"
+  },
+  "https://www.biorxiv.org/submit-a-manuscript": {
+    "chars": 11473,
+    "recorded": "2026-09-21",
+    "sha256": "ccf8efca8eca2d10a3a06c0e9afa1c7e350a2c08041136468561dab3b2916021"
+  },
+  "https://www.cell.com/cell-genomics/information-for-authors": {
+    "chars": 7020,
+    "recorded": "2026-09-21",
+    "sha256": "d929be250456f49392fef4722eb7d4113c9019c85dda7675bfd5c352e649079a"
+  },
+  "https://www.cell.com/cell-genomics/information-for-authors/article-types": {
+    "chars": 9607,
+    "recorded": "2026-09-21",
+    "sha256": "f6c8d1bd7a9e2519acdf0ae2bab2cf35dd998c46f7de4024740d0250388705c3"
+  },
+  "https://www.cell.com/cell-genomics/information-for-authors/final-submission": {
+    "chars": 4806,
+    "recorded": "2026-09-21",
+    "sha256": "c1997047d03236b786a0d24c2beb81df26351416fbc18116683255031868ba94"
+  },
+  "https://www.cell.com/cell-genomics/information-for-authors/revise-manuscript": {
+    "chars": 22265,
+    "recorded": "2026-09-21",
+    "sha256": "0c38a3ed126fe2db983085869f61caed302223c4b265327b17577a221498a6ff"
+  },
+  "https://www.cell.com/cell-genomics/information-for-authors/submit-manuscript": {
+    "chars": 4240,
+    "recorded": "2026-09-21",
+    "sha256": "5d4d0a026fb2d50a6e312a4072f4f5ebcf80d79422476eef83d96875e4fb7fd7"
+  },
+  "https://www.cell.com/cell-systems/information-for-authors": {
+    "chars": 7554,
+    "recorded": "2026-09-21",
+    "sha256": "1dc52b2e513683977a1a37f98205a008d68b1e1e7853efc347575682db6f6f69"
+  },
+  "https://www.cell.com/cell-systems/information-for-authors/article-types": {
+    "chars": 3581,
+    "recorded": "2026-09-21",
+    "sha256": "9a5f3d8d0f8e73db007ffbfd4ac1a9f5cf9daa31117f887682bb30cb5c9f4455"
+  },
+  "https://www.cell.com/cell-systems/information-for-authors/final-submission": {
+    "chars": 4805,
+    "recorded": "2026-09-21",
+    "sha256": "464788a9c5e27cb7a0c379ed06aab91f85402056d17343d85bd0cb2e37945881"
+  },
+  "https://www.cell.com/cell-systems/information-for-authors/revise-manuscript": {
+    "chars": 21776,
+    "recorded": "2026-09-21",
+    "sha256": "bb9d7afaf8174cefc7152f1ffffebe00112f6fea84532cf5e4aa08a2a82a6f05"
+  },
+  "https://www.cell.com/cell-systems/information-for-authors/submit-manuscript": {
+    "chars": 5221,
+    "recorded": "2026-09-21",
+    "sha256": "1203c42a93d6ea11e507f22fe67e2430c1d2e1728cce6c2425d22eacc93f9935"
+  },
+  "https://www.cell.com/cell/information-for-authors": {
+    "chars": 7568,
+    "recorded": "2026-09-21",
+    "sha256": "6f58d48e36c60b8a7b5d82d951993a3a81ccf870880ea4ca41390b457100556a"
+  },
+  "https://www.cell.com/cell/information-for-authors/article-types": {
+    "chars": 5278,
+    "recorded": "2026-09-21",
+    "sha256": "9135e164decd50b4a6ded954e029b67601d0333541c19ec6dea0cef07ccdc4ee"
+  },
+  "https://www.cell.com/cell/information-for-authors/final-submission": {
+    "chars": 4797,
+    "recorded": "2026-09-21",
+    "sha256": "3003cc93a61e9345e89cd9e32779c04e0013ad479b5e1abba3e6f7c23e155548"
+  },
+  "https://www.cell.com/cell/information-for-authors/revise-manuscript": {
+    "chars": 22057,
+    "recorded": "2026-09-21",
+    "sha256": "a8d40766a47324531481f203afb008de909b9742bc8caefe53e93bce73fe6f27"
+  },
+  "https://www.cell.com/cell/information-for-authors/submit-manuscript": {
+    "chars": 4231,
+    "recorded": "2026-09-21",
+    "sha256": "4fffaf282e6d89ad69667c507747da33415fdeb8a0796fbd0c40c80703b8576d"
+  },
+  "https://www.cell.com/information-for-authors/figure-guidelines": {
+    "chars": 12153,
+    "recorded": "2026-09-21",
+    "sha256": "8140f647571836d0d9bfad8b4698c1925b0f1b07bd93343c206f56428df28b8e"
+  },
+  "https://www.cell.com/information-for-authors/supplemental-information": {
+    "chars": 4810,
+    "recorded": "2026-09-21",
+    "sha256": "79098004c17e5f51f4008774d99665a2893322dfb09b82e37450cb3d638a5e13"
+  },
+  "https://www.cell.com/pb-assets/journals/EM/Master%20Final%20Files%20Checklists/Cell%20Final%20File%20Checklist.docx": {
+    "chars": 14701,
+    "recorded": "2026-09-21",
+    "sha256": "1f256b9e6b2daea444a74588829a362da2cafec050ab8e8a2ddb8e83fe626a6f"
+  },
+  "https://www.cell.com/pb-assets/journals/EM/MasterFFCs/CELSFFC-1766175470697.pdf": {
+    "chars": 16590,
+    "recorded": "2026-09-21",
+    "sha256": "f91e93c4ac8c498074a624bbcf416392fe684ee0ec941754906939739fc59860"
+  },
+  "https://www.cell.com/pb-assets/journals/EM/MasterFFCs/XGENFFC-1750589326387.pdf": {
+    "chars": 16336,
+    "recorded": "2026-09-21",
+    "sha256": "c98c97d0457a31e4dd7af3db042b048cac0cbcfc8e1c0a308c548bf936232eb1"
+  },
+  "https://www.cell.com/pb-assets/journals/research/cell-systems/do-not-delete/CSformatting-1666007786657.pdf": {
+    "chars": 10610,
+    "recorded": "2026-09-21",
+    "sha256": "c9f53345d64cb8ab00bb21357b035f67d7e3629a90e63ce8b88ef67e288d831b"
+  },
+  "https://www.cell.com/pb-assets/journals/research/cell/methods/Methods_Guide_general-1724873926937.pdf": {
+    "chars": 22607,
+    "recorded": "2026-09-21",
+    "sha256": "e5a888418823001ff01c122ce45590066b5c1bbf0bd52f14be0e8444ee340c3b"
+  },
+  "https://www.elsevier.com/about/policies-and-standards/author/artwork-and-media-instructions": {
+    "chars": 1773,
+    "recorded": "2026-09-21",
+    "sha256": "0318e7d9f3a4121e470df587743c004befef88502d5aeee777bbd4c8b737ead9"
+  },
+  "https://www.elsevier.com/about/policies-and-standards/author/artwork-and-media-instructions/artwork-faq": {
+    "chars": 1459,
+    "recorded": "2026-09-21",
+    "sha256": "31b501c656500a55ea01ed259f000d0bbf5f9a833d91f664922119c09fb10591"
+  },
+  "https://www.elsevier.com/about/policies-and-standards/author/artwork-and-media-instructions/artwork-sizing": {
+    "chars": 2735,
+    "recorded": "2026-09-21",
+    "sha256": "4b86b26c67396beed9c11b83b560d4054043f33758f05d8254919347f6e67112"
+  },
+  "https://www.medrxiv.org/about/FAQ": {
+    "chars": 33119,
+    "recorded": "2026-09-21",
+    "sha256": "56d300cebdbec73a82440b5918a84bee187e7869bd38e4041b26ff782e1d8fc9"
+  },
+  "https://www.medrxiv.org/content/about-medrxiv": {
+    "chars": 9853,
+    "recorded": "2026-09-21",
+    "sha256": "a509572790b5d852fe73c0500586ca3c65a5e043016b71a87deed6073c506fc8"
+  },
+  "https://www.medrxiv.org/submit-a-manuscript": {
+    "chars": 12189,
+    "recorded": "2026-09-21",
+    "sha256": "7324a25844037da63cf5adea15dc0234ae62ed33137cb9dd073062ea0c8319b1"
+  },
+  "https://www.nature.com/documents/NRJs-guide-to-preparing-final-artwork.pdf": {
+    "chars": 6507,
+    "recorded": "2026-09-21",
+    "sha256": "4492258091eccebb23c1450a5e6a7f7166a938c267a90aa62b61c5c925379a33"
+  },
+  "https://www.nature.com/documents/nature_3a_initial_revised_submissions.pdf": {
+    "chars": 15937,
+    "recorded": "2026-09-21",
+    "sha256": "84208c589556f0bb212cc3c7431ebf4760b85556eebc0c82a2bc2a4589d4b7a6"
+  },
+  "https://www.nature.com/nature-portfolio/editorial-policies/image-integrity": {
+    "chars": 6959,
+    "recorded": "2026-09-21",
+    "sha256": "aa2ceebaf0bc93d77fa481660e868df91afd79664cc53e8b9705276b62a34139"
+  },
+  "https://www.nature.com/nature/for-authors/final-submission": {
+    "chars": 15687,
+    "recorded": "2026-09-21",
+    "sha256": "692db9f0a189d3a60d4c873618e72791a3bdce5a534bb1440b652d7ad1c728f7"
+  },
+  "https://www.nature.com/nature/for-authors/formatting-guide": {
+    "chars": 30206,
+    "recorded": "2026-09-21",
+    "sha256": "d1f209a39a709d56159a70150abac66923de0079d6fc4620d3171c06579f9bb3"
+  },
+  "https://www.nature.com/nature/for-authors/initial-submission": {
+    "chars": 16443,
+    "recorded": "2026-09-21",
+    "sha256": "45600cc82e2aa108ee915c90a2121dc5d72ecd2cb1b029dc96358165b42d369b"
+  },
+  "https://www.nature.com/nature/for-authors/matters-arising": {
+    "chars": 5346,
+    "recorded": "2026-09-21",
+    "sha256": "0b58b808abdd4e038feb4a7bb8a3e763561ed19503e18c5888d3ae0286592111"
+  },
+  "https://www.nature.com/nature/for-authors/other-subs": {
+    "chars": 12400,
+    "recorded": "2026-09-21",
+    "sha256": "679d9e324453f8fe6b8a39e0f54d6657c906827133bf8a5ac3a3c0ef0fa8984b"
+  },
+  "https://www.nature.com/nature/for-authors/supp-info": {
+    "chars": 6883,
+    "recorded": "2026-09-21",
+    "sha256": "4a3dc3264dd46c6f23cda574e24f0247ec2831b19d7cb8b1045f0d61a725d7e4"
+  },
+  "https://www.nature.com/nbt/content": {
+    "chars": 11066,
+    "recorded": "2026-09-21",
+    "sha256": "839b5f7bf205aef0e344c594e6cf472ee4e5e57133d2bd1802710f0b5615f808"
+  },
+  "https://www.nature.com/nbt/submission-guidelines": {
+    "chars": 2711,
+    "recorded": "2026-09-21",
+    "sha256": "00b596201ca71235f2d4a2a34d81fef3600b7b4144fdaf6a7d17b2f3ab288348"
+  },
+  "https://www.nature.com/nbt/submission-guidelines/aip-and-formatting": {
+    "chars": 17002,
+    "recorded": "2026-09-21",
+    "sha256": "c896b99cc5a4de02a61815610023c78020f946cf445fb4676fe4067c5a0a2eb9"
+  },
+  "https://www.nature.com/nbt/submission-guidelines/dapr": {
+    "chars": 667,
+    "recorded": "2026-09-21",
+    "sha256": "0e65932fea3b38af66622debd23d1d2587961efa146e5fc45d392950d348d6ea"
+  },
+  "https://www.nature.com/nbt/submission-guidelines/initial-formatting": {
+    "chars": 473,
+    "recorded": "2026-09-21",
+    "sha256": "919f3b8f85d9c03f69f204f705f24016ffc62cbbe5541e54965ab6fb089a6473"
+  },
+  "https://www.nature.com/nbt/submission-guidelines/preparing-your-submission": {
+    "chars": 3281,
+    "recorded": "2026-09-21",
+    "sha256": "1e0613bfac91bfd069db5b370e923c93ab738bd63b9f630d447077693c27af6f"
+  },
+  "https://www.nature.com/nbt/submission-guidelines/writing-and-language": {
+    "chars": 1635,
+    "recorded": "2026-09-21",
+    "sha256": "49d554b639adde8ca211091a9ea7f198c137391e8a70f124f9273b1e4b20428f"
+  },
+  "https://www.nature.com/nmeth/content": {
+    "chars": 12841,
+    "recorded": "2026-09-21",
+    "sha256": "d767642d618082887a7f962ceaa814ff08065bcc99f794c49df288cb7397f278"
+  },
+  "https://www.nature.com/nmeth/submission-guidelines": {
+    "chars": 2693,
+    "recorded": "2026-09-21",
+    "sha256": "9fb6097221a8550a25f03bb9d97aaab509900e2f4ab869910e39f3ca1292afc8"
+  },
+  "https://www.nature.com/nmeth/submission-guidelines/aip-and-formatting": {
+    "chars": 16932,
+    "recorded": "2026-09-21",
+    "sha256": "8428073e405fbe0ae2e3c27f172068a01cb76f729e228efab5f28615d7a53a4f"
+  },
+  "https://www.nature.com/nmeth/submission-guidelines/dapr": {
+    "chars": 661,
+    "recorded": "2026-09-21",
+    "sha256": "dd5c1dbee794183b5c72f2abecae683d90abcc2e7937bd81501fab1e277a65c0"
+  },
+  "https://www.nature.com/nmeth/submission-guidelines/initial-formatting": {
+    "chars": 473,
+    "recorded": "2026-09-21",
+    "sha256": "919f3b8f85d9c03f69f204f705f24016ffc62cbbe5541e54965ab6fb089a6473"
+  },
+  "https://www.nature.com/nmeth/submission-guidelines/preparing-your-submission": {
+    "chars": 3269,
+    "recorded": "2026-09-21",
+    "sha256": "f8c104f138c8a084bc3cfbf3e9fa24edf92cf5060c0d85c840962e189bf17e51"
+  },
+  "https://www.nature.com/nmeth/submission-guidelines/registered-reports": {
+    "chars": 14651,
+    "recorded": "2026-09-21",
+    "sha256": "1fb05c55d4efb0b61aa4c5dd676a48d331cf5522dfa6e4b7af9c805eda80462e"
+  },
+  "https://www.nature.com/nmeth/submission-guidelines/writing-and-language": {
+    "chars": 1635,
+    "recorded": "2026-09-21",
+    "sha256": "49d554b639adde8ca211091a9ea7f198c137391e8a70f124f9273b1e4b20428f"
+  },
+  "https://www.science.org/content/page/instructions-preparing-initial-manuscript": {
+    "chars": 30075,
+    "recorded": "2026-09-21",
+    "sha256": "e80dd93ada04f025a49243e6b2e8031d6bd1e1a3bb914db30e19ced3b1808c46"
+  },
+  "https://www.science.org/content/page/preparing-manuscripts-using-latex": {
+    "chars": 5326,
+    "recorded": "2026-09-21",
+    "sha256": "3c7af65ebe8c01feb1b151a6ee41815bad6e941c425e12482515900bc7d213d3"
+  },
+  "https://www.science.org/content/page/science-advances-information-authors": {
+    "chars": 34520,
+    "recorded": "2026-09-21",
+    "sha256": "3d8c16d170518a9a7260d8f2266bf55e3d18a9a7b1c058d6aa4f3088d9785d99"
+  },
+  "https://www.science.org/content/page/science-immunology-information-authors": {
+    "chars": 11689,
+    "recorded": "2026-09-21",
+    "sha256": "db56255e6d388b9c7417a5d007c000b0766987b8c9f17619cb9a62137505e7d8"
+  },
+  "https://www.science.org/content/page/science-information-authors": {
+    "chars": 27427,
+    "recorded": "2026-09-21",
+    "sha256": "1bf7d09602be7cfd8a9fbf45490c7c323f0a7f40bb3e1c1dbe2431433cd533e3"
+  },
+  "https://www.science.org/content/page/science-journals-editorial-policies": {
+    "chars": 56864,
+    "recorded": "2026-09-21",
+    "sha256": "e431e4279b3b6b03e8755e35cd9a28665851b38436d4f473702b0d8c0da89b92"
+  },
+  "https://www.science.org/content/page/science-robotics-information-authors": {
+    "chars": 12866,
+    "recorded": "2026-09-21",
+    "sha256": "f844fe74fb8e6e669c828c06ac747b19f40c0bc4fd3a3b3d284a3668b1ef56f9"
+  },
+  "https://www.science.org/content/page/science-signaling-information-authors": {
+    "chars": 6069,
+    "recorded": "2026-09-21",
+    "sha256": "fa1bbb9ec38c45dd93d43e71e1f2ebed4e31a418081ee8b37e767194531c0409"
+  },
+  "https://www.science.org/content/page/sciimmunol-instructions-research-articles-initial-submission-new": {
+    "chars": 40698,
+    "recorded": "2026-09-21",
+    "sha256": "35c25a1809e5a6ec57db0bfcc8789b20aed42d8cd5a15b6ace255997e8ad6163"
+  },
+  "https://www.science.org/content/page/scirobotics-instructions-research-articles": {
+    "chars": 26500,
+    "recorded": "2026-09-21",
+    "sha256": "2afa14fd8b603cdaca4ebbe06f58ba9f63becfc8764593ded7643a992041c4fb"
+  },
+  "https://www.science.org/content/page/signaling-instructions-focus": {
+    "chars": 6901,
+    "recorded": "2026-09-21",
+    "sha256": "4febb6cd1396d1c3273f3b296093a68e8276c2198c2058caa5d2aefc87af398e"
+  },
+  "https://www.science.org/content/page/signaling-instructions-research-articles-initial-submission": {
+    "chars": 38951,
+    "recorded": "2026-09-21",
+    "sha256": "cff76e4ff4ab999057c670a4dc9e05105d065f3ed3d523f7b47ae8e03b5d7331"
+  },
+  "https://www.science.org/content/page/signaling-instructions-reviews": {
+    "chars": 10623,
+    "recorded": "2026-09-21",
+    "sha256": "1733d256b3cd74f53439f2e9d71b9ca94c17626c2df3a35bf1cee80a79775b88"
+  },
+  "https://www.science.org/content/page/stm-information-authors": {
+    "chars": 7493,
+    "recorded": "2026-09-21",
+    "sha256": "920603e39b8af86ca5224d5b5665413ae8f7e85143c1a9c5ed9859fb6f66b964"
+  },
+  "https://www.science.org/content/page/stm-instructions-research-articles-initial-submission": {
+    "chars": 37248,
+    "recorded": "2026-09-21",
+    "sha256": "4c2d3c7afd25cc997e3196b9c3a427bfce4501e99507fc569c62aa199f984d8d"
+  }
+}

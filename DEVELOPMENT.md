@@ -134,6 +134,38 @@ never writing next to the source, and caches the build for the process. With
 no TeX toolchain the limit is reported as unchecked. Tests that need a
 toolchain are skipped when none is installed.
 
+### Keeping entries current
+
+`scripts/check_guidelines.py` re-reads every page named in `source_urls` and
+reports which ones changed since their entry was written. It renders each page
+in a browser, hashes the text of its main content (PDF and `.docx` sources are
+downloaded and their text extracted), and compares that with the hash recorded
+in `scripts/guideline_fingerprints.json`. It never calls an LLM, so it is cheap
+enough to run on a schedule; only the venues it flags need to be re-read.
+
+```bash
+python scripts/check_guidelines.py --diff          # check every page, show what changed
+python scripts/check_guidelines.py --venue nature  # one venue
+python scripts/check_guidelines.py --accept nature # after updating the entry: advance its baseline
+python scripts/check_guidelines.py --record-new    # after adding a venue: record its pages
+```
+
+Each page comes back `unchanged`, `changed`, `new` (no baseline), `unreadable`
+(fetch failed, bot wall, or almost no text: never treated as a change) or `gone`
+(404/410: the entry needs a new URL). The JSON report
+(`.guideline_cache/report.json`) marks a venue `needs_review` when a page
+changed or is gone, or when it has unreadable pages and `retrieved` is more than
+`--stale-days` (180) old. Changed pages carry a line diff against the recorded
+text, which is kept in the gitignored `.guideline_cache/`.
+
+The baseline moves only through `--accept` / `--record-new`. Commit
+`guideline_fingerprints.json` together with the edit to
+`manuscript_requirements.json` (and its new `retrieved` date): merging that
+commit is what marks the change as handled, and a change nobody acted on is
+detected again on the next run. Several publishers refuse headless browsers, so
+the browser runs headed; without a display the script re-runs itself under
+`xvfb-run`.
+
 ## Venue data updates without a release
 
 The venue data -- `venues.json`, `manuscript_requirements.json`, their two

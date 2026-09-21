@@ -191,3 +191,5 @@ prompts.txt
 # scratch that embeds per-session tokens; never commit it.
 tests/portal_snapshots/_failures/
 /paper/
+# Page texts and run state of scripts/check_guidelines.py
+.guideline_cache/
