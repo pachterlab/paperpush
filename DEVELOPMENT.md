@@ -190,6 +190,16 @@ time. The branch is then pushed and a pull request opened; while that pull
 request is open, later runs start from its branch and add to it. Nothing is
 published to users until the pull request is merged.
 
+`scripts/scheduled_guidelines.sh` is the cron entry point (PATH for `claude`,
+the `paperpush` conda env, a lock so runs never overlap, logs in
+`.guideline_cache/logs/`). It is scheduled monthly on the maintainer's machine
+rather than in GitHub Actions because datacenter addresses are bot-walled by
+several publishers and the agent runs on the local Claude Code subscription:
+
+```
+0 3 1 * * /home/jrich/Desktop/paperpush/scripts/scheduled_guidelines.sh
+```
+
 ## Venue data updates without a release
 
 The venue data -- `venues.json`, `manuscript_requirements.json`, their two
