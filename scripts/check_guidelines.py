@@ -10,6 +10,7 @@ re-read the venues whose guidelines actually moved. It never calls an LLM.
     python scripts/check_guidelines.py --venue nature  # one venue
     python scripts/check_guidelines.py --record-new    # baseline pages that have none
     python scripts/check_guidelines.py --accept nature # requirements updated: advance baseline
+    python scripts/check_guidelines.py --text URL      # print any page's extracted text
 
 How a page is compared. Each page is rendered in a real browser (several
 publishers refuse plain HTTP clients), reduced to the text of its main content
@@ -376,6 +377,19 @@ def run_accept(targets: list[str], requirements: dict, url_venues: dict[str, lis
     return 0
 
 
+def run_text(url: str, headless: bool) -> int:
+    browser = Browser(headless=headless, delay=0)
+    try:
+        fetched = browser.fetch(url)
+    finally:
+        browser.close()
+    if fetched.text is None:
+        print(f"could not read {url}: {fetched.error}", file=sys.stderr)
+        return 1
+    print(fetched.text)
+    return 0
+
+
 def run_check(args, requirements: dict, url_venues: dict[str, list[str]], today: date) -> int:
     selected = _select(url_venues, args.venue, args.url)
     fingerprints, state = _load_json(FINGERPRINTS_FILE), _load_json(CACHE_DIR / "state.json")
@@ -453,13 +467,22 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--headless", action="store_true", help="run the browser headless (more pages are refused as a bot); " "without a display the default headed browser is run under xvfb-run")
     parser.add_argument("--delay", type=float, default=DEFAULT_DELAY_S, help="seconds between two requests to the same host")
     parser.add_argument("--stale-days", type=int, default=DEFAULT_STALE_DAYS, help="age of `retrieved` past which a venue with unreadable pages is reported stale")
+    parser.add_argument("--root", metavar="DIR", help="read the requirements and read/write the fingerprints of this checkout instead " "(a git worktree, say); the cache stays with this script's checkout")
+    parser.add_argument("--text", metavar="URL", help="print the text this script extracts from any page, then exit (reads pages that refuse plain HTTP clients)")
     args = parser.parse_args(argv)
 
+    if args.root:
+        global REQUIREMENTS_FILE, FINGERPRINTS_FILE
+        root = Path(args.root).resolve()
+        REQUIREMENTS_FILE = root / REQUIREMENTS_FILE.relative_to(REPO_ROOT)
+        FINGERPRINTS_FILE = root / FINGERPRINTS_FILE.relative_to(REPO_ROOT)
     requirements = json.loads(REQUIREMENTS_FILE.read_text(encoding="utf-8"))
     url_venues = collect_urls(requirements)
     today = date.today()
     if args.accept:
         return run_accept(args.accept, requirements, url_venues, today)
+    if args.text and not args.text.startswith(("http://", "https://")):
+        sys.exit("--text takes an http(s) URL")
 
     if not args.headless and not os.environ.get("DISPLAY") and sys.platform.startswith("linux"):
         xvfb = shutil.which("xvfb-run")
@@ -467,6 +490,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             os.execv(xvfb, [xvfb, "-a", sys.executable, *sys.argv])  # nosec B606
         print("no display and no xvfb-run: falling back to --headless", file=sys.stderr)
         args.headless = True
+    if args.text:
+        return run_text(args.text, args.headless)
     return run_check(args, requirements, url_venues, today)
 
 

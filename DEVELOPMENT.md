@@ -166,6 +166,30 @@ detected again on the next run. Several publishers refuse headless browsers, so
 the browser runs headed; without a display the script re-runs itself under
 `xvfb-run`.
 
+`scripts/update_guidelines.py` is the scheduled form of that loop: it runs the
+check and, only for the venues that need review, starts a headless Claude Code
+agent (`claude -p`, the local subscription) that is given the entry, the diff of
+each changed page and the current text of all the venue's pages, and edits the
+entry. A run in which nothing changed starts no agent.
+
+```bash
+python scripts/update_guidelines.py                  # check, update, open a pull request
+python scripts/update_guidelines.py --dry-run        # same, but push nothing
+python scripts/update_guidelines.py --dry-run --skip-check --venue cell   # reuse the last report
+```
+
+It works in a git worktree (`.guideline_cache/worktree`, branch
+`guideline-updates`, from `origin/main`), so your checkout is never touched. The
+agent can read, search the web and edit, plus one command: `check_guidelines.py
+--text URL`, for pages that refuse its own fetcher. An edit is kept only if the
+file still loads, no other venue's entry moved, and no test in
+`tests/test_requirements.py` started failing; each venue is one commit, with
+`retrieved` set to the day of the run. Baselines advance only for pages whose
+venues were all handled, so a venue the agent failed on is picked up again next
+time. The branch is then pushed and a pull request opened; while that pull
+request is open, later runs start from its branch and add to it. Nothing is
+published to users until the pull request is merged.
+
 ## Venue data updates without a release
 
 The venue data -- `venues.json`, `manuscript_requirements.json`, their two
