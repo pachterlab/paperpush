@@ -2313,11 +2313,11 @@
       "https://www.cell.com/cell-genomics/information-for-authors/final-submission",
       "https://www.cell.com/information-for-authors/figure-guidelines",
       "https://www.cell.com/information-for-authors/supplemental-information",
-      "https://www.cell.com/star-authors-guide",
+      "https://www.cell.com/information-for-authors/star-authors-guide",
       "https://www.cell.com/pb-assets/journals/EM/MasterFFCs/XGENFFC-1750589326387.pdf",
       "https://els-jbs-prod-cdn.jbs.elsevierhealth.com/pb-assets/journals/research/cell-genomics/cell-genomics_IfA-1592223534027.pdf"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-09-23",
     "article_type_field": "article_type",
     "article_types": {
       "Short Article": {
@@ -2436,7 +2436,7 @@
       "notes": [
         "Author Contributions section is required for all primary research papers, placed immediately after Acknowledgments; CRediT taxonomy encouraged.",
         "Declaration of Interests form required and uploaded; its content (including 'no competing interests' declarations) must also appear in a manuscript section titled 'Declaration of Interests,' after Author Contributions.",
-        "A 'Declaration of Generative AI and AI-assisted technologies in the writing process' section is required only if generative AI/AI-assisted technology was used in writing; omit if there is nothing to disclose."
+        "A 'Declaration of generative AI and AI-assisted technologies in the manuscript preparation process' section is required only if generative AI/AI-assisted technology was used in writing; omit if there is nothing to disclose."
       ]
     },
     "figures": {
