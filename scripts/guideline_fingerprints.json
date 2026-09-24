@@ -20,14 +20,14 @@
     "sha256": "c100d5570bf4657a2c31aaa023dc045b81d5fcfa44dd7ca2d2b79c20b4703a06"
   },
   "https://iclr.cc/Conferences/2027/AuthorGuidelines": {
-    "chars": 25551,
-    "recorded": "2026-09-21",
-    "sha256": "99728b432624ee281bdd3ea6198e42a525a825092e4ce04162465d063bf1d714"
+    "chars": 25514,
+    "recorded": "2026-09-23",
+    "sha256": "da795c2caea83f92eece04053c6e6f39b494ac95d674988f0dadb090718b465f"
   },
   "https://iclr.cc/Conferences/2027/CallForPapers": {
-    "chars": 4422,
-    "recorded": "2026-09-21",
-    "sha256": "b5cb7885af028985602116f2aa3a03d945d519871314e435c87c35c52033781d"
+    "chars": 4398,
+    "recorded": "2026-09-23",
+    "sha256": "28a4822dad285978c2d40af73a02a17283242681e082d5069e6af7e7d048cbed"
   },
   "https://info.arxiv.org/help/prep.html": {
     "chars": 16729,
@@ -75,9 +75,9 @@
     "sha256": "fb0a875b4535b643e630cfeb155c5d63dd765bf18b9215dce3947ee81d99c1f0"
   },
   "https://journals.plos.org/ploscompbiol/s/submission-guidelines": {
-    "chars": 86059,
-    "recorded": "2026-09-21",
-    "sha256": "fa488c124cb5c956041c8f0d6d6e4ce5243fb61fb21becd90b9aef89e8001149"
+    "chars": 85932,
+    "recorded": "2026-09-23",
+    "sha256": "91f1602342286227da99ea95bbb31a5e546fc312ad10df5d31c03d29e1bbfcfc"
   },
   "https://journals.plos.org/ploscompbiol/s/supporting-information": {
     "chars": 5105,
@@ -176,8 +176,8 @@
   },
   "https://www.biorxiv.org/about-biorxiv": {
     "chars": 15171,
-    "recorded": "2026-09-21",
-    "sha256": "c6524e4e5edabc8ec38fd74723d081e345f41b28172cc8ac15e6432580e1c15c"
+    "recorded": "2026-09-23",
+    "sha256": "201bc4fcd9bbfbef6819df18fede3caa7fe9536cdf4aa0e4627ada1c4258905a"
   },
   "https://www.biorxiv.org/about/FAQ": {
     "chars": 28469,
@@ -186,8 +186,8 @@
   },
   "https://www.biorxiv.org/submit-a-manuscript": {
     "chars": 11473,
-    "recorded": "2026-09-21",
-    "sha256": "ccf8efca8eca2d10a3a06c0e9afa1c7e350a2c08041136468561dab3b2916021"
+    "recorded": "2026-09-23",
+    "sha256": "75765b17a39e2ae77b1991827aeea7a53da3dd4149e971ec1aa5038c39eb3118"
   },
   "https://www.cell.com/cell-genomics/information-for-authors": {
     "chars": 7020,
@@ -269,6 +269,11 @@
     "recorded": "2026-09-21",
     "sha256": "8140f647571836d0d9bfad8b4698c1925b0f1b07bd93343c206f56428df28b8e"
   },
+  "https://www.cell.com/information-for-authors/star-authors-guide": {
+    "chars": 2905,
+    "recorded": "2026-09-23",
+    "sha256": "0a988bc47c53b065366a1f8fa959d5133b541f089e617a8373a29aad46023452"
+  },
   "https://www.cell.com/information-for-authors/supplemental-information": {
     "chars": 4810,
     "recorded": "2026-09-21",
@@ -280,14 +285,14 @@
     "sha256": "1f256b9e6b2daea444a74588829a362da2cafec050ab8e8a2ddb8e83fe626a6f"
   },
   "https://www.cell.com/pb-assets/journals/EM/MasterFFCs/CELSFFC-1766175470697.pdf": {
-    "chars": 16590,
-    "recorded": "2026-09-21",
-    "sha256": "f91e93c4ac8c498074a624bbcf416392fe684ee0ec941754906939739fc59860"
+    "chars": 16596,
+    "recorded": "2026-09-23",
+    "sha256": "0d61e71b155d2f7d738999e073fa418842bea4c31412f6e737be05a6c539a19b"
   },
   "https://www.cell.com/pb-assets/journals/EM/MasterFFCs/XGENFFC-1750589326387.pdf": {
-    "chars": 16336,
-    "recorded": "2026-09-21",
-    "sha256": "c98c97d0457a31e4dd7af3db042b048cac0cbcfc8e1c0a308c548bf936232eb1"
+    "chars": 16340,
+    "recorded": "2026-09-23",
+    "sha256": "08839d54a5bf33f92ec9f873295de40073285d22ca04764a76bd7f0e0662fb52"
   },
   "https://www.cell.com/pb-assets/journals/research/cell-systems/do-not-delete/CSformatting-1666007786657.pdf": {
     "chars": 10610,
@@ -491,8 +496,8 @@
   },
   "https://www.science.org/content/page/sciimmunol-instructions-research-articles-initial-submission-new": {
     "chars": 40698,
-    "recorded": "2026-09-21",
-    "sha256": "35c25a1809e5a6ec57db0bfcc8789b20aed42d8cd5a15b6ace255997e8ad6163"
+    "recorded": "2026-09-23",
+    "sha256": "950edf8705d1bdb8fb56fa765713380f90abf42a780afeb6532388c22987472f"
   },
   "https://www.science.org/content/page/scirobotics-instructions-research-articles": {
     "chars": 26500,
@@ -521,7 +526,7 @@
   },
   "https://www.science.org/content/page/stm-instructions-research-articles-initial-submission": {
     "chars": 37248,
-    "recorded": "2026-09-21",
-    "sha256": "4c2d3c7afd25cc997e3196b9c3a427bfce4501e99507fc569c62aa199f984d8d"
+    "recorded": "2026-09-23",
+    "sha256": "fa8d0a783cf19512f30667297700542366527b5efa02fef290989316004b5929"
   }
 }
