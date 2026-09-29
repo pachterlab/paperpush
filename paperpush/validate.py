@@ -714,6 +714,76 @@ def _anonymity_issues(venue: Venue, values: dict[str, str], *, check_repos: bool
     return _findings_to_issues(anonymity.scan_submission(paths, terms, field_texts, check_repos=check_repos))
 
 
+def _hidden_text_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
+    """Flag text a reader cannot see, above all prompts aimed at AI reviewers.
+
+    Scans every PDF, LaTeX source, and Word upload for white, invisible,
+    microscopic, or off-page text (see :mod:`paperpush.hidden_text`). Hidden
+    text that instructs a reviewer or language model is an ERROR -- conferences
+    treat it as an ethics violation -- and other hidden prose, or visible text
+    addressed to an AI reviewer, is a WARNING. Runs by default (disable with
+    ``--dont-check-hidden-text``); makes no network requests.
+    """
+    from . import hidden_text
+
+    paths = list(_iter_upload_paths(venue, values))
+    logger.info("Checking %d upload file(s) for hidden text (%s)", len(paths), venue.slug)
+    issues: list[Issue] = []
+    for finding in hidden_text.scan_paths(paths):
+        level = ERROR if finding.is_error else WARNING
+        issues.append(Issue(level, "", f"{finding.detail} (in {finding.where})"))
+    return issues
+
+
+def _pdf_reader_issues(venue: Venue, values: dict[str, str], *, check_hidden_text: bool, check_manuscript: bool) -> list[Issue]:
+    """Say once that PDF checks were skipped because pdfminer.six is not installed.
+
+    The hidden-text scan and the modified-template check read PDFs glyph by
+    glyph through the optional ``pdf`` extra. Without it they pass over every
+    PDF silently, which would hide a prompt-injection error, so this WARNING
+    names what was skipped and how to install it. Quiet when nothing a skipped
+    check would read was uploaded.
+    """
+    from . import pdf_layout
+
+    if pdf_layout.available():
+        return []
+    skipped: list[str] = []
+    if check_hidden_text:
+        skipped.append("hidden text / prompt injection")
+    if check_manuscript:
+        from .requirements import get_requirements
+
+        reqs = get_requirements(venue.slug)
+        if reqs is not None and reqs.manuscript.template_layout is not None:
+            skipped.append("modified template")
+    if not skipped:
+        return []
+    # A LaTeX manuscript is compiled to a PDF for the template check.
+    measured = {".pdf", ".tex", ".zip"} if "modified template" in skipped else {".pdf"}
+    if not any(path.suffix.lower() in measured for path in _iter_upload_paths(venue, values)):
+        return []
+    return [Issue(WARNING, "", f"PDF checks skipped ({', '.join(skipped)}): they need pdfminer.six; install it with `{pdf_layout.INSTALL_HINT}`")]
+
+
+def _openreview_profile_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
+    """Check the authors' OpenReview profiles, for venues submitted through OpenReview.
+
+    Applies when the venue's author list carries an Open Review ID column (ICLR,
+    AAAI). Looks each author up through the OpenReview API with the stored
+    login (see :mod:`paperpush.openreview_profiles`): a missing, ambiguous, or
+    inactive profile, a name mismatch, no current position, email suffixes the
+    profile does not carry. Runs by default (disable with
+    ``--dont-check-openreview-profiles``) and needs network access.
+    """
+    from . import openreview_profiles
+
+    if not openreview_profiles.applies(venue):
+        return []
+    logger.info("Checking OpenReview author profiles (%s)", venue.slug)
+    return [Issue(ERROR if p.error else WARNING, p.field, f"openreview: {p.message}") for p in openreview_profiles.check(venue, values)]
+
+
 def _manuscript_requirement_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     """Measure the uploads against the venue's author guidelines.
 
@@ -758,7 +828,7 @@ def _arxiv_cleaner_reminder(venue: Venue, findings) -> list[Issue]:
         Issue(
             WARNING,
             "",
-            "arXiv publishes your uploaded LaTeX source publicly; run arxiv_latex_cleaner on " "your source to strip the comments and unneeded files above before submitting",
+            "arXiv publishes your uploaded LaTeX source publicly; run arxiv_latex_cleaner on " "your source to strip the comments and unneeded files above before submitting " "(`paperpush validate --arxiv-latex-cleaner` does this and validates the result)",
         )
     ]
 
@@ -772,6 +842,8 @@ def validate(
     check_references: bool = True,
     check_manuscript: bool = True,
     check_anonymous: Optional[bool] = None,
+    check_hidden_text: bool = True,
+    check_openreview: bool = True,
 ) -> list[Issue]:
     """Return all issues found in ``subfile`` against ``venue``.
 
@@ -803,11 +875,17 @@ def validate(
     :func:`_anonymity_issues`; network access is needed for the repositories).
     It defaults to the venue's ``anonymous`` flag, so double-blind venues are
     always checked; pass True to check any venue.
+
+    ``check_hidden_text`` (default on) looks for white, invisible, microscopic,
+    or off-page text in the uploads and reports hidden instructions to AI
+    reviewers as errors (see :func:`_hidden_text_issues`). ``check_openreview``
+    (default on; network) looks up each author's OpenReview profile for venues
+    submitted through OpenReview (see :func:`_openreview_profile_issues`).
     """
     if check_anonymous is None:
         check_anonymous = venue.anonymous
     logger.info(
-        "Validating %s: %d field(s) (sensitive-scan=%s, link-check=%s, reference-check=%s, manuscript-check=%s, anonymity-check=%s)",
+        "Validating %s: %d field(s) (sensitive-scan=%s, link-check=%s, reference-check=%s, manuscript-check=%s, anonymity-check=%s, hidden-text-check=%s, openreview-check=%s)",
         venue.slug,
         len(venue.fields),
         check_sensitive,
@@ -815,6 +893,8 @@ def validate(
         check_references,
         check_manuscript,
         check_anonymous,
+        check_hidden_text,
+        check_openreview,
     )
     issues: list[Issue] = list(_schema_issues(venue, subfile.values))
     values = subfile.values
@@ -830,6 +910,11 @@ def validate(
         issues.extend(_manuscript_requirement_issues(venue, values))
     if check_anonymous:
         issues.extend(_anonymity_issues(venue, values))
+    if check_hidden_text:
+        issues.extend(_hidden_text_issues(venue, values))
+    issues.extend(_pdf_reader_issues(venue, values, check_hidden_text=check_hidden_text, check_manuscript=check_manuscript))
+    if check_openreview:
+        issues.extend(_openreview_profile_issues(venue, values))
 
     for field in venue.fields:
         raw = values.get(field.id, "")

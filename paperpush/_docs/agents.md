@@ -19,7 +19,8 @@ on a user's behalf.
 
 **Do your own autofilling.** Read the manuscript yourself and hand the CLI a
 `values.json`. Do **not** reach for `paperpush autofill --engine api` — that
-path calls the Anthropic API and needs an `ANTHROPIC_API_KEY`. You already have
+path calls an LLM API (Anthropic, OpenAI, or Google) and needs that provider's
+API key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`). You already have
 the manuscript in front of you; extract from it directly. Use `--engine api`
 only if the user has explicitly set an API key and asked for it.
 
@@ -204,6 +205,38 @@ camera-ready LaTeX switches, and it fetches every linked
 anonymous.4open.science repository and scans that too, including an expired or
 missing mirror. Warnings start with `anonymity:`; relay each one to the user,
 since a leak can get a paper desk-rejected.
+
+## Other desk-reject checks validate runs
+
+- **Hidden text / prompt injection** (every venue; `--dont-check-hidden-text`
+  skips it). White, invisible, microscopic, or off-page text in the PDF,
+  LaTeX, or Word uploads. Hidden text that instructs an AI reviewer is an
+  **error**. Tell the user exactly what was found and where, and never add such
+  text yourself. Reading PDFs needs the optional `validate` extra. If validate warns
+  "PDF checks skipped … need pdfminer.six", tell the user to run
+  `pip install 'paperpush[validate]'`, because the checks did not run.
+- **Uncleaned arXiv LaTeX source** (arXiv and venues that submit through it;
+  part of the sensitive-info scan). If validate warns that the source still has
+  comments or unneeded files, offer `paperpush validate --arxiv-latex-cleaner`:
+  it writes cleaned copies next to the originals (`paper_arXiv/`,
+  `source_arXiv.zip`) and validates those. It does not edit the .sub, so point
+  the upload fields at the cleaned copies before submitting. Needs
+  `pip install 'paperpush[validate]'`.
+- **Modified template** (venues whose `manuscript_requirements.json` entry has
+  `manuscript.template_layout`, e.g. ICLR). The manuscript PDF's margins, body
+  font, line spacing, running head, and review line numbers are measured
+  against the official template, and attached LaTeX source is read for
+  `geometry`, `\linespread`, text-block `\setlength`s, and heavy negative
+  `\vspace`. Warnings start with `template:`. Changing the paper's layout is the
+  author's call: report these to the user rather than editing their source.
+- **OpenReview profiles** (OpenReview venues: ICLR, AAAI;
+  `--dont-check-openreview-profiles` skips it). Each author is looked up
+  through the OpenReview API using the stored `paperpush login`. Reported:
+  missing, ambiguous, or inactive profiles, name or email-suffix mismatches, no
+  current position, and reviewers without DBLP or expertise. Messages start
+  with `openreview:`. Without a stored login the check is skipped with a note;
+  that is another reason to have the user log in first. Profile fixes happen on
+  openreview.net and are the user's to make.
 
 ## After it runs, tell the user what's left
 

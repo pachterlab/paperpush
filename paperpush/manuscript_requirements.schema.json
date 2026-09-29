@@ -647,6 +647,17 @@
           ],
           "description": "Required LaTeX document class or style file."
         },
+        "template_layout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemplateLayout"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Geometry of the compiled template, checked against the manuscript PDF to catch shrunken margins, font, or line spacing."
+        },
         "language": {
           "anyOf": [
             {
@@ -1674,6 +1685,125 @@
       },
       "type": "object",
       "additionalProperties": false
+    },
+    "TemplateLayout": {
+      "properties": {
+        "page_width_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page width in points."
+        },
+        "page_height_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Page height in points."
+        },
+        "text_left_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "x of the text block's left edge."
+        },
+        "text_right_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "x of the text block's right edge (justified line ends)."
+        },
+        "text_top_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "y of the highest body-text line on a page."
+        },
+        "text_bottom_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "y of the lowest body-text line on a full page."
+        },
+        "body_font_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Body font size in points."
+        },
+        "baseline_skip_pt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Distance between consecutive body-text baselines in points."
+        },
+        "running_head": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Running head the submission version prints on page 1 (e.g. 'Under review as a conference paper at ICLR 2027')."
+        },
+        "margin_line_numbers": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The submission version prints line numbers in the margin."
+        },
+        "tolerance_pt": {
+          "description": "How far, in points, a measured edge may sit from the template's before it is reported.",
+          "type": "number"
+        }
+      },
+      "type": "object"
     }
   }
 }

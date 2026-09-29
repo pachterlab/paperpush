@@ -114,7 +114,7 @@ def set_retrieved(text: str, slug: str, today: str) -> str:
     Done on the text rather than by re-serializing so that a venue's commit
     shows only what changed.
     """
-    start = re.search(rf'^  {re.escape(json.dumps(slug))}: \{{$', text, re.MULTILINE)
+    start = re.search(rf"^  {re.escape(json.dumps(slug))}: \{{$", text, re.MULTILINE)
     if not start:
         raise ValueError(f"no entry for {slug}")
     end = re.compile(r"^  \},?$", re.MULTILINE).search(text, start.end())

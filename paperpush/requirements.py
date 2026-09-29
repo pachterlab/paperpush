@@ -108,6 +108,30 @@ def _notes() -> Any:
 
 
 @dataclass(frozen=True)
+class TemplateLayout:
+    """Geometry of the venue's template in a compiled PDF, for spotting an edited one.
+
+    Measured from the official template compiled unchanged (see
+    :mod:`paperpush.template_check`), in PDF points with the origin at the
+    page's bottom-left. Text positions are the bottom of the glyph boxes of the
+    body-text lines: ``text_top_pt`` is the highest first line, ``text_bottom_pt``
+    the lowest last line of a full page.
+    """
+
+    page_width_pt: Annotated[Optional[float], PField(description="Page width in points.")] = None
+    page_height_pt: Annotated[Optional[float], PField(description="Page height in points.")] = None
+    text_left_pt: Annotated[Optional[float], PField(description="x of the text block's left edge.")] = None
+    text_right_pt: Annotated[Optional[float], PField(description="x of the text block's right edge (justified line ends).")] = None
+    text_top_pt: Annotated[Optional[float], PField(description="y of the highest body-text line on a page.")] = None
+    text_bottom_pt: Annotated[Optional[float], PField(description="y of the lowest body-text line on a full page.")] = None
+    body_font_pt: Annotated[Optional[float], PField(description="Body font size in points.")] = None
+    baseline_skip_pt: Annotated[Optional[float], PField(description="Distance between consecutive body-text baselines in points.")] = None
+    running_head: Annotated[Optional[str], PField(description="Running head the submission version prints on page 1 (e.g. 'Under review as a conference paper at ICLR 2027').")] = None
+    margin_line_numbers: Annotated[Optional[bool], PField(description="The submission version prints line numbers in the margin.")] = None
+    tolerance_pt: Annotated[float, PField(description="How far, in points, a measured edge may sit from the template's before it is reported.")] = 3.0
+
+
+@dataclass(frozen=True)
 class ManuscriptRules:
     """Rules for the main manuscript file: format, size, length, and layout."""
 
@@ -135,6 +159,7 @@ class ManuscriptRules:
     template_required: Annotated[Optional[bool], PField(description="Must use the venue's style file or template.")] = None
     template_url: Annotated[Optional[str], PField(description="URL of the venue's template.")] = None
     latex_class: Annotated[Optional[str], PField(description="Required LaTeX document class or style file.")] = None
+    template_layout: Annotated[Optional[TemplateLayout], PField(description="Geometry of the compiled template, checked against the manuscript PDF to catch shrunken margins, font, or line spacing.")] = None
     language: Annotated[Optional[str], PField(description="Mandated language variant, if any.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key, one per string.")] = _notes()
 
@@ -361,6 +386,10 @@ class ManuscriptRequirements:
         return out
 
 
+# Keys inside a section whose value is itself a small dataclass.
+_NESTED_TYPES: dict[str, type] = {"template_layout": TemplateLayout}
+
+
 def _section_from_dict(typ: type, data: Any):
     """Build a section dataclass from its raw mapping, ignoring unknown keys."""
     if not data:
@@ -373,6 +402,8 @@ def _section_from_dict(typ: type, data: Any):
             continue
         if key == "notes":
             kwargs[key] = list(value or [])
+        elif key in _NESTED_TYPES and isinstance(value, dict):
+            kwargs[key] = _section_from_dict(_NESTED_TYPES[key], value)
         elif value is not None:
             kwargs[key] = value
     return typ(**kwargs)
@@ -384,7 +415,7 @@ def _section_to_dict(section) -> dict[str, Any]:
         value = getattr(section, f.name)
         if value is None or (f.name == "notes" and not value):
             continue
-        out[f.name] = copy.deepcopy(value)
+        out[f.name] = _section_to_dict(value) if f.name in _NESTED_TYPES else copy.deepcopy(value)
     return out
 
 

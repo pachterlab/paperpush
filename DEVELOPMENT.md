@@ -84,7 +84,7 @@ section's `notes` list (one factual sentence each):
 
 | section         | what it holds                                                                   |
 |-----------------|---------------------------------------------------------------------------------|
-| `manuscript`    | `formats`, `max_file_size_mb`, `max_words[_before_refs]`, `max_pages[_before_refs]`, `count_excludes`, `max_display_items`, `line_numbers`, `double_spacing`, `single_file`, `figures_placement`, `anonymized`, `template_required`, ... |
+| `manuscript`    | `formats`, `max_file_size_mb`, `max_words[_before_refs]`, `max_pages[_before_refs]`, `count_excludes`, `max_display_items`, `line_numbers`, `double_spacing`, `single_file`, `figures_placement`, `anonymized`, `template_required`, `template_layout`, ... |
 | `title_page`    | `required_items` (canonical ids: `title`, `authors`, `affiliations`, `corresponding_email`, `orcid`, `keywords`, `running_title`, `word_count`, ...), `title_max_characters`, `running_title_max_characters` |
 | `abstract`      | `max_words`, `min_words`, `max_characters`, `structured`, `structured_headings`, `no_references` |
 | `keywords`      | `min`, `max`                                                                    |
@@ -133,6 +133,22 @@ compiles it with `latexmk` (or `pdflatex` + `bibtex`) into a scratch directory,
 never writing next to the source, and caches the build for the process. With
 no TeX toolchain the limit is reported as unchecked. Tests that need a
 toolchain are skipped when none is installed.
+
+`manuscript.template_layout` records the geometry of a mandatory template as
+it comes out of LaTeX -- text-block edges, body font size, baseline skip,
+running head, review line numbers -- so `validate` can tell when a paper was
+squeezed out of it (see `paperpush/template_check.py`). Don't derive the numbers
+from the style file: compile the official template unmodified, in its
+submission/review mode, and measure it with the same code `validate` uses:
+
+```bash
+python scripts/measure_template.py path/to/compiled-template.pdf \
+    --running-head "Under review as a conference paper at ICLR 2027"
+```
+
+Paste the printed object into the venue's `manuscript` section. Refresh it
+whenever the venue publishes a new year's style files (the running head usually
+changes with the year).
 
 ### Keeping entries current
 

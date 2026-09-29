@@ -36,7 +36,7 @@ See [`docs/example-session.md`](docs/example-session.md) for a full worked examp
 2. **fill out VENUE.sub - 3 options:**
    - **a.** *fill out manually*
    - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
-   - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE.sub`: Use an LLM API. Requires an API key.
+   - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE.sub`: Use an LLM API (Anthropic, OpenAI, or Google; pick one with `--provider`, otherwise the first one with an API key set is used). Requires that provider's API key and `pip install "paperpush[autofill]"`.
 3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count).
 4. `paperpush login VENUE`: log in to the VENUE submission portal.
 5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
@@ -69,7 +69,7 @@ See `python scripts/paperpush_pipeline.py --help` for the full list of options, 
 
 **Journals:** [Bioinformatics](https://academic.oup.com/bioinformatics), [BMC Bioinformatics](https://link.springer.com/journal/12859), [Cell](https://www.cell.com/cell/home), [Cell Genomics](https://www.cell.com/cell-genomics/home), [Cell Systems](https://www.cell.com/cell-systems/home), [Combinatorica](https://link.springer.com/journal/493), [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics), [Genome Biology](https://genomebiology.biomedcentral.com), [Nature](https://www.nature.com), [Nature Biotechnology](https://www.nature.com/nbt), [Nature Methods](https://www.nature.com/nmeth), [Nucleic Acids Research](https://academic.oup.com/nar), [PLOS Computational Biology](https://journal.plos.org/ploscompbiol/), [Science](https://www.science.org/journal/science), [Science Advances](https://www.science.org/journal/sciadv), [Science Immunology](https://www.science.org/journal/sciimmunol), [Science Robotics](https://www.science.org/journal/scirobotics), [Science Signaling](https://www.science.org/journal/signaling), [Science Translational Medicine](https://www.science.org/journal/stm)
 
-**Conferences:** [ICLR 2027](https://iclr.cc/Conferences/2027)
+**Conferences:** _none yet_
 <!-- END SUPPORTED VENUES -->
 
 View the list on the command line with `paperpush --venues`.

@@ -221,7 +221,7 @@ _REQ_TITLE = "paperpush manuscript requirements database"
 _REQ_DESCRIPTION = "Schema for manuscript_requirements.json. The top-level object maps a venue slug to " "what its author guidelines require of the manuscript, grouped into shared sections " "(manuscript, title_page, abstract, keywords, sections, statements, figures, tables, " "supplementary, references, cover_letter, upload). Generated from the dataclasses in " "paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate."
 
 
-def _requirements_section_schema(typ: type) -> dict[str, Any]:
+def _requirements_section_schema(typ: type, defs: dict[str, Any] | None = None) -> dict[str, Any]:
     """Schema for one section (e.g. ``figures``): every key optional and nullable.
 
     Nullable because an inheriting entry or an ``article_types`` override may
@@ -229,6 +229,12 @@ def _requirements_section_schema(typ: type) -> dict[str, Any]:
     :func:`paperpush.requirements.merge_entries`).
     """
     schema = _strip_model_description(_clean(TypeAdapter(typ).json_schema()))
+    # A nested object (e.g. manuscript.template_layout) arrives with its own
+    # $defs; hoist them into ``defs`` so its #/$defs/... reference resolves at
+    # the document root.
+    for name, nested in schema.pop("$defs", {}).items():
+        if defs is not None:
+            defs[name] = _strip_model_description(nested)
     schema["properties"] = {name: _nullable(prop) for name, prop in schema["properties"].items()}
     schema.pop("required", None)
     schema["additionalProperties"] = False
@@ -237,7 +243,8 @@ def _requirements_section_schema(typ: type) -> dict[str, Any]:
 
 def build_requirements_schema() -> dict[str, Any]:
     """Assemble the JSON Schema (draft 2020-12) for ``manuscript_requirements.json``."""
-    sections = {key: _requirements_section_schema(typ) for key, typ in SECTION_TYPES.items()}
+    nested_defs: dict[str, Any] = {}
+    sections = {key: _requirements_section_schema(typ, nested_defs) for key, typ in SECTION_TYPES.items()}
     top = _strip_model_description(_clean(TypeAdapter(ManuscriptRequirements).json_schema()))
     top.pop("$defs", None)
     properties = top["properties"]
@@ -283,5 +290,5 @@ def build_requirements_schema() -> dict[str, Any]:
         },
         "patternProperties": {"^[A-Za-z0-9_]+$": {"$ref": "#/$defs/venue"}},
         "additionalProperties": False,
-        "$defs": {"venue": top, "rules": rules, **sections},
+        "$defs": {"venue": top, "rules": rules, **sections, **nested_defs},
     }

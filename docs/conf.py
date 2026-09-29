@@ -80,10 +80,12 @@ napoleon_numpy_docstring = True
 
 # Heavy or optional third-party dependencies that need not be importable for
 # autodoc to read our docstrings. Mocking them keeps the Read the Docs build
-# light (no Playwright browsers, no Anthropic SDK required).
+# light (no Playwright browsers, no LLM SDKs required).
 autodoc_mock_imports = [
     "playwright",
     "anthropic",
+    "openai",
+    "google.genai",
 ]
 
 # -- Intersphinx -------------------------------------------------------------

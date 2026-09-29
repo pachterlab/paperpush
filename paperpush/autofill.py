@@ -1,8 +1,8 @@
 """Populate a ``.sub`` file from values extracted from a manuscript directory.
 
 This module is the deterministic core shared by both autofill front-ends: the
-``paperpush autofill`` command (which extracts values with the Anthropic
-API) and the Claude Code skill (where Claude reads the files and supplies the
+``paperpush autofill`` command (which extracts values with an LLM API --
+Anthropic, OpenAI, or Google) and the Claude Code skill (where Claude reads the files and supplies the
 values). Neither front-end writes the ``.sub`` itself; both hand a set of
 proposed ``{field id -> value}`` extractions to :func:`autofill`, which decides
 what may be written and writes it surgically through the same
@@ -25,10 +25,10 @@ so an autofilled file carries the same guarantees as one filled in by hand.
 
 The API extraction engine (``paperpush autofill --engine api``) lives in the
 "API extraction engine" section at the bottom of this module: it reads the
-manuscript files and asks the Anthropic API to propose values, returning the same
-:class:`Extraction` the manual engine produces so both flow through the identical
-gates above. ``anthropic`` is an optional dependency, imported lazily, so the
-deterministic core works without it.
+manuscript files and asks an LLM API (Anthropic, OpenAI, or Google) to propose
+values, returning the same :class:`Extraction` the manual engine produces so both
+flow through the identical gates above. Each provider's SDK is an optional
+dependency, imported lazily, so the deterministic core works without any of them.
 """
 
 from __future__ import annotations
@@ -336,14 +336,37 @@ def autofill(
 # API extraction engine (``paperpush autofill --engine api``)
 #
 # The second autofill front-end (the Claude Code skill is the first): it reads
-# the manuscript files and asks the Anthropic API to propose field values,
-# returning the same ``Extraction`` the manual engine produces so both flow
-# through the deterministic gates above. ``anthropic`` is an optional dependency
-# (``pip install paperpush[autofill]``), imported lazily below.
+# the manuscript files and asks an LLM API -- Anthropic, OpenAI, or Google -- to
+# propose field values, returning the same ``Extraction`` the manual engine
+# produces so both flow through the deterministic gates above. Every provider
+# gets the same prompt and the same JSON schema; only the request/response
+# plumbing differs. Each SDK is an optional dependency
+# (``pip install paperpush[autofill-<provider>]``, or ``paperpush[autofill]``
+# for all three), imported lazily below.
 # ---------------------------------------------------------------------------
 
 
-DEFAULT_MODEL = "claude-opus-4-8"
+PROVIDERS = ("anthropic", "openai", "google")
+
+# Default model per provider; ``--model`` overrides it.
+DEFAULT_MODELS = {
+    "anthropic": "claude-opus-5-5",
+    "openai": "gpt-6-astra",
+    "google": "gemini-3.8-flash",
+}
+DEFAULT_MODEL = DEFAULT_MODELS["anthropic"]
+
+# Environment variables each provider's SDK reads its key from. With no
+# explicit provider, :func:`detect_provider` picks the first provider (in
+# ``PROVIDERS`` order) that has one of these set.
+API_KEY_ENV = {
+    "anthropic": ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"),
+    "openai": ("OPENAI_API_KEY",),
+    "google": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+}
+
+# The PyPI package each provider's SDK comes from (for install hints).
+_SDK_PACKAGES = {"anthropic": "anthropic", "openai": "openai", "google": "google-genai"}
 
 
 class AutofillApiError(RuntimeError):
@@ -383,18 +406,34 @@ def _read_text(path: Path) -> str:
         raise AutofillApiError(f"could not read {path.name}: {exc}") from exc
 
 
-def _document_blocks(documents: list[DocumentInput]) -> list[dict]:
-    """Build the user-content blocks for the manuscript documents.
+def _read_documents(documents: list[DocumentInput]) -> list[tuple[DocumentInput, str, str]]:
+    """Read each document once, as ``(doc, kind, data)``.
 
-    PDFs become base64 ``document`` blocks; other formats are extracted to text
-    and wrapped in a labelled text block.
+    A PDF comes back as ``kind="pdf"`` with base64 ``data`` (every provider reads
+    PDFs natively); any other format is extracted to text and comes back as
+    ``kind="text"`` with a labelled header, ready to send as a text block.
     """
-    blocks: list[dict] = []
+    read: list[tuple[DocumentInput, str, str]] = []
     for doc in documents:
         if not doc.path.is_file():
             raise AutofillApiError(f"{doc.label} file not found: {doc.path}")
         if doc.path.suffix.lower() == ".pdf":
             data = base64.standard_b64encode(doc.path.read_bytes()).decode("ascii")
+            read.append((doc, "pdf", data))
+        else:
+            read.append((doc, "text", f"=== {doc.label} ({doc.path.name}) ===\n{_read_text(doc.path)}"))
+    return read
+
+
+def _document_blocks(documents: list[DocumentInput]) -> list[dict]:
+    """Build the Anthropic user-content blocks for the manuscript documents.
+
+    PDFs become base64 ``document`` blocks; other formats are extracted to text
+    and wrapped in a labelled text block.
+    """
+    blocks: list[dict] = []
+    for doc, kind, data in _read_documents(documents):
+        if kind == "pdf":
             blocks.append(
                 {
                     "type": "document",
@@ -407,14 +446,33 @@ def _document_blocks(documents: list[DocumentInput]) -> list[dict]:
                 }
             )
         else:
-            text = _read_text(doc.path)
-            blocks.append(
-                {
-                    "type": "text",
-                    "text": f"=== {doc.label} ({doc.path.name}) ===\n{text}",
-                }
-            )
+            blocks.append({"type": "text", "text": data})
     return blocks
+
+
+def _openai_content(documents: list[DocumentInput], instructions: str) -> list[dict]:
+    """The OpenAI Responses API user content: ``input_file`` PDFs, then text."""
+    content: list[dict] = []
+    for doc, kind, data in _read_documents(documents):
+        if kind == "pdf":
+            content.append({"type": "input_file", "filename": doc.path.name, "file_data": f"data:application/pdf;base64,{data}"})
+        else:
+            content.append({"type": "input_text", "text": data})
+    content.append({"type": "input_text", "text": instructions})
+    return content
+
+
+def _google_content(documents: list[DocumentInput], instructions: str) -> list[dict]:
+    """The Gemini Interactions API input: ``document`` PDFs, then text."""
+    content: list[dict] = []
+    for doc, kind, data in _read_documents(documents):
+        if kind == "pdf":
+            content.append({"type": "text", "text": f"=== {doc.label} ({doc.path.name}) ==="})
+            content.append({"type": "document", "data": data, "mime_type": "application/pdf"})
+        else:
+            content.append({"type": "text", "text": data})
+    content.append({"type": "text", "text": instructions})
+    return content
 
 
 def _extraction_schema(field_ids: list[str]) -> dict:
@@ -477,44 +535,38 @@ def _field_brief(venue: Venue) -> tuple[list[dict], list[str]]:
 _SYSTEM = "You prepare academic venue submissions. Read the attached manuscript " "documents and propose values for the listed submission fields. Rules: " "(1) Extract values that appear in the text verbatim where possible. " "(2) For a 'classify' field, choose exactly one of its options. " "(3) For a 'filemap' field, assign one or more file paths from the directory " "listing, given relative to the manuscript directory; one per line, using " "the column format described in the field's help. " "(4) Never invent emails, ORCID iDs, DOIs, funders, or licenses that are not " "present in the documents -- leave a subfield blank instead. " "(5) Set confidence honestly: 'high' only for verbatim copies or unambiguous " "file matches, 'medium' for inference or classification, 'low' for guesses. " "(6) Put any field you cannot fill in 'unfilled' with a brief reason. " "Authors go one per line in the exact pipe-delimited column format the " "authors field's help gives -- usually " "'Name | email | affiliation | ORCID | corresponding' with exactly one " "corresponding author marked 'yes', but some venues order the columns " "differently or take the name alone; follow the help, not this example."
 
 
-def _build_prompt(venue: Venue, documents: list[DocumentInput], file_listing: list[str]) -> tuple[str, list[dict], dict, list[str]]:
+def _instructions(venue: Venue, file_listing: list[str]) -> tuple[str, dict]:
+    """The task text that follows the documents, plus the output JSON schema."""
     brief, field_ids = _field_brief(venue)
-    content = _document_blocks(documents)
     instructions = f"Target venue: {venue.full_name or venue.name} " f"(slug: {venue.slug}).\n\n" "Files available in the manuscript directory (use these relative paths " "for 'filemap' fields):\n" + "\n".join(f"  {p}" for p in file_listing) + "\n\nFields to fill (JSON):\n" + json.dumps(brief, indent=2) + "\n\nReturn the extraction now."
-    content.append({"type": "text", "text": instructions})
-    schema = _extraction_schema(field_ids)
-    return _SYSTEM, content, schema, field_ids
+    return instructions, _extraction_schema(field_ids)
 
 
-def extract_via_api(
-    venue: Venue,
-    documents: list[DocumentInput],
-    file_listing: list[str],
-    model: str = DEFAULT_MODEL,
-    max_tokens: int = 16000,
-) -> Extraction:
-    """Ask the Anthropic API to propose field values; return an Extraction.
+def detect_provider() -> str | None:
+    """The first provider (in ``PROVIDERS`` order) whose API key is set, if any."""
+    for provider in PROVIDERS:
+        if any(os.environ.get(var) for var in API_KEY_ENV[provider]):
+            return provider
+    return None
 
-    Raises :class:`AutofillApiError` for setup problems (missing dependency, no
-    API key, unreadable file) and for a model refusal.
-    """
+
+def _missing_sdk(provider: str) -> AutofillApiError:
+    return AutofillApiError(f"the 'api' engine with --provider {provider} needs the {_SDK_PACKAGES[provider]} package; " f"install it with 'pip install paperpush[autofill-{provider}]'.")
+
+
+def _call_anthropic(model: str, documents: list[DocumentInput], instructions: str, schema: dict, max_tokens: int) -> str:
     try:
         import anthropic
     except ImportError as exc:
-        raise AutofillApiError("the 'api' engine needs the anthropic package; install it with " "'pip install paperpush[autofill]'.") from exc
+        raise _missing_sdk("anthropic") from exc
 
-    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
-        raise AutofillApiError("no API key found; set ANTHROPIC_API_KEY (or use '--engine manual' " "with the Claude skill).")
-
-    system, content, schema, _ = _build_prompt(venue, documents, file_listing)
-    logger.info("autofill api: calling %s for %s (%d document(s), %d field(s))", model, venue.slug, len(documents), len(schema["properties"]["fields"]["items"]["properties"]["id"]["enum"]))
-
+    content = _document_blocks(documents) + [{"type": "text", "text": instructions}]
     client = anthropic.Anthropic()
     try:
         response = client.messages.create(
             model=model,
             max_tokens=max_tokens,
-            system=system,
+            system=_SYSTEM,
             messages=[{"role": "user", "content": content}],
             output_config={"format": {"type": "json_schema", "schema": schema}},
         )
@@ -523,12 +575,112 @@ def extract_via_api(
 
     if response.stop_reason == "refusal":
         raise AutofillApiError("the model declined to process this request " f"({getattr(response.stop_details, 'category', None) or 'refusal'}).")
+    logger.info("autofill api: anthropic usage: %s in / %s out", response.usage.input_tokens, response.usage.output_tokens)
+    return next((b.text for b in response.content if b.type == "text"), "")
 
-    text = next((b.text for b in response.content if b.type == "text"), "")
+
+def _call_openai(model: str, documents: list[DocumentInput], instructions: str, schema: dict, max_tokens: int) -> str:
+    try:
+        import openai
+    except ImportError as exc:
+        raise _missing_sdk("openai") from exc
+
+    content = _openai_content(documents, instructions)
+    client = openai.OpenAI()
+    try:
+        response = client.responses.create(
+            model=model,
+            instructions=_SYSTEM,
+            input=[{"role": "user", "content": content}],
+            text={"format": {"type": "json_schema", "name": "extraction", "schema": schema, "strict": True}},
+            max_output_tokens=max_tokens,
+        )
+    except openai.APIError as exc:
+        raise AutofillApiError(f"the API request failed: {exc}") from exc
+
+    for item in response.output:
+        if item.type != "message":
+            continue
+        for part in item.content:
+            if part.type == "refusal":
+                raise AutofillApiError(f"the model declined to process this request ({part.refusal}).")
+    if response.status != "completed":
+        reason = getattr(response.incomplete_details, "reason", None) or response.status
+        raise AutofillApiError(f"the model did not finish the extraction ({reason}).")
+    logger.info("autofill api: openai usage: %s in / %s out", response.usage.input_tokens, response.usage.output_tokens)
+    return response.output_text
+
+
+def _call_google(model: str, documents: list[DocumentInput], instructions: str, schema: dict, max_tokens: int) -> str:
+    # max_tokens is not passed: the Interactions API caps output per model, and
+    # an extraction is far below that cap.
+    try:
+        from google import genai
+        from google.genai import errors as genai_errors
+    except ImportError as exc:
+        raise _missing_sdk("google") from exc
+
+    content = _google_content(documents, instructions)
+    client = genai.Client()
+    try:
+        interaction = client.interactions.create(
+            model=model,
+            system_instruction=_SYSTEM,
+            input=content,
+            response_format={"type": "text", "mime_type": "application/json", "schema": schema},
+            store=False,
+        )
+    except genai_errors.APIError as exc:
+        raise AutofillApiError(f"the API request failed: {exc}") from exc
+
+    if interaction.status != "completed":
+        raise AutofillApiError(f"the model did not finish the extraction ({interaction.status}).")
+    text = interaction.output_text
+    if not text:
+        # A safety block completes with no output rather than a refusal field.
+        raise AutofillApiError("the model returned no output (it may have declined to process this request).")
+    return text
+
+
+_CALLERS = {"anthropic": _call_anthropic, "openai": _call_openai, "google": _call_google}
+
+
+def extract_via_api(
+    venue: Venue,
+    documents: list[DocumentInput],
+    file_listing: list[str],
+    model: str | None = None,
+    provider: str | None = None,
+    max_tokens: int = 16000,
+) -> Extraction:
+    """Ask an LLM API to propose field values; return an Extraction.
+
+    ``provider`` is one of ``PROVIDERS``; when omitted it is detected from which
+    API key is set (see :func:`detect_provider`). ``model`` defaults to the
+    provider's entry in ``DEFAULT_MODELS``.
+
+    Raises :class:`AutofillApiError` for setup problems (missing dependency, no
+    API key, unreadable file) and for a model refusal.
+    """
+    if provider is None:
+        provider = detect_provider()
+        if provider is None:
+            names = ", ".join(v for p in PROVIDERS for v in API_KEY_ENV[p])
+            raise AutofillApiError(f"no API key found; set one of {names} (or use '--engine manual' " "with the Claude skill).")
+    elif provider not in PROVIDERS:
+        raise AutofillApiError(f"unknown provider {provider!r}; choose from {', '.join(PROVIDERS)}.")
+    elif not any(os.environ.get(var) for var in API_KEY_ENV[provider]):
+        raise AutofillApiError(f"no API key found for {provider}; set {' or '.join(API_KEY_ENV[provider])} " "(or use '--engine manual' with the Claude skill).")
+    model = model or DEFAULT_MODELS[provider]
+
+    instructions, schema = _instructions(venue, file_listing)
+    logger.info("autofill api: calling %s %s for %s (%d document(s), %d field(s))", provider, model, venue.slug, len(documents), len(schema["properties"]["fields"]["items"]["properties"]["id"]["enum"]))
+
+    text = _CALLERS[provider](model, documents, instructions, schema, max_tokens)
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
         raise AutofillApiError(f"the model returned output that was not valid JSON: {exc}") from exc
 
-    logger.info("autofill api: %s proposed %d field(s), %d unfilled (usage: " "%s in / %s out)", venue.slug, len(data.get("fields", [])), len(data.get("unfilled", [])), response.usage.input_tokens, response.usage.output_tokens)
+    logger.info("autofill api: %s proposed %d field(s), %d unfilled", venue.slug, len(data.get("fields", [])), len(data.get("unfilled", [])))
     return parse_extraction(data)

@@ -2967,7 +2967,7 @@
     "venue_type": "conference",
     "anonymous": true,
     "name": "ICLR 2027",
-    "deprecated": false,
+    "deprecated": true,
     "full_name": "The Fifteenth International Conference on Learning Representations",
     "submission_url": "https://openreview.net/group?id=ICLR.cc/2027/Conference&referrer=%5BHomepage%5D(%2F)#tab-recent-activity",
     "site_url": "https://iclr.cc/Conferences/2027",

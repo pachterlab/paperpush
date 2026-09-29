@@ -7,8 +7,9 @@ the ``paperpush autofill`` CLI.
   extraction-schema loader. No network and no model; proposals are supplied
   directly.
 * API engine (the API section of ``paperpush.autofill``) -- the network path is exercised
-  with a fake ``anthropic`` module injected into ``sys.modules``, and the
-  document-reading / prompt-building helpers are tested directly.
+  with fake ``anthropic``, ``openai``, and ``google.genai`` modules injected into
+  ``sys.modules``, and the document-reading / prompt-building helpers are tested
+  directly.
 * CLI (``paperpush autofill -d <dir> <subfile>``) -- the manual engine reads
   proposed field values from a ``--values`` JSON file (the same file the Claude
   skill produces), so these exercise the full CLI path without any model or
@@ -371,7 +372,7 @@ def test_extract_via_api_returns_extraction(fake_anthropic, tmp_path):
     assert extraction.unfilled == [("funding", "no statement found")]
     # The request forces JSON via output_config and uses the default model.
     kwargs = fake_anthropic["messages"].last_kwargs
-    assert kwargs["model"] == "claude-opus-4-8"
+    assert kwargs["model"] == "claude-opus-5-5"
     assert kwargs["output_config"]["format"]["type"] == "json_schema"
 
 
@@ -395,6 +396,183 @@ def test_missing_anthropic_dependency_raises(monkeypatch, tmp_path):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     with pytest.raises(api.AutofillApiError, match="anthropic"):
         api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"])
+
+
+def test_missing_every_api_key_raises(tmp_path):
+    # No provider named and no key of any provider set.
+    with pytest.raises(api.AutofillApiError, match="OPENAI_API_KEY"):
+        api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"])
+
+
+def test_detect_provider_order(monkeypatch):
+    assert api.detect_provider() is None
+    monkeypatch.setenv("GEMINI_API_KEY", "g")
+    assert api.detect_provider() == "google"
+    monkeypatch.setenv("OPENAI_API_KEY", "o")
+    assert api.detect_provider() == "openai"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "a")
+    assert api.detect_provider() == "anthropic"
+
+
+_EXTRACTION = {
+    "fields": [{"id": "title", "value": "A New Method", "confidence": "high", "source": "p.1"}],
+    "unfilled": [{"id": "funding", "reason": "no statement found"}],
+}
+
+
+# --- network path with a fake openai module --------------------------------
+
+
+class _FakeResponses:
+    def __init__(self, payload, status="completed", refusal=None):
+        self._payload = payload
+        self._status = status
+        self._refusal = refusal
+        self.last_kwargs = None
+
+    def create(self, **kwargs):
+        self.last_kwargs = kwargs
+        part = types.SimpleNamespace(type="refusal", refusal=self._refusal) if self._refusal else types.SimpleNamespace(type="output_text", text=json.dumps(self._payload))
+        message = types.SimpleNamespace(type="message", content=[part])
+        usage = types.SimpleNamespace(input_tokens=10, output_tokens=20)
+        return types.SimpleNamespace(
+            output=[message],
+            output_text="" if self._refusal else json.dumps(self._payload),
+            status=self._status,
+            incomplete_details=types.SimpleNamespace(reason="max_output_tokens") if self._status == "incomplete" else None,
+            usage=usage,
+        )
+
+
+@pytest.fixture
+def fake_openai(monkeypatch):
+    """Install a fake ``openai`` module; tests set its canned response."""
+    module = types.ModuleType("openai")
+    holder = {}
+
+    class APIError(Exception):
+        pass
+
+    class OpenAI:
+        def __init__(self, *a, **k):
+            self.responses = holder["responses"]
+
+    module.APIError = APIError
+    module.OpenAI = OpenAI
+    monkeypatch.setitem(sys.modules, "openai", module)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    return holder
+
+
+def test_openai_returns_extraction(fake_openai, tmp_path):
+    fake_openai["responses"] = _FakeResponses(_EXTRACTION)
+    # Detected from OPENAI_API_KEY alone.
+    extraction = api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"])
+    assert extraction.fields[0].value == "A New Method"
+    assert extraction.unfilled == [("funding", "no statement found")]
+    kwargs = fake_openai["responses"].last_kwargs
+    assert kwargs["model"] == "gpt-6-astra"
+    fmt = kwargs["text"]["format"]
+    assert fmt["type"] == "json_schema" and fmt["strict"] is True
+    content = kwargs["input"][0]["content"]
+    assert content[0]["type"] == "input_file"
+    assert content[0]["file_data"].startswith("data:application/pdf;base64,")
+    assert content[-1]["type"] == "input_text"
+
+
+def test_openai_refusal_raises(fake_openai, tmp_path):
+    fake_openai["responses"] = _FakeResponses(_EXTRACTION, refusal="cannot help")
+    with pytest.raises(api.AutofillApiError, match="declined"):
+        api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"], provider="openai")
+
+
+def test_openai_incomplete_raises(fake_openai, tmp_path):
+    fake_openai["responses"] = _FakeResponses(_EXTRACTION, status="incomplete")
+    with pytest.raises(api.AutofillApiError, match="max_output_tokens"):
+        api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"], provider="openai")
+
+
+def test_missing_openai_dependency_raises(monkeypatch, tmp_path):
+    monkeypatch.setitem(sys.modules, "openai", None)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    with pytest.raises(api.AutofillApiError, match=r"autofill-openai"):
+        api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"], provider="openai")
+
+
+def test_explicit_provider_without_its_key_raises(monkeypatch, tmp_path):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    with pytest.raises(api.AutofillApiError, match="OPENAI_API_KEY"):
+        api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"], provider="openai")
+
+
+# --- network path with a fake google.genai module --------------------------
+
+
+class _FakeInteractions:
+    def __init__(self, payload, status="completed", text=None):
+        self._payload = payload
+        self._status = status
+        self._text = json.dumps(payload) if text is None else text
+        self.last_kwargs = None
+
+    def create(self, **kwargs):
+        self.last_kwargs = kwargs
+        return types.SimpleNamespace(status=self._status, output_text=self._text)
+
+
+@pytest.fixture
+def fake_google(monkeypatch):
+    """Install fake ``google`` / ``google.genai`` modules; tests set the response."""
+    google = types.ModuleType("google")
+    genai = types.ModuleType("google.genai")
+    errors = types.ModuleType("google.genai.errors")
+    holder = {}
+
+    class APIError(Exception):
+        pass
+
+    class Client:
+        def __init__(self, *a, **k):
+            self.interactions = holder["interactions"]
+
+    errors.APIError = APIError
+    genai.Client = Client
+    genai.errors = errors
+    google.genai = genai
+    monkeypatch.setitem(sys.modules, "google", google)
+    monkeypatch.setitem(sys.modules, "google.genai", genai)
+    monkeypatch.setitem(sys.modules, "google.genai.errors", errors)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    return holder
+
+
+def test_google_returns_extraction(fake_google, tmp_path):
+    fake_google["interactions"] = _FakeInteractions(_EXTRACTION)
+    extraction = api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"])
+    assert extraction.fields[0].value == "A New Method"
+    kwargs = fake_google["interactions"].last_kwargs
+    assert kwargs["model"] == "gemini-3.8-flash"
+    assert kwargs["response_format"]["mime_type"] == "application/json"
+    assert kwargs["store"] is False
+    assert any(part["type"] == "document" and part["mime_type"] == "application/pdf" for part in kwargs["input"])
+
+
+def test_google_incomplete_raises(fake_google, tmp_path):
+    fake_google["interactions"] = _FakeInteractions(_EXTRACTION, status="failed")
+    with pytest.raises(api.AutofillApiError, match="failed"):
+        api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"], provider="google")
+
+
+def test_google_empty_output_raises(fake_google, tmp_path):
+    fake_google["interactions"] = _FakeInteractions(_EXTRACTION, text="")
+    with pytest.raises(api.AutofillApiError, match="no output"):
+        api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"], provider="google")
+
+
+def test_model_override(fake_google, tmp_path):
+    fake_google["interactions"] = _FakeInteractions(_EXTRACTION)
+    api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"], model="gemini-3.1-pro-preview")
+    assert fake_google["interactions"].last_kwargs["model"] == "gemini-3.1-pro-preview"
 
 
 # ===========================================================================
@@ -598,6 +776,32 @@ def test_autofill_api_without_sdk_errors(in_tmp, manuscript_dir, monkeypatch):
     # No anthropic module importable, but a manuscript is present.
     monkeypatch.setitem(sys.modules, "anthropic", None)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--engine", "api", "--manuscript", str(manuscript_dir / "paper.pdf")])
+    assert rc == 1
+
+
+def test_autofill_api_engine_openai_provider(in_tmp, manuscript_dir, monkeypatch):
+    module = types.ModuleType("openai")
+
+    class APIError(Exception):
+        pass
+
+    class OpenAI:
+        def __init__(self, *a, **k):
+            self.responses = _FakeResponses(_EXTRACTION)
+
+    module.APIError = APIError
+    module.OpenAI = OpenAI
+    monkeypatch.setitem(sys.modules, "openai", module)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    # An Anthropic key is set too, but --provider picks OpenAI.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--engine", "api", "--provider", "openai", "--manuscript", str(manuscript_dir / "paper.pdf")])
+    assert rc == 0
+    assert subfile.load(in_tmp / "biorxiv.sub").values["title"] == "A New Method"
+
+
+def test_autofill_api_no_key_errors(in_tmp, manuscript_dir):
     rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--engine", "api", "--manuscript", str(manuscript_dir / "paper.pdf")])
     assert rc == 1
 

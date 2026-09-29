@@ -10,7 +10,9 @@ hand.
    usage: paperpush autofill [-h] [-v] [-q] -d MANUSCRIPTDIR
                              [--engine {manual,api}] [--values FILE]
                              [--manuscript FILE] [--title-page FILE]
-                             [--supplement FILE] [--model MODEL]
+                             [--supplement FILE]
+                             [--provider {anthropic,openai,google}]
+                             [--model MODEL]
                              [--min-confidence {low,medium,high}] [-o OUTPUT]
                              [--force] [--dry-run]
                              subfile
@@ -39,8 +41,21 @@ Engines
    ``values.json``, and hands it to the deterministic core.
 
 ``api``
-   Extracts fields directly with the Anthropic API. Requires the ``autofill``
-   extra (``pip install "paperpush[autofill]"``) and an Anthropic API key.
+   Extracts fields directly with an LLM API: Anthropic, OpenAI, or Google.
+   Requires that provider's SDK (``pip install "paperpush[autofill]"`` for all
+   three, or ``paperpush[autofill-anthropic]`` / ``[autofill-openai]`` /
+   ``[autofill-google]`` for one) and its API key:
+
+   =============  ==========================================  ====================
+   Provider       API key variable                            Default model
+   =============  ==========================================  ====================
+   ``anthropic``  ``ANTHROPIC_API_KEY``                       ``claude-opus-5-5``
+   ``openai``     ``OPENAI_API_KEY``                          ``gpt-6-astra``
+   ``google``     ``GEMINI_API_KEY`` (or ``GOOGLE_API_KEY``)  ``gemini-3.8-flash``
+   =============  ==========================================  ====================
+
+   Every provider gets the same prompt and the same output schema, and its
+   answer goes through the same checks as the manual engine's.
 
 Arguments
 ---------
@@ -57,7 +72,7 @@ Options
 
 ``--engine {manual,api}``
    Which extraction engine to use. ``manual`` (default) reads values from
-   ``--values``; ``api`` extracts them with the Anthropic API.
+   ``--values``; ``api`` extracts them with an LLM API (see ``--provider``).
 
 ``--values FILE``
    JSON file of proposed field values. **Required for** ``--engine manual``.
@@ -72,8 +87,13 @@ Options
 ``--supplement FILE``
    *(api)* A supplementary-materials file, if any.
 
+``--provider {anthropic,openai,google}``
+   *(api)* Which LLM API to use. Defaults to the first of ``anthropic``,
+   ``openai``, ``google`` whose API key is set.
+
 ``--model MODEL``
-   *(api)* The Anthropic model to use. Defaults to ``claude-opus-4-8``.
+   *(api)* The model to use. Defaults to the provider's model in the table
+   above.
 
 ``--min-confidence {low,medium,high}``
    Do not write any value whose extraction confidence is below this threshold.
@@ -104,6 +124,12 @@ Fill from an agent-produced ``values.json`` (the default manual engine):
 .. code-block:: bash
 
    paperpush autofill -d ./my_manuscript --values values.json biorxiv.sub
+
+Use OpenAI even though an Anthropic key is also set:
+
+.. code-block:: bash
+
+   paperpush autofill -d ./my_manuscript --engine api --provider openai biorxiv.sub
 
 Write the result to a new file and only accept high-confidence values:
 

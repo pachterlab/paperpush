@@ -38,7 +38,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # Install the package so autodoc can import it (Playwright and
-          # anthropic are mocked in docs/conf.py, so no browsers/keys needed).
+          # the LLM SDKs are mocked in docs/conf.py, so no browsers/keys needed).
           pip install .
           pip install -r docs/requirements.txt
 

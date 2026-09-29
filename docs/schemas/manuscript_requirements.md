@@ -77,6 +77,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `template_required` | boolean or null | Must use the venue's style file or template. |
 | `template_url` | string or null | URL of the venue's template. |
 | `latex_class` | string or null | Required LaTeX document class or style file. |
+| `template_layout` | [TemplateLayout](#templatelayout) or null | Geometry of the compiled template, checked against the manuscript PDF to catch shrunken margins, font, or line spacing. |
 | `language` | string or null | Mandated language variant, if any. |
 | `notes` | list of string or null | Rules with no structured key, one per string. |
 
@@ -205,6 +206,22 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `max_total_mb` | number or null | Maximum combined size of one submission's uploads in MB. |
 | `max_file_mb` | number or null | Per-file size cap that applies to every upload, in MB. |
 | `notes` | list of string or null | Rules with no structured key. |
+
+## TemplateLayout
+
+| Key | Type | Description |
+|---|---|---|
+| `page_width_pt` | number or null | Page width in points. |
+| `page_height_pt` | number or null | Page height in points. |
+| `text_left_pt` | number or null | x of the text block's left edge. |
+| `text_right_pt` | number or null | x of the text block's right edge (justified line ends). |
+| `text_top_pt` | number or null | y of the highest body-text line on a page. |
+| `text_bottom_pt` | number or null | y of the lowest body-text line on a full page. |
+| `body_font_pt` | number or null | Body font size in points. |
+| `baseline_skip_pt` | number or null | Distance between consecutive body-text baselines in points. |
+| `running_head` | string or null | Running head the submission version prints on page 1 (e.g. 'Under review as a conference paper at ICLR 2027'). |
+| `margin_line_numbers` | boolean or null | The submission version prints line numbers in the margin. |
+| `tolerance_pt` | number | How far, in points, a measured edge may sit from the template's before it is reported. |
 
 ## $aliases
 

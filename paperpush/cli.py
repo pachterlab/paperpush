@@ -528,7 +528,7 @@ def _populate_orcid_into(sub_path: str, venue, profile) -> None:
     print(f"  Updated {sub_path}: filled ORCID details for author '{matched}'.")
 
 
-def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True, check_manuscript: bool = True, check_anonymous: bool | None = None) -> list:
+def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True, check_manuscript: bool = True, check_anonymous: bool | None = None, check_hidden_text: bool = True, check_openreview: bool = True) -> list:
     """Validate a loaded .sub against its venue and print the findings.
 
     Runs the same checks ``submit`` performs before opening a browser --
@@ -552,11 +552,23 @@ def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive
     statements, title-page items, figure resolution, reference count.
     ``check_anonymous`` (default: the venue's ``anonymous`` flag) scans the
     uploads and any linked anonymous.4open.science repositories for information
-    identifying the authors.
+    identifying the authors. ``check_hidden_text`` looks for text a reader cannot
+    see (hidden prompts to AI reviewers are errors); ``check_openreview`` looks
+    up the authors' OpenReview profiles for OpenReview venues.
     """
     from .validate import validate
 
-    issues = validate(subfile, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=check_anonymous)
+    issues = validate(
+        subfile,
+        venue_def,
+        check_sensitive=check_sensitive,
+        check_links=check_links,
+        check_references=check_references,
+        check_manuscript=check_manuscript,
+        check_anonymous=check_anonymous,
+        check_hidden_text=check_hidden_text,
+        check_openreview=check_openreview,
+    )
     errors = [i for i in issues if i.is_error]
     warnings = [i for i in issues if not i.is_error]
     for issue in warnings:
@@ -569,6 +581,33 @@ def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive
             where = f"[{issue.field}] " if issue.field else ""
             print(f"  - {where}{issue.message}", file=sys.stderr)
     return errors
+
+
+def _clean_latex_sources(subfile, venue_def):
+    """Swap the .sub's LaTeX uploads for arxiv_latex_cleaner'd copies (``--arxiv-latex-cleaner``).
+
+    Runs :func:`paperpush.latex_cleaner.clean_values` and prints where each
+    cleaned copy was written. The .sub on disk is left alone; the returned
+    :class:`~paperpush.subfile.SubFile` points at the copies so the rest of
+    ``validate`` checks what would be uploaded. Returns None (after printing
+    an error) when the optional package is not installed.
+    """
+    from . import latex_cleaner
+    from .subfile import SubFile
+
+    if not latex_cleaner.available():
+        print(f"error: --arxiv-latex-cleaner needs the arxiv_latex_cleaner package; install it with `{latex_cleaner.INSTALL_HINT}`", file=sys.stderr)
+        return None
+    values, cleaned, failures = latex_cleaner.clean_values(venue_def, subfile.values)
+    for field_id, path, reason in failures:
+        print(f"warning: [{field_id}] arxiv_latex_cleaner could not clean {path}: {reason}; validating the original", file=sys.stderr)
+    if not cleaned and not failures:
+        print("note: --arxiv-latex-cleaner found no LaTeX source (.tex, or a .zip/.tar bundle with one) to clean", file=sys.stderr)
+    for c in cleaned:
+        print(f"note: [{c.field_id}] cleaned {c.original} -> {c.cleaned}", file=sys.stderr)
+    if cleaned:
+        print("note: validating the cleaned copies; point the .sub at them to submit them", file=sys.stderr)
+    return SubFile(venue=subfile.venue, values=values)
 
 
 @_validate
@@ -602,6 +641,11 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
         return 2
 
+    if getattr(args, "arxiv_latex_cleaner", False):
+        subfile = _clean_latex_sources(subfile, venue_def)
+        if subfile is None:
+            return 1
+
     errors = _report_validation(
         subfile,
         venue_def,
@@ -611,6 +655,8 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         check_references=getattr(args, "check_references", True),
         check_manuscript=getattr(args, "check_manuscript", True),
         check_anonymous=getattr(args, "check_anonymous", None),
+        check_hidden_text=getattr(args, "check_hidden_text", True),
+        check_openreview=getattr(args, "check_openreview", True),
     )
     if errors:
         print("\nFix the items above, then run 'paperpush validate' again.", file=sys.stderr)
@@ -711,7 +757,8 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
     for review, file paths are resolved against the manuscript directory, and
     the result is validated. The ``manual`` engine reads the proposals from a
     ``--values`` JSON file (this is the path the Claude skill drives); the
-    ``api`` engine extracts them with the Anthropic API.
+    ``api`` engine extracts them with an LLM API (Anthropic, OpenAI, or Google,
+    chosen by ``--provider`` or by whichever API key is set).
     """
     from .autofill import autofill, parse_extraction
     from .subfile import parse, render_template
@@ -734,7 +781,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
 
     if args.engine == "manual" and not args.values:
         print(
-            "error: --values FILE is required with the manual engine.\n" "\n" "The manual engine applies field values that you extract yourself --\n" "it does not call any API. To produce them:\n" "  1. Run 'paperpush schema <venue>' to list the fields and roles.\n" "  2. Read the manuscript files and write a values.json (AGENTS.md has\n" "     the exact schema).\n" "  3. Re-run with --values values.json.\n" "Use '--engine api' instead only if ANTHROPIC_API_KEY is set and you\n" "want the Anthropic API to do the extraction.",
+            "error: --values FILE is required with the manual engine.\n" "\n" "The manual engine applies field values that you extract yourself --\n" "it does not call any API. To produce them:\n" "  1. Run 'paperpush schema <venue>' to list the fields and roles.\n" "  2. Read the manuscript files and write a values.json (AGENTS.md has\n" "     the exact schema).\n" "  3. Re-run with --values values.json.\n" "Use '--engine api' instead only if an Anthropic, OpenAI, or Google API\n" "key is set and you want that API to do the extraction.",
             file=sys.stderr,
         )
         return 1
@@ -886,7 +933,7 @@ def _extract_with_api(venue, manuscript_dir: Path, args: argparse.Namespace):
     Returns an Extraction, or None after printing an error (so the caller can
     exit nonzero).
     """
-    from .autofill import AutofillApiError, DocumentInput, extract_via_api
+    from .autofill import DEFAULT_MODELS, AutofillApiError, DocumentInput, detect_provider, extract_via_api
 
     manuscript = _find_document(manuscript_dir, args.manuscript, ("manuscript", "paper", "ms", "main"))
     if manuscript is None or not manuscript.is_file():
@@ -901,10 +948,13 @@ def _extract_with_api(venue, manuscript_dir: Path, args: argparse.Namespace):
     if supplement and supplement.is_file():
         documents.append(DocumentInput("supplement", supplement))
 
+    provider = args.provider or detect_provider()
+    model = args.model or (DEFAULT_MODELS[provider] if provider else None)
     labels = ", ".join(f"{d.label}={d.path.name}" for d in documents)
-    print(f"Reading {labels} via the API ({args.model})…")
+    if provider:
+        print(f"Reading {labels} via the {provider} API ({model})…")
     try:
-        return extract_via_api(venue, documents, _list_directory(manuscript_dir), model=args.model)
+        return extract_via_api(venue, documents, _list_directory(manuscript_dir), model=model, provider=provider)
     except AutofillApiError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return None
@@ -1109,13 +1159,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--engine",
         choices=["manual", "api"],
         default="manual",
-        help="manual: read proposed values from --values (default; used by the " "Claude skill); api: extract them with the Anthropic API ",
+        help="manual: read proposed values from --values (default; used by the " "Claude skill); api: extract them with an LLM API (see --provider)",
     )
     p_autofill.add_argument("--values", metavar="FILE", help="JSON file of proposed field values (required for --engine manual)")
     p_autofill.add_argument("--manuscript", metavar="FILE", help="(api) the manuscript file; inferred from the directory if omitted")
     p_autofill.add_argument("--title-page", dest="title_page", metavar="FILE", help="(api) a standalone title page with author details, if separate")
     p_autofill.add_argument("--supplement", metavar="FILE", help="(api) a supplementary materials file, if any")
-    p_autofill.add_argument("--model", default="claude-opus-4-8", help="(api) Anthropic model to use (default: claude-opus-4-8)")
+    p_autofill.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(api) LLM provider; defaults to the first of anthropic, openai, google " "whose API key is set (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY)")
+    p_autofill.add_argument("--model", help="(api) model to use (default: claude-opus-5-5, gpt-6-astra, or " "gemini-3.8-flash, by provider)")
     p_autofill.add_argument("--min-confidence", choices=["low", "medium", "high"], default="low", help="do not write any value below this confidence (default: low)")
     p_autofill.add_argument("-o", "--output", help="write the filled file here instead of overwriting the .sub")
     p_autofill.add_argument("--force", action="store_true", help="overwrite --output if it already exists")
@@ -1155,7 +1206,25 @@ def build_parser() -> argparse.ArgumentParser:
         const=True,
         help="check the submission for information identifying the authors, as " "for a double-blind venue. Venues marked anonymous (e.g. ICLR, AAAI) " "get this check automatically. Scans the attached files and the .sub's " "text fields for the authors' names, emails, ORCID/OpenReview IDs and " "affiliations, author metadata (PDF, Office, EXIF), home-directory " "paths, acknowledgments, and camera-ready LaTeX switches, and fetches " "every linked anonymous.4open.science repository to scan it the same " "way (requires network access).",
     )
-    p_validate.set_defaults(func=_cmd_validate, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True, check_anonymous=None)
+    p_validate.add_argument(
+        "--dont-check-hidden-text",
+        dest="check_hidden_text",
+        action="store_false",
+        help="skip looking for text a reader cannot see. By default validate " "reads every PDF, LaTeX, and Word upload for white, invisible, " "microscopic, or off-page text; hidden instructions to AI reviewers " "(prompt injection, grounds for desk rejection) are errors, other " "hidden prose and visible text addressed to an AI reviewer are warnings.",
+    )
+    p_validate.add_argument(
+        "--dont-check-openreview-profiles",
+        dest="check_openreview",
+        action="store_false",
+        help="skip looking up the authors' OpenReview profiles. For venues " "submitted through OpenReview (ICLR, AAAI), validate signs in with the " "login stored by 'paperpush login' and checks that every author has an " "active profile matching their name and email suffixes, with a current " "position. Requires network access.",
+    )
+    p_validate.add_argument(
+        "--arxiv-latex-cleaner",
+        dest="arxiv_latex_cleaner",
+        action="store_true",
+        help="run arxiv_latex_cleaner on the LaTeX source first (every .tex upload, " "and every .zip/.tar/.tar.gz/.tgz bundle containing one), then validate " "the cleaned copies. Strips comments and unreferenced or auxiliary files. " "Cleaned copies are written next to the originals (paper/ -> paper_arXiv/, " "source.zip -> source_arXiv.zip); the originals and the .sub are not " "changed. Needs the optional package: pip install 'paperpush[validate]'.",
+    )
+    p_validate.set_defaults(func=_cmd_validate, arxiv_latex_cleaner=False, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True, check_anonymous=None, check_hidden_text=True, check_openreview=True)
 
     p_requirements = sub.add_parser("requirements", parents=[verbosity], help="show the manuscript requirements recorded for a venue's author guidelines")
     p_requirements.add_argument("venue", help="venue slug, e.g. nature")

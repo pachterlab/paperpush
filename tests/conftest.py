@@ -78,6 +78,22 @@ def _no_network_anonymous_repos(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_network_openreview(monkeypatch):
+    """Keep the suite offline: the OpenReview API is "unreachable".
+
+    The profile check (on by default for OpenReview venues) would otherwise sign
+    in with whatever login is stored on the machine. A test exercising the
+    check re-patches ``openreview_profiles._request`` itself.
+    """
+    import paperpush.openreview_profiles as openreview_profiles
+
+    openreview_profiles._login.cache_clear()
+    monkeypatch.setattr(openreview_profiles, "_request", lambda *a, **k: (0, None))
+    yield
+    openreview_profiles._login.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def _no_network_doi_checks(monkeypatch):
     """Keep the suite offline: stub DOI resolution to "unknown".
 
@@ -638,10 +654,14 @@ def _isolate_user_state(tmp_path, monkeypatch):
 
     Credential storage falls back to a JSON file under ``XDG_CONFIG_HOME``;
     pointing that at ``tmp_path`` and disabling the keyring means ``login``
-    tests never touch the developer's machine keychain or config.
+    tests never touch the developer's machine keychain or config. LLM API keys
+    are cleared too, so autofill's provider detection only sees the keys a test
+    sets itself.
     """
     monkeypatch.setenv("PAPERPUSH_KEYRING", "0")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
 
 
 @pytest.fixture

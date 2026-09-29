@@ -81,12 +81,13 @@ def build_parser() -> argparse.ArgumentParser:
     # autofill-only.
     autofill = parser.add_argument_group("autofill step")
     autofill.add_argument("-d", "--directory", required=True, metavar="MANUSCRIPTDIR", help="directory holding the manuscript, figures, and other files")
-    autofill.add_argument("--engine", choices=["manual", "api"], default="manual", help="manual: read proposed values from --values (default); api: extract them with the Anthropic API")
+    autofill.add_argument("--engine", choices=["manual", "api"], default="manual", help="manual: read proposed values from --values (default); api: extract them with an LLM API (see --provider)")
     autofill.add_argument("--values", metavar="FILE", help="JSON file of proposed field values (required for --engine manual)")
     autofill.add_argument("--manuscript", metavar="FILE", help="(api) the manuscript file; inferred from the directory if omitted")
     autofill.add_argument("--title-page", dest="title_page", metavar="FILE", help="(api) a standalone title page with author details, if separate")
     autofill.add_argument("--supplement", metavar="FILE", help="(api) a supplementary materials file, if any")
-    autofill.add_argument("--model", default="claude-opus-4-8", help="(api) Anthropic model to use (default: claude-opus-4-8)")
+    autofill.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(api) LLM provider; defaults to the first of anthropic, openai, google " "whose API key is set")
+    autofill.add_argument("--model", help="(api) model to use (default: claude-opus-5-5, gpt-6-astra, or " "gemini-3.8-flash, by provider)")
     autofill.add_argument("--min-confidence", choices=["low", "medium", "high"], default="low", help="do not write any value below this confidence (default: low)")
     autofill.add_argument("--dry-run", action="store_true", help="show what autofill would write without changing the .sub file")
 
@@ -154,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
                 manuscript=args.manuscript,
                 title_page=args.title_page,
                 supplement=args.supplement,
+                provider=args.provider,
                 model=args.model,
                 min_confidence=args.min_confidence,
                 dry_run=args.dry_run,

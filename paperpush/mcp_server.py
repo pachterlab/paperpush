@@ -351,6 +351,8 @@ def validate_subfile(
     check_references: bool = True,
     check_manuscript: bool = True,
     anonymous: Optional[bool] = None,
+    check_hidden_text: bool = True,
+    check_openreview: bool = True,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file.
 
@@ -378,12 +380,18 @@ def validate_subfile(
     attached files and in every linked anonymous.4open.science repository
     (needs network). It defaults to the venue's `anonymous` flag (on for ICLR
     and AAAI); pass true to check any venue.
+    `check_hidden_text` looks for white, invisible, microscopic, or off-page
+    text in the PDF/LaTeX/Word uploads; a hidden instruction to an AI reviewer
+    (prompt injection) is an error. `check_openreview` looks up each author's
+    OpenReview profile for OpenReview venues (ICLR, AAAI) using the stored
+    login -- missing, ambiguous, or inactive profiles, name or email-suffix
+    mismatches, no current position (needs network).
 
     `errors` block submission; `warnings` are advisory. `ok` is true when there
     are no errors.
     """
     path, text, venue = _load_subfile(subfile, manuscript_dir)
-    issues = _run_validate(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous)
+    issues = _run_validate(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview)
     errors = [i for i in issues if i.is_error]
     warnings = [i for i in issues if not i.is_error]
     return {
@@ -776,7 +784,7 @@ def submit(
     except KeyError:
         raise ValueError(f"no submission runner is registered for {venue.slug!r}; " "this venue can be prepared but not driven") from None
 
-    checked = validate_subfile(str(path), check_links=False, check_sensitive=False, check_references=False)
+    checked = validate_subfile(str(path), check_links=False, check_sensitive=False, check_references=False, check_openreview=False)
     if not checked["ok"]:
         return {
             "status": "blocked",

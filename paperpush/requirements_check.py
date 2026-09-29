@@ -30,6 +30,11 @@ What is checked, and how:
   its pixel width at the venue's maximum print width), colour mode, and
   dimensions; count against the cap.
 * **References** -- the reference list's length against the cap.
+* **Template** -- when the venue records its compiled template's geometry
+  (``manuscript.template_layout``), the manuscript PDF's page size, margins,
+  body font size, line spacing, running head, and review line numbers are
+  measured against it; attached LaTeX source is read for the edits that change
+  them (see :mod:`paperpush.template_check`).
 
 Measured numeric violations (words, pages, sizes, counts) are ERRORs; anything
 that relies on text extraction or image heuristics is a WARNING.
@@ -433,6 +438,52 @@ def _figure_file_issues(field: Field, path: Path, rules: FigureRules) -> list[Is
 # --- entry point -------------------------------------------------------------
 
 
+def _template_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> list[Issue]:
+    """Report a manuscript whose compiled layout departs from the venue's template.
+
+    A WARNING per departure: the geometry is measured from extracted glyphs, so
+    it is strong evidence of an edited template but not proof.
+    """
+    layout = reqs.manuscript.template_layout
+    if layout is None:
+        return []
+    from . import manuscript, template_check
+
+    pdf = manuscript._as_pdf(path)
+    if pdf is None:
+        return []
+    measured = template_check.measure(pdf, layout.running_head or "")
+    if measured is None:
+        logger.debug("could not measure the layout of %s", pdf)
+        return []
+    issues = [Issue(WARNING, field.id, f"template: {path.name}: {problem}") for problem in template_check.layout_problems(measured, layout, reqs.manuscript.font_size_pt)]
+    if issues:
+        style = f"'{reqs.manuscript.latex_class}' style" if reqs.manuscript.latex_class else "template"
+        issues.append(Issue(WARNING, field.id, f"template: {path.name} does not match the venue's {style} as distributed; papers that modify it can be desk-rejected"))
+    return issues
+
+
+def _template_source_issues(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
+    """Report LaTeX source, in any upload, that edits a mandatory template's layout."""
+    if not reqs.manuscript.template_required:
+        return []
+    from . import template_check
+
+    issues: list[Issue] = []
+    seen: set[Path] = set()
+    for field in venue.fields:
+        if field.type not in ("file", "filelist"):
+            continue
+        for path in _existing(_paths(field, values)):
+            if path in seen:
+                continue
+            seen.add(path)
+            for where, text in template_check.iter_latex_sources(path):
+                for problem in template_check.source_problems(text):
+                    issues.append(Issue(WARNING, field.id, f"template: {where} {problem}"))
+    return issues
+
+
 def check_manuscript_requirements(venue: Venue, values: dict[str, str]) -> list[Issue]:
     """Every issue the venue's manuscript requirements raise for ``values``.
 
@@ -460,6 +511,9 @@ def check_manuscript_requirements(venue: Venue, values: dict[str, str]) -> list[
             issues.extend(_heading_issues(field, path, reqs))
             issues.extend(_title_page_issues(field, path, reqs, values))
             issues.extend(_reference_issues(field, path, reqs))
+            issues.extend(_template_issues(field, path, reqs))
+
+    issues.extend(_template_source_issues(venue, reqs, values))
 
     figure_total = 0
     for field in _fields_for(venue, "figures"):

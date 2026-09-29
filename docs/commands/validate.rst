@@ -10,6 +10,9 @@ Run the pre-submission checks on a filled ``.sub`` file. Run this before
                              [--dont-check-for-sensitive-info]
                              [--dont-check-references]
                              [--dont-check-manuscript] [--anonymous]
+                             [--dont-check-hidden-text]
+                             [--dont-check-openreview-profiles]
+                             [--arxiv-latex-cleaner]
                              subfile
 
 Synopsis
@@ -92,8 +95,18 @@ with its severity and the flag that controls it.
   per-file size cap, a word limit on the field) is reported once, by that
   check, not again here.
 
-The last four passes make network requests or read every uploaded file; each
-can be turned off with its ``--dont-check-*`` flag below.
+- **Nothing is hidden from the reader**: white, invisible, microscopic, or
+  off-page text in the PDF, LaTeX, or Word uploads. A hidden instruction to an
+  AI reviewer (prompt injection) is an error.
+- **The template is unmodified**: for venues with a recorded template layout
+  (ICLR), the manuscript PDF's margins, body font, line spacing, running head,
+  and review line numbers are measured against the official template.
+- **Every author has a usable OpenReview profile**: for OpenReview venues
+  (ICLR, AAAI), using the login stored by :doc:`login`.
+
+The link, reference, sensitive-information, manuscript, hidden-text, and
+OpenReview passes make network requests or read every uploaded file; each can
+be turned off with its ``--dont-check-*`` flag below.
 
 Arguments
 ---------
@@ -115,12 +128,33 @@ Arguments
    Skip measuring the uploads against the venue's author guidelines. Also
    skips compiling a LaTeX manuscript for its page count.
 
+``--dont-check-hidden-text``
+   Skip looking for white, invisible, microscopic, or off-page text. See
+   :ref:`vc-hidden-text`.
+
+``--dont-check-openreview-profiles``
+   Skip looking up the authors' OpenReview profiles (OpenReview venues only).
+   Avoids network requests. See :ref:`vc-openreview`.
+
 ``--anonymous``
    Check the submission for information that identifies its authors, as for a
    double-blind venue. Venues marked ``anonymous`` in ``venues.json`` (ICLR,
    AAAI) get this check automatically. Linked anonymous.4open.science
    repositories are fetched and scanned too, which needs network access. See
    :ref:`vc-anonymity`.
+
+``--arxiv-latex-cleaner``
+   Run `arxiv_latex_cleaner
+   <https://github.com/google-research/arxiv-latex-cleaner>`_ on the LaTeX
+   source first, then validate the cleaned copies. Applies to every ``.tex``
+   upload (the cleaner runs on its whole directory) and every ``.zip``,
+   ``.tar``, ``.tar.gz``, or ``.tgz`` bundle that contains a ``.tex`` file.
+   The cleaner strips comments and drops unreferenced and auxiliary files.
+   Cleaned copies are written next to the originals, as ``paper/`` →
+   ``paper_arXiv/`` and ``source.zip`` → ``source_arXiv.zip``, replacing any
+   earlier output. The originals and the ``.sub`` are not changed, so point the
+   ``.sub`` at the cleaned copies to submit them. Needs the optional package:
+   ``pip install "paperpush[validate]"``.
 
 Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags. Use ``-v``
 to see the checks as they run.
@@ -143,6 +177,12 @@ Run the field and file checks alone, with no network access:
 .. code-block:: bash
 
    paperpush validate biorxiv.sub --dont-check-links --dont-check-references
+
+Clean arXiv LaTeX source and check the result:
+
+.. code-block:: bash
+
+   paperpush validate arxiv.sub --arxiv-latex-cleaner
 
 See also
 --------
