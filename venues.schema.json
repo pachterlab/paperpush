@@ -811,6 +811,10 @@
           ],
           "description": "Maximum combined size, in megabytes, of all files in one submission."
         },
+        "anonymous": {
+          "description": "Anonymous (double-blind) review: validate checks the attached files and linked anonymous.4open.science repositories for information identifying the authors.",
+          "type": "boolean"
+        },
         "deprecated": {
           "description": "Hidden from listings but still reachable by get_venue.",
           "type": "boolean"

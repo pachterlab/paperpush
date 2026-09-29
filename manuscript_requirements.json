@@ -4935,7 +4935,22 @@
         "Submission is via OpenReview (https://openreview.net/group?id=ICLR.cc/2027/Conference); only 'Abstract' is mandatory at the abstract-deadline stage, full PDF can be uploaded any time before the paper deadline.",
         "The style-file bundle iclr-2027-style-files.zip contains iclr2027_conference.sty, iclr2027_conference.bst, and the iclr2027_conference.tex template."
       ],
-      "latex_class": "iclr2027_conference"
+      "latex_class": "iclr2027_conference",
+      "page_size": "US Letter",
+      "font_size_pt": 10,
+      "template_layout": {
+        "page_width_pt": 612,
+        "page_height_pt": 792,
+        "text_left_pt": 108,
+        "text_right_pt": 504,
+        "text_top_pt": 701.5,
+        "text_bottom_pt": 60,
+        "body_font_pt": 10,
+        "baseline_skip_pt": 11,
+        "running_head": "Under review as a conference paper at ICLR 2027",
+        "margin_line_numbers": true,
+        "tolerance_pt": 3
+      }
     },
     "statements": {
       "required": [
