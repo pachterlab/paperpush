@@ -1,7 +1,7 @@
 ## Supported venues
 
 <!-- BEGIN SUPPORTED VENUES -->
-_23 supported venues (auto-generated from `paperpush/venues.json`)._
+_22 supported venues (auto-generated from `paperpush/venues.json`)._
 
 | Slug | Venue | Venue type | Submission platform | Description | Submit walkthrough |
 | --- | --- | --- | --- | --- | --- |
