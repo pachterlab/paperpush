@@ -202,6 +202,7 @@
       ],
       "ai_use": [
         "Declaration of generative AI and AI-assisted technologies in the writing process",
+        "Declaration of generative AI and AI-assisted technologies in the manuscript preparation process",
         "Declaration of generative AI",
         "Use of AI",
         "AI use statement",
@@ -245,7 +246,7 @@
       "https://www.biorxiv.org/about/FAQ",
       "https://www.biorxiv.org/about-biorxiv"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-09-23",
     "manuscript": {
       "formats": [
         ".docx",
@@ -1733,11 +1734,11 @@
       "https://www.cell.com/cell/information-for-authors/final-submission",
       "https://www.cell.com/information-for-authors/figure-guidelines",
       "https://www.cell.com/information-for-authors/supplemental-information",
-      "https://www.cell.com/star-authors-guide",
+      "https://www.cell.com/information-for-authors/star-authors-guide",
       "https://www.cell.com/pb-assets/journals/EM/Master%20Final%20Files%20Checklists/Cell%20Final%20File%20Checklist.docx",
       "https://www.cell.com/pb-assets/journals/research/cell/methods/Methods_Guide_general-1724873926937.pdf"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-09-23",
     "article_type_field": "article_type",
     "article_types": {
       "Short Article": {
@@ -2044,11 +2045,11 @@
       "https://www.cell.com/cell-systems/information-for-authors/final-submission",
       "https://www.cell.com/information-for-authors/figure-guidelines",
       "https://www.cell.com/information-for-authors/supplemental-information",
-      "https://www.cell.com/star-authors-guide",
+      "https://www.cell.com/information-for-authors/star-authors-guide",
       "https://www.cell.com/pb-assets/journals/EM/MasterFFCs/CELSFFC-1766175470697.pdf",
       "https://www.cell.com/pb-assets/journals/research/cell-systems/do-not-delete/CSformatting-1666007786657.pdf"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-09-23",
     "article_type_field": "article_type",
     "article_types": {
       "Report": {
@@ -2201,7 +2202,7 @@
       "notes": [
         "Data and Code Availability statement must have 3 parts: (1) data reported in the paper (even if none), (2) original code reported (even if none), (3) the standard sentence 'Any additional information required to reanalyze the data reported in this paper is available from the lead contact upon request.'",
         "A Declaration of Interests form is required and its wording must match the manuscript's 'Declaration of Interests' section (use 'The authors declare no competing interests.' if none).",
-        "A 'Declaration of Generative AI and AI-assisted technologies in the writing process' section is required only if such tools were used in writing; omit if there is nothing to disclose.",
+        "A 'Declaration of generative AI and AI-assisted technologies in the manuscript preparation process' section is required only if such tools were used in writing; omit if there is nothing to disclose.",
         "Acknowledgments is strongly encouraged (not strictly required); Standardized data reporting checklists (battery, photovoltaic cell, catalysis) are strongly encouraged where relevant."
       ]
     },
@@ -2313,11 +2314,11 @@
       "https://www.cell.com/cell-genomics/information-for-authors/final-submission",
       "https://www.cell.com/information-for-authors/figure-guidelines",
       "https://www.cell.com/information-for-authors/supplemental-information",
-      "https://www.cell.com/star-authors-guide",
+      "https://www.cell.com/information-for-authors/star-authors-guide",
       "https://www.cell.com/pb-assets/journals/EM/MasterFFCs/XGENFFC-1750589326387.pdf",
       "https://els-jbs-prod-cdn.jbs.elsevierhealth.com/pb-assets/journals/research/cell-genomics/cell-genomics_IfA-1592223534027.pdf"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-09-23",
     "article_type_field": "article_type",
     "article_types": {
       "Short Article": {
@@ -2436,7 +2437,7 @@
       "notes": [
         "Author Contributions section is required for all primary research papers, placed immediately after Acknowledgments; CRediT taxonomy encouraged.",
         "Declaration of Interests form required and uploaded; its content (including 'no competing interests' declarations) must also appear in a manuscript section titled 'Declaration of Interests,' after Author Contributions.",
-        "A 'Declaration of Generative AI and AI-assisted technologies in the writing process' section is required only if generative AI/AI-assisted technology was used in writing; omit if there is nothing to disclose."
+        "A 'Declaration of generative AI and AI-assisted technologies in the manuscript preparation process' section is required only if generative AI/AI-assisted technology was used in writing; omit if there is nothing to disclose."
       ]
     },
     "figures": {
@@ -2546,7 +2547,7 @@
       "https://journals.plos.org/ploscompbiol/s/journal-information",
       "https://journals.plos.org/ploscompbiol/s/other-article-types"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-09-23",
     "article_type_field": "article_type",
     "article_types": {
       "Software": {
@@ -3980,7 +3981,7 @@
       "https://www.science.org/content/page/sciimmunol-instructions-research-articles-initial-submission-new",
       "https://www.science.org/content/page/science-journals-editorial-policies"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-09-23",
     "article_type_field": "article_type",
     "article_types": {
       "Review": {
@@ -4663,7 +4664,7 @@
       "https://www.science.org/content/page/stm-instructions-research-articles-initial-submission",
       "https://www.science.org/content/page/science-journals-editorial-policies"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-09-23",
     "article_type_field": "article_type",
     "article_types": {
       "Research Resource": {
@@ -4907,7 +4908,7 @@
       "https://iclr.cc/Conferences/2027/CallForPapers",
       "https://blog.iclr.cc/2026/09/02/submission-policies-for-iclr-2027/"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-09-23",
     "manuscript": {
       "formats": [
         ".pdf"
