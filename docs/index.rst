@@ -43,6 +43,7 @@ The workflow is five short commands:
    :caption: Reference
 
    venues
+   validation-checks
    schemas/venues
    schemas/manuscript_requirements
    api

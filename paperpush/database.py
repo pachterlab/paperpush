@@ -410,6 +410,14 @@ class Venue:
         Optional[float],
         PField(description="Maximum combined size, in megabytes, of all files in one " "submission."),
     ] = None
+    # Double-blind review: reviewers must not learn who the authors are. When
+    # set, ``paperpush validate`` scans the attachments (and any linked
+    # anonymous.4open.science mirror) for identifying information; see
+    # :mod:`paperpush.anonymity`.
+    anonymous: Annotated[
+        bool,
+        PField(description="Anonymous (double-blind) review: validate checks the " "attached files and linked anonymous.4open.science repositories " "for information identifying the authors."),
+    ] = False
     # Deprecated venues stay in the database (their sign-in/login wiring still
     # works via get_venue) but are hidden from list_venues, so they no longer
     # appear in `paperpush --venues` or the generated README.
@@ -451,6 +459,7 @@ class Venue:
             file_type_options=data.get("file_type_options"),
             max_upload_mb=data.get("max_upload_mb"),
             fields=[Field.from_dict(f) for f in data.get("fields", [])],
+            anonymous=bool(data.get("anonymous", False)),
             deprecated=bool(data.get("deprecated", False)),
             inherits=str(data.get("inherits", "") or "").lower(),
         )

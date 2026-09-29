@@ -65,6 +65,19 @@ def _no_network_link_checks(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_network_anonymous_repos(monkeypatch):
+    """Keep the suite offline: anonymous.4open.science fetches fail as "unreachable".
+
+    The anonymity check (on by default for double-blind venues) fetches every
+    linked anonymous.4open.science mirror. A test exercising that fetch
+    re-patches ``anonymity._http_get`` itself; that patch wins for its duration.
+    """
+    import paperpush.anonymity as anonymity
+
+    monkeypatch.setattr(anonymity, "_http_get", lambda *a, **k: (0, b""))
+
+
+@pytest.fixture(autouse=True)
 def _no_network_doi_checks(monkeypatch):
     """Keep the suite offline: stub DOI resolution to "unknown".
 

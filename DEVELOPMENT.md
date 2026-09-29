@@ -289,3 +289,5 @@ that breaks submission flips the venue to ❌ in
 run — CI fails if `venues.md` is out of sync with that file.
 
 To deprecate a venue, add the field `deprecated:true` to its entry in `paperpush/venues.json`.
+
+Every venue also declares `anonymous` (`true` for double-blind review, `false` otherwise; an entry without it counts as `false`). An anonymous venue gets the identifying-information check (`paperpush/anonymity.py`) on every `paperpush validate`: the attachments and any linked anonymous.4open.science repositories are searched for the authors' details. Set it for a new venue from its reviewing policy.

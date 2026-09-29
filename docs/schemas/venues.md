@@ -30,6 +30,7 @@ The keys of one venue entry (the value under a slug).
 | `description` | string | Short description of the venue. |
 | `file_type_options` | list of string or null | Labels offered by the portal's per-file 'file type' dropdown (venue-level because the same dropdown applies to every upload). |
 | `max_upload_mb` | number or null | Maximum combined size, in megabytes, of all files in one submission. |
+| `anonymous` | boolean | Anonymous (double-blind) review: validate checks the attached files and linked anonymous.4open.science repositories for information identifying the authors. |
 | `deprecated` | boolean | Hidden from listings but still reachable by get_venue. |
 | `inherits` | string | Slug this venue inherits its field schema from. Empty/absent for a standalone venue. Distinct from submission sharing (which portal/runner/login a venue submits through), which is defined in code, not here. |
 | `removed_fields` | list of string | Inherited field ids to drop. Only meaningful on an inheriting venue. |

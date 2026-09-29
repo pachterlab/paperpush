@@ -232,6 +232,7 @@ def describe_venue(venue: str) -> dict[str, Any]:
         "site_url": resolved.site_url,
         "login_required": venues_pkg.login_required(resolved.slug),
         "max_upload_mb": resolved.max_upload_mb,
+        "anonymous": resolved.anonymous,
         "file_type_options": resolved.file_type_options,
         "default_subfile_name": default_filename(resolved),
         "fields": field_schema(resolved),
@@ -349,6 +350,7 @@ def validate_subfile(
     check_sensitive: bool = True,
     check_references: bool = True,
     check_manuscript: bool = True,
+    anonymous: Optional[bool] = None,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file.
 
@@ -370,12 +372,18 @@ def validate_subfile(
     `describe_venue`): manuscript format and length (LaTeX is compiled for a
     page count), required sections and statements, title-page items, figure
     format/resolution/count, supplementary rules, and reference count.
+    `anonymous` checks a double-blind submission for information identifying
+    its authors -- their names, emails, IDs and affiliations from the author
+    list, author metadata, home-directory paths, acknowledgments -- in the
+    attached files and in every linked anonymous.4open.science repository
+    (needs network). It defaults to the venue's `anonymous` flag (on for ICLR
+    and AAAI); pass true to check any venue.
 
     `errors` block submission; `warnings` are advisory. `ok` is true when there
     are no errors.
     """
     path, text, venue = _load_subfile(subfile, manuscript_dir)
-    issues = _run_validate(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript)
+    issues = _run_validate(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous)
     errors = [i for i in issues if i.is_error]
     warnings = [i for i in issues if not i.is_error]
     return {

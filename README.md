@@ -31,7 +31,60 @@ The Claude skill `/paperpush-prepare-submission` helps with this.
 
 See [`docs/example-session.md`](docs/example-session.md) for a full worked example of this flow.
 
-### MCP server
+## Quickstart
+1. `paperpush subfile VENUE`: creates a file VENUE.sub that is a template for the VENUE submission.
+2. **fill out VENUE.sub - 3 options:**
+   - **a.** *fill out manually*
+   - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
+   - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE.sub`: Use an LLM API. Requires an API key.
+3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count).
+4. `paperpush login VENUE`: log in to the VENUE submission portal.
+5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
+
+Helper commands:
+- `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
+- `paperpush update-venues`: Update venues.json and manuscript_requirements.json from the remote venue-data branch.
+- `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
+
+See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
+
+## Documentation
+
+[paperpush.readthedocs.io](https://paperpush.readthedocs.io)
+
+## Run the whole pipeline at once
+
+`scripts/paperpush_pipeline.py` sequentially runs the commands above — `subfile`, `autofill`, `validate`, `login`, `submit`. This allows going from a manuscript directory to a filled submission portal in just one command.
+
+```bash
+python scripts/paperpush_pipeline.py -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE
+```
+
+See `python scripts/paperpush_pipeline.py --help` for the full list of options, grouped by step.
+
+## Supported venues
+
+<!-- BEGIN SUPPORTED VENUES -->
+**Preprint servers:** [arXiv](https://arxiv.org), [bioRxiv](https://www.biorxiv.org), [medRxiv](https://www.medrxiv.org)
+
+**Journals:** [Bioinformatics](https://academic.oup.com/bioinformatics), [BMC Bioinformatics](https://link.springer.com/journal/12859), [Cell](https://www.cell.com/cell/home), [Cell Genomics](https://www.cell.com/cell-genomics/home), [Cell Systems](https://www.cell.com/cell-systems/home), [Combinatorica](https://link.springer.com/journal/493), [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics), [Genome Biology](https://genomebiology.biomedcentral.com), [Nature](https://www.nature.com), [Nature Biotechnology](https://www.nature.com/nbt), [Nature Methods](https://www.nature.com/nmeth), [Nucleic Acids Research](https://academic.oup.com/nar), [PLOS Computational Biology](https://journal.plos.org/ploscompbiol/), [Science](https://www.science.org/journal/science), [Science Advances](https://www.science.org/journal/sciadv), [Science Immunology](https://www.science.org/journal/sciimmunol), [Science Robotics](https://www.science.org/journal/scirobotics), [Science Signaling](https://www.science.org/journal/signaling), [Science Translational Medicine](https://www.science.org/journal/stm)
+
+**Conferences:** [ICLR 2027](https://iclr.cc/Conferences/2027)
+<!-- END SUPPORTED VENUES -->
+
+View the list on the command line with `paperpush --venues`.
+
+Venue details (field options, limits, author-guideline rules) are updated independently of releases: paperpush fetches the latest published data at most once a day, and `paperpush update-venues` fetches it right away. New venues arrive with new releases (`pip install -U paperpush`).
+
+For more details, see [`venues.md`](venues.md)
+
+## Adding new venues
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for instructions on adding new venues. See [`DEVELOPMENT.md`](DEVELOPMENT.md) for tips on adding new venues and running unit tests.
+
+Each venue has a submission-form entry in `paperpush/venues.json` (the fields the portal asks for) and, optionally, a manuscript-requirements entry in `paperpush/manuscript_requirements.json` (what the venue's author guidelines demand of the manuscript: file formats and sizes, word/page limits, required sections and statements, title-page items, figure resolution and dimensions, reference rules). Both use a shared vocabulary across venues, each has a generated JSON schema, and `paperpush validate` checks a `.sub` against both (a venue without a requirements entry gets only the form checks).
+
+## MCP server
 
 To drive paperpush from any MCP client — Claude Desktop, an IDE extension — run
 it as an MCP server:
@@ -52,59 +105,6 @@ pip install 'paperpush[mcp]'
 
 The server exposes the whole pipeline as tools. See [`AGENTS.md`](AGENTS.md) for
 the tool list and the contract agents should follow.
-
-## Quickstart
-1. `paperpush subfile VENUE`: creates a file VENUE.sub that is a template for the VENUE submission.
-2. **fill out VENUE.sub - 3 options:**
-   - **a.** *fill out manually*
-   - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
-   - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE.sub`: Use an LLM API. Requires an API key.
-3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count).
-4. `paperpush login VENUE`: log in to the VENUE submission portal.
-5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
-
-Helper commands:
-- `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
-- `paperpush update-venues`: Update venues.json and manuscript_requirements.json from the remote venue-data branch.
-- `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
-
-See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
-
-## Run the whole pipeline at once
-
-`scripts/paperpush_pipeline.py` sequentially runs the commands above — `subfile`, `autofill`, `validate`, `login`, `submit`. This allows going from a manuscript directory to a filled submission portal in just one command.
-
-```bash
-python scripts/paperpush_pipeline.py -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE
-```
-
-See `python scripts/paperpush_pipeline.py --help` for the full list of options, grouped by step.
-
-## Supported venues
-
-<!-- BEGIN SUPPORTED VENUES -->
-**Preprint servers:** [arXiv](https://arxiv.org), [bioRxiv](https://www.biorxiv.org), [medRxiv](https://www.medrxiv.org)
-
-**Journals:** [Bioinformatics](https://academic.oup.com/bioinformatics), [BMC Bioinformatics](https://link.springer.com/journal/12859), [Cell](https://www.cell.com/cell/home), [Cell Genomics](https://www.cell.com/cell-genomics/home), [Cell Systems](https://www.cell.com/cell-systems/home), [Combinatorica](https://link.springer.com/journal/493), [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics), [Genome Biology](https://genomebiology.biomedcentral.com), [Nature](https://www.nature.com), [Nature Biotechnology](https://www.nature.com/nbt), [Nature Methods](https://www.nature.com/nmeth), [Nucleic Acids Research](https://academic.oup.com/nar), [PLOS Computational Biology](https://journal.plos.org/ploscompbiol/), [Science](https://www.science.org/journal/science), [Science Advances](https://www.science.org/journal/sciadv), [Science Immunology](https://www.science.org/journal/sciimmunol), [Science Robotics](https://www.science.org/journal/scirobotics), [Science Signaling](https://www.science.org/journal/signaling), [Science Translational Medicine](https://www.science.org/journal/stm)
-
-**Conferences:** _none yet_
-<!-- END SUPPORTED VENUES -->
-
-View the list on the command line with `paperpush --venues`.
-
-Venue details (field options, limits, author-guideline rules) are updated independently of releases: paperpush fetches the latest published data at most once a day, and `paperpush update-venues` fetches it right away. New venues arrive with new releases (`pip install -U paperpush`).
-
-For more details, see [`venues.md`](venues.md)
-
-## Documentation
-
-[paperpush.readthedocs.io](https://paperpush.readthedocs.io)
-
-## Adding new venues
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for instructions on adding new venues. See [`DEVELOPMENT.md`](DEVELOPMENT.md) for tips on adding new venues and running unit tests.
-
-Each venue has a submission-form entry in `paperpush/venues.json` (the fields the portal asks for) and, optionally, a manuscript-requirements entry in `paperpush/manuscript_requirements.json` (what the venue's author guidelines demand of the manuscript: file formats and sizes, word/page limits, required sections and statements, title-page items, figure resolution and dimensions, reference rules). Both use a shared vocabulary across venues, each has a generated JSON schema, and `paperpush validate` checks a `.sub` against both (a venue without a requirements entry gets only the form checks).
 
 ## For AI agents
 

@@ -1,6 +1,7 @@
 {
   "biorxiv": {
     "venue_type": "preprint",
+    "anonymous": false,
     "name": "bioRxiv",
     "full_name": "bioRxiv - The Preprint Server for Biology",
     "submission_url": "https://submit.biorxiv.org/submit_gateway.dtl?newms=true",
@@ -270,6 +271,7 @@
   },
   "medrxiv": {
     "venue_type": "preprint",
+    "anonymous": false,
     "inherits": "biorxiv",
     "name": "medRxiv",
     "full_name": "medRxiv - The Preprint Server for Health Sciences",
@@ -426,6 +428,7 @@
   },
   "bioinformatics": {
     "venue_type": "journal",
+    "anonymous": false,
     "name": "Bioinformatics",
     "full_name": "Bioinformatics (Oxford University Press)",
     "submission_url": "https://mc.manuscriptcentral.com/bioinformatics",
@@ -905,6 +908,7 @@
   },
   "nucleic_acids_research": {
     "venue_type": "journal",
+    "anonymous": false,
     "inherits": "bioinformatics",
     "name": "Nucleic Acids Research",
     "full_name": "Nucleic Acids Research (Oxford University Press)",
@@ -1204,6 +1208,7 @@
   },
   "arxiv": {
     "venue_type": "preprint",
+    "anonymous": false,
     "name": "arXiv",
     "full_name": "arXiv - Open-access archive for scholarly articles",
     "submission_url": "https://arxiv.org/submit",
@@ -1414,6 +1419,7 @@
   },
   "nature": {
     "venue_type": "journal",
+    "anonymous": false,
     "name": "Nature",
     "full_name": "Nature - International weekly journal of science",
     "submission_url": "https://mts-nature.nature.com/cgi-bin/main.plex",
@@ -1662,6 +1668,7 @@
   },
   "nature_biotech": {
     "venue_type": "journal",
+    "anonymous": false,
     "name": "Nature Biotechnology",
     "full_name": "Nature Biotechnology",
     "submission_url": "https://mts-nbt.nature.com/cgi-bin/main.plex",
@@ -1697,6 +1704,7 @@
   },
   "nature_methods": {
     "venue_type": "journal",
+    "anonymous": false,
     "name": "Nature Methods",
     "full_name": "Nature Methods",
     "submission_url": "https://mts-nmeth.nature.com/cgi-bin/main.plex",
@@ -1743,6 +1751,7 @@
   },
   "cell": {
     "venue_type": "journal",
+    "anonymous": false,
     "name": "Cell",
     "full_name": "Cell (Cell Press)",
     "submission_url": "https://www.editorialmanager.com/cell/default.aspx",
@@ -1970,6 +1979,7 @@
   },
   "cell_systems": {
     "venue_type": "journal",
+    "anonymous": false,
     "inherits": "cell",
     "name": "Cell Systems",
     "full_name": "Cell Systems (Cell Press)",
@@ -2005,6 +2015,7 @@
   },
   "cell_genomics": {
     "venue_type": "journal",
+    "anonymous": false,
     "inherits": "cell",
     "name": "Cell Genomics",
     "full_name": "Cell Genomics (Cell Press)",
@@ -2038,6 +2049,7 @@
   },
   "plos_compbio": {
     "venue_type": "journal",
+    "anonymous": false,
     "inherits": "cell",
     "name": "PLOS Computational Biology",
     "full_name": "PLOS Computational Biology (PLOS)",
@@ -2222,6 +2234,7 @@
   },
   "genome_biology": {
     "venue_type": "journal",
+    "anonymous": false,
     "name": "Genome Biology",
     "full_name": "Genome Biology",
     "submission_url": "https://submission.springernature.com/",
@@ -2391,6 +2404,7 @@
   },
   "bmc_bioinformatics": {
     "venue_type": "journal",
+    "anonymous": false,
     "inherits": "genome_biology",
     "name": "BMC Bioinformatics",
     "full_name": "BMC Bioinformatics",
@@ -2421,6 +2435,7 @@
   },
   "science": {
     "venue_type": "journal",
+    "anonymous": false,
     "name": "Science",
     "full_name": "Science - American Association for the Advancement of Science (AAAS)",
     "submission_url": "https://cts.sciencemag.org/scc/",
@@ -2667,6 +2682,7 @@
   },
   "science_advances": {
     "venue_type": "journal",
+    "anonymous": false,
     "inherits": "science",
     "site_url": "https://www.science.org/journal/sciadv",
     "name": "Science Advances",
@@ -2692,6 +2708,7 @@
   },
   "science_immunology": {
     "venue_type": "journal",
+    "anonymous": false,
     "inherits": "science",
     "site_url": "https://www.science.org/journal/sciimmunol",
     "name": "Science Immunology",
@@ -2717,6 +2734,7 @@
   },
   "science_robotics": {
     "venue_type": "journal",
+    "anonymous": false,
     "inherits": "science",
     "site_url": "https://www.science.org/journal/scirobotics",
     "name": "Science Robotics",
@@ -2742,6 +2760,7 @@
   },
   "science_signaling": {
     "venue_type": "journal",
+    "anonymous": false,
     "inherits": "science",
     "site_url": "https://www.science.org/journal/signaling",
     "name": "Science Signaling",
@@ -2767,6 +2786,7 @@
   },
   "science_translational_medicine": {
     "venue_type": "journal",
+    "anonymous": false,
     "inherits": "science",
     "site_url": "https://www.science.org/journal/stm",
     "name": "Science Translational Medicine",
@@ -2792,6 +2812,7 @@
   },
   "aaai_2027": {
     "venue_type": "conference",
+    "anonymous": true,
     "name": "AAAI 2027",
     "deprecated": true,
     "full_name": "The Association for the Advancement of Artificial Intelligence",
@@ -2944,8 +2965,9 @@
   },
   "iclr_2027": {
     "venue_type": "conference",
+    "anonymous": true,
     "name": "ICLR 2027",
-    "deprecated": true,
+    "deprecated": false,
     "full_name": "The Fifteenth International Conference on Learning Representations",
     "submission_url": "https://openreview.net/group?id=ICLR.cc/2027/Conference&referrer=%5BHomepage%5D(%2F)#tab-recent-activity",
     "site_url": "https://iclr.cc/Conferences/2027",
@@ -3119,6 +3141,7 @@
   },
   "discrete_mathematics": {
     "venue_type": "journal",
+    "anonymous": false,
     "name": "Discrete Mathematics",
     "full_name": "Discrete Mathematics (Elsevier)",
     "submission_url": "https://submit.elsevier.com/DISCM/submissions",
@@ -3328,6 +3351,7 @@
   },
   "combinatorica": {
     "venue_type": "journal",
+    "anonymous": false,
     "name": "Combinatorica",
     "full_name": "Combinatorica (János Bolyai Mathematical Society / Springer)",
     "submission_url": "https://ef.msp.org/submit/combinatorica",

@@ -528,7 +528,7 @@ def _populate_orcid_into(sub_path: str, venue, profile) -> None:
     print(f"  Updated {sub_path}: filled ORCID details for author '{matched}'.")
 
 
-def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True, check_manuscript: bool = True) -> list:
+def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True, check_manuscript: bool = True, check_anonymous: bool | None = None) -> list:
     """Validate a loaded .sub against its venue and print the findings.
 
     Runs the same checks ``submit`` performs before opening a browser --
@@ -550,10 +550,13 @@ def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive
     uploads are measured against the venue's author guidelines
     (``manuscript_requirements.json``): formats, length, required sections and
     statements, title-page items, figure resolution, reference count.
+    ``check_anonymous`` (default: the venue's ``anonymous`` flag) scans the
+    uploads and any linked anonymous.4open.science repositories for information
+    identifying the authors.
     """
     from .validate import validate
 
-    issues = validate(subfile, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript)
+    issues = validate(subfile, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=check_anonymous)
     errors = [i for i in issues if i.is_error]
     warnings = [i for i in issues if not i.is_error]
     for issue in warnings:
@@ -607,6 +610,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         check_links=getattr(args, "check_links", True),
         check_references=getattr(args, "check_references", True),
         check_manuscript=getattr(args, "check_manuscript", True),
+        check_anonymous=getattr(args, "check_anonymous", None),
     )
     if errors:
         print("\nFix the items above, then run 'paperpush validate' again.", file=sys.stderr)
@@ -1144,7 +1148,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_false",
         help="skip measuring the uploads against the venue's author guidelines. " "By default validate reads manuscript_requirements.json for the venue " "and checks the manuscript's format, word/page count (compiling LaTeX " "source to a scratch PDF with latexmk/pdflatex when installed), " "required section headings and declarations, title-page items, " "abstract/title/keyword limits, figure format, resolution, and count, " "supplementary-file rules, and the number of references. See " "'paperpush requirements VENUE' for the rules applied.",
     )
-    p_validate.set_defaults(func=_cmd_validate, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True)
+    p_validate.add_argument(
+        "--anonymous",
+        dest="check_anonymous",
+        action="store_const",
+        const=True,
+        help="check the submission for information identifying the authors, as " "for a double-blind venue. Venues marked anonymous (e.g. ICLR, AAAI) " "get this check automatically. Scans the attached files and the .sub's " "text fields for the authors' names, emails, ORCID/OpenReview IDs and " "affiliations, author metadata (PDF, Office, EXIF), home-directory " "paths, acknowledgments, and camera-ready LaTeX switches, and fetches " "every linked anonymous.4open.science repository to scan it the same " "way (requires network access).",
+    )
+    p_validate.set_defaults(func=_cmd_validate, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True, check_anonymous=None)
 
     p_requirements = sub.add_parser("requirements", parents=[verbosity], help="show the manuscript requirements recorded for a venue's author guidelines")
     p_requirements.add_argument("venue", help="venue slug, e.g. nature")

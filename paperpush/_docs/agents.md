@@ -192,6 +192,19 @@ accordingly, since it selects which limits apply. Warnings from this pass are
 heuristics over extracted text and images: relay them to the user as things to
 confirm, not as blockers. `--dont-check-manuscript` skips the pass.
 
+## Double-blind venues are checked for identifying information
+
+Venues marked `"anonymous": true` in `venues.json` (ICLR, AAAI) get an
+anonymity pass on every `validate`; `paperpush validate --anonymous` (MCP:
+`validate_subfile(anonymous=true)`) runs it for any other venue. It searches the
+attached files and the `.sub`'s text fields for the authors' names, emails,
+ORCID/OpenReview IDs and affiliations (from the author list), author metadata
+(PDF, Office, EXIF), home-directory paths, an acknowledgments section, and
+camera-ready LaTeX switches, and it fetches every linked
+anonymous.4open.science repository and scans that too, including an expired or
+missing mirror. Warnings start with `anonymity:`; relay each one to the user,
+since a leak can get a paper desk-rejected.
+
 ## After it runs, tell the user what's left
 
 `paperpush` deliberately leaves the `never` fields blank. Spell out for the

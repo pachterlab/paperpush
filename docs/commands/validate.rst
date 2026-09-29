@@ -9,7 +9,7 @@ Run the pre-submission checks on a filled ``.sub`` file. Run this before
    usage: paperpush validate [-h] [-v] [-q] [--dont-check-links]
                              [--dont-check-for-sensitive-info]
                              [--dont-check-references]
-                             [--dont-check-manuscript]
+                             [--dont-check-manuscript] [--anonymous]
                              subfile
 
 Synopsis
@@ -31,6 +31,9 @@ scripts and CI.
 
 What it checks
 --------------
+
+This is a summary. :doc:`../validation-checks` lists every check in detail,
+with its severity and the flag that controls it.
 
 - **Required fields** are present and non-empty.
 - **Files exist** — every ``file`` / ``filelist`` path (manuscript, figures,
@@ -112,6 +115,13 @@ Arguments
    Skip measuring the uploads against the venue's author guidelines. Also
    skips compiling a LaTeX manuscript for its page count.
 
+``--anonymous``
+   Check the submission for information that identifies its authors, as for a
+   double-blind venue. Venues marked ``anonymous`` in ``venues.json`` (ICLR,
+   AAAI) get this check automatically. Linked anonymous.4open.science
+   repositories are fetched and scanned too, which needs network access. See
+   :ref:`vc-anonymity`.
+
 Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags. Use ``-v``
 to see the checks as they run.
 
@@ -137,6 +147,7 @@ Run the field and file checks alone, with no network access:
 See also
 --------
 
+- :doc:`../validation-checks` — every check in detail.
 - :doc:`options` — look up the valid values for a field flagged as invalid.
 - :doc:`requirements` — print the author-guideline rules the manuscript is
   measured against.

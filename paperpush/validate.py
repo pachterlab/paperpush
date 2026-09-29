@@ -693,6 +693,27 @@ def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     return issues
 
 
+def _anonymity_issues(venue: Venue, values: dict[str, str], *, check_repos: bool = True) -> list[Issue]:
+    """Flag information that identifies the authors of a double-blind submission.
+
+    Runs for venues marked ``"anonymous": true`` in ``venues.json`` (and for any
+    venue under ``validate --anonymous``). Scans the uploads, the ``.sub``'s
+    free-text values, and every anonymous.4open.science repository they link
+    for the authors' names, emails, ORCID/OpenReview IDs and affiliations (taken
+    from the author list), author metadata, home-directory paths, an
+    acknowledgments section, and camera-ready LaTeX switches (see
+    :mod:`paperpush.anonymity`). ``check_repos`` fetches the linked mirrors,
+    which needs network access. Findings are advisory WARNINGs.
+    """
+    from . import anonymity
+
+    paths = list(_iter_upload_paths(venue, values))
+    terms = anonymity.identity_terms(venue, values)
+    field_texts = {f.label or f.id: values[f.id] for f in venue.fields if f.type in ("text", "textarea") and values.get(f.id, "").strip()}
+    logger.info("Checking %d upload file(s) for identifying information (%s, %d identity term(s))", len(paths), venue.slug, len(terms))
+    return _findings_to_issues(anonymity.scan_submission(paths, terms, field_texts, check_repos=check_repos))
+
+
 def _manuscript_requirement_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     """Measure the uploads against the venue's author guidelines.
 
@@ -742,7 +763,16 @@ def _arxiv_cleaner_reminder(venue: Venue, findings) -> list[Issue]:
     ]
 
 
-def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True, check_manuscript: bool = True) -> list[Issue]:
+def validate(
+    subfile: SubFile,
+    venue: Venue,
+    *,
+    check_sensitive: bool = True,
+    check_links: bool = True,
+    check_references: bool = True,
+    check_manuscript: bool = True,
+    check_anonymous: Optional[bool] = None,
+) -> list[Issue]:
     """Return all issues found in ``subfile`` against ``venue``.
 
     Combines schema-level checks (allowed options, file types, booleans, and
@@ -767,15 +797,24 @@ def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, ch
     sections and statements, title-page items, figure resolution, reference
     count (see :mod:`paperpush.requirements_check`); a LaTeX manuscript is
     compiled to a scratch PDF for its page count.
+
+    ``check_anonymous`` scans the submission for information identifying its
+    authors, including every linked anonymous.4open.science repository (see
+    :func:`_anonymity_issues`; network access is needed for the repositories).
+    It defaults to the venue's ``anonymous`` flag, so double-blind venues are
+    always checked; pass True to check any venue.
     """
+    if check_anonymous is None:
+        check_anonymous = venue.anonymous
     logger.info(
-        "Validating %s: %d field(s) (sensitive-scan=%s, link-check=%s, reference-check=%s, manuscript-check=%s)",
+        "Validating %s: %d field(s) (sensitive-scan=%s, link-check=%s, reference-check=%s, manuscript-check=%s, anonymity-check=%s)",
         venue.slug,
         len(venue.fields),
         check_sensitive,
         check_links,
         check_references,
         check_manuscript,
+        check_anonymous,
     )
     issues: list[Issue] = list(_schema_issues(venue, subfile.values))
     values = subfile.values
@@ -789,6 +828,8 @@ def validate(subfile: SubFile, venue: Venue, *, check_sensitive: bool = True, ch
         issues.extend(_sensitive_issues(venue, values))
     if check_manuscript:
         issues.extend(_manuscript_requirement_issues(venue, values))
+    if check_anonymous:
+        issues.extend(_anonymity_issues(venue, values))
 
     for field in venue.fields:
         raw = values.get(field.id, "")
