@@ -2051,7 +2051,7 @@
       "https://www.cell.com/pb-assets/journals/EM/MasterFFCs/CELSFFC-1766175470697.pdf",
       "https://www.cell.com/pb-assets/journals/research/cell-systems/do-not-delete/CSformatting-1666007786657.pdf"
     ],
-    "retrieved": "2026-09-23",
+    "retrieved": "2026-10-01",
     "article_type_field": "article_type",
     "article_types": {
       "Report": {
@@ -2215,6 +2215,8 @@
         ".pdf",
         ".eps",
         ".jpg",
+        ".psd",
+        ".png",
         ".cdx"
       ],
       "vector_formats": [
@@ -2240,7 +2242,7 @@
         "Cell Systems is a figure-driven journal; the scientific argument should be made through the figures and their legends.",
         "For production, main figures must be uploaded individually as high-resolution files (not embedded in the manuscript), with all panels on a single page; each figure should be no larger than about 6.5 x 8 in (16.5 x 20 cm), with a 1.5-column width of 11.4 cm (114 mm) in addition to 1- and 2-column widths.",
         "Resolution at intended print size: color/grayscale at least 300 dpi, black-and-white (non-line-art) at least 500 dpi, line art at least 1,000 dpi.",
-        "TIFF and PDF are the preferred production formats; EPS (vector), JPEG, and CDX are also accepted via Editorial Manager.",
+        "TIFF and PDF are the preferred production formats; EPS (vector), JPEG, PSD, PNG, and CDX are also accepted via Editorial Manager.",
         "Line weights should be 0.5-1.5 pt; embed all fonts and use only Arial; flatten layers before submission.",
         "Cell Press does not permit generative AI/AI-assisted tools to create or alter research or data images.",
         "A graphical abstract is optional for Cell Systems (unlike most other Cell Press journals): square, 1200 x 1200 px at 300 dpi, single panel; preferred formats TIFF/PDF/JPG.",
