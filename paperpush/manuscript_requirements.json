@@ -2320,7 +2320,7 @@
       "https://www.cell.com/pb-assets/journals/EM/MasterFFCs/XGENFFC-1750589326387.pdf",
       "https://els-jbs-prod-cdn.jbs.elsevierhealth.com/pb-assets/journals/research/cell-genomics/cell-genomics_IfA-1592223534027.pdf"
     ],
-    "retrieved": "2026-09-23",
+    "retrieved": "2026-10-01",
     "article_type_field": "article_type",
     "article_types": {
       "Short Article": {
@@ -2449,6 +2449,8 @@
         ".pdf",
         ".eps",
         ".jpg",
+        ".psd",
+        ".png",
         ".cdx"
       ],
       "vector_formats": [
@@ -2473,7 +2475,7 @@
       "notes": [
         "For production, main figures must be uploaded individually as high-resolution files (not embedded in the manuscript), with all panels of a figure on a single page; each figure should be no larger than about 6.5 x 8 in (16.5 x 20 cm), with a 1.5-column width of 11.4 cm (114 mm) in addition to 1- and 2-column widths.",
         "Resolution at intended print size: color/grayscale at least 300 dpi, black-and-white (non-line-art) at least 500 dpi, line art at least 1,000 dpi.",
-        "TIFF and PDF are the preferred production formats; EPS (vector), JPEG, and CDX are also accepted via Editorial Manager.",
+        "TIFF and PDF are the preferred production formats; EPS (vector), JPEG, PSD, PNG, and CDX are also accepted via Editorial Manager.",
         "Line weights should be 0.5-1.5 pt; embed all fonts and use only Arial; flatten layers before submission.",
         "Figures with micrographs require scale bars; figures with pooled data/error bars must define the measure (e.g., mean +/- SEM) in the legend.",
         "Digitally spliced gel/blot images must indicate the deletion position (line or space) and explain the manipulation in the legend or STAR Methods; composite images must be flagged as such.",
