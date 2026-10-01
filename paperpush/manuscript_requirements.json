@@ -1738,7 +1738,7 @@
       "https://www.cell.com/pb-assets/journals/EM/Master%20Final%20Files%20Checklists/Cell%20Final%20File%20Checklist.docx",
       "https://www.cell.com/pb-assets/journals/research/cell/methods/Methods_Guide_general-1724873926937.pdf"
     ],
-    "retrieved": "2026-09-23",
+    "retrieved": "2026-10-01",
     "article_type_field": "article_type",
     "article_types": {
       "Short Article": {
@@ -1943,6 +1943,8 @@
         ".pdf",
         ".eps",
         ".jpg",
+        ".psd",
+        ".png",
         ".cdx"
       ],
       "vector_formats": [
@@ -1968,7 +1970,7 @@
         "At initial submission, figures may be in a wide variety of formats/sizes/resolutions and may be interspersed with the text or uploaded as separate files; keep files small (1-2 MB) where possible.",
         "For production, main figures must be uploaded individually as high-resolution files (not embedded in the manuscript), with all panels of a figure on a single page; each figure should be no larger than about 6.5 x 8 in (16.5 x 20 cm), with a 1.5-column width of 11.4 cm (114 mm) in addition to the 1- and 2-column widths.",
         "Resolution at intended print size: color/grayscale figures at least 300 dpi, black-and-white (non-line-art) figures at least 500 dpi, line-art figures at least 1,000 dpi.",
-        "TIFF and PDF are the preferred production formats; EPS (vector), JPEG, and CDX are also accepted via Editorial Manager; AI (Adobe Illustrator) source files are accepted only for Leading Edge figures in Cell.",
+        "TIFF and PDF are the preferred production formats; EPS (vector), JPEG, PSD, PNG, and CDX are also accepted via Editorial Manager; AI (Adobe Illustrator) source files are accepted only for Leading Edge figures in Cell.",
         "Line weights should be 0.5-1.5 pt; embed all fonts and use only Arial; flatten layers before submission (except Leading Edge papers).",
         "Cell Press does not permit generative AI/AI-assisted tools to create or alter research or data images.",
         "A graphical abstract is required for Cell (not optional, unlike Cell Systems/Current Biology/Patterns/Neuron/Newton): exact square, 1200 x 1200 px at 300 dpi, single panel; preferred formats TIFF/PDF/JPG.",
@@ -2000,7 +2002,7 @@
         "No strict cap on the number of supplemental items; the recommendation is not to exceed 20 supplemental figures per paper (combine related items into multi-page figures if over).",
         "Supplemental figures/tables/schemes are titled 'Figure S1', 'Table S1', etc. (not 'Supplemental Figure 1').",
         "Supplemental tables exceeding 3 pages must be provided as standalone Excel (or similar) files; datasets/code should use non-proprietary formats (.csv, .txt) labeled 'Data S1', etc.; individual standalone SI files must not exceed 500 MB.",
-        "Video files (.mp4 preferred) and audio may be included; STAR Protocols videos must be landscape MP4.",
+        "Video files (.mp4 preferred) and audio may be included; STAR Protocols videos must be in landscape mode.",
         "A brief Supplemental Information index (one-line description of each file) must appear in the main text under the heading 'Supplemental information'."
       ]
     },
