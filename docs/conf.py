@@ -93,3 +93,7 @@ autodoc_mock_imports = [
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
 }
+
+suppress_warnings = [
+    "intersphinx.external",
+]

@@ -37,8 +37,6 @@ autofill-openai = ["openai>=2.0"]
 autofill-google = ["google-genai>=2.3.0"]
 autofill = ["anthropic>=0.40", "openai>=2.0", "google-genai>=2.3.0"]
 mcp = ["mcp>=1.2"]
-# Glyph-level PDF reading (colour, render mode, position) for the hidden-text
-# and modified-template checks in `validate`; they are skipped without it.
 validate = ["pdfminer.six>=20240706", "arxiv_latex_cleaner>=0.1.0"]
 dev = ["pytest>=7.0", "bandit", "black", "jsonschema>=4.18", "sphinx", "isort", "pdfminer.six>=20240706", "arxiv_latex_cleaner>=0.1.0", "mcp>=1.2"]
 
