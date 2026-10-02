@@ -20,14 +20,14 @@
     "sha256": "c100d5570bf4657a2c31aaa023dc045b81d5fcfa44dd7ca2d2b79c20b4703a06"
   },
   "https://iclr.cc/Conferences/2027/AuthorGuidelines": {
-    "chars": 25514,
-    "recorded": "2026-09-23",
-    "sha256": "da795c2caea83f92eece04053c6e6f39b494ac95d674988f0dadb090718b465f"
+    "chars": 25463,
+    "recorded": "2026-10-01",
+    "sha256": "71e39a19bb5473255612aa3738b71af19790f075297324e94c29980d721ee26b"
   },
   "https://iclr.cc/Conferences/2027/CallForPapers": {
-    "chars": 4398,
-    "recorded": "2026-09-23",
-    "sha256": "28a4822dad285978c2d40af73a02a17283242681e082d5069e6af7e7d048cbed"
+    "chars": 4374,
+    "recorded": "2026-10-01",
+    "sha256": "f5032c0ba0c965c16af20ef45a1101441e0c1d9fe9341602d265f86c5a4ef5fd"
   },
   "https://info.arxiv.org/help/prep.html": {
     "chars": 16729,
@@ -180,9 +180,9 @@
     "sha256": "201bc4fcd9bbfbef6819df18fede3caa7fe9536cdf4aa0e4627ada1c4258905a"
   },
   "https://www.biorxiv.org/about/FAQ": {
-    "chars": 28469,
-    "recorded": "2026-09-21",
-    "sha256": "81841a098f4acd9b2ba1626558902864064c886590598a76c0cd5dd7eb43d1e7"
+    "chars": 28493,
+    "recorded": "2026-10-01",
+    "sha256": "a605f7d4dfd0dbe5089dc29448b34536a9a74b597bc88fb4dd00de8f3ee2c23b"
   },
   "https://www.biorxiv.org/submit-a-manuscript": {
     "chars": 11473,
@@ -200,9 +200,9 @@
     "sha256": "f6c8d1bd7a9e2519acdf0ae2bab2cf35dd998c46f7de4024740d0250388705c3"
   },
   "https://www.cell.com/cell-genomics/information-for-authors/final-submission": {
-    "chars": 4806,
-    "recorded": "2026-09-21",
-    "sha256": "c1997047d03236b786a0d24c2beb81df26351416fbc18116683255031868ba94"
+    "chars": 4783,
+    "recorded": "2026-10-01",
+    "sha256": "82a7933f9f43a9dc3bb9328b94730ca6a391353e6a9456aa77424becab858a95"
   },
   "https://www.cell.com/cell-genomics/information-for-authors/revise-manuscript": {
     "chars": 22265,
@@ -250,9 +250,9 @@
     "sha256": "9135e164decd50b4a6ded954e029b67601d0333541c19ec6dea0cef07ccdc4ee"
   },
   "https://www.cell.com/cell/information-for-authors/final-submission": {
-    "chars": 4797,
-    "recorded": "2026-09-21",
-    "sha256": "3003cc93a61e9345e89cd9e32779c04e0013ad479b5e1abba3e6f7c23e155548"
+    "chars": 4774,
+    "recorded": "2026-10-01",
+    "sha256": "10e93f52b907a612e671758455d747e086d38a6ccd5ddc5941f835b25958e4e5"
   },
   "https://www.cell.com/cell/information-for-authors/revise-manuscript": {
     "chars": 22057,
@@ -265,9 +265,9 @@
     "sha256": "4fffaf282e6d89ad69667c507747da33415fdeb8a0796fbd0c40c80703b8576d"
   },
   "https://www.cell.com/information-for-authors/figure-guidelines": {
-    "chars": 12153,
-    "recorded": "2026-09-21",
-    "sha256": "8140f647571836d0d9bfad8b4698c1925b0f1b07bd93343c206f56428df28b8e"
+    "chars": 12100,
+    "recorded": "2026-10-01",
+    "sha256": "0ce3bd672f35215df1d535b98eaf04141faa7de352b674660b0660d8e1486921"
   },
   "https://www.cell.com/information-for-authors/star-authors-guide": {
     "chars": 2905,
