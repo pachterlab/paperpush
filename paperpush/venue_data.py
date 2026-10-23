@@ -1,8 +1,8 @@
 """Where the venue data files are read from, and how they are kept current.
 
-The venue data -- ``venues.json``, ``manuscript_requirements.json``, their
-JSON schemas (``venues.schema.json``, ``manuscript_requirements.schema.json``)
-and the controlled-vocabulary files under ``venues/_assets/`` -- ships inside
+The venue data -- ``venues.json`` (the master list),
+``submission_forms.json``, ``manuscript_requirements.json``, their JSON
+schemas and the controlled-vocabulary files under ``venues/_assets/`` -- ships inside
 the package, but it changes far more often than the code: a portal renames a
 category, a journal raises a word limit. So the same files are also published
 on their own (see ``scripts/build_venue_data.py`` and the ``venue-data``
@@ -58,7 +58,9 @@ logger = logging.getLogger(__name__)
 #: the data needs new code to read it (a new key the loader must understand, a
 #: changed merge rule). Clients only accept a manifest with their own format, so
 #: installed versions keep their bundled data until they upgrade.
-DATA_FORMAT = 1
+#: Format 2 split the old ``venues.json`` into the master list (``venues.json``)
+#: and the submission forms (``submission_forms.json``).
+DATA_FORMAT = 2
 
 DEFAULT_URL = "https://raw.githubusercontent.com/pachterlab/paperpush/venue-data/"
 REFRESH_INTERVAL_SECONDS = 24 * 60 * 60
@@ -71,8 +73,10 @@ TIMEOUT_SECONDS = 3.0
 
 PACKAGE_DIR = Path(__file__).parent
 VENUES_FILE = "venues.json"
+FORMS_FILE = "submission_forms.json"
 REQUIREMENTS_FILE = "manuscript_requirements.json"
 VENUES_SCHEMA_FILE = "venues.schema.json"
+FORMS_SCHEMA_FILE = "submission_forms.schema.json"
 REQUIREMENTS_SCHEMA_FILE = "manuscript_requirements.schema.json"
 MANIFEST_FILE = "manifest.json"
 ASSETS_SUBDIR = "_assets"
@@ -82,7 +86,7 @@ ASSETS_SUBDIR = "_assets"
 #: that published it, so a copy's schema is the one its data was validated
 #: against (and ``manuscript_requirements.json``'s relative ``$schema`` resolves
 #: next to it).
-DATA_FILES = (VENUES_FILE, REQUIREMENTS_FILE, VENUES_SCHEMA_FILE, REQUIREMENTS_SCHEMA_FILE)
+DATA_FILES = (VENUES_FILE, FORMS_FILE, REQUIREMENTS_FILE, VENUES_SCHEMA_FILE, FORMS_SCHEMA_FILE, REQUIREMENTS_SCHEMA_FILE)
 
 # The only paths a manifest may list. Anything else (``../``, subdirectories,
 # unexpected names) is rejected so a manifest can never write outside the cache.
@@ -99,7 +103,7 @@ class DataSource:
     """The directory venue data is read from, and where it came from."""
 
     kind: SourceKind
-    #: Directory holding ``venues.json`` and ``manuscript_requirements.json``.
+    #: Directory holding the :data:`DATA_FILES`.
     root: Path
     #: Directory holding the ``options_file`` vocabularies.
     assets: Path
@@ -110,7 +114,7 @@ class DataSource:
         """Path of one of :data:`DATA_FILES` in this source.
 
         Falls back to the bundled file when this source lacks it (an override
-        directory holding only ``venues.json``, say).
+        directory holding only ``submission_forms.json``, say).
         """
         candidate = self.root / name
         return candidate if candidate.is_file() else PACKAGE_DIR / name
@@ -176,8 +180,8 @@ def active_source() -> DataSource:
     mode = _mode()
     if mode not in {"auto", "remote", "bundled"}:
         root = Path(mode).expanduser()
-        if not (root / VENUES_FILE).is_file():
-            logger.warning("PAPERPUSH_VENUE_DATA=%s has no %s; using the bundled venue data", root, VENUES_FILE)
+        if not any((root / name).is_file() for name in (VENUES_FILE, FORMS_FILE, REQUIREMENTS_FILE)):
+            logger.warning("PAPERPUSH_VENUE_DATA=%s has none of %s, %s, %s; using the bundled venue data", root, VENUES_FILE, FORMS_FILE, REQUIREMENTS_FILE)
             return bundled_source()
         logger.info("Venue data: using the local override %s", root)
         return DataSource("override", root, root / ASSETS_SUBDIR, _read_json(root / MANIFEST_FILE))

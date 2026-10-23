@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate the supported-venue listings from venues.json.
+"""Regenerate the supported-venue listings from the venue databases.
 
 Two artifacts are kept in sync with the database:
 
@@ -15,7 +15,8 @@ Two artifacts are kept in sync with the database:
       <!-- END SUPPORTED VENUES -->
 
 In both files the surrounding prose is left untouched. Run it after editing
-``paperpush/venues.json``:
+``paperpush/venues.json`` (the master list), ``submission_forms.json``, or
+which venues ``manuscript_requirements.json`` covers:
 
     python scripts/gen_readme_venues.py        # rewrite both files in place
     python scripts/gen_readme_venues.py --check # exit 1 if either is out of date
@@ -141,11 +142,13 @@ def build_table() -> str:
     lines = [
         f"_{len(venues)} supported venue" + ("s" if len(venues) != 1 else "") + " (auto-generated from `paperpush/venues.json`)._",
         "",
-        "| Slug | Venue | Venue type | Submission platform | Description | Submit walkthrough |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Slug | Venue | Venue type | Validate | Submit | Submission platform | Description | Submit walkthrough |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for j in venues:
-        lines.append(f"| `{j.slug}` | {_linked_name(j)} | {_cell(j.venue_type.capitalize())} | {_cell(platform_of(j))} | {_cell(j.description)} | {walkthrough_cell(j.slug)} |")
+        validate, submit = ("yes" if j.supports_validate else "no"), ("yes" if j.supports_submit else "no")
+        platform = platform_of(j) if j.has_form else "-"
+        lines.append(f"| `{j.slug}` | {_linked_name(j)} | {_cell(j.venue_type.capitalize())} | {validate} | {submit} | {_cell(platform)} | {_cell(j.description)} | {walkthrough_cell(j.slug)} |")
     return "\n".join(lines)
 
 

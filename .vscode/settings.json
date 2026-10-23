@@ -6,14 +6,18 @@
     "*.sub": "yaml"
   },
 
-  // Power autocomplete and inline validation for the venue database from the
-  // generated schema. The schema's source of truth is the pydantic models in
+  // Power autocomplete and inline validation for the venue databases from the
+  // generated schemas. The schemas' source of truth is the pydantic models in
   // paperpush/schema_models.py; regenerate with
   // `python scripts/gen_venues_schema.py` (CI drift-checks it).
   "json.schemas": [
     {
       "fileMatch": ["paperpush/venues.json"],
       "url": "./paperpush/venues.schema.json"
+    },
+    {
+      "fileMatch": ["paperpush/submission_forms.json"],
+      "url": "./paperpush/submission_forms.schema.json"
     },
     {
       "fileMatch": ["paperpush/manuscript_requirements.json"],

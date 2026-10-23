@@ -73,7 +73,9 @@ python scripts/gen_readme_venues.py
 venue's author guidelines require of the manuscript itself. `paperpush validate`
 measures the files a `.sub` names against it (`paperpush/requirements_check.py`),
 and `paperpush requirements VENUE` prints it. It is the companion of
-`venues.json`: that file describes the portal's form, this one the guidelines.
+`submission_forms.json`: that file describes the portal's form, this one the
+guidelines. Every slug in either must also be listed in `venues.json`, the
+master list (see [Venue databases](#venue-databases)).
 An entry is optional: a venue without one is still fully supported, `validate`
 simply has no manuscript rules to apply, and `paperpush requirements VENUE`
 says so. Add one whenever the guidelines are available.
@@ -114,7 +116,7 @@ and `retrieved` (the date, `YYYY-MM-DD`). Two mechanisms keep entries short:
   accumulate).
 - `"article_type_field"` names the `.sub` field that selects the article type
   and `"article_types"` maps each of that field's option strings (exactly as in
-  `venues.json`) to the overrides for that type. The top level holds the primary
+  `submission_forms.json`) to the overrides for that type. The top level holds the primary
   research-article rules. `tests/test_requirements.py` checks every key is a
   real option of the field.
 
@@ -124,9 +126,10 @@ Methods" for `Methods`, "Conflict of interest" for `competing_interests`, ...).
 Add a wording there when a venue uses a new one.
 
 To keep rules from being reported twice, the checker applies a guideline rule
-only when the `venues.json` field does not already enforce the same thing
-(`accept`, `max_file_size_mb`, `max_words`, `word_count`, `max_count`, ...);
-the portal's own limits are the enforced ones and stay in `venues.json`.
+only when the `submission_forms.json` field does not already enforce the same
+thing (`accept`, `max_file_size_mb`, `max_words`, `word_count`, `max_count`,
+...); the portal's own limits are the enforced ones and stay in
+`submission_forms.json`.
 
 Page limits on a `.tex` manuscript need a rendered PDF: `paperpush.manuscript.build_pdf`
 compiles it with `latexmk` (or `pdflatex` + `bibtex`) into a scratch directory,
@@ -218,8 +221,8 @@ several publishers and the agent runs on the local Claude Code subscription:
 
 ## Venue data updates without a release
 
-The venue data -- `venues.json`, `manuscript_requirements.json`, their two
-schemas, and `paperpush/venues/_assets/*` -- is published on its own, so a data
+The venue data -- `venues.json`, `submission_forms.json`,
+`manuscript_requirements.json`, their three schemas, and `paperpush/venues/_assets/*` -- is published on its own, so a data
 fix reaches installed copies without a PyPI release:
 
 1. After `ci.yml` passes on `main`, `venue-data.yml` runs
@@ -237,8 +240,12 @@ Each installed version takes, entry by entry, only what its code can use. An
 entry it can't use keeps its bundled version, and so does any entry that
 inherits from it:
 
-- `venues.json` (`merge_published` in `paperpush/database.py`): a runner is
-  written against its venue's field ids and types. So labels, help text,
+- `venues.json` (`merge_published_info` in `paperpush/database.py`): the
+  general metadata is data only, so changes reach users. A new venue is added
+  when it is validate-only (no published form); a new venue with a form waits
+  for the release that brings its runner.
+- `submission_forms.json` (`merge_published` in `paperpush/database.py`): a
+  runner is written against its venue's field ids and types. So labels, help text,
   options, limits, `required` and URLs reach users without a release. New
   venues, and adding, removing, renaming, reordering or retyping a field, wait
   for the next release.
@@ -303,6 +310,35 @@ The submit walkthrough's pass/fail is the portal-health signal: a portal change
 that breaks submission flips the venue to ❌ in
 `tests/submit_walkthrough_status.json`. Regenerate the venue tables after any
 run — CI fails if `venues.md` is out of sync with that file.
+
+## Venue databases
+
+A venue's data lives in three files under `paperpush/`, so a venue can be
+supported by `validate`, by `submit`, or both:
+
+- `venues.json`, the master list. A venue exists exactly when it has an entry
+  here: slug, name, type, homepage, `anonymous`, `deprecated`, ... (schema:
+  `VenueInfo` in `paperpush/database.py`).
+- `submission_forms.json`, the submission form: the fields the portal asks for,
+  its URL and upload limits (schema: `SubmissionForm` and `Field`). A venue with
+  a form and a runner under `paperpush/venues/` supports `submit`.
+- `manuscript_requirements.json`, the author guidelines (see
+  [Manuscript requirements](#manuscript-requirements)). A venue with an entry
+  supports `validate`'s manuscript checks.
+
+Support is worked out from the files rather than recorded as flags:
+`Venue.supports_validate` and `Venue.supports_submit` in
+`paperpush/database.py`, shown by `paperpush --venues` and in `venues.md`. A
+validate-only venue (no form) gets `default_form()`: title, abstract, keywords,
+authors, an article-type choice when its requirements have `article_types`, and
+the manuscript, figure, table, supplementary and cover-letter files. So
+`subfile`, `autofill` and `validate` work for it, while `submit` and `login`
+refuse it. `tests/test_internals.py` checks that every form and requirements
+entry names a listed venue.
+
+To add a validate-only venue, add its entry to `venues.json` and its rules to
+`manuscript_requirements.json`. It needs no code, so it also reaches installed
+copies through the published venue data without a release.
 
 To deprecate a venue, add the field `deprecated:true` to its entry in `paperpush/venues.json`.
 

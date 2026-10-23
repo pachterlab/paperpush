@@ -10,7 +10,7 @@ Two layers of checking run, both reporting through the same :class:`Issue`
 list so the author sees one combined, actionable summary:
 
 * A pydantic model built from the venue's field schema enforces the value
-  rules encoded in ``venues.json``: a ``choice`` field's value must be one of
+  rules encoded in ``submission_forms.json``: a ``choice`` field's value must be one of
   its ``options``; a ``filelist``'s per-line file-type subfield must be one of
   its ``type_options``; a ``boolean`` must read as yes/no; and no unknown field
   ids are allowed.
@@ -70,7 +70,7 @@ def _falsey_bool(value: str) -> bool:
 
 # The legacy author column order, used by venues that don't declare their own
 # ``fields`` list. Most venues follow this; Bioinformatics (ScholarOne) is the
-# exception and declares its own order in venues.json. The ``?`` suffixes mark
+# exception and declares its own order in submission_forms.json. The ``?`` suffixes mark
 # the optional columns (see ``_subfield_specs``): only a name is strictly
 # required, matching the historical behaviour for venues that omit ``fields``.
 DEFAULT_AUTHOR_FIELDS = ["name", "email?", "affiliation?", "orcid?", "corresponding"]
@@ -244,7 +244,7 @@ def _annotation_for(field: Field, custom_validator=None):
     """Map one venue field to the pydantic type used to validate its value.
 
     A ``choice`` field's closed option set is taken straight from its ``options``
-    in ``venues.json`` and enforced as a ``Literal``, so the allowed values live
+    in ``submission_forms.json`` and enforced as a ``Literal``, so the allowed values live
     in one place (the database) and are not duplicated in this module. When the
     field sets ``options_recommended`` the list is advisory instead (the portal
     offers an "Other" free-text entry), so it validates as a plain string and an
@@ -789,7 +789,7 @@ def _manuscript_requirement_issues(venue: Venue, values: dict[str, str]) -> list
 
     Delegates to :func:`paperpush.requirements_check.check_manuscript_requirements`,
     which reads ``manuscript_requirements.json`` -- the companion to
-    ``venues.json`` that records what the guidelines demand of the manuscript
+    ``submission_forms.json`` that records what the guidelines demand of the manuscript
     itself (formats, length, sections, statements, title page, figures,
     references). Runs by default (disable with ``--dont-check-manuscript``).
     Reads and, for LaTeX, compiles the manuscript; makes no network requests.

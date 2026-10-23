@@ -4,7 +4,8 @@
 
 `paperpush/manuscript_requirements.json` records what each venue's **author
 guidelines** require of the manuscript itself -- the companion to
-`venues.json`, which describes the submission form. `paperpush validate`
+`submission_forms.json`, which describes the submission form. Every slug must
+also be listed in `venues.json`, the master list. `paperpush validate`
 measures the uploaded files against these rules and `paperpush requirements
 VENUE` prints them. The top-level object maps a venue slug to a venue entry;
 the special keys `$schema` and `$aliases` are metadata (see below). This page

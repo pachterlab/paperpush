@@ -80,7 +80,7 @@ SLUG_TO_MODULE = _discover_slug_to_module()
 # Venues that submit *through* another venue's portal -- they share that base
 # venue's runner, stored credentials, and saved browser session. This is a
 # code-level fact about which submission implementation exists, kept here next to
-# the registry rather than in ``venues.json``: the data file's ``inherits`` key
+# the registry rather than in ``submission_forms.json``: the data file's ``inherits`` key
 # describes only the field *schema* a venue derives from, which is independent.
 # A venue may share another's portal without inheriting its schema, inherit its
 # schema without sharing its portal (the Nature family: nature_biotech and

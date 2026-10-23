@@ -76,7 +76,7 @@ _PAGE_FURNITURE_WORDS = 25
 def _extra_heading_pattern(headings: tuple[str, ...]) -> re.Pattern[str] | None:
     """A standalone-heading matcher for a venue's ``main_text_end_headings``.
 
-    Each entry is a literal phrase, so ``venues.json`` lists heading wordings
+    Each entry is a literal phrase, so ``submission_forms.json`` lists heading wordings
     ("Ethics Statement", "Appendix") rather than regular expressions. The shape
     mirrors :data:`_REFERENCE_HEADING` -- the phrase alone on its line, with an
     optional leading section designator -- plus an optional trailing designator,
@@ -98,7 +98,7 @@ def main_text_end(text: str, headings: tuple[str, ...] = ()) -> re.Match[str] | 
 
     The reference list always ends it; ``headings`` names the further sections a
     venue excludes from its before-refs limits (see ``main_text_end_headings`` in
-    ``venues.json``), such as an appendix or a required statement. Whichever
+    ``submission_forms.json``), such as an appendix or a required statement. Whichever
     comes first wins.
     """
     pattern = _extra_heading_pattern(headings)

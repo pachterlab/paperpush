@@ -202,6 +202,10 @@ def main(argv: list[str] | None = None) -> int:
         ),
     ]
 
+    # A validate-only venue has no portal to sign in to or submit through.
+    if not venue.has_form:
+        steps = [step for step in steps if step[0] not in ("login", "submit")]
+
     total = len(steps)
     for i, (name, func, ns) in enumerate(steps, start=1):
         print(f"\n=== Step {i}/{total}: {name} ===\n")
@@ -210,6 +214,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"\nPipeline stopped: '{name}' exited with code {rc}.", file=sys.stderr)
             return rc
 
+    if not venue.has_form:
+        print(f"\nPipeline complete. {venue.slug} is validate-only, so there is no login or submit step.")
+        return 0
     print("\nPipeline complete. Review the submission in the portal before clicking submit.")
     return 0
 

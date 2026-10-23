@@ -35,7 +35,9 @@ Environment
 ``PAPERPUSH_VENUE_DATA``
    ``auto`` (default) uses the published data. ``bundled`` uses only the
    data shipped with the installed version. A directory path reads
-   ``venues.json`` and ``manuscript_requirements.json`` from that directory.
+   ``venues.json``, ``submission_forms.json`` and
+   ``manuscript_requirements.json`` from that directory; a file it lacks comes
+   from the bundled copy.
 
 ``PAPERPUSH_OFFLINE``
    Set to ``1`` to never fetch, while still using a previously cached copy.

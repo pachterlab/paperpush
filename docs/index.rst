@@ -45,6 +45,7 @@ The workflow is five short commands:
    venues
    validation-checks
    schemas/venues
+   schemas/submission_forms
    schemas/manuscript_requirements
    api
    example-session

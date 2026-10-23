@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
-"""Interactively add a new venue to ``paperpush/venues.json``.
+"""Interactively add a new venue to ``paperpush/venues.json`` (and its form).
 
-The prompts are generated from the :class:`~paperpush.database.Field` and
-:class:`~paperpush.database.Venue` dataclasses -- the same single source
-that produces ``venues.schema.json`` -- so this tool always offers exactly the
-keys those models define, with their descriptions, defaults, and (for ``type`` /
-``autofill``) their allowed values.
+The prompts are generated from the :class:`~paperpush.database.VenueInfo`,
+:class:`~paperpush.database.SubmissionForm` and
+:class:`~paperpush.database.Field` dataclasses -- the same single source that
+produces ``venues.schema.json`` and ``submission_forms.schema.json`` -- so this
+tool always offers exactly the keys those models define, with their
+descriptions, defaults, and (for ``type`` / ``autofill``) their allowed values.
 
 Flow:
 
-1. Enter the new venue's slug and its top-level keys (press Enter to accept a
-   default / omit an optional key).
-2. Choose standalone or inheriting (an inheriting venue derives from a base
-   slug; its fields are partial overrides).
-3. Add fields one at a time: each field asks for its ``type`` first, then walks
+1. Enter the new venue's slug and its master-list keys (press Enter to accept
+   a default / omit an optional key).
+2. Choose whether paperpush will submit to it. A validate-only venue needs no
+   form; skip to step 5.
+3. Choose a standalone or inheriting form (an inheriting form derives from a
+   base slug; its fields are partial overrides), then the form-level keys.
+4. Add fields one at a time: each field asks for its ``type`` first, then walks
    every remaining key. Leave ``type`` empty to finish adding fields.
-4. Review the assembled entry, which is validated against the schema before it
-   is written into ``venues.json``.
+5. Review the assembled entries, which are validated against the schemas before
+   they are written into ``venues.json`` and ``submission_forms.json``.
+
+The author-guideline rules ``validate`` checks go in
+``manuscript_requirements.json``, by hand or with ``scripts/update_guidelines.py``.
 
 Keys left empty are omitted entirely rather than written as empty values, so the
 entry stays minimal (the loader fills defaults).
@@ -36,13 +42,14 @@ from typing import Annotated, Any, Literal, Union, get_args, get_origin, get_typ
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from paperpush.database import Field, Venue  # noqa: E402
-from paperpush.schema_models import build_schema  # noqa: E402
+from paperpush.database import Field, SubmissionForm, VenueInfo  # noqa: E402
+from paperpush.schema_models import build_forms_schema, build_schema  # noqa: E402
 
 DATABASE_PATH = REPO_ROOT / "paperpush" / "venues.json"
+FORMS_PATH = REPO_ROOT / "paperpush" / "submission_forms.json"
 
-# Venue-level keys handled outside the generic top-level prompt loop: ``slug``
-# is the database key (asked first), ``fields`` are gathered field-by-field, and
+# Keys handled outside the generic top-level prompt loop: ``slug`` is the
+# database key (asked first), ``fields`` are gathered field-by-field, and
 # ``inherits`` / ``removed_fields`` are driven by the standalone-vs-inheriting
 # choice.
 _VENUE_SPECIAL = {"slug", "fields", "inherits", "removed_fields"}
@@ -199,11 +206,11 @@ _OMIT = object()
 # --- assembly --------------------------------------------------------------
 
 
-def _collect_venue_level(meta: dict[str, _Meta]) -> dict[str, Any]:
-    """Prompt for the top-level venue keys (everything but slug/fields/
+def _collect_venue_level(meta: dict[str, _Meta], heading: str) -> dict[str, Any]:
+    """Prompt for the top-level keys in ``meta`` (everything but slug/fields/
     inheritance)."""
     entry: dict[str, Any] = {}
-    print("\n== Venue details (press Enter to skip an optional key) ==")
+    print(f"\n== {heading} (press Enter to skip an optional key) ==")
     for name, m in meta.items():
         if name in _VENUE_SPECIAL:
             continue
@@ -250,27 +257,21 @@ def _collect_fields(meta: dict[str, _Meta], *, inheriting: bool) -> list[dict[st
     return fields
 
 
-def _build_entry() -> tuple[str, dict[str, Any]]:
+def _build_form() -> dict[str, Any]:
+    """Prompt for a submission form: inheritance, form-level keys, then fields."""
     field_meta = _describe(Field)
-    venue_meta = _describe(Venue)
-
-    print("== New venue ==")
-    slug = ""
-    while not slug:
-        slug = _read("slug (the database key, e.g. 'nature_genetics'): ").strip()
-        if not slug:
-            print("    -> a slug is required.")
+    form_meta = _describe(SubmissionForm)
 
     # Ask about inheritance up front: it decides whether fields are full
     # definitions or partial overrides, and lets the rest of the prompts be
-    # clicked through. An inheriting venue's base, and any inherited fields it
+    # clicked through. An inheriting form's base, and any inherited fields it
     # drops, are gathered here too.
-    entry: dict[str, Any] = {}
+    form: dict[str, Any] = {}
     inheriting = _read("\nDoes this venue inherit another's submission format " "(e.g. an AAAS sibling of 'science')? [y/N]: ").strip().lower() in {"y", "yes"}
     if inheriting:
-        entry["inherits"] = _ask(venue_meta["inherits"], required=True)
+        form["inherits"] = _ask(form_meta["inherits"], required=True)
         # removed_fields is a loader directive (consumed by _merge_fields), not a
-        # Venue dataclass attribute, so it has no introspected metadata.
+        # SubmissionForm dataclass attribute, so it has no introspected metadata.
         removed_meta = _Meta(
             name="removed_fields",
             kind="list",
@@ -280,26 +281,39 @@ def _build_entry() -> tuple[str, dict[str, Any]]:
         )
         removed = _ask(removed_meta, required=False)
         if removed is not _OMIT:
-            entry["removed_fields"] = removed
+            form["removed_fields"] = removed
 
-    entry.update(_collect_venue_level(venue_meta))
+    form.update(_collect_venue_level(form_meta, "Submission form"))
 
     fields = _collect_fields(field_meta, inheriting=inheriting)
     if fields:
-        entry["fields"] = fields
+        form["fields"] = fields
+    return form
 
-    return slug, entry
+
+def _build_entry() -> tuple[str, dict[str, Any], dict[str, Any] | None]:
+    """Prompt for a new venue: its slug, master entry, and form (None if validate-only)."""
+    print("== New venue ==")
+    slug = ""
+    while not slug:
+        slug = _read("slug (the database key, e.g. 'nature_genetics'): ").strip()
+        if not slug:
+            print("    -> a slug is required.")
+
+    entry = _collect_venue_level(_describe(VenueInfo), "Venue details")
+    submits = _read("\nWill paperpush submit to this venue (add a submission form)? " "Answer no for a validate-only venue. [Y/n]: ").strip().lower() not in {"n", "no"}
+    return slug, entry, _build_form() if submits else None
 
 
 # --- persistence -----------------------------------------------------------
 
 
-def _load_db() -> dict[str, Any]:
-    return json.loads(DATABASE_PATH.read_text(encoding="utf-8"))
+def _load_db(path: Path = DATABASE_PATH) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _validate(db: dict[str, Any]) -> list[str]:
-    """Validate a candidate database against the generated schema."""
+def _validate(db: dict[str, Any], build=build_schema) -> list[str]:
+    """Validate a candidate database against the schema ``build`` generates."""
     try:
         from jsonschema import Draft202012Validator
     except ImportError:
@@ -308,8 +322,16 @@ def _validate(db: dict[str, Any]) -> list[str]:
             file=sys.stderr,
         )
         return []
-    validator = Draft202012Validator(build_schema())
+    validator = Draft202012Validator(build())
     return [f"{'/'.join(map(str, e.path))}: {e.message}" for e in sorted(validator.iter_errors(db), key=lambda e: list(e.path))]
+
+
+def _write(path: Path, data: dict[str, Any]) -> str:
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
 
 
 def _scaffold_module(slug: str) -> None:
@@ -353,25 +375,32 @@ def _scaffold_module(slug: str) -> None:
 
 def main() -> int:
     try:
-        slug, entry = _build_entry()
+        slug, entry, form = _build_entry()
     except (_Abort, KeyboardInterrupt):
         print("\nAborted; nothing written.", file=sys.stderr)
         return 1
 
     db = _load_db()
+    forms = _load_db(FORMS_PATH)
     if slug in db:
         overwrite = _read(f"\n{slug!r} already exists. Overwrite it? [y/N]: ").strip().lower() in {"y", "yes"}
         if not overwrite:
             print("Aborted; nothing written.", file=sys.stderr)
             return 1
 
-    candidate = dict(db)
-    candidate[slug] = entry
+    candidate = {**db, slug: entry}
+    candidate_forms = dict(forms)
+    candidate_forms.pop(slug, None)
+    if form is not None:
+        candidate_forms[slug] = form
 
-    print("\n== Entry preview ==")
+    print("\n== venues.json entry ==")
     print(json.dumps({slug: entry}, indent=2, ensure_ascii=False))
+    if form is not None:
+        print("\n== submission_forms.json entry ==")
+        print(json.dumps({slug: form}, indent=2, ensure_ascii=False))
 
-    errors = _validate(candidate)
+    errors = _validate(candidate) + _validate(candidate_forms, build_forms_schema)
     if errors:
         print("\nThis entry does not satisfy the schema:", file=sys.stderr)
         for err in errors:
@@ -379,23 +408,33 @@ def main() -> int:
         print("Nothing written. Re-run and adjust the flagged keys.", file=sys.stderr)
         return 1
 
-    if _read("\nWrite this entry to venues.json? [y/N]: ").strip().lower() not in {
+    target = "venues.json and submission_forms.json" if form is not None or slug in forms else "venues.json"
+    if _read(f"\nWrite to {target}? [y/N]: ").strip().lower() not in {
         "y",
         "yes",
     }:
         print("Aborted; nothing written.", file=sys.stderr)
         return 1
 
-    DATABASE_PATH.write_text(json.dumps(candidate, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    try:
-        shown = DATABASE_PATH.relative_to(REPO_ROOT)
-    except ValueError:
-        shown = DATABASE_PATH
-    print(f"Added {slug!r} to {shown}.")
+    print(f"Added {slug!r} to {_write(DATABASE_PATH, candidate)}.")
+    if candidate_forms != forms:
+        print(f"Wrote its form to {_write(FORMS_PATH, candidate_forms)}." if form is not None else f"Removed its old form from {_write(FORMS_PATH, candidate_forms)}.")
 
-    _scaffold_module(slug)
+    if form is not None:
+        _scaffold_module(slug)
 
-    print("\nNext: refresh the README table with " "`python scripts/gen_readme_venues.py`. If this venue needs portal " "automation and you skipped the scaffold above, copy " "paperpush/venues/template.py to paperpush/venues/<portal>/<slug>.py " "-- naming it after the slug is all the registration it needs.")
+    print(
+        "\nNext: to support 'paperpush validate', add the venue's author-guideline rules to "
+        "paperpush/manuscript_requirements.json (see DEVELOPMENT.md). Then refresh the README "
+        "table with `python scripts/gen_readme_venues.py`."
+        + (
+            " If this venue needs portal automation and you skipped the scaffold above, copy "
+            "paperpush/venues/template.py to paperpush/venues/<portal>/<slug>.py "
+            "-- naming it after the slug is all the registration it needs."
+            if form is not None
+            else ""
+        )
+    )
     return 0
 
 

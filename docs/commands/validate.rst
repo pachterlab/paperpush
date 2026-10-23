@@ -91,7 +91,7 @@ with its severity and the flag that controls it.
 
   Measured numbers that exceed a limit are errors; anything that depends on
   extracting text from a PDF or reading an image is a warning. A rule the
-  portal already enforces through ``venues.json`` (an ``accept`` list, a
+  portal already enforces through ``submission_forms.json`` (an ``accept`` list, a
   per-file size cap, a word limit on the field) is reported once, by that
   check, not again here.
 

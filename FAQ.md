@@ -1,6 +1,6 @@
 *How does PaperPush work?*
 
-Information on supported venues is in `paperpush/venues.json`. `paperpush subfile` generates a file from this for the specified venue. The file can be filled out manually, or with the help of an LLM via `paperpush autofill`. The submission portal for a selected venue is filled out with the information from this file with a `paperpush submit`. This runs a Playwright script that is written specifically for each supported venue.
+Supported venues are listed in `paperpush/venues.json`, their submission forms are in `paperpush/submission_forms.json`, and their author guidelines are in `paperpush/manuscript_requirements.json`. `paperpush subfile` generates a file from the form for the specified venue. The file can be filled out manually, or with the help of an LLM via `paperpush autofill`. The submission portal for a selected venue is filled out with the information from this file with a `paperpush submit`. This runs a Playwright script that is written specifically for each supported venue.
 
 
 *The repository says that is supports a given venue, but it fails when I try. Why is that?*

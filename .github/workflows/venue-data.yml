@@ -1,9 +1,10 @@
 name: Publish venue data
 
-# Publishes the venue data (venues.json, manuscript_requirements.json, their
-# schemas and venues/_assets) to the `venue-data` branch, which installed copies
-# of paperpush fetch at runtime (paperpush/venue_data.py). This is how a data fix
-# reaches users without a PyPI release.
+# Publishes the venue data (venues.json, submission_forms.json,
+# manuscript_requirements.json, their schemas and venues/_assets) to the
+# `venue-data` branch, which installed copies of paperpush fetch at runtime
+# (paperpush/venue_data.py). This is how a data fix reaches users without a PyPI
+# release.
 #
 # Runs only after CI passes on main, so the published data has been through the
 # full test suite. A commit is pushed only when a data file actually changed.

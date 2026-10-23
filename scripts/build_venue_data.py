@@ -8,8 +8,8 @@ touches the data and commits the output to the ``venue-data`` branch:
 
     python scripts/build_venue_data.py OUT_DIR
 
-``OUT_DIR`` receives ``venues.json``, ``manuscript_requirements.json``, their
-two JSON schemas, ``_assets/*`` and a ``manifest.json`` recording the data
+``OUT_DIR`` receives ``venues.json``, ``submission_forms.json``,
+``manuscript_requirements.json``, their three JSON schemas, ``_assets/*`` and a ``manifest.json`` recording the data
 format, the source commit and the sha256 of every file. Nothing is written
 unless the data validates against the schemas and loads with the package's own
 loader -- the same check a client runs before accepting a download.
@@ -39,6 +39,7 @@ ASSETS_DIR = PACKAGE_DIR / "venues" / venue_data.ASSETS_SUBDIR
 # (data file, the schema it is validated against).
 SCHEMA_PAIRS = (
     (venue_data.VENUES_FILE, venue_data.VENUES_SCHEMA_FILE),
+    (venue_data.FORMS_FILE, venue_data.FORMS_SCHEMA_FILE),
     (venue_data.REQUIREMENTS_FILE, venue_data.REQUIREMENTS_SCHEMA_FILE),
 )
 

@@ -91,6 +91,18 @@ def _print_agent_guide() -> int:
     return 0
 
 
+_VALIDATE_ONLY = "paperpush can check a manuscript against its author guidelines ('paperpush validate') but cannot submit to it, so there is nothing to log in to."
+
+
+def _support_note(venue) -> str:
+    """A suffix for the venue listing when a venue lacks validate or submit support."""
+    if not venue.supports_submit:
+        return " -- validate only"
+    if not venue.supports_validate:
+        return " -- submit only"
+    return ""
+
+
 @_validate
 def _print_venues() -> int:
     venues = list_venues()
@@ -110,7 +122,7 @@ def _print_venues() -> int:
             print("  (none yet)")
             continue
         for venue in members:
-            print(f"  {venue.name} ({venue.slug})")
+            print(f"  {venue.name} ({venue.slug}){_support_note(venue)}")
 
     print(f"\nFor more details, see {_VENUES_URL}")
     print(f"Venue data: {venue_data.active_source().describe()} (refresh with 'paperpush update-venues')")
@@ -268,6 +280,10 @@ def _cmd_login(args: argparse.Namespace) -> int:
     # slug. Redirect to the base so storage, status, and logout all act on the one
     # shared login. (Schema inheritance is separate -- see submission_base.)
     from . import venues
+
+    if not venue.has_form:
+        print(f"{venue.slug} is validate-only: {_VALIDATE_ONLY}")
+        return 0
 
     sub_base = venues.submission_base(venue.slug)
     if sub_base != venue.slug:
@@ -696,6 +712,9 @@ def _cmd_submit(args: argparse.Namespace) -> int:
         venue_def = get_venue(venue)
     except KeyError:
         venue_def = None
+    if venue_def is not None and not venue_def.has_form:
+        print(f"error: {venue_def.slug} is validate-only: {_VALIDATE_ONLY}", file=sys.stderr)
+        return 1
     if venue_def is not None:
         errors = _report_validation(subfile, venue_def, args.subfile)
         if errors:
@@ -966,7 +985,7 @@ def _cmd_schema(args: argparse.Namespace) -> int:
 
     Used by the autofill front-ends (the Claude skill and the API engine) to
     learn which fields to extract, classify, map to files, or leave alone,
-    without duplicating that knowledge outside ``venues.json``.
+    without duplicating that knowledge outside ``submission_forms.json``.
     """
     from .autofill import field_schema
 
@@ -995,7 +1014,7 @@ def _cmd_schema(args: argparse.Namespace) -> int:
 def _cmd_requirements(args: argparse.Namespace) -> int:
     """Print what a venue's author guidelines require of the manuscript.
 
-    Reads ``manuscript_requirements.json`` -- the companion to ``venues.json``
+    Reads ``manuscript_requirements.json`` -- the companion to ``submission_forms.json``
     that ``validate`` measures the uploads against -- and prints the venue's
     rules, either as a readable summary grouped by section (manuscript, title
     page, abstract, figures, ...) or as JSON with ``--json``. With

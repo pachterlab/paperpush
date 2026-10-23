@@ -58,7 +58,7 @@ def _parse_authors(value: str) -> list[dict]:
 def _validate_secondary_topics(value: str) -> str:
     """Validator: each secondary topic is from the AAAI list and there are at most 5.
 
-    The per-line count is also bounded by ``max_count`` in ``venues.json``; this
+    The per-line count is also bounded by ``max_count`` in ``submission_forms.json``; this
     additionally enforces that each named topic is a member of the controlled
     vocabulary (the field is a free ``textarea`` because many topic names contain
     commas, so it cannot use the comma-separated ``multichoice`` closed-set check).

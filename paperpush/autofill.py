@@ -98,7 +98,7 @@ def field_schema(venue: Venue) -> list[dict]:
     Claude skill) needs to know what to fill and how: which fields to extract
     versus classify versus map to files versus leave alone, plus the closed
     option sets and accepted file types. Built straight from the venue
-    definition so the roles never drift from ``venues.json``.
+    definition so the roles never drift from ``submission_forms.json``.
     """
     out: list[dict] = []
     for f in venue.fields:

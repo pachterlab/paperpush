@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 API = "https://api2.openreview.net"
 TIMEOUT = 20.0
-# Author-list columns (see venues.json) this check reads.
+# Author-list columns (see submission_forms.json) this check reads.
 ID_COLUMN = "open_review_id"
 
 

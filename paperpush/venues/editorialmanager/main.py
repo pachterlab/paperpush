@@ -549,7 +549,7 @@ def _login_elsevier(page, email: str, password: str, *, cfg: Variant, timeout_ms
 # renders it as a plain ``<select>`` in an accordion (labelled by the accordion
 # header, not a tab panel), with the same id on every deployment; only its
 # option labels and values differ per journal (see each venue's ``article_type``
-# options in ``venues.json``).
+# options in ``submission_forms.json``).
 SEL_ARTICLE_TYPE = "#ddlArticleType"
 
 

@@ -1,8 +1,10 @@
-"""Build ``venues.schema.json`` from the runtime dataclasses.
+"""Build the venue databases' JSON schemas from the runtime dataclasses.
 
-The :class:`~paperpush.database.Field` and
-:class:`~paperpush.database.Venue` dataclasses are the single source of
-truth for the venue database's shape. Their attribute types and the
+The :class:`~paperpush.database.VenueInfo`,
+:class:`~paperpush.database.SubmissionForm` and
+:class:`~paperpush.database.Field` dataclasses are the single source of truth
+for the shape of ``venues.json`` (the master list) and
+``submission_forms.json``. Their attribute types and the
 ``Annotated[..., pydantic.Field(description=...)]`` descriptions on them are read
 here with :class:`pydantic.TypeAdapter` to generate the JSON Schema that powers
 editor autocomplete and validation (wired up in ``.vscode/settings.json``).
@@ -10,16 +12,16 @@ editor autocomplete and validation (wired up in ``.vscode/settings.json``).
 This module only *reshapes* what the dataclasses already declare into the parts
 JSON Schema needs that a flat dataclass cannot express on its own:
 
-* the database is an object keyed by venue slug (the slug is the key, not a
+* each database is an object keyed by venue slug (the slug is the key, not a
   value inside an entry, so it is dropped from the venue schema);
-* a venue's fields are either full definitions (standalone venue) or partial
+* a form's fields are either full definitions (standalone venue) or partial
   overrides (inheriting venue), selected with an ``if/then/else`` on
   ``inherits``;
-* an inheriting venue may carry ``removed_fields`` (an instruction consumed by
+* an inheriting form may carry ``removed_fields`` (an instruction consumed by
   the loader, not stored on the resolved :class:`Venue`).
 
-Run ``python scripts/gen_venues_schema.py`` to regenerate the committed schema;
-CI drift-checks it with ``--check``.
+Run ``python scripts/gen_venues_schema.py`` to regenerate the committed schemas;
+CI drift-checks them with ``--check``.
 
 The same script also regenerates ``manuscript_requirements.schema.json`` for
 the companion database of author-guideline rules (see
@@ -34,12 +36,21 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
-from paperpush.database import Field, Venue
+from paperpush.database import Field, SubmissionForm, VenueInfo
 from paperpush.requirements import SECTION_TYPES, ManuscriptRequirements
 
 _SCHEMA_ID = "https://paperpush.org/schemas/venues.schema.json"
-_TITLE = "paperpush venue database"
-_DESCRIPTION = "Schema for venues.json. The top-level object maps a venue slug to a " "venue definition. Generated from the Field/Venue dataclasses in " "paperpush/database.py; run scripts/gen_venues_schema.py to regenerate."
+_TITLE = "paperpush venue list"
+_DESCRIPTION = "Schema for venues.json, the master venue list. The top-level object maps a venue slug to " "its general metadata. Generated from the VenueInfo dataclass in " "paperpush/database.py; run scripts/gen_venues_schema.py to regenerate."
+
+_FORMS_SCHEMA_ID = "https://paperpush.org/schemas/submission_forms.schema.json"
+_FORMS_TITLE = "paperpush submission forms"
+_FORMS_DESCRIPTION = "Schema for submission_forms.json. The top-level object maps a venue slug to " "its submission form. Generated from the Field/SubmissionForm dataclasses in " "paperpush/database.py; run scripts/gen_venues_schema.py to regenerate."
+
+_SLUG_NAMES = {
+    "description": "Venue slug. The canonical identifier is the " "lowercase slug; case variants collapse to one venue at load time.",
+    "pattern": "^[A-Za-z0-9_]+$",
+}
 
 
 def _clean(node: Any, in_named_map: bool = False) -> Any:
@@ -120,25 +131,20 @@ def _field_override_schema(field_schema: dict[str, Any]) -> dict[str, Any]:
 
 
 def _venue_common_schema() -> dict[str, Any]:
-    """Venue-level keys, shared by standalone and inheriting venues.
+    """Form-level keys, shared by standalone and inheriting forms.
 
-    Derived from the :class:`Venue` dataclass, minus ``slug`` (the database
-    key, not an entry value) and plus ``removed_fields`` (a loader directive that
-    is not stored on the resolved venue). ``fields`` is pointed at the override
-    item schema by default; the standalone case tightens it below.
+    Derived from the :class:`SubmissionForm` dataclass, plus ``removed_fields``
+    (a loader directive that is not stored on the resolved venue). ``fields`` is
+    pointed at the override item schema by default; the standalone case
+    tightens it below.
     """
-    schema = _strip_model_description(_clean(TypeAdapter(Venue).json_schema()))
+    schema = _strip_model_description(_clean(TypeAdapter(SubmissionForm).json_schema()))
     # TypeAdapter inlines the nested Field model under $defs and points
     # `fields.items` at it; we supply our own field/fieldOverride defs instead.
     schema.pop("$defs", None)
+    schema.pop("required", None)
 
     properties = schema["properties"]
-    properties.pop("slug", None)
-    if "required" in schema:
-        schema["required"] = [r for r in schema["required"] if r != "slug"]
-        if not schema["required"]:
-            schema.pop("required")
-
     properties["fields"] = {
         "type": "array",
         "items": {"$ref": "#/$defs/fieldOverride"},
@@ -153,7 +159,25 @@ def _venue_common_schema() -> dict[str, Any]:
 
 
 def build_schema() -> dict[str, Any]:
-    """Assemble the full JSON Schema (draft 2020-12) for ``venues.json``."""
+    """Assemble the JSON Schema (draft 2020-12) for ``venues.json``, the master list."""
+    venue = _strip_model_description(_clean(TypeAdapter(VenueInfo).json_schema()))
+    venue["properties"].pop("slug", None)
+    venue.pop("required", None)
+    venue["additionalProperties"] = False
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": _SCHEMA_ID,
+        "title": _TITLE,
+        "description": _DESCRIPTION,
+        "type": "object",
+        "propertyNames": _SLUG_NAMES,
+        "additionalProperties": {"$ref": "#/$defs/venue"},
+        "$defs": {"venue": venue},
+    }
+
+
+def build_forms_schema() -> dict[str, Any]:
+    """Assemble the JSON Schema (draft 2020-12) for ``submission_forms.json``."""
     field = _field_schema()
     field_override = _field_override_schema(field)
     venue_common = _venue_common_schema()
@@ -177,11 +201,11 @@ def build_schema() -> dict[str, Any]:
                     "properties": {"inherits": {"type": "string", "minLength": 1}},
                 },
                 "then": {
-                    "description": "Inheriting venue: field entries are partial " "overrides; removed_fields is allowed.",
+                    "description": "Inheriting form: field entries are partial " "overrides; removed_fields is allowed.",
                     "properties": {"fields": {"items": {"$ref": "#/$defs/fieldOverride"}}},
                 },
                 "else": {
-                    "description": "Standalone venue: every field must be a full " "definition and removed_fields is not applicable.",
+                    "description": "Standalone form: every field must be a full " "definition and removed_fields is not applicable.",
                     "properties": {
                         "fields": {"items": {"$ref": "#/$defs/field"}},
                         "removed_fields": False,
@@ -193,14 +217,11 @@ def build_schema() -> dict[str, Any]:
 
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": _SCHEMA_ID,
-        "title": _TITLE,
-        "description": _DESCRIPTION,
+        "$id": _FORMS_SCHEMA_ID,
+        "title": _FORMS_TITLE,
+        "description": _FORMS_DESCRIPTION,
         "type": "object",
-        "propertyNames": {
-            "description": "Venue slug. The canonical identifier is the " "lowercase slug; case variants collapse to one venue at load time.",
-            "pattern": "^[A-Za-z0-9_]+$",
-        },
+        "propertyNames": _SLUG_NAMES,
         "additionalProperties": {"$ref": "#/$defs/venue"},
         "$defs": {
             "fieldOverride": field_override,

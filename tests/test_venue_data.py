@@ -1,13 +1,15 @@
 """Venue data published separately from releases (paperpush.venue_data).
 
-Covers the three layers that let a ``venues.json`` fix reach installed copies
+Covers the three layers that let a venue data fix reach installed copies
 without a PyPI release, with the network replaced by a fake that serves a
 directory built by ``scripts/build_venue_data.py``:
 
-1. **merging** -- a published venue entry replaces the bundled one only when the
-   installed runner can drive it (same field ids and types); new venues, new or
-   retyped fields, and venues inheriting from a held-back base keep the bundled
-   entry. A published ``manuscript_requirements.json`` entry is used only when
+1. **merging** -- a published submission form replaces the bundled one only
+   when the installed runner can drive it (same field ids and types); new
+   venues, new or retyped fields, and venues inheriting from a held-back base
+   keep the bundled entry. A published master-list entry is used when this
+   version can read it, and a brand-new venue is added only when it is
+   validate-only (no published form). A published ``manuscript_requirements.json`` entry is used only when
    this version's ``validate`` can apply it (known rule keys and value types).
 2. **refreshing** -- the cache is filled from the manifest, verified by hash and
    by loading it, updated incrementally, and left untouched by a bad download;
@@ -67,6 +69,10 @@ def _edit_venues(root: Path, edit) -> None:
     _edit_json(root, "venues.json", edit)
 
 
+def _edit_forms(root: Path, edit) -> None:
+    _edit_json(root, "submission_forms.json", edit)
+
+
 def _edit_requirements(root: Path, edit) -> None:
     _edit_json(root, "manuscript_requirements.json", edit)
 
@@ -119,7 +125,7 @@ def server(published, tmp_path, monkeypatch):
 
 @pytest.fixture
 def bundled() -> dict:
-    return json.loads(database.DATABASE_PATH.read_text())
+    return json.loads(database.FORMS_PATH.read_text())
 
 
 def test_data_only_change_is_taken(bundled):
@@ -134,7 +140,7 @@ def test_data_only_change_is_taken(bundled):
 def test_new_field_holds_back_the_venue_and_its_inheritors(bundled):
     published = copy.deepcopy(bundled)
     published["science"]["fields"].append({"id": "brand_new", "type": "text", "label": "New"})
-    published["science_advances"]["description"] = "changed"
+    published["science_advances"]["submission_url"] = "https://example.org/changed"
     merged = database.merge_published(bundled, published)
     assert merged["science"] == bundled["science"]
     # Its own shape is unchanged, but it would resolve against a held-back base.
@@ -158,6 +164,46 @@ def test_venue_missing_from_published_keeps_bundled(bundled):
     published = copy.deepcopy(bundled)
     del published["arxiv"]
     assert database.merge_published(bundled, published)["arxiv"] == bundled["arxiv"]
+
+
+# --- venues.json (the master list) -------------------------------------------
+
+
+@pytest.fixture
+def bundled_info() -> dict:
+    return json.loads(database.DATABASE_PATH.read_text())
+
+
+def test_master_list_change_is_taken(bundled_info, bundled):
+    published = copy.deepcopy(bundled_info)
+    published["biorxiv"]["description"] = "Updated."
+    merged = database.merge_published_info(bundled_info, published, bundled)
+    assert merged["biorxiv"]["description"] == "Updated."
+
+
+def test_new_validate_only_venue_needs_no_release(bundled_info, bundled):
+    published = copy.deepcopy(bundled_info)
+    published["future_journal"] = {"name": "Future Journal", "venue_type": "journal", "anonymous": False}
+    merged = database.merge_published_info(bundled_info, published, bundled)
+    assert merged["future_journal"]["name"] == "Future Journal"
+
+
+def test_new_venue_with_a_form_needs_a_release(bundled_info, bundled):
+    published = copy.deepcopy(bundled_info)
+    published["future_journal"] = {"name": "Future Journal"}
+    forms = {**bundled, "future_journal": copy.deepcopy(bundled["biorxiv"])}
+    assert "future_journal" not in database.merge_published_info(bundled_info, published, forms)
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [{"name": "bioRxiv", "fields": []}, {"name": "bioRxiv", "venue_type": "workshop"}, {"name": "bioRxiv", "anonymous": "maybe"}],
+    ids=["unknown-key", "bad-venue-type", "bad-bool"],
+)
+def test_master_entries_this_version_cannot_read_are_held_back(bundled_info, bundled, entry):
+    published = copy.deepcopy(bundled_info)
+    published["biorxiv"] = entry
+    assert database.merge_published_info(bundled_info, published, bundled)["biorxiv"] == bundled_info["biorxiv"]
 
 
 # --- manuscript_requirements.json ------------------------------------------
@@ -184,7 +230,7 @@ def test_requirements_rule_change_is_taken(bundled_reqs):
 
 def test_requirements_entries_can_be_added_and_dropped(bundled_reqs):
     # No runner depends on these rules, so the published copy decides which
-    # entries exist -- unlike venues.json, a new entry needs no release.
+    # entries exist -- unlike submission_forms.json, a new entry needs no release.
     published = copy.deepcopy(bundled_reqs)
     published["future_venue"] = {"figures": {"min_dpi": 300}}
     del published["arxiv"]
@@ -265,9 +311,9 @@ def test_build_rejects_data_that_breaks_its_schema(tmp_path, monkeypatch):
     (bad / "venues" / "_assets").mkdir(parents=True)
     for name in venue_data.DATA_FILES:
         (bad / name).write_bytes((database.DATABASE_PATH.parent / name).read_bytes())
-    data = json.loads((bad / "venues.json").read_text())
+    data = json.loads((bad / "submission_forms.json").read_text())
     data["biorxiv"]["fields"][0]["type"] = "not-a-type"
-    (bad / "venues.json").write_text(json.dumps(data))
+    (bad / "submission_forms.json").write_text(json.dumps(data))
     monkeypatch.setattr(build_venue_data, "PACKAGE_DIR", bad)
     monkeypatch.setattr(build_venue_data, "ASSETS_DIR", bad / "venues" / "_assets")
     with pytest.raises(SystemExit, match="does not match its schema"):
@@ -275,7 +321,7 @@ def test_build_rejects_data_that_breaks_its_schema(tmp_path, monkeypatch):
 
 
 def test_refresh_fills_the_cache_and_is_used(server, published):
-    _edit_venues(published, lambda d: d["biorxiv"].update(max_upload_mb=77))
+    _edit_forms(published, lambda d: d["biorxiv"].update(max_upload_mb=77))
     result = venue_data.refresh()
     assert result.status == "updated"
     cache = venue_data.cache_dir()
@@ -296,16 +342,16 @@ def test_refresh_is_conditional_and_incremental(server, published):
     assert venue_data.refresh().status == "current"
     assert server.requests == ["manifest.json"]
 
-    _edit_venues(published, lambda d: d["arxiv"].update(max_upload_mb=5))
+    _edit_forms(published, lambda d: d["arxiv"].update(max_upload_mb=5))
     server.requests.clear()
     assert venue_data.refresh().status == "updated"
-    assert sorted(server.requests) == ["manifest.json", "venues.json"]
+    assert sorted(server.requests) == ["manifest.json", "submission_forms.json"]
 
 
 def test_hash_mismatch_leaves_the_cache_untouched(server, published):
     venue_data.refresh()
     before = (venue_data.cache_dir() / "venues.json").read_bytes()
-    _edit_venues(published, lambda d: d["biorxiv"].update(max_upload_mb=1))
+    _edit_venues(published, lambda d: d["biorxiv"].update(description="tampered"))
     (published / "venues.json").write_text("{}")  # tampered after hashing
     with pytest.raises(ValueError, match="does not match its manifest hash"):
         venue_data.refresh(force=True)
@@ -313,10 +359,36 @@ def test_hash_mismatch_leaves_the_cache_untouched(server, published):
 
 
 def test_data_that_does_not_load_is_rejected(server, published):
-    _edit_venues(published, lambda d: d["science_advances"].update(inherits="no_such_venue"))
+    _edit_forms(published, lambda d: d["science_advances"].update(inherits="no_such_venue"))
     with pytest.raises(KeyError, match="no_such_venue"):
         venue_data.refresh()
     assert not (venue_data.cache_dir() / "venues.json").exists()
+
+
+@pytest.mark.parametrize(
+    "edit, reason",
+    [
+        (lambda p: _edit_forms(p, lambda d: d.update(unlisted=copy.deepcopy(d["arxiv"]))), "which venues.json does not list"),
+        (lambda p: _edit_requirements(p, lambda d: d.update(unlisted={"figures": {"min_dpi": 300}})), "which venues.json does not list"),
+        (lambda p: _edit_venues(p, lambda d: d["arxiv"].update(fields=[])), "does not know: fields"),
+    ],
+    ids=["form-for-unlisted-venue", "rules-for-unlisted-venue", "form-key-in-master"],
+)
+def test_databases_that_disagree_are_rejected(server, published, edit, reason):
+    edit(published)
+    with pytest.raises(ValueError, match=reason):
+        venue_data.refresh()
+
+
+def test_published_validate_only_venue_is_usable(server, published):
+    _edit_venues(published, lambda d: d.update(future_journal={"name": "Future Journal", "venue_type": "journal"}))
+    _edit_requirements(published, lambda d: d.update(future_journal={"manuscript": {"max_words": 3000}}))
+    venue_data.refresh()
+    database.reload()
+    venue = database.get_venue("future_journal")
+    assert not venue.has_form
+    assert venue.supports_validate and not venue.supports_submit
+    assert "manuscript_file" in {f.id for f in venue.fields}
 
 
 @pytest.mark.parametrize("path", ["../escape.json", "_assets/../../x", "other.json"])
@@ -452,7 +524,7 @@ def test_override_directory(tmp_path, monkeypatch, bundled):
     override.mkdir()
     data = copy.deepcopy(bundled)
     data["biorxiv"]["max_upload_mb"] = 3
-    (override / "venues.json").write_text(json.dumps(data))
+    (override / "submission_forms.json").write_text(json.dumps(data))
     monkeypatch.setenv("PAPERPUSH_VENUE_DATA", str(override))
     database.reload()
     try:

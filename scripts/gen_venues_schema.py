@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Regenerate the JSON schemas from the pydantic models.
 
-Two schemas are maintained: ``paperpush/venues.schema.json`` (for
-``venues.json``, the submission-form database) and
+Three schemas are maintained: ``paperpush/venues.schema.json`` (for
+``venues.json``, the master venue list), ``paperpush/submission_forms.schema.json``
+(for ``submission_forms.json``, the submission-form database) and
 ``paperpush/manuscript_requirements.schema.json`` (for
 ``manuscript_requirements.json``, the author-guideline rules ``validate``
-measures the uploads against). Both are editor-facing artifacts that power
+measures the uploads against). All are editor-facing artifacts that power
 autocomplete and inline validation (wired up in ``.vscode/settings.json``).
 Their single source of truth is :mod:`paperpush.schema_models`; run this after
 changing those models or the dataclasses they read:
@@ -27,14 +28,16 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from paperpush.schema_models import build_requirements_schema, build_schema  # noqa: E402
+from paperpush.schema_models import build_forms_schema, build_requirements_schema, build_schema  # noqa: E402
 
 SCHEMA_PATH = REPO_ROOT / "paperpush" / "venues.schema.json"
+FORMS_SCHEMA_PATH = REPO_ROOT / "paperpush" / "submission_forms.schema.json"
 REQUIREMENTS_SCHEMA_PATH = REPO_ROOT / "paperpush" / "manuscript_requirements.schema.json"
 
 # (path, builder) for every generated schema.
 SCHEMAS = (
     (SCHEMA_PATH, build_schema),
+    (FORMS_SCHEMA_PATH, build_forms_schema),
     (REQUIREMENTS_SCHEMA_PATH, build_requirements_schema),
 )
 

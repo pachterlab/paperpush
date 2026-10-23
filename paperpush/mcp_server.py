@@ -180,6 +180,10 @@ def _paperpush_command(*args: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+# Why a venue with author guidelines but no submission form has no login or submit.
+_VALIDATE_ONLY_REASON = "paperpush can check a manuscript against this venue's author guidelines (validate) but cannot submit to it, so there is nothing to log in to."
+
+
 def list_supported_venues(include_deprecated: bool = False) -> list[dict[str, Any]]:
     """List the venues paperpush can submit to.
 
@@ -196,7 +200,9 @@ def list_supported_venues(include_deprecated: bool = False) -> list[dict[str, An
             "description": venue.description,
             "submission_url": venue.submission_url,
             "submission_guide": venue.submission_guide,
-            "login_required": venues_pkg.login_required(venue.slug),
+            "login_required": venue.has_form and venues_pkg.login_required(venue.slug),
+            "supports_validate": venue.supports_validate,
+            "supports_submit": venue.supports_submit,
             "field_count": len(venue.fields),
             "required_field_count": sum(1 for f in venue.fields if f.required),
         }
@@ -230,7 +236,9 @@ def describe_venue(venue: str) -> dict[str, Any]:
         "submission_url": resolved.submission_url,
         "submission_guide": resolved.submission_guide,
         "site_url": resolved.site_url,
-        "login_required": venues_pkg.login_required(resolved.slug),
+        "login_required": resolved.has_form and venues_pkg.login_required(resolved.slug),
+        "supports_validate": resolved.supports_validate,
+        "supports_submit": resolved.supports_submit,
         "max_upload_mb": resolved.max_upload_mb,
         "anonymous": resolved.anonymous,
         "file_type_options": resolved.file_type_options,
@@ -518,14 +526,14 @@ def login_status(venue: Optional[str] = None) -> dict[str, Any]:
         slug = _slug_from_reference(venue)
         resolved = _venue_or_error(slug)
         base = venues_pkg.submission_base(resolved.slug)
-        if not venues_pkg.login_required(base):
+        if not resolved.has_form or not venues_pkg.login_required(base):
             return {
                 "venue": resolved.slug,
                 "credential_stored_under": base,
                 "shares_login_with_base_venue": base != resolved.slug,
                 "login_required": False,
                 "logged_in": True,
-                "reason": "This venue uses a public submission form and does not require login.",
+                "reason": _VALIDATE_ONLY_REASON if not resolved.has_form else "This venue uses a public submission form and does not require login.",
             }
         credential = credentials.get_credential(base)
         entry: dict[str, Any] = {
@@ -597,12 +605,12 @@ def login(
     slug = _slug_from_reference(venue)
     resolved = _venue_or_error(slug)
     base = venues_pkg.submission_base(resolved.slug)
-    if not venues_pkg.login_required(base):
+    if not resolved.has_form or not venues_pkg.login_required(base):
         return {
             "status": "not_required",
             "venue": resolved.slug,
             "credential_stored_under": base,
-            "reason": "This venue uses a public submission form and does not require login.",
+            "reason": _VALIDATE_ONLY_REASON if not resolved.has_form else "This venue uses a public submission form and does not require login.",
         }
     command = _paperpush_command("login", base)
     display_command = " ".join(["paperpush", "login", base])
@@ -779,6 +787,8 @@ def submit(
     """
     path, _, venue = _load_subfile(subfile, manuscript_dir)
 
+    if not venue.has_form:
+        raise ValueError(f"{venue.slug} is validate-only: {_VALIDATE_ONLY_REASON}")
     try:
         venues_pkg.get_runner(venue.slug)
     except KeyError:

@@ -97,7 +97,7 @@ def _parse_authors(value: str) -> list[dict]:
 
 
 def _options(field_id: str) -> list[str]:
-    """The declared options of one ICLR field, from ``venues.json``."""
+    """The declared options of one ICLR field, from ``submission_forms.json``."""
     field = next(f for f in get_venue(SLUG).fields if f.id == field_id)
     return list(field.options or [])
 

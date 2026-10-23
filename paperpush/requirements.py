@@ -1,6 +1,6 @@
 """Access to the manuscript requirements database.
 
-``venues.json`` describes a venue's *submission form* -- the fields the portal
+``submission_forms.json`` describes a venue's *submission form* -- the fields the portal
 asks for. This module reads its companion, ``manuscript_requirements.json``,
 which describes what the venue's author guidelines demand of the *manuscript
 itself*: accepted file formats and sizes, length limits, the sections and
@@ -600,7 +600,7 @@ def merge_published(bundled: dict[str, Any], published: dict[str, Any]) -> dict[
 
     The published copy is authoritative for the data: it may add, change, or
     drop an entry (no runner depends on these rules, so, unlike a venue in
-    ``venues.json``, a new entry needs no release). Each entry is still checked
+    ``submission_forms.json``, a new entry needs no release). Each entry is still checked
     against this version's rule vocabulary (:func:`_entry_problem`). An entry
     this version cannot read keeps its bundled version, if there is one. So does
     an entry that inherits from a held-back or missing base, so an entry is never
@@ -641,12 +641,12 @@ def merge_published(bundled: dict[str, Any], published: dict[str, Any]) -> dict[
     return merged
 
 
-def check_requirements_file(path: Path) -> None:
+def check_requirements_file(path: Path) -> list[str]:
     """Raise if the requirements database at ``path`` does not load.
 
     Checks the database this version would actually use -- the file merged onto
     the bundled copy by :func:`merge_published` -- so every entry must resolve
-    and build.
+    and build. Returns the venue slugs the file at ``path`` has rules for.
     """
     published = _read_requirements(path)
     bundled = _read_requirements(REQUIREMENTS_PATH) if REQUIREMENTS_PATH.exists() else {}
@@ -654,6 +654,7 @@ def check_requirements_file(path: Path) -> None:
     for slug in raw:
         if not slug.startswith("$"):
             ManuscriptRequirements.from_dict(slug, _resolve_entry(slug, raw))
+    return [slug for slug in published if not slug.startswith("$")]
 
 
 def list_requirements() -> list[ManuscriptRequirements]:

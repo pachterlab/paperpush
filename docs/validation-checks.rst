@@ -100,8 +100,11 @@ bundles are read too. Nothing in your manuscript directory is modified.
 Presence and shape of fields
 ----------------------------
 
-These checks come from the field definitions in ``venues.json``. Every venue
-gets them.
+These checks come from the field definitions in ``submission_forms.json``.
+Every venue gets them; a validate-only venue, which has no form there, is
+checked against a default form (title, abstract, keywords, authors, article
+type, and the manuscript, figure, table, supplementary and cover-letter
+files).
 
 **Required fields** (error)
    A field marked ``required`` must have a value. The message names the field
@@ -278,7 +281,7 @@ The rules are resolved for the article type selected in the ``.sub``. Run
 rules for a venue.
 
 - **Manuscript**: file format and size, and the word and page limits above
-  when ``venues.json`` does not already set them.
+  when ``submission_forms.json`` does not already set them.
 - **Required sections and declarations**: headings such as Introduction,
   Methods, and Results, and statements such as data availability, competing
   interests, and author contributions. Each is searched for under its usual
@@ -304,7 +307,7 @@ rules for a venue.
 
 Measured numbers over a limit are errors. Checks that depend on extracting text
 from a PDF or reading an image are warnings. A rule the portal already enforces
-through ``venues.json``, such as an ``accept`` list, a per-file size cap, or a
+through ``submission_forms.json``, such as an ``accept`` list, a per-file size cap, or a
 field word limit, is reported only once, by that check.
 
 .. _vc-links:
@@ -560,5 +563,6 @@ See also
 - :doc:`commands/validate`: usage, flags, and examples.
 - :doc:`commands/options`: valid values for a flagged choice field.
 - :doc:`commands/requirements`: the author-guideline rules for a venue.
-- :doc:`schemas/venues`: the field attributes (``required``, ``accept``,
-  ``max_pages``, ``anonymous``, …) that drive these checks.
+- :doc:`schemas/submission_forms`: the field attributes (``required``,
+  ``accept``, ``max_pages``, …) that drive these checks.
+- :doc:`schemas/venues`: venue-level keys such as ``anonymous``.

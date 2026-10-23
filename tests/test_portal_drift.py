@@ -21,7 +21,7 @@ They hit the network, so they carry ``@pytest.mark.portal`` and are skipped by a
 bare ``pytest``. Opt in with ``pytest --run-portal`` (see ``tests/conftest.py``).
 
 Both tests are parametrized over *every* venue in the database, so a venue
-added to ``venues.json`` is checked automatically without editing this file.
+added to ``submission_forms.json`` is checked automatically without editing this file.
 A venue that does not yet have a drift spec (see ``SPECS`` below) is reported
 as a skip naming what to add, rather than being silently left unchecked.
 
@@ -176,7 +176,7 @@ class _Spec:
 # Per-venue drift specs. Every venue in the database is parametrized
 # automatically (see ``_all_venue_slugs``); a venue *with* a spec here is
 # fully checked, while one *without* a spec is skipped with a pointer to add
-# one. So adding a venue to venues.json immediately surfaces it here as a
+# one. So adding a venue to submission_forms.json immediately surfaces it here as a
 # visible coverage gap rather than silently going unchecked, and writing its
 # spec below is all that is needed to start checking it.
 SPECS = {
@@ -209,13 +209,13 @@ SPECS = {
 
 
 def _all_venue_slugs() -> list[str]:
-    """Every venue slug in the database, so the drift tests track the registry.
+    """Every venue slug paperpush can submit to, so the drift tests track the registry.
 
     Parametrizing over this (rather than over ``SPECS``) means a venue added
-    to venues.json is covered the moment it exists: it is collected here and,
+    to submission_forms.json is covered the moment it exists: it is collected here and,
     until it has a spec, reported as a skip by :func:`_spec_or_skip`.
     """
-    return [venue.slug for venue in list_venues()]
+    return [venue.slug for venue in list_venues() if venue.has_form]
 
 
 def _spec_or_skip(slug: str) -> "_Spec":

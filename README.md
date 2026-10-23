@@ -43,7 +43,7 @@ See [`docs/example-session.md`](docs/example-session.md) for a full worked examp
 
 Helper commands:
 - `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
-- `paperpush update-venues`: Update venues.json and manuscript_requirements.json from the remote venue-data branch.
+- `paperpush update-venues`: Update the venue data (venues.json, submission_forms.json, manuscript_requirements.json) from the remote venue-data branch.
 - `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
 
 See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
@@ -82,7 +82,7 @@ For more details, see [`venues.md`](venues.md)
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for instructions on adding new venues. See [`DEVELOPMENT.md`](DEVELOPMENT.md) for tips on adding new venues and running unit tests.
 
-Each venue has a submission-form entry in `paperpush/venues.json` (the fields the portal asks for) and, optionally, a manuscript-requirements entry in `paperpush/manuscript_requirements.json` (what the venue's author guidelines demand of the manuscript: file formats and sizes, word/page limits, required sections and statements, title-page items, figure resolution and dimensions, reference rules). Both use a shared vocabulary across venues, each has a generated JSON schema, and `paperpush validate` checks a `.sub` against both (a venue without a requirements entry gets only the form checks).
+Each venue is listed in `paperpush/venues.json` (the master list of venues and their general metadata). A venue paperpush can submit to has a submission-form entry in `paperpush/submission_forms.json` (the fields the portal asks for), and a venue paperpush can validate against has a manuscript-requirements entry in `paperpush/manuscript_requirements.json` (what the venue's author guidelines demand of the manuscript: file formats and sizes, word/page limits, required sections and statements, title-page items, figure resolution and dimensions, reference rules). A venue may have either or both, so it can be supported by `validate` without `submit` or the other way round; `paperpush --venues` and [`venues.md`](venues.md) show which. Each file has a generated JSON schema, and `paperpush validate` checks a `.sub` against the form and the requirements (a venue without a requirements entry gets only the form checks; a venue without a form gets a default one naming the manuscript files).
 
 ## MCP server
 

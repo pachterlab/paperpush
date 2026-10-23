@@ -3,7 +3,7 @@
 These exercise the pre-submission checks directly against hand-built
 :class:`~paperpush.database.Venue` / :class:`~paperpush.database.Field`
 definitions and :class:`~paperpush.subfile.SubFile` values, so each rule is
-tested in isolation without depending on the shipped ``venues.json``. A few
+tested in isolation without depending on the shipped venue data. A few
 tests at the end cover the ``paperpush validate`` CLI command end to end.
 
 File-existence and PDF checks use the ``samples`` factory from ``conftest.py``

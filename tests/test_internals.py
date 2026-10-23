@@ -3,9 +3,9 @@
 Consolidates four sets of low-level checks that back the CLI commands but are
 not commands themselves:
 
-1. **venues.schema.json** -- the generated schema stays in sync with the
-   dataclasses, the database conforms, and the schema actually rejects malformed
-   entries.
+1. **venues.schema.json / submission_forms.schema.json** -- the generated
+   schemas stay in sync with the dataclasses, the databases conform, and the
+   schemas actually reject malformed entries.
 2. **manuscript measures** (:mod:`paperpush.manuscript`) -- word/page counts
    stop at the reference list and unsupported formats report ``None``.
 3. **conftest sample-file builders** -- the fixtures the rest of the suite relies
@@ -26,36 +26,43 @@ from jsonschema import Draft202012Validator
 from PIL import Image
 
 from paperpush import manuscript as m
-from paperpush.database import DATABASE_PATH, Field
-from paperpush.schema_models import build_schema
+from paperpush.database import DATABASE_PATH, FORMS_PATH, Field
+from paperpush.schema_models import build_forms_schema, build_schema
 from paperpush.validate import _check_file_field
 
 # Reuse the same low-level builders the sample fixtures use.
 from tests.conftest import _build_docx, _build_pdf
 
 # ===========================================================================
-# venues.schema.json
+# venues.schema.json / submission_forms.schema.json
 # ===========================================================================
 #
-# The schema is built from the Field / Venue dataclasses (see
-# paperpush.schema_models), the single source of truth for the venue
-# database's shape. These tests check: no drift from the dataclasses, the
-# database conforms, and the schema bites (rejects representative malformed
-# entries and accepts the valid shapes that are easy to get wrong).
+# The schemas are built from the VenueInfo / SubmissionForm / Field
+# dataclasses (see paperpush.schema_models), the single source of truth for
+# the databases' shape. These tests check: no drift from the dataclasses, the
+# databases conform, and the schemas bite (reject representative malformed
+# entries and accept the valid shapes that are easy to get wrong).
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "paperpush" / "venues.schema.json"
+FORMS_SCHEMA_PATH = Path(__file__).resolve().parent.parent / "paperpush" / "submission_forms.schema.json"
 
 
 def _validator() -> Draft202012Validator:
+    """Validator for submission_forms.json, the schema with the most to get wrong."""
+    return Draft202012Validator(json.loads(FORMS_SCHEMA_PATH.read_text(encoding="utf-8")))
+
+
+def _info_validator() -> Draft202012Validator:
     return Draft202012Validator(json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
 
 
-def test_schema_file_is_up_to_date():
+@pytest.mark.parametrize("path,build", [(SCHEMA_PATH, build_schema), (FORMS_SCHEMA_PATH, build_forms_schema)], ids=["venues", "submission_forms"])
+def test_schema_file_is_up_to_date(path, build):
     """The committed schema equals what the dataclasses generate (run
     scripts/gen_venues_schema.py to refresh)."""
-    expected = json.dumps(build_schema(), indent=2, ensure_ascii=False) + "\n"
-    actual = SCHEMA_PATH.read_text(encoding="utf-8")
-    assert actual == expected, "venues.schema.json is out of date; run " "`python scripts/gen_venues_schema.py`"
+    expected = json.dumps(build(), indent=2, ensure_ascii=False) + "\n"
+    actual = path.read_text(encoding="utf-8")
+    assert actual == expected, f"{path.name} is out of date; run " "`python scripts/gen_venues_schema.py`"
 
 
 def test_schema_docs_pages_are_up_to_date():
@@ -70,24 +77,39 @@ def test_schema_docs_pages_are_up_to_date():
         assert path.read_text(encoding="utf-8") == render(), f"{path.name} is out of date; run `python scripts/gen_schema_docs.py`"
 
 
-def test_schema_is_well_formed():
-    Draft202012Validator.check_schema(json.loads(SCHEMA_PATH.read_text()))
+@pytest.mark.parametrize("path", [SCHEMA_PATH, FORMS_SCHEMA_PATH], ids=["venues", "submission_forms"])
+def test_schema_is_well_formed(path):
+    Draft202012Validator.check_schema(json.loads(path.read_text()))
 
 
-def test_database_validates_against_schema():
-    data = json.loads(DATABASE_PATH.read_text(encoding="utf-8"))
-    errors = sorted(_validator().iter_errors(data), key=lambda e: list(e.path))
-    assert not errors, "venues.json violates its schema:\n" + "\n".join(f"  {'/'.join(map(str, e.path))}: {e.message}" for e in errors)
+@pytest.mark.parametrize("path,schema", [(DATABASE_PATH, SCHEMA_PATH), (FORMS_PATH, FORMS_SCHEMA_PATH)], ids=["venues", "submission_forms"])
+def test_database_validates_against_schema(path, schema):
+    data = json.loads(path.read_text(encoding="utf-8"))
+    validator = Draft202012Validator(json.loads(schema.read_text(encoding="utf-8")))
+    errors = sorted(validator.iter_errors(data), key=lambda e: list(e.path))
+    assert not errors, f"{path.name} violates its schema:\n" + "\n".join(f"  {'/'.join(map(str, e.path))}: {e.message}" for e in errors)
+
+
+def test_every_form_and_requirements_entry_names_a_listed_venue():
+    """The master list is the one place a venue exists; the other two databases only add to it."""
+    from paperpush.requirements import REQUIREMENTS_PATH
+
+    listed = set(json.loads(DATABASE_PATH.read_text(encoding="utf-8")))
+    forms = set(json.loads(FORMS_PATH.read_text(encoding="utf-8")))
+    rules = {k for k in json.loads(REQUIREMENTS_PATH.read_text(encoding="utf-8")) if not k.startswith("$")}
+    assert forms - listed == set()
+    assert rules - listed == set()
 
 
 # Each entry is validated as the sole venue {"j": ...} (or with a "base" the
 # inheriting cases derive from). ``reject`` is whether the schema should flag it.
 _MALFORMED = [
-    ("typo key", {"name": "J", "fields": [{"id": "x", "lable": "X", "type": "text"}]}),
-    ("bad type enum", {"name": "J", "fields": [{"id": "x", "label": "X", "type": "nope"}]}),
-    ("standalone missing type", {"name": "J", "fields": [{"id": "x", "label": "X"}]}),
-    ("removed_fields on standalone", {"name": "J", "removed_fields": ["a"], "fields": []}),
-    ("accept as string", {"name": "J", "fields": [{"id": "x", "label": "X", "type": "file", "accept": ".pdf"}]}),
+    ("typo key", {"fields": [{"id": "x", "lable": "X", "type": "text"}]}),
+    ("bad type enum", {"fields": [{"id": "x", "label": "X", "type": "nope"}]}),
+    ("standalone missing type", {"fields": [{"id": "x", "label": "X"}]}),
+    ("removed_fields on standalone", {"removed_fields": ["a"], "fields": []}),
+    ("general metadata in a form", {"name": "J", "fields": []}),
+    ("accept as string", {"fields": [{"id": "x", "label": "X", "type": "file", "accept": ".pdf"}]}),
 ]
 
 
@@ -97,9 +119,12 @@ def test_schema_rejects_malformed_entries(label, entry):
 
 
 def test_schema_accepts_omitted_name():
-    # name is optional (defaults to the slug at load time).
-    doc = {"j": {"fields": [{"id": "x", "label": "X", "type": "text"}]}}
-    assert not list(_validator().iter_errors(doc))
+    # name is optional in the master list (defaults to the slug at load time).
+    assert not list(_info_validator().iter_errors({"j": {}}))
+
+
+def test_master_schema_rejects_form_keys():
+    assert list(_info_validator().iter_errors({"j": {"name": "J", "fields": []}}))
 
 
 def test_schema_accepts_inheriting_partial_override():

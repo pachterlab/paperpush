@@ -37,7 +37,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from .schema_models import Venue
+from .database import Venue
 
 logger = logging.getLogger(__name__)
 

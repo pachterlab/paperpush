@@ -1,13 +1,26 @@
-"""Access to the venue requirements database.
+"""Access to the venue databases.
 
-The database is a single JSON file (``venues.json``) shipped with the
-package. Each top-level key is a venue slug (e.g. ``"biorxiv"``) mapping to a
-venue definition that lists the fields required for submission.
+Three JSON files shipped with the package describe the venues:
+
+* ``venues.json`` -- the master list: one entry per venue slug with its general
+  metadata (name, type, homepage, double-blind review, ...). A venue exists
+  exactly when it has an entry here.
+* ``submission_forms.json`` -- the submission form for each venue paperpush can
+  submit to: the fields the portal asks for and the portal-level facts its
+  runner needs.
+* ``manuscript_requirements.json`` -- the author-guideline rules ``validate``
+  measures the manuscript against (read by :mod:`paperpush.requirements`).
+
+A venue may have a form, requirements, or both, so one can be supported by
+``validate`` without ``submit`` or the other way round (see
+:attr:`Venue.supports_validate` and :attr:`Venue.supports_submit`). A venue
+without a form gets :func:`default_form`, so it still has a ``.sub`` to fill.
 
 A newer copy may also be published separately from releases and cached locally
-(see :mod:`paperpush.venue_data`). The bundled file is always the baseline: a
-published entry replaces a bundled one only when the installed runner can
-drive it (see :func:`merge_published`).
+(see :mod:`paperpush.venue_data`). The bundled files are always the baseline: a
+published form replaces a bundled one only when the installed runner can drive
+it, and a published master entry is used only for a venue this version can
+serve (see :func:`merge_published` and :func:`merge_published_info`).
 """
 
 from __future__ import annotations
@@ -16,12 +29,14 @@ import copy
 import json
 import logging
 from dataclasses import dataclass
+from dataclasses import fields as dataclass_fields
 from dataclasses import field as dataclass_field
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional
 
 from pydantic import Field as PField
+from pydantic import TypeAdapter, ValidationError
 
 from . import venue_data
 
@@ -30,6 +45,7 @@ logger = logging.getLogger(__name__)
 # The copies shipped with the package. The files actually read may come from a
 # published copy instead; see paperpush.venue_data.
 DATABASE_PATH = Path(__file__).with_name("venues.json")
+FORMS_PATH = Path(__file__).with_name("submission_forms.json")
 
 # Directory holding shared keyword/vocabulary lists that a field can pull in via
 # its ``options_file`` key (see :func:`_load_options_file`).
@@ -370,30 +386,59 @@ class Field:
 
 
 @dataclass(frozen=True)
-class Venue:
-    """A supported venue and the fields it requires."""
+class VenueInfo:
+    """What the master database (``venues.json``) records about a venue.
+
+    The general metadata every venue carries whatever paperpush can do with it.
+    The submission form lives in ``submission_forms.json`` (:class:`SubmissionForm`)
+    and the author-guideline rules in ``manuscript_requirements.json``; a venue may
+    have either, both, or (briefly, while being added) neither.
+    """
 
     # ``slug`` is the database key (the top-level key in venues.json), carried
     # on the resolved object for convenience; it is not itself a key inside a
     # venue entry, so the generated schema omits it.
     slug: str
-    # ``name`` and ``fields`` are optional in venues.json -- ``from_dict``
-    # defaults a missing name to the slug and missing fields to an empty list --
-    # so they carry dataclass defaults, which keeps them optional in the schema.
     name: Annotated[str, PField(description="Display name. Defaults to the slug when omitted.")] = ""
-    fields: Annotated[
-        list[Field],
-        PField(description="The fields this venue asks for during submission."),
-    ] = dataclass_field(default_factory=list)
     full_name: Annotated[str, PField(description="Full, unabbreviated venue name.")] = ""
-    submission_url: Annotated[str, PField(description="Submission/portal URL.")] = ""
     venue_type: Annotated[
         Literal["preprint", "journal", "conference"],
         PField(description="Kind of venue: a preprint server, a journal, or a conference."),
     ] = "journal"
+    # Double-blind review: reviewers must not learn who the authors are. When
+    # set, ``paperpush validate`` scans the attachments (and any linked
+    # anonymous.4open.science mirror) for identifying information; see
+    # :mod:`paperpush.anonymity`.
+    anonymous: Annotated[
+        bool,
+        PField(description="Anonymous (double-blind) review: validate checks the " "attached files and linked anonymous.4open.science repositories " "for information identifying the authors."),
+    ] = False
+    # Deprecated venues stay in the database (their sign-in/login wiring still
+    # works via get_venue) but are hidden from list_venues, so they no longer
+    # appear in `paperpush --venues` or the generated README.
+    deprecated: Annotated[
+        bool,
+        PField(description="Hidden from listings but still reachable by get_venue."),
+    ] = False
     site_url: Annotated[str, PField(description="Public homepage URL.")] = ""
     submission_guide: Annotated[str, PField(description="URL of the author/submission guide.")] = ""
     description: Annotated[str, PField(description="Short description of the venue.")] = ""
+
+
+@dataclass(frozen=True)
+class SubmissionForm:
+    """A venue's submission form, as recorded in ``submission_forms.json``.
+
+    The fields the portal asks for and the portal-level facts its runner needs.
+    Only venues paperpush can submit to have one; a validate-only venue gets
+    :func:`default_form` instead.
+    """
+
+    fields: Annotated[
+        list[Field],
+        PField(description="The fields this venue asks for during submission."),
+    ] = dataclass_field(default_factory=list)
+    submission_url: Annotated[str, PField(description="Submission/portal URL.")] = ""
     # Labels offered by a portal's per-file "file type" dropdown on its upload
     # step (e.g. ScholarOne's "Main Document", "Figure", ...). Venue-level
     # rather than per-field because the same dropdown applies to every file the
@@ -410,40 +455,52 @@ class Venue:
         Optional[float],
         PField(description="Maximum combined size, in megabytes, of all files in one " "submission."),
     ] = None
-    # Double-blind review: reviewers must not learn who the authors are. When
-    # set, ``paperpush validate`` scans the attachments (and any linked
-    # anonymous.4open.science mirror) for identifying information; see
-    # :mod:`paperpush.anonymity`.
-    anonymous: Annotated[
-        bool,
-        PField(description="Anonymous (double-blind) review: validate checks the " "attached files and linked anonymous.4open.science repositories " "for information identifying the authors."),
-    ] = False
-    # Deprecated venues stay in the database (their sign-in/login wiring still
-    # works via get_venue) but are hidden from list_venues, so they no longer
-    # appear in `paperpush --venues` or the generated README.
-    deprecated: Annotated[
-        bool,
-        PField(description="Hidden from listings but still reachable by get_venue."),
-    ] = False
-    # Slug this venue inherits its *schema* from, if any. An inheriting venue
-    # takes the base venue's fields and other top-level keys wholesale, then
-    # adds, overrides, or removes individual fields (see ``inherits`` /
-    # ``removed_fields`` in ``venues.json`` and :func:`_resolve_entry`). This is
-    # purely about the submission form. Whether a venue also submits *through*
+    # Slug this form inherits from, if any. An inheriting form takes the base
+    # form's fields and other keys wholesale, then adds, overrides, or removes
+    # individual fields (see ``inherits`` / ``removed_fields`` in
+    # ``submission_forms.json`` and :func:`_resolve_entry`). This is purely
+    # about the submission form. Whether a venue also submits *through*
     # another's portal -- sharing its runner, stored credentials, and saved
     # session -- is a separate, code-level fact declared next to the runners (see
     # :func:`paperpush.venues.submission_base`), so a venue can inherit
     # another's fields while still submitting through its own portal (e.g. the
-    # Nature family: nature_methods inherits nature's schema but has its own eJP
+    # Nature family: nature_methods inherits nature's form but has its own eJP
     # deployment), or share a portal without inheriting (and vice versa). Empty
-    # for a standalone venue.
+    # for a standalone form.
     inherits: Annotated[
         str,
         PField(description="Slug this venue inherits its field schema from. " "Empty/absent for a standalone venue. Distinct from submission " "sharing (which portal/runner/login a venue submits through), which " "is defined in code, not here."),
     ] = ""
 
+
+@dataclass(frozen=True)
+class Venue(SubmissionForm, VenueInfo):
+    """A venue: its master entry joined with its submission form.
+
+    ``has_form`` is false for a venue with no entry in ``submission_forms.json``
+    (validate-only); its ``fields`` are then :func:`default_form`'s, enough for a
+    ``.sub`` to name the manuscript files that ``validate`` measures.
+    """
+
+    has_form: bool = True
+
+    @property
+    def supports_validate(self) -> bool:
+        """Whether ``manuscript_requirements.json`` has rules for this venue."""
+        from .requirements import get_requirements
+
+        return get_requirements(self.slug) is not None
+
+    @property
+    def supports_submit(self) -> bool:
+        """Whether this venue has a submission form and an installed runner."""
+        from .venues import SLUG_TO_MODULE, submission_base
+
+        return self.has_form and submission_base(self.slug) in SLUG_TO_MODULE
+
     @classmethod
-    def from_dict(cls, slug: str, data: dict[str, Any]) -> "Venue":
+    def from_dict(cls, slug: str, data: dict[str, Any], has_form: bool = True) -> "Venue":
+        """Build a venue from its master entry merged with its (resolved) form."""
         # The slug is the canonical, case-insensitive identifier for a venue,
         # so it is always normalized to lowercase.
         slug = slug.lower()
@@ -462,7 +519,62 @@ class Venue:
             anonymous=bool(data.get("anonymous", False)),
             deprecated=bool(data.get("deprecated", False)),
             inherits=str(data.get("inherits", "") or "").lower(),
+            has_form=has_form,
         )
+
+
+# Keys of a master entry and of a form entry, for the loaders and for
+# check_venue_data. ``removed_fields`` is a form-only loader directive.
+INFO_KEYS = frozenset(f.name for f in dataclass_fields(VenueInfo)) - {"slug"}
+FORM_KEYS = frozenset(f.name for f in dataclass_fields(SubmissionForm)) | {"removed_fields"}
+
+
+def default_form(slug: str) -> dict[str, Any]:
+    """The form a validate-only venue gets: just what ``validate`` reads.
+
+    Field ids are the ones :mod:`paperpush.requirements_check` looks up by role
+    (``manuscript_file``, ``figure_files``, ...), so the manuscript checks find
+    the files without a portal-specific form. An ``article_type`` choice is
+    added when the venue's requirements vary by article type, named after the
+    requirements' ``article_type_field`` so :func:`paperpush.requirements.resolve`
+    picks the selected type's limits.
+    """
+    from .requirements import get_requirements
+
+    fields: list[dict[str, Any]] = [
+        {"id": "title", "autofill": "extract", "label": "Manuscript title", "type": "text", "required": True, "help": "The full title of the manuscript."},
+        {"id": "abstract", "autofill": "extract", "label": "Abstract", "type": "textarea", "required": True, "help": "The abstract as it appears in the manuscript."},
+        {"id": "keywords", "autofill": "extract", "label": "Keywords", "type": "text", "help": "Optional. Comma-separated keywords, as listed in the manuscript."},
+        {
+            "id": "authors",
+            "autofill": "extract",
+            "label": "Authors",
+            "type": "authorlist",
+            "required": True,
+            "help": "One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). Mark exactly one author as the corresponding author.",
+            "fields": ["name", "email?", "affiliation?", "orcid?", "corresponding"],
+        },
+    ]
+    reqs = get_requirements(slug)
+    if reqs is not None and reqs.article_types:
+        fields.append(
+            {
+                "id": reqs.article_type_field or "article_type",
+                "autofill": "classify",
+                "label": "Article type",
+                "type": "choice",
+                "help": "Selects which of the author guidelines' per-article-type limits apply.",
+                "options": list(reqs.article_types),
+            }
+        )
+    fields += [
+        {"id": "manuscript_file", "autofill": "filemap", "label": "Manuscript file", "type": "file", "required": True, "help": "Path to the manuscript (PDF, Word, or LaTeX source)."},
+        {"id": "figure_files", "autofill": "filemap", "label": "Figure files", "type": "filelist", "help": "Optional. One figure file per line as 'path | label' (label optional)."},
+        {"id": "table_files", "autofill": "filemap", "label": "Table files", "type": "filelist", "help": "Optional. One table file per line as 'path | label' (label optional)."},
+        {"id": "supplementary_files", "autofill": "filemap", "label": "Supplementary files", "type": "filelist", "help": "Optional. One supplementary file per line as 'path | label' (label optional)."},
+        {"id": "cover_letter", "autofill": "filemap", "label": "Cover letter", "type": "file", "help": "Optional. Path to the cover letter."},
+    ]
+    return {"fields": fields}
 
 
 def _read_database(path: Path) -> dict[str, Any]:
@@ -471,22 +583,47 @@ def _read_database(path: Path) -> dict[str, Any]:
         return json.load(fh)
 
 
+def _source_copy(name: str) -> Optional[dict[str, Any]]:
+    """The active source's copy of data file ``name``, or None to use the bundled one."""
+    source = venue_data.active_source()
+    if source.kind == "bundled":
+        return None
+    try:
+        return _read_database(source.path(name))
+    except (OSError, ValueError) as exc:
+        logger.warning("Could not read %s from %s (%s); using the bundled copy", name, source.root, exc)
+        return None
+
+
 @lru_cache(maxsize=1)
 def _load_raw() -> dict[str, Any]:
-    source = venue_data.active_source()
-    bundled = _read_database(DATABASE_PATH)
-    if source.kind == "bundled":
+    """The submission forms, keyed by slug (``submission_forms.json``)."""
+    bundled = _read_database(FORMS_PATH)
+    published = _source_copy(venue_data.FORMS_FILE)
+    # A local override is the author's own data, used as is; a published copy
+    # is merged venue by venue onto what this version can drive.
+    if published is None:
         data = bundled
+    elif venue_data.active_source().kind == "override":
+        data = published
     else:
-        try:
-            published = _read_database(source.path(venue_data.VENUES_FILE))
-        except (OSError, ValueError) as exc:
-            logger.warning("Could not read the venue data from %s (%s); using the bundled copy", source.root, exc)
-            published = bundled
-        # A local override is the author's own data, used as is; a published
-        # copy is merged venue by venue onto what this version can drive.
-        data = published if source.kind == "override" else merge_published(bundled, published)
-    logger.info("Loaded %d venue entr(y/ies) from the database (%s)", len(data), source.describe())
+        data = merge_published(bundled, published)
+    logger.info("Loaded %d submission form(s) (%s)", len(data), venue_data.active_source().describe())
+    return data
+
+
+@lru_cache(maxsize=1)
+def _load_info() -> dict[str, Any]:
+    """The master venue list, keyed by slug (``venues.json``)."""
+    bundled = _read_database(DATABASE_PATH)
+    published = _source_copy(venue_data.VENUES_FILE)
+    if published is None:
+        data = bundled
+    elif venue_data.active_source().kind == "override":
+        data = published
+    else:
+        data = merge_published_info(bundled, published, _source_copy(venue_data.FORMS_FILE) or {})
+    logger.info("Loaded %d venue(s) from the master list", len(data))
     return data
 
 
@@ -544,27 +681,88 @@ def merge_published(bundled: dict[str, Any], published: dict[str, Any]) -> dict[
     return {slug: published[slug] if slug in accepted else entry for slug, entry in bundled.items()}
 
 
+@lru_cache(maxsize=1)
+def _info_adapter() -> TypeAdapter:
+    return TypeAdapter(VenueInfo)
+
+
+def _info_problem(slug: str, entry: Any) -> Optional[str]:
+    """Why this version cannot use the master-list ``entry``, or None."""
+    if not isinstance(entry, dict):
+        return f"{slug} is not an object"
+    unknown = sorted(set(entry) - INFO_KEYS)
+    if unknown:
+        return f"{slug} has key(s) this version does not know: {', '.join(unknown)}"
+    try:
+        _info_adapter().validate_python({"slug": slug, **entry})
+    except ValidationError as exc:
+        return f"{slug} does not match this version's types ({exc.errors()[0]['msg']})"
+    return None
+
+
+def merge_published_info(bundled: dict[str, Any], published: dict[str, Any], published_forms: dict[str, Any]) -> dict[str, Any]:
+    """Overlay a published master list onto the bundled one, venue by venue.
+
+    A published entry is used when this version can read it (known keys and
+    value types) and either the bundled list already has the venue or the venue
+    is validate-only -- it has no published submission form. A new venue that
+    can be submitted to needs its runner, which only a release can bring, so it
+    is held back; a new validate-only venue needs nothing but data and is added.
+    A bundled venue the published list omits keeps its bundled entry.
+    """
+    merged = dict(bundled)
+    held_back: list[str] = []
+    for slug, entry in published.items():
+        problem = _info_problem(slug, entry)
+        if problem:
+            logger.info("Published venue list: %s; keeping the bundled entry", problem)
+            held_back.append(slug)
+        elif slug in bundled or slug not in published_forms:
+            merged[slug] = entry
+        else:
+            held_back.append(slug)
+    if held_back:
+        logger.info("Published venue list entries for %s need a newer paperpush. " "Run 'pip install -U paperpush' to get them.", ", ".join(sorted(held_back)))
+    return merged
+
+
 def check_venue_data(root: Path) -> None:
     """Raise if the venue data in directory ``root`` does not load.
 
-    Run on a downloaded copy before it replaces the cache: every venue must
-    resolve and build, every ``options_file`` it names must exist, and the
-    manuscript requirements must load too.
+    Run on a downloaded copy before it replaces the cache: every master entry
+    must be readable, every form must belong to a listed venue, resolve and
+    build, every ``options_file`` it names must exist, and the manuscript
+    requirements must load and name only listed venues.
     """
     from .requirements import check_requirements_file
 
-    raw = _read_database(root / venue_data.VENUES_FILE)
-    if not isinstance(raw, dict) or not raw:
+    info = _read_database(root / venue_data.VENUES_FILE)
+    if not isinstance(info, dict) or not info:
         raise ValueError("venues.json holds no venues")
-    for slug in raw:
-        entry = _resolve_entry(slug, raw)
+    for slug, entry in info.items():
+        problem = _info_problem(slug, entry)
+        if problem:
+            raise ValueError(f"venues.json: {problem}")
+    forms = _read_database(root / venue_data.FORMS_FILE)
+    if not isinstance(forms, dict):
+        raise ValueError("submission_forms.json is not a JSON object")
+    for slug in forms:
+        if slug not in info:
+            raise ValueError(f"submission_forms.json has a form for {slug!r}, which venues.json does not list")
+        entry = _resolve_entry(slug, forms)
+        unknown = sorted(set(forms[slug]) - FORM_KEYS)
+        if unknown:
+            raise ValueError(f"submission_forms.json: {slug} has unknown key(s) {', '.join(unknown)}")
         Venue.from_dict(slug, {**entry, "fields": []})
         for f in entry.get("fields", []):
             name = f.get("options_file")
             if name and not (root / venue_data.ASSETS_SUBDIR / name).is_file() and not (ASSETS_DIR / name).is_file():
                 raise ValueError(f"{slug}.{f.get('id')} names a missing options_file {name!r}")
             Field.from_dict({k: v for k, v in f.items() if k != "options_file"})
-    check_requirements_file(root / venue_data.REQUIREMENTS_FILE)
+    requirement_slugs = check_requirements_file(root / venue_data.REQUIREMENTS_FILE)
+    unlisted = sorted(set(requirement_slugs) - set(info))
+    if unlisted:
+        raise ValueError(f"manuscript_requirements.json has rules for {', '.join(unlisted)}, which venues.json does not list")
 
 
 def reload() -> None:
@@ -573,6 +771,7 @@ def reload() -> None:
 
     venue_data.reset()
     _load_raw.cache_clear()
+    _load_info.cache_clear()
     _load_options_file.cache_clear()
     requirements._load_raw.cache_clear()
 
@@ -673,20 +872,32 @@ def _resolve_entry(slug: str, raw: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+def _build(slug: str, info: dict[str, Any], forms: dict[str, Any]) -> Venue:
+    """The :class:`Venue` for master entry ``info[slug]``, joined with its form."""
+    form_key = next((k for k in forms if k.lower() == slug.lower()), None)
+    if form_key is None:
+        form, has_form = default_form(slug), False
+    else:
+        form, has_form = _resolve_entry(form_key, forms), True
+    return Venue.from_dict(slug, {**form, **{k: v for k, v in info[slug].items() if k in INFO_KEYS}}, has_form=has_form)
+
+
 def list_venues(include_deprecated: bool = False) -> list[Venue]:
-    """Return supported venues, sorted by lowercase slug.
+    """Return every venue in the master list, sorted by lowercase slug.
 
     Venues are keyed by their lowercase slug, so any case variants in the
     database (e.g. ``"bioRxiv"`` and ``"biorxiv"``) collapse to a single entry
-    rather than being listed twice.
+    rather than being listed twice. The list includes validate-only and
+    submit-only venues alike; see :attr:`Venue.supports_validate` and
+    :attr:`Venue.supports_submit`.
 
     Deprecated venues are omitted unless ``include_deprecated`` is true. They
     remain reachable via ``get_venue`` so any wired-up login flow still works.
     """
-    raw = _load_raw()
+    info, forms = _load_info(), _load_raw()
     by_slug: dict[str, Venue] = {}
-    for slug in raw:
-        venue = Venue.from_dict(slug, _resolve_entry(slug, raw))
+    for slug in info:
+        venue = _build(slug, info, forms)
         if venue.deprecated and not include_deprecated:
             continue
         by_slug.setdefault(venue.slug, venue)
@@ -701,11 +912,11 @@ def get_venue(slug: str) -> Venue:
 
     Raises ``KeyError`` if no venue matches.
     """
-    raw = _load_raw()
+    info, forms = _load_info(), _load_raw()
     key = slug.lower()
-    for candidate, data in raw.items():
+    for candidate, data in info.items():
         if candidate.lower() == key or data.get("name", "").lower() == key:
             logger.debug("Resolved venue %r to %r", slug, candidate)
-            return Venue.from_dict(candidate, _resolve_entry(candidate, raw))
+            return _build(candidate, info, forms)
     logger.debug("No venue matches %r", slug)
     raise KeyError(slug)

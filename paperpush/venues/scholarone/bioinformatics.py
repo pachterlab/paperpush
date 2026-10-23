@@ -35,7 +35,7 @@ _VENUE = get_venue("bioinformatics")
 PORTAL_URL = _VENUE.submission_url
 
 # Labels offered by the per-file "file type" dropdown on the upload step, read
-# from venues.json; _upload_files asserts the live dropdown still matches.
+# from submission_forms.json; _upload_files asserts the live dropdown still matches.
 FILE_TYPE_OPTIONS = _VENUE.file_type_options or []
 
 # The specific labels this runner assigns (each must be in FILE_TYPE_OPTIONS;
@@ -44,7 +44,7 @@ TYPE_MAIN_DOCUMENT = "Main Document (Word or Pdf)"
 TYPE_FIGURE = "Figure"
 TYPE_TABLE = "Table"
 TYPE_SUPPLEMENTARY = "Supplementary Material for Review & Online Publication"
-assert set((TYPE_MAIN_DOCUMENT, TYPE_FIGURE, TYPE_TABLE, TYPE_SUPPLEMENTARY)).issubset(FILE_TYPE_OPTIONS), "bioinformatics file_type_options in venues.json is missing a label this runner uses"
+assert set((TYPE_MAIN_DOCUMENT, TYPE_FIGURE, TYPE_TABLE, TYPE_SUPPLEMENTARY)).issubset(FILE_TYPE_OPTIONS), "bioinformatics file_type_options in submission_forms.json is missing a label this runner uses"
 
 
 # Custom-field ids for the free-text follow-ups on the final declarations step
@@ -184,7 +184,7 @@ def _upload_files(page, files: list[tuple[str, str]]) -> None:
             live = [opt for opt in live if not opt.startswith("Choose File Designation")]
             offered = [opt.strip() for opt in live if opt.strip()]
             if offered != FILE_TYPE_OPTIONS:
-                raise RuntimeError("ScholarOne file-type options changed; update bioinformatics " f"file_type_options in venues.json. Live: {offered}; expected: {FILE_TYPE_OPTIONS}")
+                raise RuntimeError("ScholarOne file-type options changed; update bioinformatics " f"file_type_options in submission_forms.json. Live: {offered}; expected: {FILE_TYPE_OPTIONS}")
         dropdown.select_option(label=file_type)
 
 
@@ -216,7 +216,7 @@ def submit_bioinformatics(values: dict, headless: bool = False, debug: bool = Fa
     if supplementary_file:
         upload_files.append((supplementary_file, TYPE_SUPPLEMENTARY))
 
-    # Authors, parsed with the Bioinformatics column order declared in venues.json
+    # Authors, parsed with the Bioinformatics column order declared in submission_forms.json
     # (email | prefix | name | institution | country | city | corresponding).
     author_field = next((f for f in _VENUE.fields if f.type == "authorlist"), None)
     authors = parse_authors(values.get("authors", ""), author_field.fields if author_field else None)

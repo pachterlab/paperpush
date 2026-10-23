@@ -128,7 +128,7 @@ SEL_FILE_TYPE = "select[name^='object_file_type_']"
 FILE_TYPE_ARTICLE = "Article File"
 FILE_TYPE_COVER_LETTER = "Author Cover Letter"
 # File-type labels eJP offers; kept in sync with the ``additional_files`` field's
-# ``type_options`` in venues.json.
+# ``type_options`` in submission_forms.json.
 FILE_TYPE_OPTIONS = (
     "Author Cover Letter",
     "Response to Referees Letter",

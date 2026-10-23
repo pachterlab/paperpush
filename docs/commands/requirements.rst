@@ -45,7 +45,8 @@ Where the rules live
 --------------------
 
 The rules come from ``paperpush/manuscript_requirements.json``, the companion
-to ``venues.json``. ``venues.json`` describes the *submission form* -- the
+to ``submission_forms.json``. ``submission_forms.json`` describes the
+*submission form* -- the
 fields a portal asks for and what each accepts. ``manuscript_requirements.json``
 describes what the venue's *author guidelines* say about the manuscript: every
 entry uses the same section keys (``manuscript``, ``title_page``, ``abstract``,

@@ -10,12 +10,12 @@ What is checked, and how:
 
 * **Formats and sizes** of the manuscript, figures, tables, supplementary
   files, and cover letter -- but only for a field that does not already
-  declare its own ``accept`` / ``max_file_size_mb`` in ``venues.json``. The
+  declare its own ``accept`` / ``max_file_size_mb`` in ``submission_forms.json``. The
   portal's own upload rules are the stricter, enforced ones and are reported
   by the generic field checks; the guideline rules fill in where the portal
   is silent.
 * **Length** -- word and page limits on the manuscript, likewise only when the
-  ``venues.json`` field does not carry them. A LaTeX manuscript is compiled to
+  ``submission_forms.json`` field does not carry them. A LaTeX manuscript is compiled to
   a scratch PDF for its page count (see :func:`paperpush.manuscript.build_pdf`).
 * **Abstract, title, keywords** -- read from the ``.sub`` values, again only
   when the field declares no limit of its own.

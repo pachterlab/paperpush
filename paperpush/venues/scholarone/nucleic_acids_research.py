@@ -40,7 +40,7 @@ _VENUE = get_venue(_SLUG)
 
 AUTHOR_LINK = scholarone.AUTHOR_LINK
 
-# Labels offered by NAR's per-file "Designation" dropdown, read from venues.json;
+# Labels offered by NAR's per-file "Designation" dropdown, read from submission_forms.json;
 # _upload_files asserts the labels it assigns are members of this set.
 FILE_TYPE_OPTIONS = _VENUE.file_type_options or []
 
@@ -50,7 +50,7 @@ TYPE_MAIN_DOCUMENT = "Manuscript file - clean"
 TYPE_FIGURE = "Figure"
 TYPE_TABLE = "Table"
 TYPE_SUPPLEMENTARY = "Supplementary data - for compiled PDF"
-assert set((TYPE_MAIN_DOCUMENT, TYPE_FIGURE, TYPE_TABLE, TYPE_SUPPLEMENTARY)).issubset(FILE_TYPE_OPTIONS), "nucleic_acids_research file_type_options in venues.json is missing a designation label this runner uses"
+assert set((TYPE_MAIN_DOCUMENT, TYPE_FIGURE, TYPE_TABLE, TYPE_SUPPLEMENTARY)).issubset(FILE_TYPE_OPTIONS), "nucleic_acids_research file_type_options in submission_forms.json is missing a designation label this runner uses"
 
 # NAR requires at least 6 recommended (suggested) referees and allows at most 3
 # opposed referees. ScholarOne labels the referee controls "Add Referee" /
@@ -98,7 +98,7 @@ CF_OPEN_ACCESS_CHECKBOX = "1068912"  # read the open access charges and waiver p
 
 # The page-6 "data deposition" matrix: one Yes/No group per data type. A label
 # selected in the .sub ``data_deposition_types`` answers its row "Yes", rest "No".
-# Labels must match the venues.json ``data_deposition_types`` options exactly.
+# Labels must match the submission_forms.json ``data_deposition_types`` options exactly.
 DATA_DEPOSITION_ROWS = (
     ("New genome expression or sequencing data (ChIP-seq, RNA-seq)", "1286390"),
     ("New genome-wide binding/interaction data or genome-wide mutation data", "1286391"),
@@ -366,7 +366,7 @@ def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: b
         upload_files.append((supplementary_file, TYPE_SUPPLEMENTARY))
 
     # Authors, parsed with the inherited Bioinformatics column order declared in
-    # venues.json (email | prefix | name | institution | country | city | corresponding).
+    # submission_forms.json (email | prefix | name | institution | country | city | corresponding).
     author_field = next((f for f in _VENUE.fields if f.type == "authorlist"), None)
     authors = parse_authors(values.get("authors", ""), author_field.fields if author_field else None)
 

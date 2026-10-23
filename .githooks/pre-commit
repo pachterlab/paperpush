@@ -90,17 +90,20 @@ if [ "$status" -ne 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Keep artifacts generated from venues.json in sync with the database.
-# Both blocks below only run when venues.json is part of this commit, and
-# re-stage whatever they regenerate so the committed tree never drifts.
+# Keep artifacts generated from the venue databases in sync with them.
+# Both blocks below only run when venues.json, submission_forms.json or
+# manuscript_requirements.json is part of this commit (a validate-only venue's
+# .sub template and the venues table's validate/submit columns depend on all
+# three), and re-stage whatever they regenerate so the committed tree never
+# drifts.
 # ---------------------------------------------------------------------------
 if git diff --cached --name-only --diff-filter=ACM -z \
-    | tr '\0' '\n' | grep -qx 'paperpush/venues.json'; then
+    | tr '\0' '\n' | grep -qE '^paperpush/(venues|submission_forms|manuscript_requirements)\.json$'; then
     # README.md's supported-venues table (and venues.md).
     if python scripts/gen_readme_venues.py; then
-        if ! git diff --quiet -- README.md; then
-            git add README.md
-            echo "pre-commit: regenerated README.md venues table and re-staged it."
+        if ! git diff --quiet -- README.md venues.md; then
+            git add README.md venues.md
+            echo "pre-commit: regenerated the venues tables and re-staged them."
         fi
     else
         echo "pre-commit: failed to regenerate README.md venues table." >&2
@@ -126,7 +129,7 @@ fi
 # JSON schemas whenever a schema is part of this commit.
 # ---------------------------------------------------------------------------
 if git diff --cached --name-only --diff-filter=ACM -z \
-    | tr '\0' '\n' | grep -qE '^paperpush/(venues|manuscript_requirements)\.schema\.json$'; then
+    | tr '\0' '\n' | grep -qE '^paperpush/(venues|submission_forms|manuscript_requirements)\.schema\.json$'; then
     if python scripts/gen_schema_docs.py; then
         if ! git diff --quiet -- docs/schemas; then
             git add docs/schemas

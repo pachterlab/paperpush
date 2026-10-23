@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 AUTHOR_LINK = " Author"
 
 # Title prefixes offered in the manual author-entry form's "Prefix" drop-down; the
-# .sub "prefix" column must be one of these. Kept in step with venues.json.
+# .sub "prefix" column must be one of these. Kept in step with submission_forms.json.
 AUTHOR_PREFIXES = ["Dr.", "Miss", "Mr.", "Mrs.", "Ms.", "Prof.", "Mx", "Dr"]
 
 # Sign-in form selectors (shared across ScholarOne deployments).

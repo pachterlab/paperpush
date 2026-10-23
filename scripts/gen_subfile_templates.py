@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Regenerate the checked-in ``.sub`` templates from venues.json.
+"""Regenerate the checked-in ``.sub`` templates from the venue databases.
 
 For every supported venue, ``paperpush/subfile_templates/<slug>.sub``
 holds an empty submission template -- the same file ``paperpush subfile
 <slug> --dont-fill-defaults`` would produce -- so contributors can see each
 venue's fields at a glance without running the tool. These are generated
-artifacts; edit ``paperpush/venues.json`` (and the field schema) instead
+artifacts; edit ``paperpush/submission_forms.json`` (and the field schema) instead
 and re-run this script:
 
     python scripts/gen_subfile_templates.py         # rewrite templates in place
@@ -16,7 +16,7 @@ The ``--check`` form is suitable for CI or a pre-commit hook. Templates are
 committed file is a stable, defaults-free starting point.
 
 Every supported venue is regenerated on each run rather than only the ones
-whose entry changed: venues.json inheritance means one base venue's edit can
+whose entry changed: submission_forms.json inheritance means one base venue's edit can
 change several inheriting venues' fields, so regenerating the whole set is both
 simpler and always correct. Stale templates (for a venue removed from the
 database) are deleted.
