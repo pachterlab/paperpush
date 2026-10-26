@@ -33,7 +33,8 @@ from paperpush.cli import main
 from paperpush.database import get_venue, list_venues
 from paperpush.validate import parse_authors
 
-VENUES = list_venues()
+# Login is for submission portals; a validate-only venue refuses it (tests/test_validate_only_venue.py).
+VENUES = [v for v in list_venues() if v.supports_submit]
 SLUGS = [j.slug for j in VENUES]
 
 _USERNAME = "researcher@example.edu"

@@ -62,7 +62,7 @@ def test_every_venue_declares_anonymous_explicitly():
     raw = json.loads((Path(anonymity.__file__).parent / "venues.json").read_text(encoding="utf-8"))
     missing = [slug for slug, entry in raw.items() if "anonymous" not in entry]
     assert missing == []
-    assert {v.slug for v in list_venues(include_deprecated=True) if v.anonymous} == {"iclr_2027", "aaai_2027"}
+    assert {v.slug for v in list_venues(include_deprecated=True) if v.anonymous} == {"iclr_2027", "aaai_2027", "aistats_2027", "cvpr_2027", "acl_arr", "tmlr", "ieee_tnnls", "radiology", "radiology_ai"}
 
 
 # --- identity terms ------------------------------------------------------------

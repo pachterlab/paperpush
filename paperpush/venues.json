@@ -216,5 +216,285 @@
     "site_url": "https://link.springer.com/journal/493",
     "submission_guide": "https://combinatorica.hu/",
     "description": "International journal publishing research in combinatorics and the theory of computing, including combinatorial structures, optimization, algorithms, complexity, geometry, and number theory."
+  },
+  "acl_arr": {
+    "name": "ACL Rolling Review",
+    "full_name": "ACL Rolling Review (ARR)",
+    "venue_type": "conference",
+    "anonymous": true,
+    "site_url": "https://aclrollingreview.org",
+    "submission_guide": "https://aclrollingreview.org/cfp",
+    "description": "Centralized, rolling peer-review service for the ACL community, feeding reviewed NLP and computational linguistics papers to *ACL conferences."
+  },
+  "aistats_2027": {
+    "name": "AISTATS 2027",
+    "full_name": "The 30th International Conference on Artificial Intelligence and Statistics",
+    "venue_type": "conference",
+    "anonymous": true,
+    "site_url": "https://virtual.aistats.org/Conferences/2027",
+    "submission_guide": "https://virtual.aistats.org/Conferences/2027/CallForPapers",
+    "description": "Conference at the intersection of artificial intelligence, machine learning, and statistics.",
+    "deprecated": true
+  },
+  "ajhg": {
+    "name": "AJHG",
+    "full_name": "The American Journal of Human Genetics (Cell Press)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.cell.com/ajhg",
+    "submission_guide": "https://www.cell.com/ajhg/authors",
+    "description": "Official journal of the American Society of Human Genetics, publishing research and perspectives across human genetics and genomics."
+  },
+  "bmj": {
+    "name": "The BMJ",
+    "full_name": "The BMJ (British Medical Journal)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.bmj.com",
+    "submission_guide": "https://www.bmj.com/about-bmj/resources-authors/article-types",
+    "description": "Weekly general medical journal publishing original research, analysis, education and commentary for an international readership of clinicians and policy makers."
+  },
+  "cell_reports": {
+    "name": "Cell Reports",
+    "full_name": "Cell Reports",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.cell.com/cell-reports",
+    "submission_guide": "https://www.cell.com/cell-reports/information-for-authors",
+    "description": "Open-access Cell Press journal publishing high-quality life-science research across the full spectrum of biology, with a focus on shorter single-point Reports as well as longer Research Articles and Resources."
+  },
+  "cvpr_2027": {
+    "name": "CVPR 2027",
+    "full_name": "IEEE/CVF Conference on Computer Vision and Pattern Recognition 2027",
+    "venue_type": "conference",
+    "anonymous": true,
+    "site_url": "https://cvpr.thecvf.com/Conferences/2027",
+    "submission_guide": "https://cvpr.thecvf.com/Conferences/2027/AuthorGuidelines",
+    "description": "Premier conference on computer vision and pattern recognition, covering 3D vision, deep learning, generative models, embodied vision, autonomous driving, and medical and biological vision."
+  },
+  "elife": {
+    "name": "eLife",
+    "full_name": "eLife",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://elifesciences.org",
+    "submission_guide": "https://reviewer.elifesciences.org/author-guide/types",
+    "description": "Open-access journal publishing significant research across the life sciences and medicine as Reviewed Preprints with public reviews and an eLife assessment."
+  },
+  "european_radiology": {
+    "name": "European Radiology",
+    "full_name": "European Radiology (Springer / ESR)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://link.springer.com/journal/330",
+    "submission_guide": "https://journals.myesr.org/eur-radiol/for-authors/",
+    "description": "Official journal of the European Society of Radiology publishing original research, reviews, technical developments, and guidelines across all areas of diagnostic and interventional radiology."
+  },
+  "genome_medicine": {
+    "name": "Genome Medicine",
+    "full_name": "Genome Medicine (BMC)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://genomemedicine.biomedcentral.com",
+    "submission_guide": "https://genomemedicine.biomedcentral.com/submission-guidelines",
+    "description": "Open access journal publishing research on the application of genetics, genomics and multi-omics to understand, diagnose and treat disease."
+  },
+  "genome_research": {
+    "name": "Genome Research",
+    "full_name": "Genome Research (Cold Spring Harbor Laboratory Press)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://genome.cshlp.org",
+    "submission_guide": "https://genome.cshlp.org/site/misc/ifora.xhtml",
+    "description": "Publishes research on genome structure and function, comparative genomics, molecular evolution, genome-scale quantitative and population genetics, epigenomics, systems biology, and computational and high-throughput methods."
+  },
+  "ieee_tmi": {
+    "name": "IEEE TMI",
+    "full_name": "IEEE Transactions on Medical Imaging",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://ieeetmi.org/",
+    "submission_guide": "https://ieeetmi.org/authors-instructions/",
+    "description": "Publishes original research on the science and engineering of medical imaging, including image formation, reconstruction, analysis, and computational methods across imaging modalities."
+  },
+  "ieee_tnnls": {
+    "name": "IEEE TNNLS",
+    "full_name": "IEEE Transactions on Neural Networks and Learning Systems",
+    "venue_type": "journal",
+    "anonymous": true,
+    "site_url": "https://cis.ieee.org/publications/t-neural-networks-and-learning-systems",
+    "submission_guide": "https://cis.ieee.org/publications/t-neural-networks-and-learning-systems/tnnls",
+    "description": "IEEE Computational Intelligence Society journal on the theory, design, and applications of neural networks and related learning systems, reviewed double-anonymously."
+  },
+  "ieee_tpami": {
+    "name": "IEEE TPAMI",
+    "full_name": "IEEE Transactions on Pattern Analysis and Machine Intelligence",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.computer.org/csdl/journal/tp",
+    "submission_guide": "https://www.computer.org/csdl/journal/tp/write-for-us/15083",
+    "description": "IEEE Computer Society journal covering computer vision, pattern analysis and recognition, and machine intelligence with an emphasis on machine learning for pattern analysis."
+  },
+  "jama": {
+    "name": "JAMA",
+    "full_name": "JAMA: The Journal of the American Medical Association",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://jamanetwork.com/journals/jama",
+    "submission_guide": "https://jamanetwork.com/journals/jama/pages/instructions-for-authors",
+    "description": "Weekly general medical journal of the American Medical Association publishing original investigations, research letters, reviews and commentary."
+  },
+  "jmlr": {
+    "name": "JMLR",
+    "full_name": "Journal of Machine Learning Research",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.jmlr.org",
+    "submission_guide": "https://www.jmlr.org/author-info.html",
+    "description": "Open-access journal publishing theory and methods of machine learning; applications of ML to other domains are out of scope."
+  },
+  "jnm": {
+    "name": "JNM",
+    "full_name": "The Journal of Nuclear Medicine (SNMMI)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://jnm.snmjournals.org",
+    "submission_guide": "https://jnm.snmjournals.org/authors",
+    "description": "Official journal of the Society of Nuclear Medicine and Molecular Imaging publishing original laboratory and clinical investigations in nuclear medicine and molecular imaging."
+  },
+  "lancet": {
+    "name": "The Lancet",
+    "full_name": "The Lancet",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.thelancet.com/journals/lancet/home",
+    "submission_guide": "https://www.thelancet.com/pb-assets/Lancet/authors/tl-info-for-authors-1740380189507.pdf",
+    "description": "Weekly international general medical journal publishing original research likely to change clinical practice, plus reviews, commentary and correspondence."
+  },
+  "lancet_digital_health": {
+    "name": "Lancet Digital Health",
+    "full_name": "The Lancet Digital Health",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.thelancet.com/journals/landig/home",
+    "submission_guide": "https://www.thelancet.com/pb-assets/Lancet/authors/tldh-info-for-authors.pdf",
+    "description": "Publishes original research, reviews, and commentary on digital health, including AI, mobile health, telemedicine, wearables, health informatics, and digital therapeutics."
+  },
+  "medical_image_analysis": {
+    "name": "Medical Image Analysis",
+    "full_name": "Medical Image Analysis (Elsevier)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.sciencedirect.com/journal/medical-image-analysis",
+    "submission_guide": "https://www.sciencedirect.com/journal/medical-image-analysis/publish/guide-for-authors",
+    "description": "Official journal of the MICCAI Society publishing original research on the analysis and use of biomedical images, including segmentation, registration, computer-aided diagnosis, and image-guided intervention."
+  },
+  "nature_biomedical_engineering": {
+    "name": "Nature Biomedical Engineering",
+    "full_name": "Nature Biomedical Engineering",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/natbiomedeng",
+    "submission_guide": "https://www.nature.com/natbiomedeng/submission-guidelines",
+    "description": "Publishes original research and commissioned content at the interface of engineering and the biomedical and clinical sciences, including biomaterials, devices, imaging, computational methods and therapeutic technologies."
+  },
+  "nature_communications": {
+    "name": "Nature Communications",
+    "full_name": "Nature Communications",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/ncomms",
+    "submission_guide": "https://www.nature.com/ncomms/submit",
+    "description": "Open access journal publishing high-quality original research from all areas of the natural sciences, presenting important advances of significance to specialists within each field."
+  },
+  "nature_genetics": {
+    "name": "Nature Genetics",
+    "full_name": "Nature Genetics",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/ng",
+    "submission_guide": "https://www.nature.com/ng/submission-guidelines",
+    "description": "Publishes research of broad interest across all areas of genetics and genomics, including human, model-organism, plant and cancer genetics, and functional and population genomics."
+  },
+  "nature_machine_intelligence": {
+    "name": "Nature Machine Intelligence",
+    "full_name": "Nature Machine Intelligence",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/natmachintell",
+    "submission_guide": "https://www.nature.com/natmachintell/submission-guidelines",
+    "description": "Publishes original research and commentary on machine learning, robotics and AI and their applications across the sciences, including methods, analyses and reusability reports."
+  },
+  "nature_medicine": {
+    "name": "Nature Medicine",
+    "full_name": "Nature Medicine",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/nm",
+    "submission_guide": "https://www.nature.com/nm/submission-guidelines",
+    "description": "Publishes original peer-reviewed research in all areas of medicine, with emphasis on translational and clinical research, on the basis of originality, timeliness, interdisciplinary interest and impact on human health."
+  },
+  "nejm": {
+    "name": "NEJM",
+    "full_name": "The New England Journal of Medicine",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nejm.org",
+    "submission_guide": "https://www.nejm.org/author-center/new-manuscripts",
+    "description": "Weekly general medical journal publishing original clinical research, reviews, case reports and commentary of importance to clinical practice."
+  },
+  "neuron": {
+    "name": "Neuron",
+    "full_name": "Neuron",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.cell.com/neuron",
+    "submission_guide": "https://www.cell.com/neuron/information-for-authors",
+    "description": "Cell Press journal publishing research across neuroscience, from molecular and cellular to systems, cognitive and disease-related studies."
+  },
+  "npj_digital_medicine": {
+    "name": "npj Digital Medicine",
+    "full_name": "npj Digital Medicine (Nature Portfolio)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/npjdigitalmed",
+    "submission_guide": "https://www.nature.com/npjdigitalmed/for-authors-and-referees/submission-guidelines",
+    "description": "Open access Nature Portfolio journal publishing research on digital medicine, including AI, wearables, telehealth, health data, and clinical informatics."
+  },
+  "pnas": {
+    "name": "PNAS",
+    "full_name": "Proceedings of the National Academy of Sciences",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.pnas.org",
+    "submission_guide": "https://www.pnas.org/author-center/submitting-your-manuscript",
+    "description": "Multidisciplinary journal of the US National Academy of Sciences publishing original research of exceptional importance across the biological, physical, and social sciences."
+  },
+  "radiology": {
+    "name": "Radiology",
+    "full_name": "Radiology (RSNA)",
+    "venue_type": "journal",
+    "anonymous": true,
+    "site_url": "https://pubs.rsna.org/journal/radiology",
+    "submission_guide": "https://pubs.rsna.org/page/radiology/author-instructions",
+    "description": "Peer-reviewed journal of the Radiological Society of North America publishing original research, reviews, and commentary across diagnostic radiology and imaging; uses double-anonymized review."
+  },
+  "radiology_ai": {
+    "name": "Radiology: Artificial Intelligence",
+    "full_name": "Radiology: Artificial Intelligence (RSNA)",
+    "venue_type": "journal",
+    "anonymous": true,
+    "site_url": "https://pubs.rsna.org/journal/ai",
+    "submission_guide": "https://pubs.rsna.org/page/ai/author-instructions",
+    "description": "RSNA journal on applications of machine learning and artificial intelligence in medical imaging, including original research, technical developments, data resources, and reviews; uses double-anonymized review."
+  },
+  "tmlr": {
+    "name": "TMLR",
+    "full_name": "Transactions on Machine Learning Research",
+    "venue_type": "journal",
+    "anonymous": true,
+    "site_url": "https://jmlr.org/tmlr/",
+    "submission_guide": "https://jmlr.org/tmlr/author-guide.html",
+    "description": "Open-access, double-blind journal for machine learning research reviewed on OpenReview, with acceptance based on correctness and claim support rather than novelty."
   }
 }
