@@ -280,8 +280,8 @@ def test_cli_validate_anonymous_flag(tmp_path, monkeypatch, capsys):
     sub.write_text(f"@venue: test_anonymity_cli\nauthors: {AUTHOR_LINE}\npdf_file: {_leaky_pdf(tmp_path)}\n", encoding="utf-8")
 
     assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "--dont-check-manuscript"]) == 0
-    assert "anonymity:" not in capsys.readouterr().err
+    assert "anonymity:" not in capsys.readouterr().out
 
     assert main(["validate", str(sub), "--anonymous", "--dont-check-links", "--dont-check-references", "--dont-check-manuscript"]) == 0
-    err = capsys.readouterr().err
+    err = capsys.readouterr().out
     assert "anonymity: author name 'Ada Lovelace'" in err

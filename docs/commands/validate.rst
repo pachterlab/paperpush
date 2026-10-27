@@ -12,7 +12,10 @@ Run the pre-submission checks on a filled ``.sub`` file. Run this before
                              [--dont-check-manuscript] [--anonymous]
                              [--dont-check-hidden-text]
                              [--dont-check-openreview-profiles]
-                             [--arxiv-latex-cleaner]
+                             [--arxiv-latex-cleaner] [-o [PATH]] [--alt-color]
+                             [--ai] [--provider {anthropic,openai,google}]
+                             [--model MODEL] [--ai-tasks FILE]
+                             [--ai-results FILE]
                              subfile
 
 Synopsis
@@ -21,13 +24,17 @@ Synopsis
 .. code-block:: bash
 
    paperpush validate biorxiv.sub
+   paperpush validate biorxiv.sub -o              # also save biorxiv_validation.pdf
+   paperpush validate biorxiv.sub --ai            # also run the AI checks via an API
 
-``validate`` reports two severities:
-
-- **Errors** must be fixed before the file can be submitted (for example, a
-  required field left blank, a referenced file that does not exist, or a choice
-  value that isn't one of the venue's allowed options).
-- **Warnings** are worth reviewing but don't block submission.
+``validate`` prints a report of every check, grouped and coloured by what
+happened to it: **failed** (red), **warnings** (red), **not checked** --
+because it could not run here, needs AI, or is not implemented yet (yellow) --
+and **passed** (green). Errors must be fixed before the file can be submitted
+(for example, a required field left blank, a referenced file that does not
+exist, or a choice value that isn't one of the venue's allowed options);
+warnings are worth reviewing but don't block submission. See
+:ref:`how findings are reported <vc-report>` and :doc:`../validation-checks`.
 
 The command exits non-zero if any errors are found, so it fits cleanly into
 scripts and CI.
@@ -35,74 +42,110 @@ scripts and CI.
 What it checks
 --------------
 
-This is a summary. :doc:`../validation-checks` lists every check in detail,
-with its severity and the flag that controls it.
+This is a summary, grouped as in ``paperpush validate --help``.
+:doc:`../validation-checks` lists every check in detail, with its severity and
+the flag that controls it.
 
-- **Required fields** are present and non-empty.
-- **Files exist** — every ``file`` / ``filelist`` path (manuscript, figures,
-  cover letter, supplements) resolves to a real file on disk.
-- **Choice values are valid** — every ``choice`` field holds one of the venue's
-  allowed options, including nested drill-down fields.
-- **Structured fields are well-formed** — for example, author lists parse and
-  mark exactly one corresponding author.
-- **Cited links resolve** — the URLs in the uploaded files are probed, and ones
-  that are definitively broken (404/gone, including a still-private GitHub
-  repository) are reported as warnings.
-- **Reference DOIs point at the right paper** — every DOI in the submission's
-  bibliography is resolved through ``doi.org`` and held against the reference
-  citing it. A DOI that is malformed, cited by two references, unregistered, or
-  registered to a different work — the usual sign of a DOI copied from the wrong
-  reference — is reported as a warning.
+Checks that run without AI
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-  The bibliography is read whichever way the submission ships it. If there is a
-  ``.bib`` file (including one bundled in a source archive), its entries are
-  compared field by field: title, first author, and year. Otherwise the
-  manuscript's own reference list is read — from a PDF's extracted text, LaTeX
-  source, or a compiled ``.bbl`` — and each DOI is compared against the text of
-  the reference entry it sits in, so no ``.bib`` is needed. Only DOIs inside the
-  reference list are compared this way; a dataset DOI in a data-availability
-  sentence is merely checked that it resolves.
-- **Nothing private is about to be published** — the uploaded files are scanned
-  for API keys, passwords, private keys, GPS coordinates in figures,
-  editable-document links, and LaTeX source comments.
-- **The manuscript meets the venue's author guidelines** — the uploads are
-  measured against the rules recorded for the venue in
-  ``manuscript_requirements.json`` (see :doc:`requirements` to print them):
+**Submission form** (:ref:`vc-fields`, :ref:`vc-choices`)
 
-  - the manuscript file's format and size, and its word and page count against
-    the venue's limits, for the article type selected in the ``.sub``. A
-    ``.tex`` manuscript (or a ``.zip`` LaTeX bundle) is compiled to a scratch
-    PDF with ``latexmk`` or ``pdflatex`` for its page count; the source
-    directory is never written to, and without a TeX toolchain the page limit
-    is reported as unchecked;
-  - the section headings and declarations the venue requires (Introduction,
-    Methods, Results, ...; data availability, competing interests, author
-    contributions, ...), found in the manuscript text under any of their usual
-    wordings;
-  - title-page items that leave a trace in the front matter — the title, a
-    corresponding e-mail, an ORCID, a keywords line, a running title, a word
-    count;
-  - abstract, title, running-title, and keyword limits read from the ``.sub``;
-  - each figure's format, file size, resolution (from its metadata, or judged
-    from its pixel width at the venue's print width), colour mode, and print
-    dimensions, and the number of figures, tables, and display items;
-  - supplementary-file format, size, and single-PDF rules; the cover letter;
-    the reference count; the total upload size.
+- Required fields and confirmations
+- Valid options, including nested drill-down fields
+- Field types
+- Item counts
+- Word and character limits
+- URLs
+- Author list (parses, with exactly one corresponding author)
 
-  Measured numbers that exceed a limit are errors; anything that depends on
-  extracting text from a PDF or reading an image is a warning. A rule the
-  portal already enforces through ``submission_forms.json`` (an ``accept`` list, a
-  per-file size cap, a word limit on the field) is reported once, by that
-  check, not again here.
+**Files** (:ref:`vc-files`, :ref:`vc-length`)
 
-- **Nothing is hidden from the reader**: white, invisible, microscopic, or
-  off-page text in the PDF, LaTeX, or Word uploads. A hidden instruction to an
-  AI reviewer (prompt injection) is an error.
-- **The template is unmodified**: for venues with a recorded template layout
-  (ICLR), the manuscript PDF's margins, body font, line spacing, running head,
-  and review line numbers are measured against the official template.
-- **Every author has a usable OpenReview profile**: for OpenReview venues
-  (ICLR, AAAI), using the login stored by :doc:`login`.
+- Files exist
+- Accepted types and sizes
+- Total upload size
+- Portal word and page limits
+
+**Integrity**
+
+- Reachable links (:ref:`vc-links`)
+- Reference DOIs point at the right paper (:ref:`vc-references`)
+- Secrets and private data (:ref:`vc-sensitive`)
+- Hidden text and prompt injection (:ref:`vc-hidden-text`)
+- Anonymity, for double-blind venues (:ref:`vc-anonymity`)
+- OpenReview profiles, for OpenReview venues (:ref:`vc-openreview`)
+
+**Guidelines** (:ref:`vc-guidelines`, measured against
+``manuscript_requirements.json``; see :doc:`requirements`)
+
+- Manuscript format and size
+- Word and page limits, for the article type selected in the ``.sub``
+- Title, abstract, and keyword limits
+- Undefined abbreviations in the abstract
+- Required sections and their order
+- Required statements (data availability, competing interests, ...)
+- Title-page items
+- Separate title page
+- Reference count
+- Citation style (numbered or author-year; numbered in order)
+- DOIs on every reference
+- Preprints and unpublished work
+- Figure, table, and supplementary counts
+- Combined supplementary PDF
+- Cover letter
+- Edits to a mandatory template (:ref:`vc-template`)
+
+**Layout** (:ref:`vc-layout`)
+
+- Template or LaTeX class
+- Page size and margins
+- Body font and size
+- Double spacing
+- Line numbers and page numbers
+- English spelling variant
+
+**Figures** (:ref:`vc-figures`; the attached figure files, or the figures
+embedded in the manuscript when none are attached)
+
+- Resolution (dpi, line-art threshold)
+- Lettering size and typeface in vector figures
+- Panel labels (case, bold, cited panels present)
+- Colour mode
+- Print size
+- Placement
+- Legend length and location
+
+**Citation order** (:ref:`vc-citations`)
+
+- Main, supplementary, and Extended Data figures and tables first cited in
+  order
+- Every one cited
+- None cited that is missing
+
+**.sub vs paper** (:ref:`vc-consistency`; compared word for word)
+
+- Title
+- Abstract
+- Authors (names, order, e-mails, ORCID iDs)
+- Keywords
+- Statements
+
+Checks that need AI
+^^^^^^^^^^^^^^^^^^^
+
+These run with ``--ai``, or through an agent with ``--ai-tasks`` /
+``--ai-results``; otherwise they are listed as not checked (:ref:`vc-ai`).
+
+- Lettering size, typeface, and panel labels in raster figures
+- Title-page items found only by reading (postal address, author footnotes,
+  one-sentence summary, classification, affiliations)
+- Tables pasted as images
+- Reference formatting in the venue's style
+- Template used, for a PDF or Word manuscript
+- The venue's free-text guideline rules
+- Whether every ``.sub`` field agrees with the manuscript in meaning
+
+Guideline rules no check reads are listed as **not implemented**.
 
 The link, reference, sensitive-information, manuscript, hidden-text, and
 OpenReview passes make network requests or read every uploaded file; each can
@@ -156,6 +199,38 @@ Arguments
    ``.sub`` at the cleaned copies to submit them. Needs the optional package:
    ``pip install "paperpush[validate]"``.
 
+``-o [PATH]``, ``--output [PATH]``
+   Also save the report. PDF by default, which keeps the colours; a path ending
+   in ``.html``, ``.md``, or ``.txt`` saves that format instead. With no PATH,
+   writes ``<subfile>_validation.pdf`` next to the ``.sub``.
+
+``--alt-color``
+   Use colour-blind-friendly colours (blue for passed, vermillion for failed,
+   grey for not checked) in the terminal and the saved report.
+
+``--ai``
+   Also run the checks that need a reader's judgement through an LLM API, with
+   the manuscript, figures, and other files attached. Uses whichever of
+   ``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``, or ``GEMINI_API_KEY`` is set and
+   the provider's SDK (``pip install "paperpush[autofill]"``). If the request
+   fails, the report says why and lists those checks as needing AI.
+
+``--provider {anthropic,openai,google}``, ``--model MODEL``
+   With ``--ai``: the provider and model to use (defaults as for
+   :doc:`autofill`).
+
+``--ai-tasks FILE``
+   Write the AI checks to ``FILE`` as JSON -- each with an id, instructions,
+   and the files to read -- for an agent such as Claude Code or Codex to do
+   with its own subscription. The ``paperpush-validate`` Claude skill drives
+   this.
+
+``--ai-results FILE``
+   Merge an agent's verdicts on the AI checks into the report instead of
+   calling an API. ``FILE`` holds ``{"results": [{"id", "status", "details",
+   "evidence"}]}`` with ``status`` one of ``pass``, ``fail``, ``unclear``,
+   ``not_applicable``.
+
 Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags. Use ``-v``
 to see the checks as they run.
 
@@ -177,6 +252,20 @@ Run the field and file checks alone, with no network access:
 .. code-block:: bash
 
    paperpush validate biorxiv.sub --dont-check-links --dont-check-references
+
+Save a colour-blind-friendly HTML report:
+
+.. code-block:: bash
+
+   paperpush validate biorxiv.sub -o report.html --alt-color
+
+Let an agent do the AI checks, then merge its answers:
+
+.. code-block:: bash
+
+   paperpush validate biorxiv.sub --ai-tasks tasks.json
+   # ... the agent writes results.json ...
+   paperpush validate biorxiv.sub --ai-results results.json -o
 
 Clean arXiv LaTeX source and check the result:
 

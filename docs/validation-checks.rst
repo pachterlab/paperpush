@@ -9,27 +9,50 @@ MCP tool ``validate_subfile`` runs them too.
 
    paperpush validate biorxiv.sub
 
+.. _vc-report:
+
 How findings are reported
 -------------------------
 
-Each finding is either an **error** or a **warning**:
+``validate`` prints a report with one line per check, grouped by what happened
+to it:
 
-- **Errors** block submission. They cover things paperpush can measure
-  exactly: a blank required field, a missing file, an invalid option, a word or
-  page count over the limit.
-- **Warnings** are advisory. They cover heuristics over extracted text and
-  images, such as a heading that was not found, a figure that looks
-  low-resolution, or a name that might identify an author. Read each one and
-  decide whether it applies.
+- **Failed** -- the check found an **error**. Errors block submission. They
+  cover things paperpush can measure exactly: a blank required field, a
+  missing file, an invalid option, a word or page count over the limit.
+- **Warnings** -- the check found only **warnings**, which are advisory. They
+  cover heuristics over extracted text and images, such as a heading that was
+  not found, a figure that looks low-resolution, or a name that might identify
+  an author. Read each one and decide whether it applies.
+- **Not checked: could not run** -- the check applies but did not run here:
+  it was switched off with a flag, a tool or optional package is missing
+  (``latexmk``, ``pdfminer.six``), or a file could not be read. The reason is
+  shown.
+- **Not checked: needs AI** -- the check needs someone to look at the files
+  (see :ref:`vc-ai`).
+- **Not checked: not implemented** -- the venue's guidelines state the rule,
+  but paperpush has no check for it yet. Check it by hand.
+- **Passed** -- the check ran and found nothing wrong, often with a note of
+  what it measured ("2 raster figures, lowest 600 dpi").
+- **Not applicable** -- the venue sets no such rule, or the submission has
+  nothing for the check to look at. Listed in one line at the end.
 
-Warnings print first, as ``warning: [field_id] message``. Errors follow, one
-per line, under ``error: N problem(s) in FILE must be fixed before submitting``.
-The field id in brackets tells you which line of the ``.sub`` to edit. It is
-left out when the finding concerns the submission as a whole.
+In the terminal the sections are coloured: green for passed, red for failed
+and warnings, yellow for anything not checked. ``--alt-color`` switches to a
+colour-blind-friendly palette (blue, vermillion, grey), and every line also
+carries a marker (``✔``, ``✖``, ``▲``, ``?``, ``–``), so the status never
+depends on colour alone. ``-o`` saves the same report as a PDF (colours kept),
+or as HTML, Markdown, or plain text when the path ends in ``.html``, ``.md``,
+or ``.txt``.
+
+Each problem reads ``error: [field_id] message`` or ``warning: [field_id]
+message``. The field id in brackets tells you which line of the ``.sub`` to
+edit. It is left out when the finding concerns the submission as a whole.
 
 The exit code is ``0`` when there are no errors, ``1`` when there is at least
 one error, and ``2`` when the ``.sub`` names an unknown venue. That makes it
-easy to use ``validate`` as a gate in CI.
+easy to use ``validate`` as a gate in CI. Warnings and checks that did not run
+never change the exit code.
 
 The passes at a glance
 ----------------------
@@ -82,6 +105,26 @@ The passes at a glance
      - yes
      - ``--dont-check-hidden-text``
      - no
+   * - :ref:`Page layout <vc-layout>`
+     - venues whose guidelines set one
+     - ``--dont-check-manuscript``
+     - no
+   * - :ref:`Figures <vc-figures>`
+     - yes
+     - ``--dont-check-manuscript``
+     - no
+   * - :ref:`Figure and table citation order <vc-citations>`
+     - yes
+     - ``--dont-check-manuscript``
+     - no
+   * - :ref:`.sub matches the manuscript <vc-consistency>`
+     - yes
+     - ``--dont-check-manuscript``
+     - no
+   * - :ref:`Checks that need AI <vc-ai>`
+     - listed; run with ``--ai`` or an agent
+     - ``--ai`` / ``--ai-tasks`` / ``--ai-results``
+     - with ``--ai`` (the provider's API)
    * - :ref:`Modified template <vc-template>`
      - venues with a recorded template layout (ICLR)
      - ``--dont-check-manuscript``
@@ -285,30 +328,179 @@ rules for a venue.
 - **Required sections and declarations**: headings such as Introduction,
   Methods, and Results, and statements such as data availability, competing
   interests, and author contributions. Each is searched for under its usual
-  wordings. A missing one is a warning.
+  wordings. A missing one is a warning. When the guidelines prescribe a
+  **section order**, the headings found must come in that order.
 - **Title page**: items that should leave a trace in the front matter, such as
-  the title, a corresponding e-mail, an ORCID, a keywords line, a running
-  title, and a word count.
+  the title, the authors, a corresponding author and e-mail, an ORCID, a
+  keywords line, a running title, a word, figure, or table count, a telephone
+  number, and the abstract. A postal address, author footnotes, a one-sentence
+  summary, and a classification are looked for by pattern and, if not found,
+  go to an AI check. A separate title-page upload is required when the
+  guidelines ask for one.
 - **Text limits from the .sub**: abstract, title, running-title, and keyword
-  limits.
-- **Figures**: format, file size, resolution (from the image metadata, or
-  estimated from pixel width at the venue's print width), colour mode (for
-  example RGB or CMYK), print dimensions, and the number of figures.
+  limits, and undefined abbreviations in the abstract when the guidelines ban
+  them.
+- **Figures**: format, file size, and the number of figures; resolution,
+  lettering, panel labels, colour mode, print dimensions, and placement are
+  covered under :ref:`vc-figures`.
 - **Tables and display items**: the number of tables, and the combined number
   of figures plus tables.
 - **Supplementary files**: format, size, count, and whether the venue asks for
   a single combined PDF.
-- **Cover letter**: format, and a warning when the guidelines ask for one and
-  the field is empty.
-- **References**: the number of entries in the reference list.
+- **Cover letter**: format, length, and a warning when the guidelines ask for
+  one and the field is empty.
+- **References**: the number of entries in the reference list; numbered versus
+  author-year citations, and numbered citations in order of first citation
+  when the style asks for it; DOIs on every entry when required; and preprints
+  or unpublished work cited where the guidelines bar them. The style's finer
+  points (journal abbreviations, article titles) go to an AI check.
 - **Total upload size**, when the portal does not set its own limit.
 - **Template**: for a venue with a mandatory style file whose layout is
   recorded, the manuscript PDF is measured against it. See :ref:`vc-template`.
+
+Each of the venue's rules with no check behind it is listed under **Not
+checked: not implemented**, and the free-text rules (``notes``) become AI
+checks, so nothing the guidelines state is silently skipped.
 
 Measured numbers over a limit are errors. Checks that depend on extracting text
 from a PDF or reading an image are warnings. A rule the portal already enforces
 through ``submission_forms.json``, such as an ``accept`` list, a per-file size cap, or a
 field word limit, is reported only once, by that check.
+
+.. _vc-layout:
+
+Page layout
+-----------
+
+When the guidelines set a page layout (``manuscript`` in
+``manuscript_requirements.json``), the manuscript is measured against it:
+
+- **Template** (``template_required``, ``latex_class``): LaTeX source must load
+  the named class or style. A Word file reports the template it is attached
+  to; a PDF's template can only be judged by eye, so that becomes an AI check.
+- **Page size** (``page_size``), **margins** (``margins_mm``), **body text
+  size** (``font_size_pt``), and **body font** (``font``). A font rule is read
+  from its wording: "Arial, Calibri, or Times New Roman" allows those three;
+  "Helvetica or a similar typeface" allows any sans-serif; "Times and Symbol
+  fonts only" also flags any other text font. Metric clones count as the font
+  they copy (Nimbus Roman and TeX Gyre Termes are Times; Arimo and Nimbus Sans
+  are Arial/Helvetica).
+- **Double spacing** (``double_spacing``): baselines at least 1.8 times the
+  font size apart.
+- **Line numbers** (``line_numbers``) and **page numbers** (``page_numbers``).
+- **Spelling variant** (``language``): American and British spellings are
+  counted (*color/colour*, *center/centre*, *analyze/analyse*, *-ize/-ise*).
+  "American English" flags British forms; "Oxford" spelling flags American
+  forms and *-ise*; "American or British, used consistently" flags a mixture.
+
+How it measures depends on the file. A **PDF** (or LaTeX compiled to one) is
+read glyph by glyph: the body font is the most common size outside figures,
+text lines are glyphs grouped by baseline with page numbers, running heads, and
+margin line numbers split off, margins are the distances from the page edges
+to the text block, and line spacing is the most common gap between baselines.
+A **Word** file's page setup, styles, and run properties are read from its XML.
+**LaTeX** that cannot be compiled is read from its preamble (class options,
+``geometry``, ``setspace``, ``lineno``, font packages). All findings are
+warnings. Reading PDFs needs the optional ``validate`` extra.
+
+.. _vc-figures:
+
+Figures
+-------
+
+The figures checked are the attached figure files or, when the ``.sub``
+attaches none, the figures embedded in the manuscript: images and vector
+drawings placed in a PDF (LaTeX's ``\includegraphics`` of a PDF is a vector
+drawing whose lettering can be read), or pictures in a Word file.
+
+- **Resolution** (``min_dpi``, ``min_dpi_line_art``): a raster figure's pixels
+  over its printed width. An attached file's width comes from its resolution
+  metadata, else the venue's maximum print width; an embedded image's from its
+  size on the page. An image with only a few flat colours is line art and is
+  held to the line-art minimum.
+- **Lettering size** (``min_font_size_pt``, ``max_font_size_pt``) and
+  **typeface** (``font``): measured from the glyphs of PDF and SVG figures,
+  scaled to the venue's maximum print width, so the sizes are the printed ones.
+  Single-letter panel labels are exempt from the maximum. A rule that asks for
+  embedded fonts is checked against each PDF figure.
+- **Panel labels** (``multipanel_labels``): single letters, a, b, c..., drawn
+  as large as the lettering. Their case and weight are compared with the rule,
+  the text's panel citations ("Fig. 2a-c") are compared with the case, and a
+  panel the text cites but the figure does not label is reported.
+- **Colour mode and print size** of attached raster files, and **placement**
+  (``placement``, ``manuscript.figures_placement``, ``single_file``): figures
+  as separate files, in the manuscript, or after the references.
+
+The lettering of a raster figure is pixels, so its size, typeface, and panel
+labels go to an AI check, with the minimum size given as a fraction of the
+image width so it can be judged at any zoom.
+
+.. _vc-citations:
+
+Figure and table citation order
+-------------------------------
+
+Every figure and table should be cited, and numbered in the order the text
+first cites it. The manuscript text is searched for citations ("Fig. 2",
+"Figures 3-5", "Table 1", "Supplementary Fig. S4", "Extended Data Fig. 1") and
+captions (a line that starts ``Figure 2.`` or ``Fig. 2 |``). Each series -- main,
+supplementary, and Extended Data figures and tables -- is checked for an item
+first cited before a lower-numbered one, an item with a caption or attached
+file that is never cited, and a citation of an item that does not exist.
+Captions in the supplementary files count as supplementary items. A LaTeX
+source that cannot be compiled is read through its ``\label``/``\ref`` pairs.
+The citation pass ignores the reference list.
+
+Figure legends are checked against ``legend_max_words`` and
+``legends_location`` (after the references, at the end, or with each figure).
+
+.. _vc-consistency:
+
+The ``.sub`` matches the manuscript
+-----------------------------------
+
+The values typed into the portal should say what the paper says. Each is
+compared word for word, ignoring case, punctuation, and line breaks:
+
+- the **title** against the manuscript's first pages (and a running title
+  against a "Running title:" line);
+- the **abstract** and free-text **statements** (data and code availability,
+  competing interests, author contributions, funding, acknowledgements) are
+  located in the manuscript by their wording and aligned with it;
+- each **author**'s surname, with a first name or initial, must appear in the
+  front matter in the ``.sub``'s order; e-mail addresses and ORCID iDs printed
+  there must agree;
+- the **keywords** against the manuscript's "Keywords:" line, as sets.
+
+An identical value passes. A near match is a warning that lists the first
+differing words ("'twelve' in the .sub vs 'ten' in the manuscript"); a value
+the manuscript does not contain is a warning too.
+
+.. _vc-ai:
+
+Checks that need AI
+-------------------
+
+Some rules can only be judged by reading the files the way a person does: the
+lettering inside raster figures, a postal address on the title page, whether a
+table is an image, the free-text rules each venue's guidelines carry (the
+``notes`` in ``manuscript_requirements.json``), and whether every ``.sub``
+field agrees with the manuscript in meaning. These are listed as **needs AI**
+unless one of these runs them:
+
+- ``--ai``: one request to an LLM provider, whichever of
+  ``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``, or ``GEMINI_API_KEY`` is set
+  (``--provider`` and ``--model`` choose), with the files attached. Needs the
+  provider's SDK: ``pip install "paperpush[autofill]"``.
+- An agent, with its own subscription and no API key: ``--ai-tasks FILE``
+  writes the tasks (id, instructions, files to read) as JSON; the agent answers
+  each with ``pass``, ``fail``, ``unclear``, or ``not_applicable``; and
+  ``--ai-results FILE`` merges its answers. The ``paperpush-validate`` Claude
+  skill does exactly this, and the MCP server offers ``validation_ai_tasks`` and
+  ``validate_subfile(ai_results=...)``.
+
+An AI verdict is marked "(AI)" in the report. A failed AI check is a warning:
+it is a judgement, not a measurement, so it never blocks submission.
 
 .. _vc-links:
 

@@ -1,0 +1,22 @@
+# Render Blueprint for the paperpush website. In the Render dashboard choose
+# New > Blueprint and point it at this repository; Render builds the Dockerfile.
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: paperpush
+    runtime: docker
+    plan: free
+    branch: main
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      # Visitors supply their own API keys for AI features.
+      - key: PAPERPUSH_WEB_AI
+        value: "1"
+      # Stop the server fetching links and DOIs found in uploaded files.
+      - key: PAPERPUSH_WEB_NETWORK_CHECKS
+        value: "0"
+      - key: PAPERPUSH_WEB_TTL_HOURS
+        value: "24"
+      - key: PAPERPUSH_WEB_MAX_WORKSPACE_MB
+        value: "200"

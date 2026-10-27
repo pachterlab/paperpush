@@ -1,0 +1,51 @@
+# paperpush submission file for cvpr_2027  -*- mode: yaml -*-
+# IEEE/CVF Conference on Computer Vision and Pattern Recognition 2027
+#
+# Edit the values below, then run:  paperpush submit cvpr_2027.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: cvpr_2027
+# submission guide: https://cvpr.thecvf.com/Conferences/2027/AuthorGuidelines
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript.
+title: 
+
+# Abstract (textarea, REQUIRED)
+#   The abstract as it appears in the manuscript.
+abstract: |
+  
+
+# Keywords (text, optional)
+#   Optional. Comma-separated keywords, as listed in the manuscript.
+keywords: 
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). Mark exactly one author as the corresponding author.
+authors: |
+  
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript (PDF, Word, or LaTeX source).
+manuscript_file: 
+
+# Figure files (filelist, optional)
+#   Optional. One figure file per line as 'path | label' (label optional).
+figure_files: |
+  
+
+# Table files (filelist, optional)
+#   Optional. One table file per line as 'path | label' (label optional).
+table_files: |
+  
+
+# Supplementary files (filelist, optional)
+#   Optional. One supplementary file per line as 'path | label' (label optional).
+supplementary_files: |
+  
+
+# Cover letter (file, optional)
+#   Optional. Path to the cover letter.
+cover_letter: 
+
+# vim: set filetype=yaml :

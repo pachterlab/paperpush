@@ -189,9 +189,42 @@ manuscript is compiled with `latexmk`/`pdflatex` for its page count when a
 toolchain is installed. To see the rules before you fill anything, run
 `paperpush requirements <venue>` (or read `manuscript_requirements` in the
 MCP `describe_venue` result), and pick the article type in `values.json`
-accordingly, since it selects which limits apply. Warnings from this pass are
-heuristics over extracted text and images: relay them to the user as things to
-confirm, not as blockers. `--dont-check-manuscript` skips the pass.
+accordingly, since it selects which limits apply. The same pass checks the page
+layout (template, margins, font, spacing, line/page numbers, spelling variant),
+the figures (resolution, lettering size and typeface, panel labels -- attached
+files, or the figures embedded in the manuscript when none are attached), that
+figures and tables are cited in order, and that the title, abstract, authors,
+keywords, and statements in the `.sub` match the manuscript. Warnings from this
+pass are heuristics over extracted text and images: relay them to the user as
+things to confirm, not as blockers. `--dont-check-manuscript` skips the pass.
+
+## The report, and the checks you run yourself
+
+`validate` reports every check as passed, failed, warning, could not run, needs
+AI, not implemented, or not applicable (MCP: `checks` in the `validate_subfile`
+result). `-o` saves the report (PDF by default; `.html`/`.md`/`.txt` by
+extension); `--alt-color` is the colour-blind-friendly palette.
+
+Checks that need a reader's judgement -- lettering in raster figures, a postal
+address on the title page, tables pasted as images, the venue's free-text
+guideline rules, whether each `.sub` field means what the manuscript says --
+come back as **needs AI**. Do them yourself rather than asking the user for an
+API key:
+
+1. `paperpush validate <abs .sub> --ai-tasks <scratch>/tasks.json` (MCP:
+   `validation_ai_tasks`). Each task has an `id`, `instructions`, and the
+   `files` to read.
+2. Read the files and judge each task: `pass`, `fail` (say exactly what and
+   where), `unclear`, or `not_applicable`. Figure tasks give the minimum
+   lettering size as a fraction of the image width; measure against it.
+3. Write `{"results": [{"id", "status", "details", "evidence"}]}` and run
+   `paperpush validate <abs .sub> --ai-results <that file>` (MCP:
+   `validate_subfile(ai_results=[...])`).
+
+An AI `fail` is a warning, never a blocking error; do not mark a task `pass`
+you could not verify. With an API key, `paperpush validate --ai` does the same
+through the provider's API. The Claude skill `paperpush-validate` walks
+through these steps.
 
 ## Double-blind venues are checked for identifying information
 

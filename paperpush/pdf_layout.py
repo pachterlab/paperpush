@@ -16,6 +16,7 @@ once (see :func:`available`).
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -49,7 +50,9 @@ class Glyph:
     in ``colorspace`` (``DeviceGray``/``DeviceRGB``/``DeviceCMYK``, or another
     space's name), ``None`` when it is a pattern or unknown. ``render`` is the
     PDF text rendering mode (3 = invisible, 7 = clip only). ``in_figure`` marks
-    a glyph drawn inside a Form XObject -- in a LaTeX paper, an included figure.
+    a glyph drawn inside a Form XObject -- in a LaTeX paper, an included figure
+    -- and ``figure`` numbers that XObject on its page (1-based; 0 outside one),
+    matching :attr:`Page.figure_boxes`.
     """
 
     text: str
@@ -63,6 +66,34 @@ class Glyph:
     colorspace: str
     render: int
     in_figure: bool
+    figure: int = 0
+
+
+@dataclass(frozen=True)
+class ImageBox:
+    """One raster image drawn on a page: where, how large, and its pixel size.
+
+    ``figure`` is the 1-based index of the Form XObject (in
+    :attr:`Page.figure_boxes`) it was drawn in. The effective resolution of the
+    image as printed is ``pixels / (box width in points / 72)``.
+    """
+
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    width_px: int
+    height_px: int
+    name: str
+    figure: int = 0
+
+    @property
+    def dpi(self) -> float | None:
+        width_in = (self.x1 - self.x0) / 72.0
+        height_in = (self.y1 - self.y0) / 72.0
+        if width_in <= 0 or height_in <= 0 or not self.width_px or not self.height_px:
+            return None
+        return min(self.width_px / width_in, self.height_px / height_in)
 
 
 @dataclass(frozen=True)
@@ -76,6 +107,10 @@ class Page:
     # Boxes painted with something other than white -- filled shapes and
     # images -- that light-coloured text can legitimately sit on.
     backgrounds: tuple[tuple[float, float, float, float], ...] = ()
+    # Raster images drawn on the page, and the boxes of its Form XObjects
+    # (LaTeX's included figures; every image is drawn inside one, too).
+    images: tuple[ImageBox, ...] = ()
+    figure_boxes: tuple[tuple[float, float, float, float], ...] = ()
 
     def on_background(self, glyph: Glyph) -> bool:
         """Whether the glyph's centre lies on a painted (non-white) background."""
@@ -121,7 +156,8 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
                 item.paperpush_render = self.render_mode
             return advance
 
-    def walk(item, in_figure: bool, out: list[Glyph], backgrounds: list) -> None:
+    def walk(item, figure: int, out: list[Glyph], backgrounds: list, images: list, boxes: list) -> None:
+        in_figure = figure > 0
         for obj in item:
             if isinstance(obj, LTChar):
                 cs = getattr(getattr(obj, "ncs", None), "name", "") or ""
@@ -138,12 +174,20 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
                         colorspace=str(cs),
                         render=getattr(obj, "paperpush_render", 0),
                         in_figure=in_figure,
+                        figure=figure,
                     )
                 )
             elif isinstance(obj, LTFigure):
-                walk(obj, True, out, backgrounds)
+                if not in_figure:
+                    boxes.append(tuple(obj.bbox))
+                walk(obj, figure or len(boxes), out, backgrounds, images, boxes)
             elif isinstance(obj, LTImage):
                 backgrounds.append(obj.bbox)
+                width_px, height_px = (getattr(obj, "srcsize", None) or (0, 0))[:2]
+                try:
+                    images.append(ImageBox(*obj.bbox, int(width_px or 0), int(height_px or 0), str(getattr(obj, "name", "")), figure))
+                except (TypeError, ValueError):
+                    pass
             elif isinstance(obj, LTCurve) and getattr(obj, "fill", False):
                 color = obj.non_stroking_color
                 fill = (float(color),) if isinstance(color, (int, float)) else tuple(color) if isinstance(color, (tuple, list)) else None
@@ -166,9 +210,11 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
                     continue
                 glyphs: list[Glyph] = []
                 backgrounds: list = []
-                walk(layout, False, glyphs, backgrounds)
+                images: list[ImageBox] = []
+                boxes: list = []
+                walk(layout, 0, glyphs, backgrounds, images, boxes)
                 x0, y0, x1, y1 = layout.bbox
-                pages.append(Page(number, x1 - x0, y1 - y0, x0, y0, tuple(glyphs), tuple(backgrounds)))
+                pages.append(Page(number, x1 - x0, y1 - y0, x0, y0, tuple(glyphs), tuple(backgrounds), tuple(images), tuple(boxes)))
     except Exception:
         logger.debug("could not read glyphs from %s", path, exc_info=True)
         return None
@@ -193,6 +239,22 @@ def read_pages(path: Path, max_pages: int = MAX_PAGES) -> list[Page] | None:
         return None
     pages = _cached(str(path.resolve()), stat.st_mtime_ns, stat.st_size, max_pages)
     return None if pages is None else list(pages)
+
+
+def join_glyphs(glyphs) -> str:
+    """The text of glyphs on one line (sorted by x), with spaces where the gaps are.
+
+    pdfminer reports no space characters when it is not doing layout analysis,
+    so a word break is inferred from a gap wider than a fifth of the font size.
+    """
+    out: list[str] = []
+    previous = None
+    for g in glyphs:
+        if previous is not None and g.x0 - previous.x1 > 0.2 * max(g.size, previous.size) and not g.text.isspace():
+            out.append(" ")
+        out.append(g.text)
+        previous = g
+    return re.sub(r"\s+", " ", "".join(out)).strip()
 
 
 def is_near_white(glyph: Glyph, threshold: float = 0.95) -> bool:

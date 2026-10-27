@@ -31,6 +31,11 @@ from paperpush.subfile import SubFile
 from paperpush.validate import ERROR, WARNING, Issue, parse_authors, validate
 
 
+def _both(captured) -> str:
+    """stdout and stderr together: the report prints to stdout, notes and the final hint to stderr."""
+    return captured.out + captured.err
+
+
 @pytest.fixture(autouse=True)
 def _clear_model_cache():
     """Drop the per-slug pydantic model cache so each test's hand-built venue
@@ -1099,7 +1104,7 @@ def test_cli_validate_reports_errors(tmp_path, monkeypatch, capsys):
     sub = _write_sub(tmp_path / "biorxiv.sub", "@venue: biorxiv\nms:\n")
 
     rc = main(["validate", str(sub)])
-    err = capsys.readouterr().err
+    err = _both(capsys.readouterr())
 
     assert rc == 1
     assert "must be" in err
@@ -1122,10 +1127,10 @@ def test_cli_validate_checks_sensitive_by_default(tmp_path, monkeypatch, capsys)
     captured = capsys.readouterr()
 
     assert rc == 0
-    assert "AWS access key" in captured.err
-    assert "LaTeX" in captured.err
+    assert "AWS access key" in _both(captured)
+    assert "LaTeX" in _both(captured)
     # The raw secret must not be echoed to the terminal.
-    assert "AKIAIOSFODNN7EXAMPLE" not in captured.err
+    assert "AKIAIOSFODNN7EXAMPLE" not in _both(captured)
 
 
 def test_cli_validate_dont_check_sensitive_skips_scan(tmp_path, monkeypatch, capsys):
@@ -1141,7 +1146,7 @@ def test_cli_validate_dont_check_sensitive_skips_scan(tmp_path, monkeypatch, cap
     captured = capsys.readouterr()
 
     assert rc == 0
-    assert "AWS access key" not in captured.err
+    assert "AWS access key" not in _both(captured)
 
 
 def test_cli_validate_checks_links_by_default(tmp_path, monkeypatch, capsys):
@@ -1158,7 +1163,7 @@ def test_cli_validate_checks_links_by_default(tmp_path, monkeypatch, capsys):
     sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {tex}\n")
 
     rc = main(["validate", str(sub)])
-    err = capsys.readouterr().err
+    err = _both(capsys.readouterr())
 
     assert rc == 0
     assert "not reachable" in err
@@ -1179,7 +1184,7 @@ def test_cli_validate_dont_check_links_skips_probes(tmp_path, monkeypatch, capsy
     sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {tex}\n")
 
     rc = main(["validate", str(sub), "--dont-check-links"])
-    err = capsys.readouterr().err
+    err = _both(capsys.readouterr())
 
     assert rc == 0
     assert "example.com/gone-page" not in err
@@ -1200,7 +1205,7 @@ def test_cli_validate_checks_references_by_default(tmp_path, monkeypatch, capsys
     sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {bib}\n")
 
     rc = main(["validate", str(sub)])
-    err = capsys.readouterr().err
+    err = _both(capsys.readouterr())
 
     assert rc == 0
     assert "lovelace1843" in err
@@ -1225,7 +1230,7 @@ def test_cli_validate_dont_check_references_skips_lookups(tmp_path, monkeypatch,
     sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {bib}\n")
 
     rc = main(["validate", str(sub), "--dont-check-references"])
-    err = capsys.readouterr().err
+    err = _both(capsys.readouterr())
 
     assert rc == 0
     assert "10.1234/abc" not in err
@@ -1246,7 +1251,7 @@ def test_cli_validate_checks_the_manuscript_reference_list(tmp_path, monkeypatch
     sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {doc}\n")
 
     rc = main(["validate", str(sub)])
-    err = capsys.readouterr().err
+    err = _both(capsys.readouterr())
 
     assert rc == 0
     assert "10.1093/mind/lix.236.433" in err
@@ -1267,11 +1272,11 @@ def test_cli_validate_reference_problems_do_not_block(tmp_path, monkeypatch, cap
     sub = _write_sub(tmp_path / "biorxiv.sub", f"@venue: biorxiv\nsrc: {bib}\n")
 
     rc = main(["validate", str(sub)])
-    out, err = capsys.readouterr()
+    out = capsys.readouterr().out
 
     assert rc == 0
-    assert "warning:" in err
-    assert "not registered" in err
+    assert "warning:" in out
+    assert "not registered" in out
     assert "passed validation" in out
 
 
@@ -1290,7 +1295,7 @@ def test_cli_validate_arxiv_reminds_to_run_cleaner(tmp_path, monkeypatch, capsys
     sub = _write_sub(tmp_path / "arxiv.sub", f"@venue: arxiv\nmanuscript_file: {tex}\n")
 
     rc = main(["validate", str(sub)])
-    err = capsys.readouterr().err
+    err = _both(capsys.readouterr())
 
     assert rc == 0
     assert "arxiv_latex_cleaner" in err
@@ -1310,7 +1315,7 @@ def test_cli_validate_arxiv_no_reminder_when_source_clean(tmp_path, monkeypatch,
     sub = _write_sub(tmp_path / "arxiv.sub", f"@venue: arxiv\nmanuscript_file: {tex}\n")
 
     rc = main(["validate", str(sub)])
-    err = capsys.readouterr().err
+    err = _both(capsys.readouterr())
 
     assert rc == 0
     assert "arxiv_latex_cleaner" not in err
@@ -1319,14 +1324,14 @@ def test_cli_validate_arxiv_no_reminder_when_source_clean(tmp_path, monkeypatch,
 def test_cli_validate_unknown_venue(tmp_path, capsys):
     sub = _write_sub(tmp_path / "x.sub", "@venue: not_a_real_venue\n")
     rc = main(["validate", str(sub)])
-    err = capsys.readouterr().err
+    err = _both(capsys.readouterr())
     assert rc == 2
     assert "unknown venue" in err
 
 
 def test_cli_validate_missing_file(capsys):
     rc = main(["validate", "/no/such/file.sub"])
-    err = capsys.readouterr().err
+    err = _both(capsys.readouterr())
     assert rc == 1
     assert "cannot read" in err
 

@@ -1,0 +1,56 @@
+# paperpush submission file for european_radiology  -*- mode: yaml -*-
+# European Radiology (Springer / ESR)
+#
+# Edit the values below, then run:  paperpush submit european_radiology.sub
+# Lines starting with '#' are comments and are ignored.
+
+@venue: european_radiology
+# submission guide: https://journals.myesr.org/eur-radiol/for-authors/
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript.
+title: 
+
+# Abstract (textarea, REQUIRED)
+#   The abstract as it appears in the manuscript.
+abstract: |
+  
+
+# Keywords (text, optional)
+#   Optional. Comma-separated keywords, as listed in the manuscript.
+keywords: 
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). Mark exactly one author as the corresponding author.
+authors: |
+  
+
+# Article type (choice, optional)
+#   Selects which of the author guidelines' per-article-type limits apply.
+#   options: Original Article | Original Article (Systematic Review / Meta-Analysis) | Review (including Narrative Review) | Technical Developments | Special Report | Guideline | Statement | Letter to the Editor
+article_type: 
+
+# Manuscript file (file, REQUIRED)
+#   Path to the manuscript (PDF, Word, or LaTeX source).
+manuscript_file: 
+
+# Figure files (filelist, optional)
+#   Optional. One figure file per line as 'path | label' (label optional).
+figure_files: |
+  
+
+# Table files (filelist, optional)
+#   Optional. One table file per line as 'path | label' (label optional).
+table_files: |
+  
+
+# Supplementary files (filelist, optional)
+#   Optional. One supplementary file per line as 'path | label' (label optional).
+supplementary_files: |
+  
+
+# Cover letter (file, optional)
+#   Optional. Path to the cover letter.
+cover_letter: 
+
+# vim: set filetype=yaml :

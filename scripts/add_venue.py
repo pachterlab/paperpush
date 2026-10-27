@@ -423,18 +423,7 @@ def main() -> int:
     if form is not None:
         _scaffold_module(slug)
 
-    print(
-        "\nNext: to support 'paperpush validate', add the venue's author-guideline rules to "
-        "paperpush/manuscript_requirements.json (see DEVELOPMENT.md). Then refresh the README "
-        "table with `python scripts/gen_readme_venues.py`."
-        + (
-            " If this venue needs portal automation and you skipped the scaffold above, copy "
-            "paperpush/venues/template.py to paperpush/venues/<portal>/<slug>.py "
-            "-- naming it after the slug is all the registration it needs."
-            if form is not None
-            else ""
-        )
-    )
+    print("\nNext: to support 'paperpush validate', add the venue's author-guideline rules to " "paperpush/manuscript_requirements.json (see DEVELOPMENT.md). Then refresh the README " "table with `python scripts/gen_readme_venues.py`." + (" If this venue needs portal automation and you skipped the scaffold above, copy " "paperpush/venues/template.py to paperpush/venues/<portal>/<slug>.py " "-- naming it after the slug is all the registration it needs." if form is not None else ""))
     return 0
 
 

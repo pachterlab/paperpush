@@ -785,6 +785,69 @@ def reference_count(path: Path) -> int | None:
     return author_year or None
 
 
+# Where a reference list ends in extracted text: a figure/table caption or a
+# heading that commonly follows it.
+_AFTER_REFERENCES = re.compile(r"^\s*(?:(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?\.?|Table)\s+S?\d+\s*[.:|]|Figure\s+legends?\b|Tables?\s*$|Supplementary\s+(?:information|materials?)\b|Appendix\b|Methods\s*$)", re.IGNORECASE | re.MULTILINE)
+_BIB_ITEM = re.compile(r"\\bibitem\s*(?:\[[^\]]*\])?\s*\{[^}]*\}(.*?)(?=\\bibitem|\\end\s*\{\s*thebibliography|$)", re.DOTALL)
+
+
+def reference_entries(path: Path) -> list[str] | None:
+    """The entries of the manuscript's reference list, as text, or None if none is found.
+
+    LaTeX: the ``\\bibitem`` entries, else the ``.bib`` entries the source names.
+    PDF/Word: the text after the references heading, up to the first caption
+    or closing heading, split into numbered entries ("1.", "[1]") or, failing
+    that, into lines that start like an author-year entry.
+    """
+    from . import document
+
+    doc = document.get(path)
+    if doc.is_tex and doc.pdf is None:
+        source = doc.tex_source
+        if source is None:
+            return None
+        items = [re.sub(r"\s+", " ", m.group(1)).strip() for m in _BIB_ITEM.finditer(source)]
+        if items:
+            return items
+        if path.suffix.lower() == ".tex":
+            names = [n.strip() for m in re.finditer(r"\\(?:bibliography|addbibresource)\s*\{([^}]*)\}", source) for n in m.group(1).split(",")]
+            entries: list[str] = []
+            for name in names:
+                bib = path.parent / (name if name.lower().endswith(".bib") else name + ".bib")
+                try:
+                    text = bib.read_text("utf-8", "replace")
+                except OSError:
+                    continue
+                entries += [e.strip() for e in re.split(r"\n\s*(?=@[A-Za-z]+\s*[{(])", text) if _BIB_ENTRY.match(e)]
+            return entries or None
+        return None
+    text = doc.text
+    if text is None:
+        return None
+    match = _REFERENCE_HEADING.search(text)
+    if match is None:
+        return None
+    tail = text[match.end() :]
+    end = _AFTER_REFERENCES.search(tail)
+    if end:
+        tail = tail[: end.start()]
+    starts = [m.start() for m in _NUMBERED_REF.finditer(tail)]
+    if len(starts) < 2:
+        starts = [m.start() for m in _AUTHOR_YEAR_REF.finditer(tail)]
+    if not starts:
+        return None
+    bounds = starts + [len(tail)]
+    entries: list[str] = []
+    for a, b in zip(bounds, bounds[1:]):
+        entry = re.sub(r"\s+", " ", tail[a:b]).strip()
+        # A short fragment ("1843. 1": a year then a page number) belongs to the entry before.
+        if entries and len(entry) < 25:
+            entries[-1] += " " + entry
+        elif entry:
+            entries.append(entry)
+    return entries
+
+
 # Lines of extracted text that make up the "title page" of a PDF/Word manuscript.
 _TITLE_PAGE_LINES = 80
 

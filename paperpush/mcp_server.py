@@ -63,7 +63,7 @@ from .autofill import field_schema, parse_extraction
 from .database import Venue, get_venue, list_venues
 from .subfile import default_filename, parse as parse_subfile, render_template, write_template
 from .validate import Issue
-from .validate import validate as _run_validate
+from .validate import validate_report as _run_validate_report
 
 logger = logging.getLogger(__name__)
 
@@ -361,8 +361,11 @@ def validate_subfile(
     anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
     check_openreview: bool = True,
+    ai_results: Optional[list[dict[str, Any]]] = None,
+    output: Optional[str] = None,
+    alt_color: bool = False,
 ) -> dict[str, Any]:
-    """Run paperpush's pre-submission checks on a `.sub` file.
+    """Run paperpush's pre-submission checks on a `.sub` file and report every check.
 
     Checks required fields, value types and option sets, length and count
     limits, and that referenced upload files exist, are the right type, and fit
@@ -380,8 +383,12 @@ def validate_subfile(
     `check_manuscript` measures the uploads against the venue's author
     guidelines (`manuscript_requirements.json`, also returned by
     `describe_venue`): manuscript format and length (LaTeX is compiled for a
-    page count), required sections and statements, title-page items, figure
-    format/resolution/count, supplementary rules, and reference count.
+    page count), required sections and statements, title-page items, page
+    layout (page size, margins, body font and size, double spacing, line and
+    page numbers, template, spelling variant), figures (resolution, lettering
+    size and typeface, panel labels, placement, legends), the order figures and
+    tables are cited in, and whether the title, abstract, authors, keywords,
+    and statements in the `.sub` match the manuscript.
     `anonymous` checks a double-blind submission for information identifying
     its authors -- their names, emails, IDs and affiliations from the author
     list, author metadata, home-directory paths, acknowledgments -- in the
@@ -395,20 +402,60 @@ def validate_subfile(
     login -- missing, ambiguous, or inactive profiles, name or email-suffix
     mismatches, no current position (needs network).
 
-    `errors` block submission; `warnings` are advisory. `ok` is true when there
-    are no errors.
+    Some checks need a reader's judgement (lettering in raster figures, the
+    guidelines' free-text rules, whether every `.sub` field says what the
+    manuscript says). They come back with status `needs_ai` and are listed in
+    `ai_tasks`: do each task yourself by reading the files it names, then call
+    this tool again with `ai_results` = `[{"id", "status": "pass"|"fail"|
+    "unclear"|"not_applicable", "details", "evidence"}]` to merge your verdicts
+    (or get the same list from `validation_ai_tasks`).
+
+    `checks` lists every check with its status: passed, failed, warning,
+    unchecked (could not run here), needs_ai, not_implemented, or
+    not_applicable. `errors` block submission; `warnings` are advisory. `ok` is
+    true when there are no errors. `output`, an absolute path ending in .pdf,
+    .html, .md, or .txt, also saves the colour-coded report there
+    (`alt_color` for a colour-blind-friendly palette).
     """
+    from . import report as report_mod
+    from .ai_validate import AiOptions, tasks_payload
+
     path, text, venue = _load_subfile(subfile, manuscript_dir)
-    issues = _run_validate(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview)
-    errors = [i for i in issues if i.is_error]
-    warnings = [i for i in issues if not i.is_error]
-    return {
+    ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
+    result = _run_validate_report(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, ai=ai, subfile_path=str(path))
+    out: dict[str, Any] = {
         "path": str(path),
         "venue": venue.slug,
-        "ok": not errors,
-        "errors": _issue_dicts(errors),
-        "warnings": _issue_dicts(warnings),
+        "ok": result.ok,
+        "errors": _issue_dicts(result.errors),
+        "warnings": _issue_dicts(result.warnings),
+        "counts": result.counts(),
+        "checks": [r.to_dict() for r in result.results],
+        "ai_tasks": tasks_payload([t for t in result.ai_tasks if t.id in {r.id for r in result.by_status(report_mod.NEEDS_AI)}], venue, str(path))["tasks"],
     }
+    if output:
+        saved = report_mod.save(result, report_mod.output_path(str(_resolve(output, manuscript_dir)), str(path)), alt_color=alt_color)
+        out["report"] = str(saved)
+    return out
+
+
+def validation_ai_tasks(subfile: str, manuscript_dir: Optional[str] = None) -> dict[str, Any]:
+    """The validation checks that need a reader's judgement, for you to do yourself.
+
+    Runs the deterministic checks offline (no link, DOI, or OpenReview lookups)
+    to find which judgement checks apply -- lettering in raster figures, the
+    venue's free-text guideline rules, whether each `.sub` field agrees with
+    the manuscript, and so on -- and returns them as tasks: an id, the
+    instructions, and the files to read. Do each one, then pass your verdicts
+    to `validate_subfile` as `ai_results` (`[{"id", "status": "pass"|"fail"|
+    "unclear"|"not_applicable", "details", "evidence"}]`). No API key is
+    needed: you are the reader.
+    """
+    from .ai_validate import tasks_payload
+
+    path, text, venue = _load_subfile(subfile, manuscript_dir)
+    result = _run_validate_report(parse_subfile(text), venue, check_links=False, check_references=False, check_openreview=False, subfile_path=str(path))
+    return tasks_payload(result.ai_tasks, venue, str(path))
 
 
 def autofill_subfile(
@@ -943,6 +990,7 @@ TOOLS = (
     create_subfile,
     read_subfile,
     validate_subfile,
+    validation_ai_tasks,
     autofill_subfile,
     login_status,
     login,
@@ -989,7 +1037,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; call submit_close when the " "author says they are done. It needs a .sub file that passes validation and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; call submit_close when the " "author says they are done. It needs a .sub file that passes validation and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
     )
     for tool in TOOLS:
         server.tool()(tool)

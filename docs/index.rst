@@ -9,6 +9,10 @@ and conferences with just a few commands. Instead of spending hours filling out
 submission portals by hand, point PaperPush at a manuscript directory and a
 target venue, and it fills out the submission form for you.
 
+Prefer not to install anything? The PaperPush website,
+`paperpush.onrender.com <https://paperpush.onrender.com>`_, lets you prepare
+and validate a submission in your browser.
+
 The workflow is five short commands:
 
 .. code-block:: bash

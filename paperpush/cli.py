@@ -626,16 +626,65 @@ def _clean_latex_sources(subfile, venue_def):
     return SubFile(venue=subfile.venue, values=values)
 
 
+# The checks, as listed at the end of 'paperpush validate --help'. Keep in step
+# with docs/validation-checks.rst and "What it checks" in docs/commands/validate.rst.
+_VALIDATE_CHECKS = """\
+checks that run without AI:
+  submission form   required fields and confirmations, valid options, types,
+                    item counts, word/character limits, URLs, author list
+  files             files exist, accepted types and sizes, total upload size,
+                    portal word/page limits
+  integrity         reachable links, reference DOIs, secrets and private data,
+                    hidden text / prompt injection, anonymity (double-blind),
+                    OpenReview profiles
+  guidelines        formats and sizes, word/page limits, title/abstract/keyword
+                    limits, undefined abbreviations in the abstract, required
+                    sections and their order, required statements, title-page
+                    items, separate title page, reference count, citation style
+                    (numbered or author-year, numbered in order), DOIs on every
+                    reference, preprints/unpublished work, figure/table/
+                    supplementary counts, combined supplementary PDF, cover
+                    letter, edits to a mandatory template
+  layout            template or LaTeX class, page size, margins, body font and
+                    size, double spacing, line numbers, page numbers, English
+                    spelling variant
+  figures           resolution (dpi, line-art threshold), lettering size and
+                    typeface in vector figures, panel labels (case, bold, cited
+                    panels present), colour mode, print size, placement,
+                    legend length and location -- attached figure files, or the
+                    figures embedded in the manuscript when none are attached
+  citation order    main, supplementary, and Extended Data figures and tables
+                    first cited in order, all cited, none cited that is missing
+  .sub vs paper     title, abstract, authors (names, order, emails, ORCIDs),
+                    keywords, and statements match the manuscript word for word
+
+checks that need AI (--ai, or an agent via --ai-tasks / --ai-results):
+  lettering size, typeface, and panel labels in raster figures; title-page
+  items found only by reading (postal address, author footnotes, one-sentence
+  summary, classification, affiliations); tables pasted as images; reference
+  formatting in the venue's style; template used, for a PDF or Word manuscript;
+  the venue's free-text guideline rules; whether every .sub field agrees with
+  the manuscript in meaning
+
+Guideline rules no check reads are listed as 'not implemented'. See
+'paperpush requirements VENUE' for a venue's rules.
+"""
+
+
 @_validate
 def _cmd_validate(args: argparse.Namespace) -> int:
-    """Run the pre-submission checks on a .sub file.
+    """Run the pre-submission checks on a .sub file and print the full report.
 
-    This surfaces, as a standalone command, exactly the validation ``submit``
-    performs before it opens the portal: it loads the .sub file, looks up the
-    venue it declares, and reports every required/missing field, missing file,
-    bad option, and malformed value. Exits 0 when the file is ready to submit, 1
-    when it has errors, and 2 when the venue is unknown.
+    Loads the .sub file, looks up the venue it declares, runs every check, and
+    prints a colour-coded report of what passed, what failed, what could not be
+    checked (needs AI, not implemented, or could not run here), and why. With
+    ``--ai`` the checks only an LLM can judge go to a provider's API; with
+    ``--ai-results`` they are taken from an agent's verdicts, and
+    ``--ai-tasks`` writes those tasks out for the agent. ``-o`` saves the report
+    (PDF by default; .html, .md, or .txt by extension). Exits 0 when the file is
+    ready to submit, 1 when it has errors, and 2 when the venue is unknown.
     """
+    from . import report as report_mod
     from .subfile import load
 
     logger.debug("validate: subfile=%r", args.subfile)
@@ -662,10 +711,26 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         if subfile is None:
             return 1
 
-    errors = _report_validation(
+    ai = None
+    if getattr(args, "ai_results", None):
+        from .ai_validate import AiOptions
+
+        try:
+            data = json.loads(Path(args.ai_results).expanduser().read_text(encoding="utf-8"))
+            ai = AiOptions.from_results(data, args.ai_results)
+        except (OSError, ValueError) as exc:
+            print(f"error: cannot read the AI results in {args.ai_results}: {exc}", file=sys.stderr)
+            return 1
+    elif getattr(args, "ai", False):
+        from .ai_validate import AiOptions
+
+        ai = AiOptions.api(provider=args.provider, model=args.model)
+
+    result = validate_report_for(
         subfile,
         venue_def,
         args.subfile,
+        ai=ai,
         check_sensitive=getattr(args, "check_sensitive", True),
         check_links=getattr(args, "check_links", True),
         check_references=getattr(args, "check_references", True),
@@ -674,11 +739,36 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         check_hidden_text=getattr(args, "check_hidden_text", True),
         check_openreview=getattr(args, "check_openreview", True),
     )
-    if errors:
-        print("\nFix the items above, then run 'paperpush validate' again.", file=sys.stderr)
+    alt = getattr(args, "alt_color", False)
+    report_mod.print_report(result, alt_color=alt)
+
+    if getattr(args, "ai_tasks", None):
+        from .ai_validate import tasks_payload
+
+        tasks_path = Path(args.ai_tasks).expanduser()
+        tasks_path.write_text(json.dumps(tasks_payload(result.ai_tasks, venue_def, args.subfile), indent=2) + "\n", encoding="utf-8")
+        print(f"\nWrote {len(result.ai_tasks)} AI check(s) to {tasks_path}; have an agent answer them, then run 'paperpush validate {args.subfile} --ai-results <results.json>'.")
+    if getattr(args, "output", None) is not None:
+        out = report_mod.output_path(args.output, args.subfile)
+        try:
+            report_mod.save(result, out, alt_color=alt)
+        except OSError as exc:
+            print(f"error: could not save the report to {out}: {exc}", file=sys.stderr)
+            return 1
+        print(f"\nSaved the report to {out}")
+
+    if result.errors:
+        print("\nFix the errors above, then run 'paperpush validate' again.", file=sys.stderr)
         return 1
-    print(f"{args.subfile} passed validation for {venue}; ready to submit.")
+    print(f"\n{args.subfile} passed validation for {venue}; ready to submit.")
     return 0
+
+
+def validate_report_for(subfile, venue_def, subfile_path: str, *, ai=None, **flags):
+    """:func:`paperpush.validate.validate_report` for the CLI (a seam for tests)."""
+    from .validate import validate_report
+
+    return validate_report(subfile, venue_def, ai=ai, subfile_path=subfile_path, **flags)
 
 
 @_validate
@@ -1192,7 +1282,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_autofill.add_argument("--dry-run", action="store_true", help="show what would be filled without writing the file")
     p_autofill.set_defaults(func=_cmd_autofill)
 
-    p_validate = sub.add_parser("validate", parents=[verbosity], help="run the pre-submission checks on a .sub file")
+    p_validate = sub.add_parser(
+        "validate",
+        parents=[verbosity],
+        help="run the pre-submission checks on a .sub file",
+        description="Run the pre-submission checks on a .sub file and print a report of every check:\npassed (green), failed (red), and not checked -- could not run, needs AI, or not\nimplemented -- (yellow).",
+        epilog=_VALIDATE_CHECKS,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     p_validate.add_argument("subfile", help="path to the .sub file to check, e.g. biorxiv.sub")
     p_validate.add_argument(
         "--dont-check-links",
@@ -1243,6 +1340,24 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run arxiv_latex_cleaner on the LaTeX source first (every .tex upload, " "and every .zip/.tar/.tar.gz/.tgz bundle containing one), then validate " "the cleaned copies. Strips comments and unreferenced or auxiliary files. " "Cleaned copies are written next to the originals (paper/ -> paper_arXiv/, " "source.zip -> source_arXiv.zip); the originals and the .sub are not " "changed. Needs the optional package: pip install 'paperpush[validate]'.",
     )
+    p_validate.add_argument(
+        "-o",
+        "--output",
+        nargs="?",
+        const="",
+        metavar="PATH",
+        help="also save the report. PDF by default (keeps the colours); give a path ending in .html, .md, or .txt for those formats. With no PATH, writes <subfile>_validation.pdf next to the .sub.",
+    )
+    p_validate.add_argument("--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours (blue for passed, vermillion for failed, grey for not checked) in the terminal and saved report")
+    p_validate.add_argument(
+        "--ai",
+        action="store_true",
+        help="also run the checks only an LLM can judge (lettering in raster figures, the guidelines' free-text rules, whether the .sub's fields say the same as the manuscript, ...) through an LLM API. Needs ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY and the provider's SDK (pip install 'paperpush[autofill]'). Without it those checks are listed as needing AI.",
+    )
+    p_validate.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(--ai) LLM provider; defaults to the first whose API key is set")
+    p_validate.add_argument("--model", help="(--ai) model to use (default: the provider's default, as for autofill)")
+    p_validate.add_argument("--ai-tasks", dest="ai_tasks", metavar="FILE", help="write the AI checks to FILE as JSON, for an agent (Claude Code, Codex, ...) to run with its own subscription; see the paperpush-validate skill")
+    p_validate.add_argument("--ai-results", dest="ai_results", metavar="FILE", help='merge an agent\'s verdicts on the AI checks (JSON: {"results": [{"id", "status": pass|fail|unclear|not_applicable, "details"}]}) into the report instead of calling an API')
     p_validate.set_defaults(func=_cmd_validate, arxiv_latex_cleaner=False, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True, check_anonymous=None, check_hidden_text=True, check_openreview=True)
 
     p_requirements = sub.add_parser("requirements", parents=[verbosity], help="show the manuscript requirements recorded for a venue's author guidelines")

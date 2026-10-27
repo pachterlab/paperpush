@@ -110,7 +110,8 @@ def test_cli_validate_arxiv_latex_cleaner_silences_reminder(tmp_path, monkeypatc
     sub.write_text(f"@venue: arxiv\nmanuscript_file: {src}\n", encoding="utf-8")
 
     rc = main(["validate", str(sub), "--arxiv-latex-cleaner", "--dont-check-links", "--dont-check-references"])
-    err = capsys.readouterr().err
+    captured = capsys.readouterr()
+    err = captured.err + captured.out
 
     assert rc == 0
     assert f"cleaned {src} -> {tmp_path / 'source_arXiv.zip'}" in err

@@ -2,6 +2,8 @@
 
 <!-- [![Documentation Status](https://readthedocs.org/projects/paperpush/badge/?version=latest)](https://paperpush.readthedocs.io/en/latest/?badge=latest) -->
 
+**Website:** [paperpush.onrender.com](https://paperpush.onrender.com) — prepare and validate a submission in your browser, no install needed.
+
 Prepare manuscripts for submission to preprint servers, venues, and conferences with just a few commands. No need to spend hours filling out forms manually. Just provide a manuscript directory and submission venue of interest, and `paperpush` will fill out the submission portal for you.
 
 ## Install
@@ -37,7 +39,7 @@ See [`docs/example-session.md`](docs/example-session.md) for a full worked examp
    - **a.** *fill out manually*
    - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
    - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE.sub`: Use an LLM API (Anthropic, OpenAI, or Google; pick one with `--provider`, otherwise the first one with an API key set is used). Requires that provider's API key and `pip install "paperpush[autofill]"`.
-3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count).
+3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count), its page layout (template, margins, font, spacing, line/page numbers), its figures (resolution, lettering size and typeface, panel labels — in attached files or embedded in the manuscript), the order figures and tables are cited in, and whether the title, abstract, authors, and keywords in the `.sub` match the manuscript. It prints a colour-coded report of what passed (green), failed (red), and was not checked and why (yellow; `--alt-color` for a colour-blind-friendly palette); `-o` also saves it as PDF (or `.html`/`.md`/`.txt`). Checks that need a reader's judgement — lettering in raster figures, the guidelines' free-text rules — run with `--ai` (an Anthropic, OpenAI, or Gemini API key), or with your own Claude Code/Codex subscription through the `paperpush-validate` skill (`--ai-tasks` / `--ai-results`).
 4. `paperpush login VENUE`: log in to the VENUE submission portal.
 5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
 
@@ -105,6 +107,30 @@ pip install 'paperpush[mcp]'
 
 The server exposes the whole pipeline as tools. See [`AGENTS.md`](AGENTS.md) for
 the tool list and the contract agents should follow.
+
+## Website
+
+For authors who would rather not use a terminal, paperpush also runs as a website.
+Pick a venue and the form fills in with every field its portal asks for and the limits
+its author guidelines set. Upload the manuscript (and optionally autofill the rest from
+it), then validate. Simple limits such as word and keyword counts are checked as you
+type. The checks that read your files run when you press **Validate**, and the ones
+that need a reader run with **Validate, extended with AI**. When you are done, download
+the `.sub` (or a zip of the `.sub` plus your files) and run `paperpush submit` on it.
+
+```bash
+pip install 'paperpush[web]'
+paperpush-web --open            # http://127.0.0.1:8000
+```
+
+Autofill and the AI checks require a visitor to enter their provider and API key
+in the page header. The key is sent only with AI requests. Set `PAPERPUSH_WEB_AI=0` to turn them off on a
+public deployment, and `PAPERPUSH_WEB_NETWORK_CHECKS=0` to stop the server from fetching
+the links and DOIs found in uploads. Other settings: `PAPERPUSH_WEB_DATA` (where uploads
+live), `PAPERPUSH_WEB_TTL_HOURS` (default 24), `PAPERPUSH_WEB_MAX_WORKSPACE_MB` (default 500).
+
+The included Dockerfile uses Python 3.12 and installs `paperpush[web,autofill,validate]`.
+Build and run it with `docker build -t paperpush-web .` and `docker run -p 8000:8000 paperpush-web`.
 
 ## For AI agents
 

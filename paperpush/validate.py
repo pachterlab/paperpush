@@ -6,6 +6,11 @@
 warnings are advisory. The checks here are deliberately venue-agnostic and
 driven by the field metadata in the database.
 
+``validate_report`` runs the same checks through a :class:`Checks` collector
+and returns a :class:`~paperpush.report.ValidationReport` recording every
+check, including the ones that passed and the ones that could not run or need
+an AI reader (see :mod:`paperpush.report` and :mod:`paperpush.ai_validate`).
+
 Two layers of checking run, both reporting through the same :class:`Issue`
 list so the author sees one combined, actionable summary:
 
@@ -54,10 +59,21 @@ class Issue:
     level: str  # ERROR or WARNING
     field: str  # field id the issue concerns ("" for file-level)
     message: str
+    # Id of the check that raised it (see paperpush.report); stamped by the
+    # check runner, so producers need not set it.
+    check: str = ""
+    # The message says a rule could not be checked (an unreadable file, a
+    # missing tool), rather than that it was broken.
+    unchecked: bool = False
 
     @property
     def is_error(self) -> bool:
         return self.level == ERROR
+
+
+def unchecked(field: str, message: str) -> Issue:
+    """A WARNING saying a rule went unchecked, and why."""
+    return Issue(WARNING, field, message, unchecked=True)
 
 
 def _truthy_bool(value: str) -> bool:
@@ -150,6 +166,14 @@ def _check_pdf(path: Path, field_id: str) -> list[Issue]:
         )
     # Rough page count: count page objects. Good enough to flag a 0-page file.
     pages = data.count(b"/Type /Page") + data.count(b"/Type/Page")
+    if pages == 0:
+        # PDF 1.5+ can keep its page objects in compressed object streams.
+        try:
+            from pypdf import PdfReader
+
+            pages = len(PdfReader(str(path)).pages)
+        except Exception:  # noqa: BLE001 -- unreadable: leave the count at 0
+            pages = 0
     if pages == 0:
         issues.append(Issue(WARNING, field_id, f"could not detect any pages in {path.name}"))
     return issues
@@ -576,7 +600,8 @@ def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> 
                 Issue(
                     WARNING,
                     field.id,
-                    f"could not count words in {path.name} ('{path.suffix}' is not supported for word counting); the {limit}-word limit was not checked",
+                    unchecked=True,
+                    message=f"could not count words in {path.name} ('{path.suffix}' is not supported for word counting); the {limit}-word limit was not checked",
                 )
             )
         elif words > limit:
@@ -600,7 +625,8 @@ def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> 
                 Issue(
                     WARNING,
                     field.id,
-                    f"could not count pages in {path.name} ({unsupported}); the {limit}-page limit was not checked",
+                    unchecked=True,
+                    message=f"could not count pages in {path.name} ({unsupported}); the {limit}-page limit was not checked",
                 )
             )
         elif pages > limit:
@@ -833,6 +859,86 @@ def _arxiv_cleaner_reminder(venue: Venue, findings) -> list[Issue]:
     ]
 
 
+class NotApplicable(Exception):
+    """Raised by a check that has nothing to look at for this submission."""
+
+
+class Unchecked(Exception):
+    """Raised by a check that applies but cannot run here (the message says why)."""
+
+
+@dataclass
+class Outcome:
+    """What a check function found, plus a note on what it measured."""
+
+    issues: list[Issue]
+    detail: str = ""
+
+
+def _status_for(issues: list[Issue]) -> str:
+    from . import report
+
+    if any(i.is_error for i in issues):
+        return report.FAILED
+    if any(not i.unchecked for i in issues):
+        return report.WARNING
+    if issues:
+        return report.UNCHECKED
+    return report.PASSED
+
+
+class Checks:
+    """Runs checks and keeps one :class:`~paperpush.report.CheckResult` each.
+
+    A check function returns a list of :class:`Issue` (or an :class:`Outcome`
+    carrying a note on what it measured), raises :class:`NotApplicable` when
+    there is nothing for it to look at, or :class:`Unchecked` when it cannot
+    run. An unexpected exception is logged and recorded as unchecked, so one
+    broken heuristic never hides the rest of the report.
+    """
+
+    def __init__(self) -> None:
+        from . import report
+
+        self._report = report
+        self.results: list = []
+        self.ai_tasks: list = []
+
+    def run(self, check_id: str, title: str, category: str, fn, *args, **kwargs):
+        report = self._report
+        try:
+            out = fn(*args, **kwargs)
+        except NotApplicable as exc:
+            return self.record(check_id, title, category, report.NOT_APPLICABLE, detail=str(exc))
+        except Unchecked as exc:
+            return self.record(check_id, title, category, report.UNCHECKED, detail=str(exc))
+        except Exception as exc:  # noqa: BLE001 -- report it, keep validating
+            logger.warning("check %s failed to run: %s", check_id, exc)
+            logger.debug("check %s traceback", check_id, exc_info=True)
+            return self.record(check_id, title, category, report.UNCHECKED, detail=f"the check itself failed ({type(exc).__name__}: {exc}); please report this")
+        if out is None:
+            out = Outcome([])
+        elif isinstance(out, list):
+            out = Outcome(out)
+        return self.record(check_id, title, category, _status_for(out.issues), issues=out.issues, detail=out.detail)
+
+    def record(self, check_id: str, title: str, category: str, status: str, *, issues: list[Issue] | None = None, detail: str = "", source: str = ""):
+        from dataclasses import replace
+
+        stamped = [replace(i, check=i.check or check_id) for i in (issues or [])]
+        result = self._report.CheckResult(id=check_id, title=title, category=category, status=status, issues=stamped, detail=detail, source=source)
+        self.results.append(result)
+        return result
+
+    def needs_ai(self, task) -> None:
+        """Queue an :class:`~paperpush.ai_validate.AiTask`; it is resolved after the deterministic checks."""
+        self.ai_tasks.append(task)
+
+
+def _off(flag: str) -> Unchecked:
+    return Unchecked(f"switched off ({flag})")
+
+
 def validate(
     subfile: SubFile,
     venue: Venue,
@@ -850,7 +956,42 @@ def validate(
     Combines schema-level checks (allowed options, file types, booleans, and
     stray fields, via pydantic) with required-field, file-existence, and
     author-list checks. Every problem is reported, so the author can fix them
-    in one pass.
+    in one pass. This is the flat list of problems from
+    :func:`validate_report`, which also records the checks that passed or did
+    not run; see it for what each flag does.
+    """
+    return validate_report(
+        subfile,
+        venue,
+        check_sensitive=check_sensitive,
+        check_links=check_links,
+        check_references=check_references,
+        check_manuscript=check_manuscript,
+        check_anonymous=check_anonymous,
+        check_hidden_text=check_hidden_text,
+        check_openreview=check_openreview,
+    ).issues()
+
+
+def validate_report(
+    subfile: SubFile,
+    venue: Venue,
+    *,
+    check_sensitive: bool = True,
+    check_links: bool = True,
+    check_references: bool = True,
+    check_manuscript: bool = True,
+    check_anonymous: Optional[bool] = None,
+    check_hidden_text: bool = True,
+    check_openreview: bool = True,
+    ai=None,
+    subfile_path: str = "",
+):
+    """Run every check on ``subfile`` and return a :class:`~paperpush.report.ValidationReport`.
+
+    The report holds one entry per check -- passed, failed, warning, could not
+    run, needs AI, not implemented, or not applicable -- so the author sees what
+    was verified as well as what is wrong.
 
     When ``check_sensitive`` is set (the default), the referenced upload files
     are scanned for information that was never meant to be shared -- secrets, GPS
@@ -868,7 +1009,12 @@ def validate(
     recorded in ``manuscript_requirements.json`` -- formats, length, required
     sections and statements, title-page items, figure resolution, reference
     count (see :mod:`paperpush.requirements_check`); a LaTeX manuscript is
-    compiled to a scratch PDF for its page count.
+    compiled to a scratch PDF for its page count. The same switch covers the
+    page layout (:mod:`paperpush.layout_check`), the figures' resolution,
+    lettering, and type (:mod:`paperpush.figure_check`), the order figures and
+    tables are cited in (:mod:`paperpush.citation_check`), and whether the
+    title, abstract, authors, keywords, and statements in the ``.sub`` match
+    the manuscript (:mod:`paperpush.consistency`).
 
     ``check_anonymous`` scans the submission for information identifying its
     authors, including every linked anonymous.4open.science repository (see
@@ -881,7 +1027,14 @@ def validate(
     reviewers as errors (see :func:`_hidden_text_issues`). ``check_openreview``
     (default on; network) looks up each author's OpenReview profile for venues
     submitted through OpenReview (see :func:`_openreview_profile_issues`).
+
+    ``ai`` (an :class:`~paperpush.ai_validate.AiOptions`) decides what happens
+    to the checks only an LLM can judge: run them through a provider's API,
+    take an agent's answers from a results file, or (None) list them as
+    needing AI.
     """
+    from . import report
+
     if check_anonymous is None:
         check_anonymous = venue.anonymous
     logger.info(
@@ -896,25 +1049,96 @@ def validate(
         check_hidden_text,
         check_openreview,
     )
-    issues: list[Issue] = list(_schema_issues(venue, subfile.values))
     values = subfile.values
+    checks = Checks()
 
-    issues.extend(_upload_size_issues(venue, values))
+    form = "Submission form"
+    checks.run("form.schema", "Field values have the right type and known field ids", form, _schema_issues, venue, values)
+    _field_checks(checks, venue, values)
+    checks.run("files.total_size", "Combined upload size", "Files", _total_size_check, venue, values)
+
+    integrity = "Integrity"
     if check_links:
-        issues.extend(_link_issues(venue, values))
+        checks.run("integrity.links", "Links cited in the files are reachable", integrity, _link_issues, venue, values)
+    else:
+        checks.record("integrity.links", "Links cited in the files are reachable", integrity, report.UNCHECKED, detail="switched off (--dont-check-links)")
     if check_references:
-        issues.extend(_reference_issues(venue, values))
+        checks.run("integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values)
+    else:
+        checks.record("integrity.dois", "Reference DOIs match the works they cite", integrity, report.UNCHECKED, detail="switched off (--dont-check-references)")
     if check_sensitive:
-        issues.extend(_sensitive_issues(venue, values))
-    if check_manuscript:
-        issues.extend(_manuscript_requirement_issues(venue, values))
+        checks.run("integrity.sensitive", "No secrets or private information in the files", integrity, _sensitive_issues, venue, values)
+    else:
+        checks.record("integrity.sensitive", "No secrets or private information in the files", integrity, report.UNCHECKED, detail="switched off (--dont-check-for-sensitive-info)")
     if check_anonymous:
-        issues.extend(_anonymity_issues(venue, values))
+        checks.run("integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, _anonymity_issues, venue, values)
+    else:
+        checks.record("integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, report.NOT_APPLICABLE, detail="the venue is not double-blind (use --anonymous to check anyway)")
     if check_hidden_text:
-        issues.extend(_hidden_text_issues(venue, values))
-    issues.extend(_pdf_reader_issues(venue, values, check_hidden_text=check_hidden_text, check_manuscript=check_manuscript))
-    if check_openreview:
-        issues.extend(_openreview_profile_issues(venue, values))
+        checks.run("integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, _hidden_text_issues, venue, values)
+    else:
+        checks.record("integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, report.UNCHECKED, detail="switched off (--dont-check-hidden-text)")
+    pdf_reader = _pdf_reader_issues(venue, values, check_hidden_text=check_hidden_text, check_manuscript=check_manuscript)
+    if pdf_reader:
+        checks.record("integrity.pdf_reader", "PDF glyph reader (pdfminer.six) available", integrity, report.UNCHECKED, issues=[replace_unchecked(i) for i in pdf_reader])
+    from . import openreview_profiles
+
+    if not openreview_profiles.applies(venue):
+        checks.record("integrity.openreview", "Authors' OpenReview profiles", integrity, report.NOT_APPLICABLE, detail="the venue is not submitted through OpenReview")
+    elif check_openreview:
+        checks.run("integrity.openreview", "Authors' OpenReview profiles", integrity, _openreview_profile_issues, venue, values)
+    else:
+        checks.record("integrity.openreview", "Authors' OpenReview profiles", integrity, report.UNCHECKED, detail="switched off (--dont-check-openreview-profiles)")
+
+    if check_manuscript:
+        from . import citation_check, consistency, figure_check, layout_check, requirements_check
+
+        requirements_check.run_checks(checks, venue, values)
+        layout_check.run_checks(checks, venue, values)
+        figure_check.run_checks(checks, venue, values)
+        citation_check.run_checks(checks, venue, values)
+        consistency.run_checks(checks, venue, values)
+        requirements_check.not_implemented(checks, venue, values)
+    else:
+        checks.record("guidelines", "Manuscript checked against the author guidelines", "Guidelines", report.UNCHECKED, detail="switched off (--dont-check-manuscript)")
+
+    from . import ai_validate
+
+    tasks = ai_validate.resolve(checks, venue, values, ai) if check_manuscript else []
+
+    result = report.ValidationReport(venue=venue.slug, subfile=subfile_path, results=checks.results, ai_tasks=tasks)
+    if ai is not None:
+        result.ai = ai.description
+        result.ai_error = ai.error
+    errors = len(result.errors)
+    logger.info(
+        "Validated %s subfile: %d issue(s) (%d error(s), %d warning(s))",
+        venue.slug,
+        len(result.issues()),
+        errors,
+        len(result.issues()) - errors,
+    )
+    return result
+
+
+def replace_unchecked(issue: Issue) -> Issue:
+    from dataclasses import replace
+
+    return replace(issue, unchecked=True)
+
+
+def _total_size_check(venue: Venue, values: dict[str, str]) -> list[Issue]:
+    if not venue.max_upload_mb:
+        raise NotApplicable("the portal states no combined upload limit")
+    return _upload_size_issues(venue, values)
+
+
+def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
+    """The per-field checks, each recorded as its own check in the report."""
+    from . import report
+
+    buckets: dict[str, list[Issue]] = {key: [] for key in ("required", "options", "counts", "lengths", "urls", "uploads", "manuscript_length", "authors", "subfields")}
+    applied: set[str] = {"required"}
 
     for field in venue.fields:
         raw = values.get(field.id, "")
@@ -940,15 +1164,15 @@ def validate(
         # plain required yes/no question only needs an answer.
         if required and not present:
             if field.type == "boolean" and field.confirm:
-                issues.append(Issue(ERROR, field.id, f"{field.label} must be confirmed (set to yes)"))
+                buckets["required"].append(Issue(ERROR, field.id, f"{field.label} must be confirmed (set to yes)"))
             elif field.type == "boolean":
-                issues.append(Issue(ERROR, field.id, f"{field.label} must be answered (yes or no)"))
+                buckets["required"].append(Issue(ERROR, field.id, f"{field.label} must be answered (yes or no)"))
             elif field.required_if:
                 trigger = trigger_field.label if trigger_field is not None else field.required_if
                 when = "is yes" if trigger_field is not None and trigger_field.type == "boolean" else "is provided"
-                issues.append(Issue(ERROR, field.id, f"{field.label} is required when {trigger} {when}"))
+                buckets["required"].append(Issue(ERROR, field.id, f"{field.label} is required when {trigger} {when}"))
             else:
-                issues.append(Issue(ERROR, field.id, f"{field.label} is required but empty"))
+                buckets["required"].append(Issue(ERROR, field.id, f"{field.label} is required but empty"))
             continue
 
         if not present:
@@ -967,13 +1191,14 @@ def validate(
         # ``choice`` is already a ``Literal`` in the schema pass and would only be
         # reported twice.
         if field.options and field.type in ("choice", "multichoice"):
+            applied.add("options")
             chosen = [raw.strip()] if field.type == "choice" else [c.strip() for c in raw.split(",")]
             for choice in chosen:
                 if not choice or choice in field.options:
                     continue
                 if field.options_recommended:
                     entered = "added as a custom keyword" if field.type == "multichoice" else "entered as custom text"
-                    issues.append(
+                    buckets["options"].append(
                         Issue(
                             WARNING,
                             field.id,
@@ -985,7 +1210,7 @@ def validate(
                         valid = f"run '{options_command(venue.slug, field.id)}' to list the valid options"
                     else:
                         valid = " | ".join(field.options)
-                    issues.append(
+                    buckets["options"].append(
                         Issue(
                             ERROR,
                             field.id,
@@ -997,9 +1222,10 @@ def validate(
         # chosen options, or the lines of a filelist/authorlist/list-style
         # textarea (e.g. at least 4 recommended reviewers, at most N figures).
         if field.min_count is not None or field.max_count is not None:
+            applied.add("counts")
             count = _count_items(field, raw)
             if field.min_count is not None and count < field.min_count:
-                issues.append(
+                buckets["counts"].append(
                     Issue(
                         ERROR,
                         field.id,
@@ -1007,7 +1233,7 @@ def validate(
                     )
                 )
             if field.max_count is not None and count > field.max_count:
-                issues.append(
+                buckets["counts"].append(
                     Issue(
                         ERROR,
                         field.id,
@@ -1016,44 +1242,63 @@ def validate(
                 )
 
         # Maximum word/character length on a text-bearing value (e.g. abstract).
-        issues.extend(_check_length(field, raw))
+        if field.word_count is not None or field.character_count is not None or field.min_character_count is not None:
+            applied.add("lengths")
+            buckets["lengths"].extend(_check_length(field, raw))
 
         # URL-format constraint on a text-bearing value (e.g. data availability).
-        issues.extend(_check_url(field, raw))
+        if field.require_url:
+            applied.add("urls")
+            buckets["urls"].extend(_check_url(field, raw))
 
         if field.type == "file":
-            issues.extend(_check_file_field(field, raw))
-            issues.extend(_check_manuscript_length(field, raw, values))
+            applied.add("uploads")
+            buckets["uploads"].extend(_check_file_field(field, raw))
+            length = _check_manuscript_length(field, raw, values)
+            if any(getattr(field, name) is not None for name in ("max_words", "max_words_before_refs", "max_pages", "max_pages_before_refs", "max_words_by", "max_words_before_refs_by", "max_pages_by", "max_pages_before_refs_by")):
+                applied.add("manuscript_length")
+            buckets["manuscript_length"].extend(length)
 
         if field.type == "filelist":
+            applied.add("uploads")
             # Each line is 'path | ...'; only the first segment is the path.
             for line in (l.strip() for l in raw.splitlines()):
                 if line:
                     path_part = line.split("|", 1)[0].strip()
-                    issues.extend(_check_file_field(field, path_part))
+                    buckets["uploads"].extend(_check_file_field(field, path_part))
 
         # A required confirmation (e.g. author consent, ``confirm: true``) must
         # read as yes. An informational yes/no question accepts either answer.
         # Skip the unparseable case, which the schema pass already flagged.
         if field.type == "boolean" and field.required and field.confirm and not _truthy_bool(raw) and _falsey_bool(raw):
-            issues.append(Issue(ERROR, field.id, f"{field.label} must be confirmed (set to yes)"))
+            buckets["required"].append(Issue(ERROR, field.id, f"{field.label} must be confirmed (set to yes)"))
 
         if field.type == "authorlist":
-            issues.extend(_check_authors(field, raw))
+            applied.add("authors")
+            buckets["authors"].extend(_check_authors(field, raw))
         elif field.type == "textarea" and field.fields:
             # A pipe-delimited structured textarea (funding, suggested
             # reviewers, ...): enforce its required columns per line.
-            issues.extend(_check_subfields(field, raw))
+            applied.add("subfields")
+            buckets["subfields"].extend(_check_subfields(field, raw))
 
-    errors = sum(1 for i in issues if i.is_error)
-    logger.info(
-        "Validated %s subfile: %d issue(s) (%d error(s), %d warning(s))",
-        venue.slug,
-        len(issues),
-        errors,
-        len(issues) - errors,
-    )
-    return issues
+    form = "Submission form"
+    titles = {
+        "required": ("form.required", "Required fields are filled and confirmations given", form),
+        "options": ("form.options", "Choices are valid options", form),
+        "counts": ("form.counts", "Item counts within the form's limits", form),
+        "lengths": ("form.lengths", "Text within the form's word/character limits", form),
+        "urls": ("form.urls", "Link fields hold http(s) URLs", form),
+        "authors": ("form.authors", "Author list is complete (names, corresponding author, emails)", form),
+        "subfields": ("form.subfields", "Structured entries (funding, reviewers, ...) are complete", form),
+        "uploads": ("files.uploads", "Upload files exist and have accepted types and sizes", "Files"),
+        "manuscript_length": ("files.manuscript_length", "Manuscript within the portal's word/page limits", "Files"),
+    }
+    for key, (check_id, title, category) in titles.items():
+        if key in applied:
+            checks.record(check_id, title, category, _status_for(buckets[key]), issues=buckets[key])
+        else:
+            checks.record(check_id, title, category, report.NOT_APPLICABLE)
 
 
 def _author_name(author: dict) -> str:

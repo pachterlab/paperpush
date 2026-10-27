@@ -77,10 +77,17 @@ fly. See step 1.
    paperpush validate <resolved-sub-path>
    ```
 
+   The report lists checks that **need AI** (lettering in raster figures, the
+   guidelines' free-text rules, whether each field matches the manuscript).
+   Run them by invoking the `paperpush-validate` skill (via the Skill tool) on
+   the same `.sub`; it does them itself, with no API key, and merges the
+   verdicts into the report.
+
    If validation reports errors, **stop here.** Report the exact errors and the
    review-flagged / `never` fields the autofill skill left for the user, and do
    not proceed to login or submit until they are resolved. A file with
-   validation errors will not submit.
+   validation errors will not submit. Relay warnings (including failed AI
+   checks) as things for the user to confirm.
 
 4. **Confirm the login landed.** Re-run `paperpush login --list` (or
    `paperpush login <venue> --status`). If the venue is now listed, go on to

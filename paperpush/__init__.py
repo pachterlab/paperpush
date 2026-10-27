@@ -25,7 +25,7 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 from .database import Field, Venue, get_venue, list_venues
 from .subfile import SubFile, load, parse, render_template, write_template
 from .autofill import autofill
-from .validate import validate
+from .validate import validate, validate_report
 
 __all__ = [
     "__version__",
@@ -44,4 +44,5 @@ __all__ = [
     # Workflow operations
     "autofill",
     "validate",
+    "validate_report",
 ]

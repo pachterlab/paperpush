@@ -20,6 +20,27 @@ For iterating on the script, the VS Code debugger is recommended:
 - Run the debugger
 
 
+## Website
+
+`paperpush/web/app.py` is a FastAPI app that wraps the same functions as the CLI and the MCP
+server. `paperpush/web/static/` is the page (plain JavaScript, no build step). Two of its
+scripts port Python code and must stay in step with it. `tests/test_web.py` checks both
+against the Python versions (when Node is installed), so change each pair together:
+
+- `static/subfile.js` ports `parse` / `replace_scalar` / `replace_block` from `paperpush/subfile.py`.
+- `static/checks.js` ports the form checks the page runs as the author types (`form.*` in
+  `validate._field_checks`, and `requirements_check._text_fields_check`). A check added to
+  `LIVE_CHECKS` in `app.py` needs a port there too.
+
+The page puts each check `validate` reports into one of four blocks (`app.check_group`):
+checked as you type, checked by Validate, checked only with AI, and not checked (rules
+recorded as `not_implemented`).
+
+```bash
+pip install -e .[dev]
+paperpush-web --open -v
+```
+
 ## Testing
 
 Local tests only:

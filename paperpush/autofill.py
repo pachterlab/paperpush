@@ -406,12 +406,44 @@ def _read_text(path: Path) -> str:
         raise AutofillApiError(f"could not read {path.name}: {exc}") from exc
 
 
+# Raster formats sent to the model as images (``paperpush validate --ai``
+# shows it the figures). Anything the providers do not take natively (TIFF,
+# BMP) or that is too large is converted to a PNG at most IMAGE_MAX_PX on a side.
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".tif", ".tiff", ".bmp"}
+_NATIVE_IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
+IMAGE_MAX_PX = 2000
+_IMAGE_MAX_BYTES = 4_500_000
+
+
+def _image_data(path: Path) -> tuple[str, str]:
+    """``(media type, base64 data)`` for an image, converted and shrunk as needed."""
+    import io
+
+    from PIL import Image
+
+    raw = path.read_bytes()
+    media = _NATIVE_IMAGE_TYPES.get(path.suffix.lower())
+    try:
+        with Image.open(io.BytesIO(raw)) as img:
+            if media and len(raw) <= _IMAGE_MAX_BYTES and max(img.size) <= IMAGE_MAX_PX:
+                return media, base64.standard_b64encode(raw).decode("ascii")
+            img = img.convert("RGB") if img.mode not in ("RGB", "L") else img.copy()
+            img.thumbnail((IMAGE_MAX_PX, IMAGE_MAX_PX))
+            out = io.BytesIO()
+            img.save(out, format="PNG", optimize=True)
+    except Exception as exc:  # noqa: BLE001 -- any unreadable image
+        raise AutofillApiError(f"could not read the image {path.name}: {exc}") from exc
+    return "image/png", base64.standard_b64encode(out.getvalue()).decode("ascii")
+
+
 def _read_documents(documents: list[DocumentInput]) -> list[tuple[DocumentInput, str, str]]:
     """Read each document once, as ``(doc, kind, data)``.
 
     A PDF comes back as ``kind="pdf"`` with base64 ``data`` (every provider reads
-    PDFs natively); any other format is extracted to text and comes back as
-    ``kind="text"`` with a labelled header, ready to send as a text block.
+    PDFs natively); a raster image as ``kind="image"`` with ``data`` of
+    ``"<media type>;<base64>"``; any other format is extracted to text and
+    comes back as ``kind="text"`` with a labelled header, ready to send as a
+    text block.
     """
     read: list[tuple[DocumentInput, str, str]] = []
     for doc in documents:
@@ -420,6 +452,9 @@ def _read_documents(documents: list[DocumentInput]) -> list[tuple[DocumentInput,
         if doc.path.suffix.lower() == ".pdf":
             data = base64.standard_b64encode(doc.path.read_bytes()).decode("ascii")
             read.append((doc, "pdf", data))
+        elif doc.path.suffix.lower() in IMAGE_SUFFIXES:
+            media, data = _image_data(doc.path)
+            read.append((doc, "image", f"{media};{data}"))
         else:
             read.append((doc, "text", f"=== {doc.label} ({doc.path.name}) ===\n{_read_text(doc.path)}"))
     return read
@@ -445,6 +480,10 @@ def _document_blocks(documents: list[DocumentInput]) -> list[dict]:
                     },
                 }
             )
+        elif kind == "image":
+            media, b64 = data.split(";", 1)
+            blocks.append({"type": "text", "text": f"=== {doc.label} ({doc.path.name}) ==="})
+            blocks.append({"type": "image", "source": {"type": "base64", "media_type": media, "data": b64}})
         else:
             blocks.append({"type": "text", "text": data})
     return blocks
@@ -456,6 +495,10 @@ def _openai_content(documents: list[DocumentInput], instructions: str) -> list[d
     for doc, kind, data in _read_documents(documents):
         if kind == "pdf":
             content.append({"type": "input_file", "filename": doc.path.name, "file_data": f"data:application/pdf;base64,{data}"})
+        elif kind == "image":
+            media, b64 = data.split(";", 1)
+            content.append({"type": "input_text", "text": f"=== {doc.label} ({doc.path.name}) ==="})
+            content.append({"type": "input_image", "image_url": f"data:{media};base64,{b64}"})
         else:
             content.append({"type": "input_text", "text": data})
     content.append({"type": "input_text", "text": instructions})
@@ -469,6 +512,10 @@ def _google_content(documents: list[DocumentInput], instructions: str) -> list[d
         if kind == "pdf":
             content.append({"type": "text", "text": f"=== {doc.label} ({doc.path.name}) ==="})
             content.append({"type": "document", "data": data, "mime_type": "application/pdf"})
+        elif kind == "image":
+            media, b64 = data.split(";", 1)
+            content.append({"type": "text", "text": f"=== {doc.label} ({doc.path.name}) ==="})
+            content.append({"type": "image", "data": b64, "mime_type": media})
         else:
             content.append({"type": "text", "text": data})
     content.append({"type": "text", "text": instructions})
@@ -550,23 +597,69 @@ def detect_provider() -> str | None:
     return None
 
 
+def guess_provider(api_key: str) -> str | None:
+    """The provider an API key belongs to, from its prefix, or None if it is not recognisable."""
+    key = api_key.strip()
+    if key.startswith("sk-ant-"):
+        return "anthropic"
+    if key.startswith("AIza"):
+        return "google"
+    if key.startswith("sk-"):
+        return "openai"
+    return None
+
+
+def resolve_provider(provider: str | None, alternative: str = "use '--engine manual' with the Claude skill", api_key: str | None = None) -> str:
+    """The provider to call: ``provider`` checked, or the first with an API key set.
+
+    With ``api_key`` (a key handed over directly, as the website does, instead
+    of read from the environment) the provider is ``provider`` or the one the
+    key's prefix names.
+
+    Raises :class:`AutofillApiError` naming the environment variables to set
+    (and ``alternative``, the way to go on without a key) when none is usable.
+    """
+    if api_key:
+        provider = provider or guess_provider(api_key)
+        if provider is None:
+            raise AutofillApiError(f"cannot tell which provider this API key is for; choose one of {', '.join(PROVIDERS)}.")
+        if provider not in PROVIDERS:
+            raise AutofillApiError(f"unknown provider {provider!r}; choose from {', '.join(PROVIDERS)}.")
+        return provider
+    if provider is None:
+        provider = detect_provider()
+        if provider is None:
+            names = ", ".join(v for p in PROVIDERS for v in API_KEY_ENV[p])
+            raise AutofillApiError(f"no API key found; set one of {names} (or {alternative}).")
+    elif provider not in PROVIDERS:
+        raise AutofillApiError(f"unknown provider {provider!r}; choose from {', '.join(PROVIDERS)}.")
+    elif not any(os.environ.get(var) for var in API_KEY_ENV[provider]):
+        raise AutofillApiError(f"no API key found for {provider}; set {' or '.join(API_KEY_ENV[provider])} (or {alternative}).")
+    return provider
+
+
 def _missing_sdk(provider: str) -> AutofillApiError:
     return AutofillApiError(f"the 'api' engine with --provider {provider} needs the {_SDK_PACKAGES[provider]} package; " f"install it with 'pip install paperpush[autofill-{provider}]'.")
 
 
-def _call_anthropic(model: str, documents: list[DocumentInput], instructions: str, schema: dict, max_tokens: int) -> str:
+def _client_kwargs(api_key: str | None) -> dict[str, str]:
+    """``api_key=`` for an SDK client when a key was handed over; otherwise the SDK reads its environment variable."""
+    return {"api_key": api_key} if api_key else {}
+
+
+def _call_anthropic(model: str, documents: list[DocumentInput], instructions: str, schema: dict, max_tokens: int, system: str = _SYSTEM, api_key: str | None = None) -> str:
     try:
         import anthropic
     except ImportError as exc:
         raise _missing_sdk("anthropic") from exc
 
     content = _document_blocks(documents) + [{"type": "text", "text": instructions}]
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(**_client_kwargs(api_key))
     try:
         response = client.messages.create(
             model=model,
             max_tokens=max_tokens,
-            system=_SYSTEM,
+            system=system,
             messages=[{"role": "user", "content": content}],
             output_config={"format": {"type": "json_schema", "schema": schema}},
         )
@@ -579,18 +672,18 @@ def _call_anthropic(model: str, documents: list[DocumentInput], instructions: st
     return next((b.text for b in response.content if b.type == "text"), "")
 
 
-def _call_openai(model: str, documents: list[DocumentInput], instructions: str, schema: dict, max_tokens: int) -> str:
+def _call_openai(model: str, documents: list[DocumentInput], instructions: str, schema: dict, max_tokens: int, system: str = _SYSTEM, api_key: str | None = None) -> str:
     try:
         import openai
     except ImportError as exc:
         raise _missing_sdk("openai") from exc
 
     content = _openai_content(documents, instructions)
-    client = openai.OpenAI()
+    client = openai.OpenAI(**_client_kwargs(api_key))
     try:
         response = client.responses.create(
             model=model,
-            instructions=_SYSTEM,
+            instructions=system,
             input=[{"role": "user", "content": content}],
             text={"format": {"type": "json_schema", "name": "extraction", "schema": schema, "strict": True}},
             max_output_tokens=max_tokens,
@@ -611,7 +704,7 @@ def _call_openai(model: str, documents: list[DocumentInput], instructions: str, 
     return response.output_text
 
 
-def _call_google(model: str, documents: list[DocumentInput], instructions: str, schema: dict, max_tokens: int) -> str:
+def _call_google(model: str, documents: list[DocumentInput], instructions: str, schema: dict, max_tokens: int, system: str = _SYSTEM, api_key: str | None = None) -> str:
     # max_tokens is not passed: the Interactions API caps output per model, and
     # an extraction is far below that cap.
     try:
@@ -621,11 +714,11 @@ def _call_google(model: str, documents: list[DocumentInput], instructions: str, 
         raise _missing_sdk("google") from exc
 
     content = _google_content(documents, instructions)
-    client = genai.Client()
+    client = genai.Client(**_client_kwargs(api_key))
     try:
         interaction = client.interactions.create(
             model=model,
-            system_instruction=_SYSTEM,
+            system_instruction=system,
             input=content,
             response_format={"type": "text", "mime_type": "application/json", "schema": schema},
             store=False,
@@ -652,31 +745,25 @@ def extract_via_api(
     model: str | None = None,
     provider: str | None = None,
     max_tokens: int = 16000,
+    api_key: str | None = None,
 ) -> Extraction:
     """Ask an LLM API to propose field values; return an Extraction.
 
     ``provider`` is one of ``PROVIDERS``; when omitted it is detected from which
     API key is set (see :func:`detect_provider`). ``model`` defaults to the
-    provider's entry in ``DEFAULT_MODELS``.
+    provider's entry in ``DEFAULT_MODELS``. ``api_key`` is used instead of the
+    provider's environment variable when given.
 
     Raises :class:`AutofillApiError` for setup problems (missing dependency, no
     API key, unreadable file) and for a model refusal.
     """
-    if provider is None:
-        provider = detect_provider()
-        if provider is None:
-            names = ", ".join(v for p in PROVIDERS for v in API_KEY_ENV[p])
-            raise AutofillApiError(f"no API key found; set one of {names} (or use '--engine manual' " "with the Claude skill).")
-    elif provider not in PROVIDERS:
-        raise AutofillApiError(f"unknown provider {provider!r}; choose from {', '.join(PROVIDERS)}.")
-    elif not any(os.environ.get(var) for var in API_KEY_ENV[provider]):
-        raise AutofillApiError(f"no API key found for {provider}; set {' or '.join(API_KEY_ENV[provider])} " "(or use '--engine manual' with the Claude skill).")
+    provider = resolve_provider(provider, api_key=api_key)
     model = model or DEFAULT_MODELS[provider]
 
     instructions, schema = _instructions(venue, file_listing)
     logger.info("autofill api: calling %s %s for %s (%d document(s), %d field(s))", provider, model, venue.slug, len(documents), len(schema["properties"]["fields"]["items"]["properties"]["id"]["enum"]))
 
-    text = _CALLERS[provider](model, documents, instructions, schema, max_tokens)
+    text = _CALLERS[provider](model, documents, instructions, schema, max_tokens, **_client_kwargs(api_key))
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:

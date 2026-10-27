@@ -45,6 +45,11 @@ _ALIASES = {
 }
 
 
+def _both(captured) -> str:
+    """stdout and stderr together: the report prints to stdout, notes and the final hint to stderr."""
+    return captured.out + captured.err
+
+
 @pytest.fixture
 def _use(monkeypatch):
     """Inject an in-memory requirements database for the duration of a test."""
@@ -420,9 +425,9 @@ def test_validate_cli_flag(_use, tmp_path, monkeypatch, capsys):
     sub = tmp_path / "biorxiv.sub"
     sub.write_text(f"@venue: biorxiv\nmanuscript_file: {doc}\n", encoding="utf-8")
     assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "--dont-check-for-sensitive-info"]) == 1
-    assert "1-word limit" in capsys.readouterr().err
+    assert "1-word limit" in _both(capsys.readouterr())
     main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "--dont-check-for-sensitive-info", "--dont-check-manuscript"])
-    assert "1-word limit" not in capsys.readouterr().err
+    assert "1-word limit" not in _both(capsys.readouterr())
 
 
 def test_requirements_command(_use, capsys):

@@ -22,6 +22,11 @@ from tests.conftest import _build_pdf
 SLUG = "future_journal"
 
 
+def _both(captured) -> str:
+    """stdout and stderr together: the report prints to stdout, notes and the final hint to stderr."""
+    return captured.out + captured.err
+
+
 @pytest.fixture
 def validate_only(tmp_path, monkeypatch):
     """Point paperpush at data that adds ``future_journal`` as a validate-only venue."""
@@ -76,10 +81,10 @@ def test_validate_checks_the_guidelines_and_submit_refuses(validate_only, tmp_pa
 
     assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references"]) != 0
     # The Brief Report limit, selected through the default form's article type.
-    assert "exceeds the 10-word limit in the author guidelines" in capsys.readouterr().err
+    assert "exceeds the 10-word limit in the author guidelines" in _both(capsys.readouterr())
 
     assert main(["submit", str(sub)]) == 1
-    assert "validate-only" in capsys.readouterr().err
+    assert "validate-only" in _both(capsys.readouterr())
 
     with pytest.raises(ValueError, match="validate-only"):
         mcp_server.submit(str(sub))
