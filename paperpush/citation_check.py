@@ -12,7 +12,10 @@ PDF's, or a LaTeX source compiled to one; a Word file's paragraphs) and finds:
 
 For each series it reports an item first cited before a lower-numbered one, an
 item with a caption (or an attached figure file) that the text never cites,
-and a citation of an item that does not exist. A LaTeX source that cannot be
+and a citation of an item that does not exist. Within each main figure it
+reports a panel first cited before a lower-lettered one ("Fig. 2c" before
+"Fig. 2b"), in every series ("Supplementary Fig. 3c", "Extended Data Fig. 1b",
+"Table 2b" too). A LaTeX source that cannot be
 compiled is read through its ``\\label``/``\\ref`` pairs instead: the order of
 the ``figure``/``table`` environments numbers the items, and the ``\\ref``
 calls outside them are the citations.
@@ -48,6 +51,7 @@ SERIES = [
     ("ed_table", "Extended Data Table", "Extended Data tables cited in order"),
 ]
 _NAMES = {key: name for key, name, _ in SERIES}
+PANEL_TITLE = "Figure and table panels cited in order"
 
 _ITEM = r"S?\d{1,3}[a-zA-Z]?"
 _MENTION = re.compile(
@@ -103,8 +107,6 @@ def mentions(text: str) -> list[Mention]:
     Citations inside the reference list -- from its heading to the first
     caption after it, where collected legends usually start -- are left out.
     """
-    from .manuscript import _REFERENCE_HEADING
-
     out: list[Mention] = []
     for m in _MENTION.finditer(text):
         line_start = text.rfind("\n", 0, m.start()) + 1
@@ -122,11 +124,126 @@ def mentions(text: str) -> list[Mention]:
             series = _series(m.group("prefix") or "", m.group("word"), item)
             if series is not None:
                 out.append(Mention(series, int(re.sub(r"\D", "", item)), m.start(), caption, m.group(0)))
-    refs = _REFERENCE_HEADING.search(text)
-    if refs:
-        end = next((x.pos for x in out if x.caption and x.pos > refs.end()), len(text))
-        out = [x for x in out if x.caption or not refs.start() <= x.pos < end]
+    span = _reference_span(text, out)
+    if span:
+        out = [x for x in out if x.caption or not span[0] <= x.pos < span[1]]
     return out
+
+
+def _reference_span(text: str, found: list[Mention]) -> tuple[int, int] | None:
+    """Where the reference list runs: from its heading to the first caption after it."""
+    from .manuscript import _REFERENCE_HEADING
+
+    refs = _REFERENCE_HEADING.search(text)
+    if not refs:
+        return None
+    end = next((x.pos for x in found if x.caption and x.pos > refs.end()), len(text))
+    return refs.start(), end
+
+
+# --- panels ---------------------------------------------------------------------------
+
+# "Fig." / "Figure" / "Table" (with any Supplementary / Extended Data prefix) and a number.
+_PANEL_START = re.compile(
+    r"(?P<prefix>\b(?:Supplementary|Supplemental|Suppl\.?|Supp\.?|Extended\s+Data|Appendix)\s+(?:Information\s+)?)?" r"\b(?P<word>Fig(?:ure)?s?\.?|Tables?)[~\u00a0]?\s*(?=S?\d)",
+    re.IGNORECASE,
+)
+_DASH = r"\s*[\u2013\u2014-]\s*"
+# "2", "2a", "2a-c", "2a-2c", "S2b"
+_PANEL_ITEM = re.compile(rf"(S?)(\d{{1,3}})(?:([a-zA-Z])(?:{_DASH}(?:\1\2)?([a-zA-Z]))?)?(?![\w])")
+# A bare letter (or range) continuing the previous item: the ", b" of "Fig. 2a, b".
+_PANEL_LETTER = re.compile(rf"([a-zA-Z])(?:{_DASH}([a-zA-Z]))?(?![\w])")
+_PANEL_SEP = re.compile(r"\s*(,|;|and\b|&)\s*")
+# Whose figure: "Fig. 3b of ref. 12", "Fig. 2a in Smith et al.", "(ref. 4, Fig. 1c)".
+_OTHER_AFTER = re.compile(r"\s*(?:of|in|from)\s+(?:refs?\b|\[|\(\d|\d|[A-Z][\w'-]+(?:\s+and\s+[A-Z][\w'-]+)?\s+(?:et\s+al|\(\d{4}|\d{4})|the\s+(?:original|cited|previous)|their\b|ours?\s+previous)")
+_OTHER_BEFORE = re.compile(r"(?:\brefs?\.?\s*\d+[\w\s,\u2013-]*|et\s+al\.?(?:\s*\(?\d{4}\)?)?|\[\d+[\d,\s\u2013-]*\])\s*[,;:]?\s*(?:see\s+)?$", re.IGNORECASE)
+# How a panel is written in a message, per series.
+PANEL_NAMES = {"figure": "Fig. ", "table": "Table ", "supp_figure": "Supplementary Fig. ", "supp_table": "Supplementary Table ", "ed_figure": "Extended Data Fig. ", "ed_table": "Extended Data Table "}
+
+
+@dataclass(frozen=True)
+class PanelCite:
+    series: str  # one of the SERIES ids
+    number: int
+    letter: str  # as written ("a" or "A")
+    pos: int
+
+    @property
+    def figure(self) -> int:  # the number, for main-figure callers
+        return self.number
+
+
+def _letters(first: str, last: str | None) -> list[str]:
+    if last and first.lower() < last.lower() and first.isupper() == last.isupper():
+        return [chr(c) for c in range(ord(first), ord(last) + 1)]
+    return [first] + ([last] if last else [])
+
+
+def panel_mentions(text: str, series: str | None = None) -> list[PanelCite]:
+    """Every citation of a panel ("Fig. 2a", "Supplementary Fig. 3b", "Table 1c") in ``text``, in order.
+
+    "See Figs. 2a-c and 3b, d" -> 2a, 2b, 2c, 3b, 3d. Other papers' figures
+    ("Fig. 3b of ref. 12") and the reference list are left out. ``series``
+    keeps one series only ("figure" for main figures).
+    """
+    out: list[PanelCite] = []
+    for start in _PANEL_START.finditer(text):
+        before = text[max(0, start.start() - 40) : start.start()]
+        if _OTHER_BEFORE.search(before):
+            continue
+        prefix, word = start.group("prefix") or "", start.group("word")
+        found: list[PanelCite] = []
+        pos, current, lettered, sep = start.end(), None, False, None
+        while True:
+            item = _PANEL_ITEM.match(text, pos)
+            if item:
+                kind = _series(prefix, word, item.group(1) + item.group(2))
+                current, lettered = (kind, int(item.group(2))), bool(item.group(3))
+                if kind and item.group(3):
+                    found += [PanelCite(kind, current[1], c, item.start()) for c in _letters(item.group(3), item.group(4))]
+                pos = item.end()
+            elif current is not None and current[0] and lettered and (letter := _PANEL_LETTER.match(text, pos)):
+                # After "and", a bare letter must close the list ("Fig. 2a and b)"), so
+                # "Fig. 2a and a control" is not read as a panel.
+                if sep.group(1) in ("and", "&") and not re.match(r"\s*(?:[),;.\]]|$)", text[letter.end() :]):
+                    break
+                found += [PanelCite(current[0], current[1], c, letter.start()) for c in _letters(letter.group(1), letter.group(2))]
+                pos = letter.end()
+            else:
+                break
+            sep = _PANEL_SEP.match(text, pos)
+            if not sep:
+                break
+            pos = sep.end()
+        if found and not _OTHER_AFTER.match(text, pos if not sep else sep.start()):
+            out += found
+    span = _reference_span(text, mentions(text))
+    if span:
+        out = [c for c in out if not span[0] <= c.pos < span[1]]
+    if series:
+        out = [c for c in out if c.series == series]
+    return out
+
+
+def panel_order_problems(cites: list[PanelCite]) -> tuple[list[str], str]:
+    """Panels of a figure or table first cited before a lower-lettered panel of the same item."""
+    first: dict[tuple[str, int], dict[str, int]] = {}
+    for c in cites:
+        first.setdefault((c.series, c.number), {}).setdefault(c.letter.lower(), c.pos)
+    order = {key: i for i, (key, _, _) in enumerate(SERIES)}
+    problems: list[str] = []
+    for series, number in sorted(first, key=lambda k: (order[k[0]], k[1])):
+        letters = first[(series, number)]
+        name = PANEL_NAMES[series] + str(number)
+        seen: set[str] = set()
+        for letter in sorted(letters, key=letters.get):
+            earlier = [x for x in letters if x < letter and x not in seen]
+            if earlier:
+                problems.append(f"{name}{letter} is first cited before {name}{min(earlier)}; panels are usually lettered in the order the text first cites them (citing an earlier panel again later is fine)")
+                break
+            seen.add(letter)
+    detail = f"panels of {len(first)} figure(s)/table(s) first cited in order" if first and not problems else ""
+    return problems, detail
 
 
 # --- LaTeX labels ---------------------------------------------------------------------
@@ -253,6 +370,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         status = NOT_APPLICABLE if isinstance(exc, NotApplicable) else UNCHECKED
         for key, _name, title in SERIES[:4]:
             checks.record(f"citations.{key}", title, CITATIONS, status, detail=str(exc))
+        checks.record("citations.panels", PANEL_TITLE, CITATIONS, status, detail=str(exc))
         _legend_checks(checks, venue, values, None, "")
         return
     found = found + _supplement_captions(venue, values)
@@ -266,11 +384,26 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
             continue
         extra = set(range(1, attached[key] + 1)) if attached.get(key) and not any(m.series == key and m.caption for m in found) else None
         checks.run(f"citations.{key}", title, CITATIONS, _order_check, found, key, extra, field_id)
+    checks.run("citations.panels", PANEL_TITLE, CITATIONS, _panel_check, venue, values, field_id)
     _legend_checks(checks, venue, values, found, field_id)
 
 
 def _order_check(found: list[Mention], series: str, extra: set[int] | None, field_id: str) -> Outcome:
     problems, detail = order_problems(found, series, extra)
+    return Outcome([Issue(WARNING, field_id, p) for p in problems], detail)
+
+
+def _panel_check(venue: Venue, values: dict[str, str], field_id: str) -> Outcome:
+    from .requirements_check import manuscript_files
+
+    path = manuscript_files(venue, values)[0][1]
+    text = document.get(path).text
+    if text is None:
+        raise Unchecked(f"could not read {path.name} as text")
+    cites = panel_mentions(text)
+    if not cites:
+        raise NotApplicable("the text cites no figure or table panels (e.g. Fig. 2a, Supplementary Fig. 3b)")
+    problems, detail = panel_order_problems(cites)
     return Outcome([Issue(WARNING, field_id, p) for p in problems], detail)
 
 

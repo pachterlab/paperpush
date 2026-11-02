@@ -650,16 +650,19 @@ checks that run without AI:
                     spelling variant
   figures           resolution (dpi, line-art threshold), lettering size and
                     typeface in vector figures, panel labels (case, bold, cited
-                    panels present), colour mode, print size, placement,
+                    panels present, labelled panels cited), colour mode, print size, placement,
                     legend length and location -- attached figure files, or the
                     figures embedded in the manuscript when none are attached
   citation order    main, supplementary, and Extended Data figures and tables
-                    first cited in order, all cited, none cited that is missing
+                    first cited in order, all cited, none cited that is missing;
+                    panels of each figure and table (every series) first
+                    cited in order
   .sub vs paper     title, abstract, authors (names, order, emails, ORCIDs),
                     keywords, and statements match the manuscript word for word
 
 checks that need AI (--ai, or an agent via --ai-tasks / --ai-results):
-  lettering size, typeface, and panel labels in raster figures; title-page
+  lettering size, typeface, and panel labels in raster figures, and that
+  each of their labelled panels is cited; title-page
   items found only by reading (postal address, author footnotes, one-sentence
   summary, classification, affiliations); tables pasted as images; reference
   formatting in the venue's style; template used, for a PDF or Word manuscript;

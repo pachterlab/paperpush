@@ -190,7 +190,7 @@ accordingly, since it selects which limits apply. The same pass checks the page
 layout (template, margins, font, spacing, line/page numbers, spelling variant),
 the figures (resolution, lettering size and typeface, panel labels -- attached
 files, or the figures embedded in the manuscript when none are attached), that
-figures and tables are cited in order, and that the title, abstract, authors,
+figures, tables, and figure panels are cited in order, and that the title, abstract, authors,
 keywords, and statements in the `.sub` match the manuscript. Warnings from this
 pass are heuristics over extracted text and images: relay them to the user as
 things to confirm, not as blockers. `--dont-check-manuscript` skips the pass.

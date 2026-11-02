@@ -17,7 +17,8 @@ resolution (``min_dpi``, and ``min_dpi_line_art`` for figures with only a few
 flat colours), the smallest and largest lettering (``min_font_size_pt`` /
 ``max_font_size_pt``), the typeface (``font``), the panel labels
 (``multipanel_labels``: their case and weight in the figures, and that each
-panel the text cites -- "Fig. 2d" -- exists), the colour mode and print size of
+panel the text cites -- "Fig. 2d" -- exists, and that each labelled panel is
+cited), the colour mode and print size of
 attached raster files, and where the figures are placed (``placement``,
 ``manuscript.figures_placement``, ``manuscript.single_file``).
 """
@@ -493,6 +494,25 @@ def _raster_ai_task(checks: Checks, inv: _Inventory, rules: FigureRules) -> int:
     return len(rasters)
 
 
+def _raster_panels_task(checks: Checks, inv: _Inventory, cites: dict[int, set[str]]) -> None:
+    """Queue the AI check that every panel of a raster figure is cited (its labels cannot be read)."""
+    from .ai_validate import AiTask
+
+    rasters = [f for f in inv.figures if f.kind == "raster" and f.number in cites]
+    if not rasters:
+        return
+    lines = [f"- {f.name} (Figure {f.number}): the text cites panel(s) {', '.join(sorted(cites[f.number], key=str.lower))}" for f in rasters]
+    checks.needs_ai(
+        AiTask(
+            id="ai.figures.raster_panels_cited",
+            title="Every panel of the raster figures is cited",
+            category=FIGURES,
+            instructions="Read the panel labels (a, b, c... or A, B, C...) drawn in each figure below and compare them with the panels the text cites.\n" + "\n".join(lines) + "\nReport 'fail' naming each figure with a labelled panel the text never cites (e.g. 'Figure 2 has panel e, which the text never cites'), else 'pass'. A panel the text cites but the figure does not label is also a 'fail'.",
+            files=list(dict.fromkeys(str(f.image_path or f.path) for f in rasters)),
+        )
+    )
+
+
 def _text_size_check(checks: Checks, inv: _Inventory, rules: FigureRules, where: str) -> Outcome:
     issues: list[Issue] = []
     smallest: list[float] = []
@@ -557,31 +577,23 @@ def _font_check(checks: Checks, inv: _Inventory, rules: FigureRules, where: str)
 
 # --- panel labels ---------------------------------------------------------------------
 
-_FIG_PANEL_CITE = re.compile(r"\b(?:Fig(?:ure)?s?\.?)\s*(\d{1,2})((?:[a-zA-Z](?:\s*[,–-]\s*(?:\d{1,2})?[a-zA-Z])*))(?![a-zA-Z])")
-
-
 def cited_panels(text: str) -> dict[int, set[str]]:
     """Panels the text cites, per figure number: "Fig. 2a-c, 3d" -> {2: {a, b, c}, 3: {d}}."""
+    from .citation_check import panel_mentions
+
     out: dict[int, set[str]] = {}
-    for match in _FIG_PANEL_CITE.finditer(text):
-        before = text[max(0, match.start() - 25) : match.start()].lower()
-        if "supplementary" in before or "extended data" in before:
-            continue
-        number = int(match.group(1))
-        letters = re.findall(r"[a-zA-Z]", match.group(2))
-        if not letters:
-            continue
-        expanded: set[str] = set()
-        spec = re.sub(r"\s+", "", match.group(2))
-        for part in spec.split(","):
-            bounds = re.split(r"[–-]", re.sub(r"\d", "", part))
-            if len(bounds) == 2 and len(bounds[0]) == 1 and len(bounds[1]) == 1 and bounds[0].lower() <= bounds[1].lower():
-                start, end = ord(bounds[0]), ord(bounds[1])
-                expanded.update(chr(c) for c in range(start, end + 1))
-            else:
-                expanded.update(c for c in part if c.isalpha())
-        out.setdefault(number, set()).update(expanded)
+    for c in panel_mentions(text, "figure"):
+        out.setdefault(c.number, set()).add(c.letter)
     return out
+
+
+def _label_run(letters: set[str]) -> list[str]:
+    """The panel letters a, b, c... with no gap, so a stray axis letter ('x') is left out."""
+    have = {c.lower() for c in letters}
+    run: list[str] = []
+    while chr(ord("a") + len(run)) in have:
+        run.append(chr(ord("a") + len(run)))
+    return run
 
 
 def _labels(fig: Figure) -> list[Text]:
@@ -649,11 +661,16 @@ def _lettering_check(checks: Checks, venue: Venue, values: dict[str, str], inv: 
             missing = sorted(c for c in cites[fig.number] if c.lower() not in have)
             if missing:
                 issues.append(Issue(WARNING, fig.field_id, f"{fig.name}: the text cites panel(s) {', '.join(missing)} of Figure {fig.number}, which the figure does not label (it has {', '.join(sorted(have))})"))
+            cited = {c.lower() for c in cites[fig.number]}
+            uncited = [c for c in _label_run(letters) if c not in cited]
+            if uncited:
+                issues.append(Issue(WARNING, fig.field_id, f"{fig.name}: panel(s) {', '.join(uncited)} of Figure {fig.number} {'is' if len(uncited) == 1 else 'are'} never cited in the text (it cites {', '.join(sorted(cited))}); cite every panel, e.g. Fig. {fig.number}{uncited[0]}"))
     if labelled:
         details.append(f"panel labels found in {labelled} vector figure(s)")
     queued = _raster_ai_task(checks, inv, rules)
     if queued:
         details.append(f"{queued} raster figure(s) need the AI check")
+    _raster_panels_task(checks, inv, cites)
     if not cites and not labelled and not issues:
         raise Unchecked("no panel citations in the text and no panel labels in vector figures to check" + (f"; {queued} raster figure(s) are queued for the AI check" if queued else ""))
     return Outcome(issues, "; ".join(details))

@@ -401,6 +401,47 @@ def test_legend_length_and_location(_use, tmp_path):
     assert any("comes before the references" in m for m in messages)
 
 
+def test_panel_mentions_parse_lists_ranges_and_skip_other_papers():
+    cites = citation_check.panel_mentions("See Figs. 2a and 3b\u2013d, then Fig. 2a,c. Fig. 4a and a control. Fig. 5a\u20135c.")
+    assert [(c.figure, c.letter) for c in cites] == [(2, "a"), (3, "b"), (3, "c"), (3, "d"), (2, "a"), (2, "c"), (4, "a"), (5, "a"), (5, "b"), (5, "c")]
+    others = "As in Fig. 3b of ref. 12, Fig. 1c in Smith et al. 2020, (ref. 4, Fig. 5a) and Appendix Fig. 2b."
+    assert citation_check.panel_mentions(others) == []
+    in_refs = "Intro cites Fig. 1a.\nReferences\n1. A. Author. Fig. 9a of a book. 2020.\n"
+    assert [c.figure for c in citation_check.panel_mentions(in_refs)] == [1]
+
+
+def test_panel_mentions_cover_supplementary_extended_data_and_tables():
+    text = "Supplementary Figs. 2a and 3b, Fig. S4a\u2013S4c, Extended Data Fig. 1b, Table 2a, b and Supplementary Table 1c. Figs. 1b and S5a."
+    cites = [(c.series, c.number, c.letter) for c in citation_check.panel_mentions(text)]
+    assert cites == [
+        ("supp_figure", 2, "a"), ("supp_figure", 3, "b"), ("supp_figure", 4, "a"), ("supp_figure", 4, "b"), ("supp_figure", 4, "c"),
+        ("ed_figure", 1, "b"), ("table", 2, "a"), ("table", 2, "b"), ("supp_table", 1, "c"), ("figure", 1, "b"), ("supp_figure", 5, "a"),
+    ]
+    assert [c.number for c in citation_check.panel_mentions(text, "figure")] == [1]
+
+
+def test_panel_order_is_checked_in_every_series():
+    text = "Supplementary Fig. 2c, then Supplementary Fig. 2b. Extended Data Fig. 1b before Extended Data Fig. 1a. Table 3b, then Table 3a. Fig. 1a, b."
+    problems, _ = citation_check.panel_order_problems(citation_check.panel_mentions(text))
+    assert [p.split(" is first")[0] for p in problems] == ["Table 3b", "Supplementary Fig. 2c", "Extended Data Fig. 1b"]
+
+
+def test_panel_order_uses_first_citations_only():
+    problems, _ = citation_check.panel_order_problems(citation_check.panel_mentions("Fig. 1a. Then Fig. 1c. Then Fig. 1b."))
+    assert problems == [problems[0]] and "Fig. 1c is first cited before Fig. 1b" in problems[0]
+    problems, detail = citation_check.panel_order_problems(citation_check.panel_mentions("Fig. 1a, b, then Fig. 1a again, and Fig. 1c. Fig. 2A-C."))
+    assert not problems and "2 figure(s)" in detail
+
+
+def test_panel_order_check_runs_on_the_manuscript(_use, tmp_path):
+    _use({"testj": {}})
+    doc = tmp_path / "ms.docx"
+    _build_docx(doc, ["Intro", "See Fig. 1a and Fig. 1c, then Fig. 1b.", "Figure 1. A legend."])
+    rep = _report(_venue(MANUSCRIPT), {"manuscript_file": str(doc)})
+    result = _result(rep, "citations.panels")
+    assert "Fig. 1c is first cited before Fig. 1b" in result.issues[0].message
+
+
 # ===========================================================================
 # figures
 # ===========================================================================
@@ -452,6 +493,32 @@ def test_vector_figure_lettering_panels_and_font(_use, tmp_path):
     assert "upper" in lettering  # cited and drawn in lower case
     assert "not bold" in lettering
     assert "panel(s) c of Figure 2" in lettering
+    assert "never cited" not in lettering
+
+
+def test_labelled_panels_the_text_never_cites(_use, tmp_path):
+    _pdfminer()
+    _use({"testj": {"figures": {"min_font_size_pt": 5}}})
+    fig = _figure_pdf(tmp_path / "fig2.pdf", labels=("a", "b", "c", "x"))
+    doc = tmp_path / "ms.docx"
+    _build_docx(doc, ["See Fig. 2a and Fig. 2c, and Figure 2 as a whole."])
+    rep = _report(_venue(MANUSCRIPT, FIGURES), {"manuscript_file": str(doc), "figure_files": f"{fig} | Figure 2"})
+    lettering = " ".join(i.message for i in _result(rep, "figures.lettering").issues)
+    assert "panel(s) b of Figure 2 is never cited" in lettering
+    assert " x " not in lettering  # a stray letter outside the a, b, c run
+
+
+def test_raster_panels_cited_goes_to_an_ai_task(_use, tmp_path):
+    from PIL import Image
+
+    _use({"testj": {"figures": {"min_font_size_pt": 5}}})
+    png = tmp_path / "fig1.png"
+    Image.new("RGB", (600, 400), "white").save(png, dpi=(300, 300))
+    doc = tmp_path / "ms.docx"
+    _build_docx(doc, ["See Fig. 1a and Fig. 1b."])
+    rep = _report(_venue(MANUSCRIPT, FIGURES), {"manuscript_file": str(doc), "figure_files": f"{png} | Figure 1"})
+    task = next(t for t in rep.ai_tasks if t.id == "ai.figures.raster_panels_cited")
+    assert "cites panel(s) a, b" in task.instructions and str(png) in task.files
 
 
 def test_figures_are_found_in_the_manuscript_when_none_are_attached(_use, tmp_path):
