@@ -589,6 +589,7 @@
       "single_file": false,
       "figures_placement": "inline",
       "tables_placement": "inline",
+      "initial_submission_any_format": "Format-Free submission: the initial submission may be unformatted (journal style is needed only at revision), provided it stays within the article type's page/word guide.",
       "notes": [
         "Format-Free submission is offered: manuscripts can be submitted unformatted (into journal style only required at revision), provided they stay within the type's page/word guide; exceeding the limit by 20%+ risks immediate return by the editorial office without review.",
         "Initial submissions: .doc/.rtf/.odf or PDF word-processing formats, or LaTeX source files submitted directly; LaTeX must use the OUP LaTeX template (Overleaf/CTAN/direct download), article style only, two-column text with 86mm column widths -- compile to PDF/PS before uploading since ScholarOne does not compile LaTeX.",
@@ -1130,6 +1131,7 @@
       "font": "Times New Roman",
       "font_size_pt": 12,
       "language": "English (Oxford English Dictionary spelling)",
+      "initial_submission_any_format": "Style and length are flexible at initial submission ('within reason, style and length will not influence consideration of a manuscript'); formatting instructions come only with an invited revision.",
       "notes": [
         "A typical 6-page Article contains ~2,500 words of text with 4 modest display items; a typical 8-page Article contains ~4,300 words with 5-6 modest display items; final print length is at the editor's discretion. The 4,300-word/6-item figure is recorded at the top level as the upper bound.",
         "Style and length are explicitly flexible at initial submission ('within reason, style and length will not influence consideration of a manuscript'); the editor gives detailed formatting instructions only if a revision is invited.",
@@ -1415,6 +1417,7 @@
       "max_display_items": 6,
       "single_file": false,
       "template_required": false,
+      "initial_submission_any_format": "Initial submissions need no special formatting and may be a PDF, Word, or TeX/LaTeX file (TeX compiled to a PDF); the formatting rules apply from acceptance in principle.",
       "notes": [
         "Initial submissions do NOT need to be specially formatted -- accepted as PDF, Word, or TeX/LaTeX (compiled to a PDF for TeX/LaTeX at initial submission; only Word or TeX/LaTeX -- no PDF -- is accepted at Acceptance in Principle/final submission).",
         "Article main text is up to 3,000 words of body text (excluding abstract, Methods, references and figure legends) with up to 6 display items (figures and/or tables); as a guideline, up to 50 references (Methods-only references do not count against this).",
@@ -1636,6 +1639,7 @@
       "max_display_items": 6,
       "single_file": false,
       "line_numbers": true,
+      "initial_submission_any_format": "Initial submissions need no special formatting and may be a PDF, Word, or TeX/LaTeX file (TeX compiled to a PDF); the formatting rules apply from acceptance in principle.",
       "notes": [
         "Article main text: up to 3,000 words (up to 5,000 words with editorial discretion), excluding abstract, Methods, references, and figure legends; up to 6 figures and/or tables as display items; references recommended up to ~50 (guideline, not a hard cap).",
         "Article structure: Introduction (without heading), Results, Discussion, Online Methods; Results and Methods use topical subheadings, Discussion does not.",
@@ -1859,6 +1863,7 @@
       "single_file": false,
       "figures_placement": "end_or_inline",
       "template_required": false,
+      "initial_submission_any_format": "No specific format is required at initial submission beyond a title, the author list with affiliations and contact details, a summary/abstract, and enough experimental detail; a single PDF is accepted.",
       "notes": [
         "Research article main text must be under 7,000 words, including main figure legends but excluding STAR Methods text, supplemental item legends, and references; no more than 7 figures/tables (additional display items may be published as supplemental information).",
         "The Discussion must end with a 'Limitations of the study' subsection specific to the paper (e.g., sample size, genetic strains, detection levels).",
@@ -2136,6 +2141,7 @@
       "single_file": false,
       "figures_placement": "end_or_inline",
       "template_required": false,
+      "initial_submission_any_format": "No specific format is required at initial submission beyond a title, the author list with affiliations and contact details, a summary/abstract, and enough experimental detail; a single PDF is accepted.",
       "notes": [
         "'Article' contains up to 7 figures/tables. The current article-types page gives qualitative guidance ('long enough to convey the work, short enough to read in one sitting'; STAR Methods and references don't count toward text-length limits) rather than a hard word cap; the 7,000-word figure below comes from Cell Systems' Final File Checklist.",
         "Main document components, in order: title; author list and affiliations; Lead Contact footnote; corresponding-author email(s); Summary; Keywords; Introduction; Results; Discussion; Resource availability; Acknowledgments; Author contributions; Declaration of interests; Declaration of generative AI (if applicable); supplemental information titles/legends; figure titles and legends; Tables; STAR Methods; Resource identification initiative; References. (Unlike Cell, there is no 'Limitations of the study' subsection in this list.)",
@@ -2378,6 +2384,7 @@
         "reference list",
         "supplemental information"
       ],
+      "initial_submission_any_format": "No specific format is required at initial submission beyond a title, the author list with affiliations and contact details, a summary/abstract, and enough experimental detail; a single PDF is accepted.",
       "notes": [
         "The default/primary research format is 'Article': under 8,000 words (not including the reference list, STAR Methods, or supplemental information), up to 7 display items; longer papers may be acceptable after discussion with the editor.",
         "Also published in this format family: 'Technology' (new experimental/computational methods; under 7,000 words, up to 7 display items) -- see venue notes for other article types not represented as separate keys here.",
@@ -2647,6 +2654,7 @@
       "figures_placement": "separate",
       "tables_placement": "inline",
       "language": "American or British English, used consistently",
+      "initial_submission_any_format": "All formatting requirements are waived for the initial submission, until the manuscript receives a provisional Editorial Accept decision.",
       "notes": [
         "PLOS Computational Biology waives all formatting requirements for the INITIAL submission until the manuscript receives a provisional Editorial Accept decision.",
         "Initial submissions may be a single PDF containing text and figures; revised (post-acceptance) manuscripts require separate files for text, figures, and supporting information.",
@@ -3844,6 +3852,7 @@
       "single_file": true,
       "figures_placement": "inline",
       "tables_placement": "inline",
+      "initial_submission_any_format": "The initial submission has no required format or order beyond logical organization.",
       "notes": [
         "Research Articles allow a flexible short-or-long format, up to 15,000 words, with up to 10 figures and/or tables (combined) and up to 80 references.",
         "Initial submission has no required format/order beyond logical organization; it is uploaded as a single .docx file (or LaTeX plus PDF and supporting files) containing all components in sequence (title, main text, references, table/figure legends, then the Supplementary Materials list if applicable).",
@@ -4549,6 +4558,7 @@
       "figures_placement": "end",
       "tables_placement": "end",
       "language": "American English",
+      "initial_submission_any_format": "The manuscript and figures need not be reformatted to Science Signaling style for the initial submission.",
       "notes": [
         "It is not necessary to reformat manuscripts to Science Signaling style for initial submission; no explicit main-text word limit is stated on the Research-Article initial-submission page (unlike sister journals such as Science, Science Immunology, and Science Translational Medicine).",
         "Required sections: Abstract, Introduction, Results, Discussion, Materials and Methods, References and Notes.",
@@ -5047,6 +5057,7 @@
       "single_file": true,
       "template_required": false,
       "latex_class": "elsarticle",
+      "initial_submission_any_format": "Under Elsevier's 'Your Paper Your Way' policy, the initial submission may be a single manuscript file in any format (PDF, Word, ...); source files and journal formatting are needed only at revision.",
       "notes": [
         "Under Elsevier's 'Your Paper Your Way' policy, submission proceeds fully online; the system converts source files to a single PDF used for peer review. Initial submission may be a single manuscript file (PDF, Word, etc.) -- separate source files are not required until revision or final submission.",
         "LaTeX submissions are recommended to use the elsarticle.cls class and BibTeX for the bibliography; a dedicated LaTeX site provides templates and detailed instructions.",
@@ -5986,6 +5997,7 @@
       "single_file": false,
       "figures_placement": "end_or_inline",
       "template_required": false,
+      "initial_submission_any_format": "No specific format is required at initial submission beyond a title, the author list with affiliations and contact details, a summary/abstract, and enough experimental detail; a single PDF is accepted.",
       "notes": [
         "Initial submission needs no specific format beyond title, author list/affiliations/footnotes/contact info, a summary/abstract, and sufficient experimental information; upload a single PDF (text plus related material) or a Word file with related material as separate files. LaTeX manuscripts must be submitted as a PDF at initial submission.",
         "Initial submission materials should be no larger than 20 MB total; keep individual figure/other files small (1-2 MB).",
@@ -8900,6 +8912,7 @@
       ],
       "max_display_items": 8,
       "single_file": false,
+      "initial_submission_any_format": "Initial submissions need no special formatting and may be a PDF, Word, or TeX/LaTeX file (TeX compiled to a PDF); the formatting rules apply from acceptance in principle.",
       "notes": [
         "Article: main text up to 3,500 words excluding abstract, Methods, references and figure/table legends; up to 8 figures/tables.",
         "Article structure: Introduction (without heading), Results, Discussion, Online Methods, Acknowledgements, Author contributions, Competing interests; Results and Methods use one-level subheadings only (no nested subheadings).",
@@ -9028,6 +9041,7 @@
       "double_spacing": true,
       "page_numbers": true,
       "single_file": false,
+      "initial_submission_any_format": "Initial-submission length and style are flexible; the formatting rules apply at revision.",
       "notes": [
         "Initial-submission length and style are flexible; the 5,000-word main text limit (excluding abstract, Methods, references and figure legends) is a stated ideal, not a hard cap.",
         "Display items: up to 10 figures/tables depending on word count; manuscripts under 2,000 words should have no more than 4 figures/tables; schemes are not used.",
@@ -9465,6 +9479,7 @@
       ],
       "max_display_items": 6,
       "single_file": false,
+      "initial_submission_any_format": "Initial submissions need no special formatting and may be a PDF, Word, or TeX/LaTeX file (TeX compiled to a PDF); the formatting rules apply from acceptance in principle.",
       "notes": [
         "Article: main text up to 3,500 words excluding abstract, Methods, references and figure legends; up to 6 figures/tables.",
         "Article structure: Introduction (without heading), Results, Discussion, Methods; Results and Methods use topical subheadings and the Discussion has none.",
@@ -9609,6 +9624,7 @@
       ],
       "max_display_items": 6,
       "single_file": false,
+      "initial_submission_any_format": "Initial submissions need no special formatting and may be a PDF, Word, or TeX/LaTeX file (TeX compiled to a PDF); the formatting rules apply from acceptance in principle.",
       "notes": [
         "Article: main text up to 4,000 words excluding abstract, Methods, references and figure legends; up to 6 figures/tables.",
         "Article structure: Introduction (without heading), Results, Discussion, Online Methods; Results and Methods use topical subheadings and the Discussion has none.",
@@ -10177,6 +10193,7 @@
       "single_file": false,
       "figures_placement": "end_or_inline",
       "template_required": false,
+      "initial_submission_any_format": "No specific format is required at initial submission beyond a title, the author list with affiliations and contact details, a summary/abstract, and enough experimental detail; a single PDF is accepted.",
       "notes": [
         "Initial submission needs no specific format beyond title, author list/affiliations/footnotes/contact info, a summary/abstract, and sufficient experimental information; upload a single PDF (text plus related material) or a Word file with related material as separate files. LaTeX manuscripts must be submitted as a PDF at initial submission.",
         "Initial submission materials should be no larger than 20 MB total; keep individual figure/other files small (1-2 MB).",
@@ -10487,6 +10504,7 @@
       ],
       "figures_placement": "end_or_inline",
       "tables_placement": "end",
+      "initial_submission_any_format": "Initial submissions need not follow the formatting requirements, which apply at acceptance; a compiled PDF (or Word file) is accepted at first submission.",
       "notes": [
         "No strict word or page limits (online-only open access journal) but concise writing is strongly recommended; limits below are the content-type formatting guidance.",
         "Initial submissions need not follow formatting requirements, which apply at acceptance; supply a compiled PDF (or Word) at first submission, LaTeX accepted at acceptance.",
@@ -10670,6 +10688,7 @@
       "figures_placement": "separate",
       "tables_placement": "end_or_inline",
       "template_required": false,
+      "initial_submission_any_format": "Initial submissions are format-neutral: any format is accepted, provided it has a title page, abstract, significance statement, main text, references, and figures or tables with legends.",
       "notes": [
         "Initial submissions are format-neutral: the manuscript may be in any format but must include a title page (title, author list, classification, keywords), abstract, significance statement, main text, references, and figures or tables with legends (which may be uploaded separately); SI files may be uploaded separately.",
         "Pages should be numbered starting with the title page.",

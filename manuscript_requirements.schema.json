@@ -442,6 +442,20 @@
           ],
           "description": "Headings other than the reference list that end the main text for the before-refs limits (e.g. Appendix)."
         },
+        "main_text_start_headings": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Headings that start the main text the venue's word count covers, when it is not the Introduction (e.g. Main, Results). Used to check a word count stated on the title page."
+        },
         "count_excludes": {
           "anyOf": [
             {
@@ -668,6 +682,17 @@
             }
           ],
           "description": "Mandated language variant, if any."
+        },
+        "initial_submission_any_format": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings."
         },
         "notes": {
           "anyOf": [

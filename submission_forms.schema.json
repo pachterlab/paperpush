@@ -394,6 +394,26 @@
             }
           ],
           "description": "Id of another field in the same venue; when that field has a non-empty value, this field becomes required. A `boolean` target triggers only on an affirmative answer, since \"no\" means the dependent fields do not apply. Combined with `required` (unconditional)."
+        },
+        "section": {
+          "anyOf": [
+            {
+              "enum": [
+                "type",
+                "files",
+                "metadata",
+                "authors",
+                "reviewers",
+                "declarations",
+                "additional"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Section of the .sub template this field is listed under (type, files, metadata, authors, reviewers, declarations, additional). Omit to use the section paperpush/common_fields.json gives this field id, or \"additional\" when it names none. Layout only: ignored by `paperpush subfile --venue-order`, submission and validation."
         }
       },
       "required": [
@@ -735,6 +755,26 @@
             }
           ],
           "description": "Id of another field in the same venue; when that field has a non-empty value, this field becomes required. A `boolean` target triggers only on an affirmative answer, since \"no\" means the dependent fields do not apply. Combined with `required` (unconditional)."
+        },
+        "section": {
+          "anyOf": [
+            {
+              "enum": [
+                "type",
+                "files",
+                "metadata",
+                "authors",
+                "reviewers",
+                "declarations",
+                "additional"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Section of the .sub template this field is listed under (type, files, metadata, authors, reviewers, declarations, additional). Omit to use the section paperpush/common_fields.json gives this field id, or \"additional\" when it names none. Layout only: ignored by `paperpush subfile --venue-order`, submission and validation."
         }
       },
       "required": [

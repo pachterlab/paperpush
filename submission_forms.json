@@ -6,6 +6,7 @@
       {
         "id": "result_type",
         "autofill": "classify",
+        "section": "type",
         "label": "Type of result",
         "type": "choice",
         "required": true,
@@ -20,6 +21,7 @@
       {
         "id": "server_suitability",
         "autofill": "never",
+        "section": "type",
         "label": "Is your manuscript better suited for bioRxiv or medRxiv?",
         "type": "choice",
         "required": true,
@@ -36,6 +38,7 @@
       {
         "id": "article_scope",
         "autofill": "never",
+        "section": "type",
         "label": "Is your article within scope for bioRxiv?",
         "type": "choice",
         "required": true,
@@ -345,6 +348,7 @@
       {
         "id": "human_subjects",
         "autofill": "never",
+        "section": "declarations",
         "label": "Does the study use human data, samples, or involve human subjects?",
         "type": "choice",
         "required": true,
@@ -358,6 +362,7 @@
       {
         "id": "public_data_only",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Did this work use ONLY simulated data or ONLY openly public data?",
         "type": "choice",
         "required": false,
@@ -371,6 +376,7 @@
       {
         "id": "public_data_source",
         "autofill": "extract",
+        "section": "declarations",
         "label": "Source of the openly available data",
         "type": "textarea",
         "required": false,
@@ -380,6 +386,7 @@
       {
         "id": "ethics_statement",
         "autofill": "extract",
+        "section": "declarations",
         "label": "Ethics oversight / approval statement",
         "type": "textarea",
         "required": false,
@@ -389,6 +396,7 @@
       {
         "id": "clinical_trial",
         "autofill": "never",
+        "section": "declarations",
         "label": "Is this manuscript reporting a clinical trial?",
         "type": "choice",
         "required": true,
@@ -454,7 +462,7 @@
         "label": "Abstract",
         "type": "textarea",
         "required": true,
-        "word_count": 250,
+        "word_count": 150,
         "help": "Original Papers use a structured abstract with the headings 'Motivation:', 'Results:', 'Availability and implementation:', 'Contact:', and (optional) 'Supplementary information:'."
       },
       {
@@ -480,6 +488,7 @@
       {
         "id": "next_gen_sequencing",
         "autofill": "classify",
+        "section": "metadata",
         "label": "Does your manuscript involve Next Generation Sequencing data analysis?",
         "type": "boolean",
         "required": true,
@@ -489,6 +498,7 @@
       {
         "id": "machine_learning",
         "autofill": "classify",
+        "section": "metadata",
         "label": "Does your manuscript involve Machine Learning?",
         "type": "boolean",
         "required": true,
@@ -498,6 +508,7 @@
       {
         "id": "portal_keywords",
         "autofill": "classify",
+        "section": "metadata",
         "label": "Portal Keywords",
         "type": "multichoice",
         "required": true,
@@ -572,7 +583,8 @@
           ".docx",
           ".doc",
           ".tex",
-          ".zip"
+          ".zip",
+          ".rtf"
         ]
       },
       {
@@ -587,7 +599,8 @@
           ".eps",
           ".pdf",
           ".jpg",
-          ".png"
+          ".png",
+          ".gif"
         ]
       },
       {
@@ -607,6 +620,7 @@
       {
         "id": "num_pages",
         "autofill": "extract",
+        "section": "metadata",
         "label": "Number of pages",
         "type": "int",
         "required": true,
@@ -616,6 +630,7 @@
       {
         "id": "num_tables",
         "autofill": "extract",
+        "section": "metadata",
         "label": "Number of tables",
         "type": "int",
         "required": false,
@@ -625,6 +640,7 @@
       {
         "id": "num_figures",
         "autofill": "extract",
+        "section": "metadata",
         "label": "Number of figures",
         "type": "int",
         "required": false,
@@ -671,6 +687,7 @@
       {
         "id": "ethics",
         "autofill": "extract",
+        "section": "declarations",
         "label": "Ethics statement",
         "type": "textarea",
         "required": false,
@@ -687,6 +704,7 @@
       {
         "id": "ai_disclosure",
         "autofill": "never",
+        "section": "declarations",
         "label": "Generative AI use disclosure",
         "type": "textarea",
         "required": false,
@@ -710,6 +728,7 @@
       {
         "id": "funding_to_report",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Is there funding to report for this submission?",
         "type": "boolean",
         "required": true,
@@ -719,6 +738,7 @@
       {
         "id": "resubmission",
         "autofill": "classify",
+        "section": "type",
         "label": "Is this a resubmission of a manuscript which was previously submitted under a different manuscript number?",
         "type": "boolean",
         "required": true,
@@ -728,6 +748,7 @@
       {
         "id": "previous_manuscript_id",
         "autofill": "never",
+        "section": "type",
         "label": "If yes, what is the manuscript ID of the previous submission?",
         "type": "text",
         "required": false,
@@ -736,6 +757,7 @@
       {
         "id": "has_conflict_of_interest",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Do you or your co-authors have any conflict of interest?",
         "type": "boolean",
         "required": true,
@@ -745,6 +767,7 @@
       {
         "id": "conflict_of_interest_details",
         "autofill": "extract",
+        "section": "declarations",
         "label": "If yes, please state your conflict of interest:",
         "type": "textarea",
         "required": false,
@@ -753,6 +776,7 @@
       {
         "id": "cited_unpublished_works",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Have you cited any works that are unpublished or in press?",
         "type": "boolean",
         "required": true,
@@ -762,6 +786,7 @@
       {
         "id": "algorithm_or_software_central",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Is an algorithm or software central to the paper?",
         "type": "boolean",
         "required": true,
@@ -771,6 +796,7 @@
       {
         "id": "code_in_text",
         "autofill": "classify",
+        "section": "declarations",
         "label": "The text of the article includes a link to the code in an open-source repository (e.g., GitHub).",
         "type": "boolean",
         "required": true,
@@ -780,6 +806,7 @@
       {
         "id": "code_repository_link",
         "autofill": "extract",
+        "section": "declarations",
         "label": "Please provide the link to the repository below (optional):",
         "type": "text",
         "required": false,
@@ -789,6 +816,7 @@
       {
         "id": "software_installable",
         "autofill": "classify",
+        "section": "declarations",
         "label": "The software can be installed from an open package repository (e.g. Bioconda, PyPI, Bioconductor) or contains an extensive installation guide and all software dependencies are listed.",
         "type": "boolean",
         "required": true,
@@ -798,6 +826,7 @@
       {
         "id": "software_tested",
         "autofill": "never",
+        "section": "declarations",
         "label": "Someone that is not familiar with the tool has tested its installation and use prior to submission.",
         "type": "boolean",
         "required": true,
@@ -807,6 +836,7 @@
       {
         "id": "test_dataset_provided",
         "autofill": "never",
+        "section": "declarations",
         "label": "The software repository contains a link to a test dataset, and the README includes the instructions to run the method on the test dataset, with the input and output clearly described.",
         "type": "boolean",
         "required": true,
@@ -816,6 +846,7 @@
       {
         "id": "data_documented",
         "autofill": "classify",
+        "section": "declarations",
         "label": "The data used in the manuscript is clearly documented.",
         "type": "boolean",
         "required": true,
@@ -825,6 +856,7 @@
       {
         "id": "data_sources_link",
         "autofill": "extract",
+        "section": "declarations",
         "label": "Please provide the link(s)/accessions/reference(s) to the data sources:",
         "type": "text",
         "required": false,
@@ -833,6 +865,7 @@
       {
         "id": "is_ml_dl_paper",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Is this a Machine Learning / Deep Learning paper?",
         "type": "boolean",
         "required": true,
@@ -842,6 +875,7 @@
       {
         "id": "ml_train_test_splits",
         "autofill": "classify",
+        "section": "declarations",
         "label": "The details of train-test splits or cross-validation folds are explicitly mentioned in the manuscript.",
         "type": "boolean",
         "required": false,
@@ -851,6 +885,7 @@
       {
         "id": "ml_data_transformations",
         "autofill": "classify",
+        "section": "declarations",
         "label": "All transformations of the dataset from its raw form to the form used in the model are reported, and the corresponding pre-processing code is provided.",
         "type": "boolean",
         "required": false,
@@ -860,6 +895,7 @@
       {
         "id": "ml_metrics_uncertainty",
         "autofill": "classify",
+        "section": "declarations",
         "label": "All metrics used to assess and compare model performance are provided along with uncertainty estimates.",
         "type": "boolean",
         "required": false,
@@ -869,6 +905,7 @@
       {
         "id": "is_preprint",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Is this manuscript posted as a preprint?",
         "type": "boolean",
         "required": false,
@@ -952,6 +989,7 @@
       {
         "id": "key_points",
         "autofill": "extract",
+        "section": "metadata",
         "label": "Key Points",
         "type": "textarea",
         "required": true,
@@ -978,7 +1016,10 @@
         "max_pages_by": null,
         "type": "file",
         "accept": [
-          ".pdf"
+          ".pdf",
+          ".doc",
+          ".rtf",
+          ".tex"
         ],
         "help": "Manuscript document. Initial submission requires PDF, revision requires .docx, .rtf, or .tex (NOT PDF)"
       },
@@ -1013,6 +1054,7 @@
       {
         "id": "category",
         "autofill": "classify",
+        "section": "type",
         "label": "Manuscript category",
         "type": "choice",
         "required": true,
@@ -1040,6 +1082,7 @@
       {
         "id": "is_resubmission",
         "autofill": "never",
+        "section": "type",
         "label": "Is this manuscript a resubmission of previous work?",
         "type": "boolean",
         "required": true,
@@ -1049,6 +1092,7 @@
       {
         "id": "resubmission_id",
         "autofill": "never",
+        "section": "type",
         "label": "Manuscript ID of the previous submission (if a resubmission)",
         "type": "text",
         "required": false,
@@ -1062,6 +1106,7 @@
       {
         "id": "author_list_altered",
         "autofill": "never",
+        "section": "authors",
         "label": "If this is a resubmission or revision, has the author list been altered?",
         "type": "choice",
         "required": true,
@@ -1076,6 +1121,7 @@
       {
         "id": "author_list_change_details",
         "autofill": "never",
+        "section": "authors",
         "label": "If the author list has been altered, please provide details",
         "type": "textarea",
         "required": false,
@@ -1084,6 +1130,7 @@
       {
         "id": "back_to_back",
         "autofill": "never",
+        "section": "additional",
         "label": "Should this manuscript be published back-to-back with another?",
         "type": "boolean",
         "required": true,
@@ -1093,6 +1140,7 @@
       {
         "id": "back_to_back_authors",
         "autofill": "never",
+        "section": "additional",
         "label": "First three authors of the accompanying manuscript (if back-to-back)",
         "type": "textarea",
         "required": false,
@@ -1101,6 +1149,7 @@
       {
         "id": "novel_method",
         "autofill": "classify",
+        "section": "additional",
         "label": "Does the manuscript contain a Novel Method?",
         "type": "boolean",
         "required": true,
@@ -1110,6 +1159,7 @@
       {
         "id": "novel_method_description",
         "autofill": "extract",
+        "section": "additional",
         "label": "Brief description of the novel method (if any)",
         "type": "textarea",
         "required": false,
@@ -1118,6 +1168,7 @@
       {
         "id": "supplementary_online",
         "autofill": "never",
+        "section": "files",
         "label": "Is this manuscript accompanied by supplementary material for publication online only?",
         "type": "boolean",
         "required": true,
@@ -1127,6 +1178,7 @@
       {
         "id": "publication_charge_funding",
         "autofill": "never",
+        "section": "declarations",
         "label": "Source of funding for publication charges",
         "type": "textarea",
         "required": true,
@@ -1135,6 +1187,7 @@
       {
         "id": "institution_verification",
         "autofill": "never",
+        "section": "authors",
         "label": "Institution verification status",
         "type": "choice",
         "required": true,
@@ -1154,6 +1207,7 @@
       {
         "id": "data_deposition_types",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Data deposition: which of the following does the manuscript use or report?",
         "type": "multichoice",
         "required": false,
@@ -1177,6 +1231,10 @@
           "Software and source codes",
           "Gel images, micrographs, graphs, and tables"
         ]
+      },
+      {
+        "id": "abstract",
+        "word_count": 200
       }
     ]
   },
@@ -1187,6 +1245,7 @@
       {
         "id": "primary_archive",
         "autofill": "classify",
+        "section": "metadata",
         "label": "Primary archive",
         "type": "choice",
         "required": true,
@@ -1217,6 +1276,7 @@
       {
         "id": "primary_category",
         "autofill": "classify",
+        "section": "metadata",
         "label": "Primary subject category",
         "type": "text",
         "required": true,
@@ -1226,6 +1286,7 @@
       {
         "id": "crosslist_archives",
         "autofill": "never",
+        "section": "metadata",
         "label": "Cross-list archives",
         "type": "multichoice",
         "required": false,
@@ -1257,6 +1318,7 @@
       {
         "id": "crosslist_categories",
         "autofill": "never",
+        "section": "metadata",
         "label": "Cross-list categories",
         "type": "multichoice",
         "required": false,
@@ -1328,6 +1390,7 @@
       {
         "id": "keep_all_files",
         "autofill": "never",
+        "section": "files",
         "label": "Keep all uploaded files",
         "type": "boolean",
         "required": false,
@@ -1337,6 +1400,7 @@
       {
         "id": "comments",
         "autofill": "extract",
+        "section": "metadata",
         "label": "Comments",
         "type": "textarea",
         "required": false,
@@ -1345,6 +1409,7 @@
       {
         "id": "report_number",
         "autofill": "never",
+        "section": "metadata",
         "label": "Report number",
         "type": "text",
         "required": false,
@@ -1353,6 +1418,7 @@
       {
         "id": "journal_reference",
         "autofill": "never",
+        "section": "metadata",
         "label": "Journal reference",
         "type": "text",
         "required": false,
@@ -1361,6 +1427,7 @@
       {
         "id": "acm_class",
         "autofill": "never",
+        "section": "metadata",
         "label": "ACM classification",
         "type": "text",
         "required": false,
@@ -1369,6 +1436,7 @@
       {
         "id": "msc_class",
         "autofill": "never",
+        "section": "metadata",
         "label": "MSC classification",
         "type": "text",
         "required": false,
@@ -1377,6 +1445,7 @@
       {
         "id": "doi",
         "autofill": "never",
+        "section": "metadata",
         "label": "DOI",
         "type": "text",
         "required": false,
@@ -1490,7 +1559,14 @@
           ".pdf",
           ".jpg",
           ".jpeg",
-          ".ppt"
+          ".ppt",
+          ".ai",
+          ".eps",
+          ".ps",
+          ".svg",
+          ".psd",
+          ".tif",
+          ".png"
         ]
       },
       {
@@ -1507,7 +1583,7 @@
         "label": "Supplementary information files",
         "type": "filelist",
         "required": false,
-        "max_file_size_mb": 100,
+        "max_file_size_mb": 30,
         "help": "Optional. Supplementary information files, one per line as 'path | title | description'. Every column after the path is optional. Each file uploads with the 'Supplementary Information' file type. eJournalPress has no distinct supplementary-figure type, so supplementary figures belong here. The title names the object on the per-object metadata step; the description is optional. Example: 'supp/supp_methods.pdf | Supplementary Information | Extended methods'."
       },
       {
@@ -1652,6 +1728,23 @@
       {
         "id": "supplementary_files",
         "help": "Optional. Supplementary information files, one per line as 'path | title | description'. Every column after the path is optional. Each file uploads with the 'Supplemental & Additional Information' file type. eJournalPress has no distinct supplementary-figure type, so supplementary figures belong here. The title names the object on the per-object metadata step; the description is optional. Example: 'supp/supp_methods.pdf | Supplementary Information | Extended methods'."
+      },
+      {
+        "id": "figure_files",
+        "accept": [
+          ".pdf",
+          ".jpg",
+          ".jpeg",
+          ".ppt",
+          ".ai",
+          ".eps",
+          ".ps",
+          ".svg",
+          ".psd",
+          ".tif",
+          ".png",
+          ".cdx"
+        ]
       }
     ]
   },
@@ -1687,7 +1780,21 @@
       },
       {
         "id": "figure_files",
-        "max_file_size_mb": null
+        "max_file_size_mb": null,
+        "accept": [
+          ".pdf",
+          ".jpg",
+          ".jpeg",
+          ".ppt",
+          ".ai",
+          ".eps",
+          ".ps",
+          ".svg",
+          ".psd",
+          ".tif",
+          ".png",
+          ".cdx"
+        ]
       },
       {
         "id": "supplementary_files",
@@ -1734,7 +1841,7 @@
         "label": "Manuscript title",
         "type": "text",
         "required": true,
-        "character_count": 150,
+        "character_count": 145,
         "help": "The full title of the manuscript, typed into the Editorial Manager rich-text title editor."
       },
       {
@@ -1779,7 +1886,8 @@
         "accept": [
           ".pdf",
           ".docx",
-          ".doc"
+          ".doc",
+          ".tex"
         ]
       },
       {
@@ -1824,7 +1932,8 @@
           ".cdx",
           ".ai",
           ".psd",
-          ".ppt"
+          ".ppt",
+          ".png"
         ]
       },
       {
@@ -1999,7 +2108,7 @@
         "label": "Manuscript title",
         "type": "text",
         "required": true,
-        "character_count": 250,
+        "character_count": 200,
         "help": "The full title of the manuscript, typed into the Editorial Manager rich-text title editor."
       },
       {
@@ -2008,7 +2117,7 @@
         "label": "Manuscript short title",
         "type": "text",
         "required": true,
-        "character_count": 90,
+        "character_count": 70,
         "help": "A short running title, typed into the 'Short Title' box beside the full title on the Editorial Manager manuscript-data step. PLOS Computational Biology requires it and will not accept the step without one."
       },
       {
@@ -2017,7 +2126,7 @@
         "label": "Abstract",
         "type": "textarea",
         "required": true,
-        "word_count": 500,
+        "word_count": 300,
         "help": "Plain-text abstract, typed into the Editorial Manager rich-text abstract editor."
       },
       {
@@ -2042,6 +2151,7 @@
       {
         "id": "classifications",
         "autofill": "extract",
+        "section": "metadata",
         "label": "Classifications",
         "type": "textarea",
         "required": true,
@@ -2084,6 +2194,7 @@
       {
         "id": "previous_interactions",
         "autofill": "never",
+        "section": "additional",
         "label": "Previous interactions with PLOS",
         "type": "textarea",
         "required": false,
@@ -2092,6 +2203,7 @@
       {
         "id": "prior_submission",
         "autofill": "never",
+        "section": "declarations",
         "label": "Prior submission / consideration history",
         "type": "textarea",
         "required": false,
@@ -2116,6 +2228,7 @@
       {
         "id": "funding_country",
         "autofill": "never",
+        "section": "declarations",
         "label": "Funding country",
         "type": "choice",
         "required": false,
@@ -2126,6 +2239,7 @@
       {
         "id": "human_participants",
         "autofill": "never",
+        "section": "declarations",
         "label": "Human participants, data, specimens, or tissue",
         "type": "choice",
         "required": true,
@@ -2151,6 +2265,16 @@
           "zip_code",
           "country",
           "corresponding"
+        ]
+      },
+      {
+        "id": "manuscript_file",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".doc",
+          ".tex",
+          ".rtf"
         ]
       }
     ]
@@ -2213,7 +2337,9 @@
         "accept": [
           ".docx",
           ".doc",
-          ".zip"
+          ".zip",
+          ".rtf",
+          ".tex"
         ]
       },
       {
@@ -2401,7 +2527,7 @@
         "label": "Manuscript title",
         "type": "text",
         "required": true,
-        "character_count": 135,
+        "character_count": 96,
         "help": "The full title of the manuscript, typed into the title box on the manuscript-information step."
       },
       {
@@ -2419,7 +2545,7 @@
         "label": "Abstract",
         "type": "textarea",
         "required": true,
-        "word_count": 150,
+        "word_count": 125,
         "help": "Plain-text abstract, typed into the abstract box on the manuscript-information step."
       },
       {
@@ -2512,7 +2638,7 @@
         "autofill": "filemap",
         "label": "Cover letter",
         "type": "file",
-        "required": false,
+        "required": true,
         "help": "Optional. Path to the cover letter, uploaded as the 'Cover Letter' on the file-upload step. doc, docx, or pdf.",
         "accept": [
           ".doc",
@@ -2530,7 +2656,12 @@
         "accept": [
           ".doc",
           ".docx",
-          ".pdf"
+          ".pdf",
+          ".mp4",
+          ".csv",
+          ".tsv",
+          ".json",
+          ".xml"
         ]
       },
       {
@@ -2599,6 +2730,27 @@
         "max_count": 2,
         "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
         "options_file": "science_advances_subjects.txt"
+      },
+      {
+        "id": "abstract",
+        "word_count": 150
+      },
+      {
+        "id": "title",
+        "character_count": 135
+      },
+      {
+        "id": "short_title",
+        "character_count": 50
+      },
+      {
+        "id": "manuscript_file",
+        "accept": [
+          ".docx",
+          ".doc",
+          ".pdf",
+          ".tex"
+        ]
       }
     ]
   },
@@ -2619,6 +2771,14 @@
         "max_count": 2,
         "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
         "options_file": "science_immunology_subjects.txt"
+      },
+      {
+        "id": "abstract",
+        "word_count": 250
+      },
+      {
+        "id": "title",
+        "character_count": 135
       }
     ]
   },
@@ -2639,6 +2799,32 @@
         "max_count": 2,
         "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
         "options_file": "science_robotics_subjects.txt"
+      },
+      {
+        "id": "abstract",
+        "word_count": 250
+      },
+      {
+        "id": "title",
+        "character_count": 100
+      },
+      {
+        "id": "short_title",
+        "character_count": 40
+      },
+      {
+        "id": "supplementary_material",
+        "accept": [
+          ".doc",
+          ".docx",
+          ".pdf",
+          ".mp4",
+          ".csv",
+          ".tsv",
+          ".json",
+          ".xml",
+          ".mov"
+        ]
       }
     ]
   },
@@ -2659,6 +2845,14 @@
         "max_count": 2,
         "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
         "options_file": "science_signaling_subjects.txt"
+      },
+      {
+        "id": "abstract",
+        "word_count": 250
+      },
+      {
+        "id": "title",
+        "character_count": 135
       }
     ]
   },
@@ -2679,6 +2873,14 @@
         "max_count": 2,
         "help": "One or two subject areas selected on the manuscript-information step, comma-separated. The first is required and the second is optional; each is matched to the portal's subject-area picker by name.",
         "options_file": "science_translational_medicine_subjects.txt"
+      },
+      {
+        "id": "abstract",
+        "word_count": 250
+      },
+      {
+        "id": "title",
+        "character_count": 135
       }
     ]
   },
@@ -3080,6 +3282,7 @@
       {
         "id": "no_competing_interests",
         "autofill": "classify",
+        "section": "declarations",
         "label": "No competing interests to declare",
         "type": "boolean",
         "required": false,
@@ -3106,6 +3309,7 @@
       {
         "id": "latex_source",
         "autofill": "filemap",
+        "section": "files",
         "label": "LaTeX source files",
         "type": "file",
         "required": false,
@@ -3133,6 +3337,7 @@
       {
         "id": "share_data",
         "autofill": "never",
+        "section": "declarations",
         "label": "Share research data",
         "type": "boolean",
         "required": false,
@@ -3142,6 +3347,7 @@
       {
         "id": "data_repository_name",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Data repository",
         "type": "choice",
         "required": false,
@@ -3174,6 +3380,7 @@
       {
         "id": "data_repository_url",
         "autofill": "extract",
+        "section": "declarations",
         "label": "Data repository link",
         "type": "text",
         "required": false,
@@ -3184,6 +3391,7 @@
       {
         "id": "source_of_data",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Source of data",
         "type": "choice",
         "required": false,
@@ -3197,6 +3405,7 @@
       {
         "id": "dataset_title",
         "autofill": "extract",
+        "section": "declarations",
         "label": "Dataset title",
         "type": "text",
         "required": false,
@@ -3206,6 +3415,7 @@
       {
         "id": "data_statement",
         "autofill": "classify",
+        "section": "declarations",
         "label": "Research data statement",
         "type": "choice",
         "required": true,
@@ -3239,6 +3449,7 @@
       {
         "id": "author_agreement",
         "autofill": "never",
+        "section": "declarations",
         "label": "EditFlow author agreement accepted",
         "type": "boolean",
         "required": true,
@@ -3274,6 +3485,7 @@
       {
         "id": "msc_classification",
         "autofill": "extract",
+        "section": "metadata",
         "label": "Mathematics Subject Classification",
         "type": "text",
         "required": true,
@@ -3282,6 +3494,7 @@
       {
         "id": "handling_editor",
         "autofill": "never",
+        "section": "reviewers",
         "label": "Handling editor",
         "type": "text",
         "required": true,
@@ -3290,6 +3503,7 @@
       {
         "id": "arxiv_reference",
         "autofill": "extract",
+        "section": "metadata",
         "label": "arXiv reference",
         "type": "text",
         "required": true,
@@ -3312,7 +3526,8 @@
         "required": true,
         "help": "PDF manuscript uploaded to EditFlow's required Article field.",
         "accept": [
-          ".pdf"
+          ".pdf",
+          ".tex"
         ]
       }
     ]
