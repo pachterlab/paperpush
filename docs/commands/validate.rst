@@ -13,7 +13,8 @@ Run the pre-submission checks on a filled ``.sub`` file. Run this before
                              [--dont-check-hidden-text]
                              [--dont-check-openreview-profiles]
                              [--arxiv-latex-cleaner] [--initial-submission]
-                             [-o [PATH]] [--alt-color]
+                             [-o [PATH]] [--cover-letter-max-age DAYS]
+                             [--alt-color]
                              [--ai] [--provider {anthropic,openai,google}]
                              [--model MODEL] [--ai-only] [--ai-tasks FILE]
                              [--ai-results FILE]
@@ -132,6 +133,17 @@ embedded in the manuscript when none are attached)
 - Keywords
 - Statements
 
+**Abstract and front matter** (:ref:`vc-front-matter`)
+
+- No citations in the abstract (the ``.sub``'s and the manuscript's)
+- Structured-abstract headings, when the venue asks for them
+- A contact e-mail address in the manuscript
+
+**Reference list** (:ref:`vc-bibliography`)
+
+- Every reference cited; every citation in the reference list
+- Self-citations not excessive (more than 15, or more than 80% of the list)
+
 **Prose** (:ref:`vc-prose`; a mechanical proofread, not a grammar check)
 
 - Double spaces between words (not after a sentence)
@@ -139,6 +151,8 @@ embedded in the manuscript when none are attached)
 - Spacing around punctuation ("word ,", "word,word")
 - Unbalanced brackets and quotes
 - Common misspellings (codespell)
+- Repetitive word choice (stock words, overused words, a word repeated within
+  a sentence, runs of sentences opening the same way)
 
 Checks that need AI
 ^^^^^^^^^^^^^^^^^^^
@@ -228,6 +242,10 @@ Arguments
    ``paperpush submit`` still validates normally. On the web page, the
    "initial submission (any format)" checkbox next to the Validate buttons
    does the same (it is greyed out for venues without the rule).
+
+``--cover-letter-max-age DAYS``
+   Warn when the date at the top of the cover letter is more than DAYS days
+   old (default 7) or lies in the future. See :ref:`vc-cover-letter`.
 
 ``-o [PATH]``, ``--output [PATH]``
    Also save the report. PDF by default, which keeps the colours; a path ending

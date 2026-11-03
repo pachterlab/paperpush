@@ -220,6 +220,20 @@ _LABEL_JS = "el => [el.getAttribute('aria-label'), el.innerText, el.value, el.ge
 # ---------------------------------------------------------------------------
 
 
+def append_log(directory: str | os.PathLike, failure: FailedAction, resolution: Resolution, actions: list, note: str, **extra: Any) -> None:
+    """Append one handled failure to ``recoveries.jsonl`` in ``directory``.
+
+    The one format every handler writes (agent, ``--ai``, by hand), which
+    ``read_log``, the MCP status, and ``paperpush recovery-report`` read.
+    """
+    entry = {**failure_dict(failure), "resolution": resolution.value, "agent_actions": actions, "note": note, **extra, "at": _now()}
+    try:
+        with (Path(directory) / LOG_FILE).open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry) + "\n")
+    except OSError as exc:
+        logger.warning("recovery: could not append to %s: %s", LOG_FILE, exc)
+
+
 class PageTools:
     """The actions a recovering agent may take on a paused page, with the guardrails.
 
@@ -235,6 +249,9 @@ class PageTools:
         self.allowed_uploads = {str(Path(p).resolve()) for p in allowed_uploads}
         self.final_submit_names = tuple(final_submit_names)
         self._screens = 0
+        #: How an earlier, similar failure in this run was fixed, set by
+        #: :class:`RememberingHandler` so the agent can repeat it.
+        self.hint: dict[str, Any] | None = None
 
     def act(self, page: Any, op: str, target: dict[str, Any] | None = None, value: Any = None) -> dict[str, Any]:
         """Carry out one action. Returns ``{"ok": True, ...}`` or ``{"ok": False, "error": ...}``."""
@@ -312,6 +329,7 @@ class PageTools:
             "aria_snapshot": aria[:SNAPSHOT_LIMIT],
             "aria_snapshot_truncated": len(aria) > SNAPSHOT_LIMIT,
             "screenshot": self.screenshot(page),
+            **({"earlier_fix": self.hint} if self.hint else {}),
         }
 
     def screenshot(self, page: Any) -> str | None:
@@ -325,13 +343,8 @@ class PageTools:
         return str(path)
 
     def log(self, failure: FailedAction, resolution: Resolution, actions: list, note: str, **extra: Any) -> None:
-        """Append one resolved failure to ``recoveries.jsonl``."""
-        entry = {**failure_dict(failure), "resolution": resolution.value, "agent_actions": actions, "note": note, **extra, "at": _now()}
-        try:
-            with (self.directory / LOG_FILE).open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(entry) + "\n")
-        except OSError as exc:
-            logger.warning("recovery: could not append to %s: %s", LOG_FILE, exc)
+        """Append one handled failure to ``recoveries.jsonl``."""
+        append_log(self.directory, failure, resolution, actions, note, **extra)
 
 
 class AgentHandler:
@@ -357,7 +370,8 @@ class AgentHandler:
     def recover(self, page: Any, failure: FailedAction) -> Resolution:
         actions: list[dict[str, Any]] = []
         screenshot = self.tools.screenshot(page)
-        _write_json(self.directory / PAUSED_FILE, {**failure_dict(failure), "screenshot": screenshot, "paused_at": _now()})
+        hint = {"earlier_fix": self.tools.hint} if self.tools.hint else {}
+        _write_json(self.directory / PAUSED_FILE, {**failure_dict(failure), "screenshot": screenshot, "paused_at": _now(), **hint})
         self._print(f"\n>>> Paused for agent recovery: {failure.describe()}")
         self._print(f"    Recovery directory: {self.directory}")
         deadline = time.monotonic() + self.pause_timeout
@@ -410,6 +424,121 @@ class AgentHandler:
                 actions.append({"op": op, **{k: command[k] for k in ("target", "value") if k in command}})
             return reply, None
         return {"ok": False, "error": command.get("error") or f"unknown op {op!r}"}, None
+
+
+#: Agent actions that only wait or press a named button/link. A fix made of
+#: these alone carries no data from the .sub, so repeating it for an identical
+#: failure cannot type the previous entry's values into the next one.
+_REPLAYABLE_ROLES = frozenset({"button", "link", "tab"})
+
+
+def _replayable(actions: list[dict[str, Any]]) -> bool:
+    if not actions:
+        return False  # "resolved" with nothing done (e.g. fixed by hand): never skip a step silently
+    for action in actions:
+        op = action.get("op")
+        if op == "wait":
+            continue
+        target = action.get("target") or {}
+        if op == "click" and isinstance(target, dict) and target.get("role") in _REPLAYABLE_ROLES and set(target) <= {"role", "name", "exact", "nth"}:
+            continue
+        return False
+    return True
+
+
+def _similar_key(failure: FailedAction) -> tuple:
+    """The failure with numbers blurred: row 1 and row 2 of the same widget match."""
+    name = failure.action.split("(", 1)[0]
+    return (failure.step, name, re.sub(r"\d+", "#", failure.target or ""))
+
+
+class RememberingHandler:
+    """Reuse what fixed a failure earlier in the same run.
+
+    Wraps the handler that does the real work (:class:`AgentHandler`, or the
+    in-process model of ``submit --ai``). For each failure it resolves, it
+    remembers the actions that worked. Then:
+
+    * The same action on the same element failing again (first attempt) is
+      fixed by replaying those actions, without pausing, when they only wait or
+      click a named button or link (:func:`_replayable`). A fix that typed,
+      selected, or uploaded something is never replayed: on a repeated widget it
+      would enter the previous row's data.
+    * Otherwise, a failure that matches an earlier one apart from numbers (row
+      2 after row 1) goes to the wrapped handler with the earlier fix attached
+      as ``earlier_fix`` (in ``paused.json`` and page snapshots), so the agent
+      can repeat it with the right index and values.
+
+    Nothing is kept between runs; each run starts with an empty memory.
+    """
+
+    def __init__(self, inner: Any, tools: PageTools, output=print):
+        self.inner = inner
+        self.tools = tools
+        self._print = output
+        self._exact: dict[tuple, dict[str, Any]] = {}
+        self._similar: dict[tuple, dict[str, Any]] = {}
+        # A reused --recover-dir holds earlier runs' entries; they are not this run's.
+        self._seen_log = len(read_log(tools.directory))
+
+    def recover(self, page: Any, failure: FailedAction) -> Resolution:
+        exact_key = (failure.step, failure.action, failure.target)
+        known = self._exact.get(exact_key)
+        if known and failure.attempt == 1 and _replayable(known["actions"]):
+            resolution = self._replay(page, failure, known)
+            if resolution is not None:
+                return resolution
+        earlier = self._similar.get(_similar_key(failure))
+        self.tools.hint = earlier
+        try:
+            resolution = self.inner.recover(page, failure)
+        finally:
+            self.tools.hint = None
+        if resolution is not Resolution.ABORT:
+            self._remember(failure, resolution)
+        return resolution
+
+    def _replay(self, page: Any, failure: FailedAction, known: dict[str, Any]) -> Resolution | None:
+        self._print(f"\n>>> Step failed the same way as before: {failure.describe()}")
+        self._print("    Repeating the fix that worked last time...")
+        for action in known["actions"]:
+            reply = self.tools.act(page, action["op"], action.get("target"), action.get("value"))
+            if not reply.get("ok"):
+                self._print(f"    That no longer works ({reply.get('error')}); handing over.")
+                return None
+        resolution = Resolution(known["resolution"])
+        self.tools.log(failure, resolution, known["actions"], f"replayed the fix from {known['at']}", handler="replay")
+        self._seen_log += 1
+        self._print(f">>> Replayed: {resolution.value}")
+        return resolution
+
+    def _remember(self, failure: FailedAction, resolution: Resolution) -> None:
+        # The wrapped handler logged what it did; read back its newest entry.
+        entries = read_log(self.tools.directory)
+        new = entries[self._seen_log :]
+        self._seen_log = len(entries)
+        if not new:
+            return
+        entry = new[-1]
+        record = {"resolution": resolution.value, "actions": entry.get("agent_actions") or [], "note": entry.get("note") or "", "at": entry.get("at") or _now(), "action": failure.action, "target": failure.target}
+        self._exact[(failure.step, failure.action, failure.target)] = record
+        self._similar[_similar_key(failure)] = record
+
+
+def recovery_dir_of(handler: Any) -> Path | None:
+    """The recovery directory a handler logs to, looking through wrappers."""
+    seen = 0
+    while handler is not None and seen < 5:
+        tools = getattr(handler, "tools", None)
+        if isinstance(tools, PageTools):
+            return tools.directory
+        log_dir = getattr(handler, "log_dir", None)  # HumanHandler
+        if isinstance(log_dir, Path):
+            return log_dir
+        handlers = getattr(handler, "handlers", None)  # FallbackHandler
+        handler = handlers[0] if handlers else getattr(handler, "inner", None)
+        seen += 1
+    return None
 
 
 # ---------------------------------------------------------------------------

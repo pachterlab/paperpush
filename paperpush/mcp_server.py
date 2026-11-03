@@ -88,6 +88,8 @@ Confidence = Literal["low", "medium", "high"]
 # pipe, the child's `input()` raises EOFError, the process exits, and Playwright
 # takes the browser down with it. See :func:`submit`.
 _RUNS: dict[int, "SubmissionRun"] = {}
+# Recovery directories of closed runs, so recovery_report still finds them by pid.
+_CLOSED_RECOVER_DIRS: dict[int, Path] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -372,6 +374,7 @@ def validate_subfile(
     alt_color: bool = False,
     initial_submission: bool = False,
     ai_only: bool = False,
+    cover_letter_max_age_days: int = 7,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file and report every check.
 
@@ -396,9 +399,14 @@ def validate_subfile(
     page numbers, template, spelling variant), figures (resolution, lettering
     size and typeface, panel labels, placement, legends), the order figures and
     tables are cited in, whether the title, abstract, authors, keywords,
-    and statements in the `.sub` match the manuscript, and the prose (double
-    spaces, repeated words, punctuation spacing, unbalanced brackets and
-    quotes, common misspellings).
+    and statements in the `.sub` match the manuscript, whether the word,
+    figure, and table counts stated on the title page are right, whether the
+    cover letter is recently dated and names this venue, whether the abstract
+    cites references (or lacks the structure the venue asks for), whether the
+    manuscript gives a contact e-mail, whether every reference is cited and how
+    many are self-citations, and the prose (double spaces, repeated words,
+    punctuation spacing, unbalanced brackets and quotes, common misspellings,
+    repetitive word choice).
     `anonymous` checks a double-blind submission for information identifying
     its authors -- their names, emails, IDs and affiliations from the author
     list, author metadata, home-directory paths, acknowledgments -- in the
@@ -422,6 +430,10 @@ def validate_subfile(
     those checks and skips the deterministic ones (the manuscript is still read
     to find which apply; it cannot be combined with `check_manuscript=false`).
 
+    `cover_letter_max_age_days` (default 7): the cover letter's date may be at
+    most this old; the letter is also checked for the name of a different
+    venue left over from an earlier submission.
+
     `initial_submission` validates the file as an initial submission: every
     error comes back as a warning, so nothing blocks it. Use it when the venue
     lets the initial submission be in any format; that rule, when the venue
@@ -439,7 +451,7 @@ def validate_subfile(
 
     path, text, venue = _load_subfile(subfile, manuscript_dir)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
-    result = _run_validate_report(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, ai=ai, subfile_path=str(path), ai_only=ai_only)
+    result = _run_validate_report(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path), ai_only=ai_only)
     out: dict[str, Any] = {
         "path": str(path),
         "venue": venue.slug,
@@ -809,6 +821,12 @@ class SubmissionRun:
             }
             if paused:
                 report["next_step"] = _PAUSED_NEXT_STEP
+            elif report["recovery"]["resolved_so_far"]:
+                report["recovery"]["report"] = (
+                    "Steps of this run needed recovery, so the venue script is probably out of date for everyone. "
+                    "Once the author is done, call recovery_report to draft a redacted GitHub issue, show them the draft, "
+                    "and give them the link to file it only if they want to. Never file it yourself."
+                )
         if self.cdp_port is not None:
             from .venues.recovery_channel import cdp_endpoint
 
@@ -1071,11 +1089,50 @@ def submit_close(pid: int) -> dict[str, Any]:
         run.process.stdin.close()
     run.log_file.close()
     snapshot = run.snapshot()
+    if run.recover_dir is not None:
+        _CLOSED_RECOVER_DIRS[pid] = run.recover_dir
     _RUNS.pop(pid, None)
     _reap_finished_runs()
 
     snapshot["status"] = "already_finished" if already_finished else "closed"
     return snapshot
+
+
+def recovery_report(pid: Optional[int] = None, directory: Optional[str] = None) -> dict[str, Any]:
+    """Draft a bug report from a submission run whose steps needed recovery.
+
+    When steps of a `submit` run failed and were fixed (with submit_act /
+    submit_resume), the run logged what failed and what worked instead. On a
+    pip install nobody else sees that log, so the next author hits the same
+    broken step. This turns it into a GitHub issue draft for the paperpush
+    maintainers: `title`, a Markdown `body`, and a prefilled `issue_url`.
+
+    The draft is redacted (typed values, file paths, e-mail addresses, values
+    from the .sub, URL query strings) and screenshots are left out, but it is
+    still the author's to share. Show them the title and body, and give them the
+    `issue_url` to review and submit themselves if they agree. Never open or
+    submit it on their behalf.
+
+    Pass the `pid` of a run this server started (also after submit_close), or
+    the run's recovery `directory` (absolute path).
+    """
+    from .venues import recovery_report as rr
+
+    if directory:
+        root = Path(directory).expanduser()
+    elif pid is not None:
+        run = _RUNS.get(pid)
+        root = run.recover_dir if run is not None else _CLOSED_RECOVER_DIRS.get(pid)
+        if root is None:
+            raise ValueError(f"no submission with pid {pid} and a recovery directory was started by this server")
+    else:
+        root = rr.latest_run_with_recoveries()
+        if root is None:
+            raise ValueError("no submission run with recoveries was found; pass pid or directory")
+    try:
+        return rr.build_report(root).as_dict()
+    except FileNotFoundError as exc:
+        raise ValueError(str(exc)) from None
 
 
 def submit_page(pid: int) -> dict[str, Any]:
@@ -1178,6 +1235,7 @@ TOOLS = (
     submit_act,
     submit_resume,
     submit_close,
+    recovery_report,
 )
 
 
@@ -1218,7 +1276,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. It needs a .sub file that passes validation and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
     )
     for tool in TOOLS:
         server.tool()(tool)

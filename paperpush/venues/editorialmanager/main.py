@@ -34,7 +34,7 @@ from ..common import DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts, hold
 from ..common import parse_pipe_funders as _parse_funders
 from ..common import save_storage
 from ..common import split_name_first_last as _split_name
-from ..common import wait_for_human
+from ..common import wait_for_manual_sign_in
 from ..login import VenueLoginError, login_orcid
 from ..recovery import GuardedPage, guard, step, unrecovered
 from ..recovery_channel import browser_launch_args
@@ -1631,6 +1631,6 @@ class EditorialManagerVenue(Venue):
                 return False
 
             logger.info("Falling back to a manual %s sign-in", cfg.name)
-            wait_for_human(f"Sign in to {cfg.name} in the browser window")
+            wait_for_manual_sign_in(cfg.name, cfg.slug)
             save_storage(context, session)
             return True

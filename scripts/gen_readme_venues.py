@@ -100,14 +100,17 @@ PLATFORMS = {
 WALKTHROUGH = load_status(STATUS_PATH)
 
 
-def walkthrough_cell(slug: str) -> str:
+def walkthrough_cell(slug: str, supports_submit: bool = True) -> str:
     """Render the submit-walkthrough status cell as plain text.
 
     The cell text is the last successful run date (``✅ YYYY-MM-DD``) when the
-    walkthrough test has recorded one for this slug, or ``❌`` otherwise.
+    walkthrough test has recorded one for this slug, ``➖`` when the venue has
+    no submit script (so there is nothing to walk through), or ``❌`` otherwise.
     """
     date = WALKTHROUGH.get(slug)
-    return f"✅ {date}" if date else "❌"
+    if date:
+        return f"✅ {date}"
+    return "❌" if supports_submit else "➖"
 
 
 def _cell(text: str) -> str:
@@ -148,7 +151,7 @@ def build_table() -> str:
     for j in venues:
         validate, submit = ("yes" if j.supports_validate else "no"), ("yes" if j.supports_submit else "no")
         platform = platform_of(j) if j.has_form else "-"
-        lines.append(f"| `{j.slug}` | {_linked_name(j)} | {_cell(j.venue_type.capitalize())} | {validate} | {submit} | {_cell(platform)} | {_cell(j.description)} | {walkthrough_cell(j.slug)} |")
+        lines.append(f"| `{j.slug}` | {_linked_name(j)} | {_cell(j.venue_type.capitalize())} | {validate} | {submit} | {_cell(platform)} | {_cell(j.description)} | {walkthrough_cell(j.slug, j.supports_submit)} |")
     return "\n".join(lines)
 
 

@@ -79,6 +79,21 @@ CF_NOVEL_METHOD_DESC = "564150"
 CF_SUPPLEMENTARY_ONLINE = "61758"
 CF_DATA_AVAILABILITY = "1521496"
 
+# File-upload step: every row's file input has this accessible label, whether
+# ScholarOne renders styled "Select File N" buttons or bare native inputs.
+UPLOAD_INPUT_LABEL = "FILE_TO_UPLOAD"
+
+# "Add Funder" modal on the declarations page (an ExtJS dialog). The funder
+# name box autocompletes from a paged, alphabetical suggestion list, and the
+# modal's "+ Add Funder" button is exposed as "Confirm".
+FUNDER_OPEN_BUTTON = "Add Funder"
+FUNDER_NAME_INPUT = "[role=dialog] input[type=text]"
+FUNDER_SUGGESTIONS = ".x-boundlist"
+FUNDER_NEXT_PAGE = ".x-tbar-page-next"
+FUNDER_GRANT_INPUT = "[role=dialog] tr:has-text('Grant / Award') input[type=text]"
+FUNDER_CONFIRM_BUTTON = "Confirm"
+FUNDER_CLOSE_BUTTON = "Close"
+
 # Author-confirmation checkboxes (all required consents): checked unconditionally.
 CF_CONFIRM_CHECKBOXES = (
     "61761",  # all authors in complete agreement with the contents
@@ -209,7 +224,7 @@ def _upload_files(page, files: list[tuple[str, str]]) -> None:
         # The rows are addressed by position: ScholarOne sometimes renders them
         # with styled "Select File N" buttons and sometimes as bare native file
         # inputs with no number in the row's text.
-        page.get_by_label("FILE_TO_UPLOAD", exact=True).nth(index).set_input_files(path)
+        page.get_by_label(UPLOAD_INPUT_LABEL, exact=True).nth(index).set_input_files(path)
         page.locator(f'select[file-index="{index}"]').select_option(label=designation)
 
 
@@ -328,9 +343,9 @@ def _add_funders(page, funders: list[tuple[str, str]]) -> None:
             # The whole modal is best-effort (failures are logged below), so its
             # actions are not handed to the recovery handler one by one.
             with unrecovered():
-                page.get_by_role("button", name="Add Funder").click()
+                page.get_by_role("button", name=FUNDER_OPEN_BUTTON).click()
                 page.wait_for_timeout(1000)
-                name_box = page.locator("[role=dialog] input[type=text]").first
+                name_box = page.locator(FUNDER_NAME_INPUT).first
                 name_box.click()
                 # Type the last character as a key press: a bare fill() does not
                 # fire the keyup that opens the Crossref-funder suggestion list.
@@ -339,17 +354,16 @@ def _add_funders(page, funders: list[tuple[str, str]]) -> None:
                 page.wait_for_timeout(2000)
                 _pick_funder_suggestion(page, funder)
                 if grant_id:
-                    grant_box = page.locator("[role=dialog] tr:has-text('Grant / Award') input[type=text]").first
+                    grant_box = page.locator(FUNDER_GRANT_INPUT).first
                     grant_box.fill(grant_id)
-                # The modal's "+ Add Funder" button is exposed as "Confirm".
-                page.get_by_role("button", name="Confirm").click()
+                page.get_by_role("button", name=FUNDER_CONFIRM_BUTTON).click()
                 page.wait_for_timeout(1000)
         except Exception as exc:  # noqa: BLE001 -- best-effort optional modal step
             logger.warning("nucleic_acids_research: could not add funder %r via the modal (%s); " "leaving it to be finished by hand", funder, exc)
             # Never leave the modal open: it covers every later control on the page.
             try:
                 with unrecovered():
-                    page.get_by_role("button", name="Close").click(timeout=3000)
+                    page.get_by_role("button", name=FUNDER_CLOSE_BUTTON).click(timeout=3000)
             except Exception:  # noqa: BLE001 -- modal may never have opened
                 pass
 
@@ -366,11 +380,11 @@ def _pick_funder_suggestion(page, funder: str) -> None:
     for "National Institutes of Health"), so the first item is not the match.
     """
     for _ in range(MAX_FUNDER_PAGES):
-        match = page.locator(".x-boundlist").get_by_text(funder, exact=True)
+        match = page.locator(FUNDER_SUGGESTIONS).get_by_text(funder, exact=True)
         if match.count():
             match.first.click()
             return
-        next_page = page.locator(".x-tbar-page-next")
+        next_page = page.locator(FUNDER_NEXT_PAGE)
         if not next_page.count() or "x-item-disabled" in (next_page.first.get_attribute("class") or "") or "x-btn-disabled" in (next_page.first.locator("xpath=ancestor::*[contains(@class,'x-btn')][1]").get_attribute("class") or ""):
             break
         next_page.first.click()

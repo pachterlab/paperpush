@@ -909,12 +909,14 @@ class Checks:
     broken heuristic never hides the rest of the report.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, options: dict | None = None) -> None:
         from . import report
 
         self._report = report
         self.results: list = []
         self.ai_tasks: list = []
+        # Settings the check modules read (e.g. ``cover_letter_max_age_days``).
+        self.options: dict = dict(options or {})
 
     def run(self, check_id: str, title: str, category: str, fn, *args, **kwargs):
         report = self._report
@@ -1002,6 +1004,9 @@ _MANUSCRIPT_STAGES = (
     ("figure_check", "Figures"),
     ("citation_check", "Figure and table order"),
     ("consistency", "Form against the manuscript"),
+    ("front_matter_check", "Abstract and front matter"),
+    ("bibliography_check", "Reference list"),
+    ("cover_letter_check", "Cover letter"),
     ("prose_check", "Spelling and prose"),
 )
 
@@ -1055,6 +1060,7 @@ def validate(
     check_hidden_text: bool = True,
     check_openreview: bool = True,
     initial_submission: bool = False,
+    cover_letter_max_age_days: int = 7,
 ) -> list[Issue]:
     """Return all issues found in ``subfile`` against ``venue``.
 
@@ -1076,6 +1082,7 @@ def validate(
         check_hidden_text=check_hidden_text,
         check_openreview=check_openreview,
         initial_submission=initial_submission,
+        cover_letter_max_age_days=cover_letter_max_age_days,
     ).issues()
 
 
@@ -1091,6 +1098,7 @@ def validate_report(
     check_hidden_text: bool = True,
     check_openreview: bool = True,
     initial_submission: bool = False,
+    cover_letter_max_age_days: int = 7,
     ai=None,
     subfile_path: str = "",
     ai_only: bool = False,
@@ -1123,9 +1131,17 @@ def validate_report(
     lettering, and type (:mod:`paperpush.figure_check`), the order figures and
     tables are cited in (:mod:`paperpush.citation_check`), and whether the
     title, abstract, authors, keywords, and statements in the ``.sub`` match
-    the manuscript (:mod:`paperpush.consistency`), and the manuscript's prose
+    the manuscript and whether the word, figure, and table counts stated on its
+    title page are right (:mod:`paperpush.consistency`), whether the cover
+    letter is recently dated and names this venue
+    (:mod:`paperpush.cover_letter_check`), whether the abstract cites
+    references or lacks the structure the venue asks for and whether the
+    manuscript gives a contact e-mail (:mod:`paperpush.front_matter_check`),
+    whether every reference is cited and how many are self-citations
+    (:mod:`paperpush.bibliography_check`), and the manuscript's prose
     for double spaces, repeated words, punctuation spacing, unbalanced
-    brackets and quotes, and common misspellings (:mod:`paperpush.prose_check`).
+    brackets and quotes, common misspellings, and repetitive word choice
+    (:mod:`paperpush.prose_check`).
 
     ``check_anonymous`` scans the submission for information identifying its
     authors, including every linked anonymous.4open.science repository (see
@@ -1144,6 +1160,10 @@ def validate_report(
     for venues whose guidelines let the initial submission be in any format
     (``manuscript.initial_submission_any_format``); that rule is put on the
     report (``initial_submission_rule``) whether or not the flag is set.
+
+    ``cover_letter_max_age_days`` is how old the cover letter's date may be
+    before it is reported (see :mod:`paperpush.cover_letter_check`, which also
+    checks that the letter does not name another venue).
 
     ``ai`` (an :class:`~paperpush.ai_validate.AiOptions`) decides what happens
     to the checks only an LLM can judge: run them through a provider's API,
@@ -1176,7 +1196,7 @@ def validate_report(
         check_openreview,
     )
     values = subfile.values
-    checks = Checks()
+    checks = Checks(options={"cover_letter_max_age_days": cover_letter_max_age_days})
     if ai_only:
         if not check_manuscript:
             raise ValueError("ai_only needs check_manuscript: the manuscript checks decide which AI checks apply")

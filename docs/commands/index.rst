@@ -6,8 +6,8 @@ the submission workflow. This section documents every command in detail.
 
 .. code-block:: text
 
-   usage: paperpush [-h] [--version] [--venues]
-                    {subfile,options,autofill,validate,requirements,login,submit,web,add-venue,update-venues} ...
+   usage: paperpush [-h] [--version] [--venues [{all,submit}]]
+                    {subfile,options,autofill,validate,requirements,login,submit,recovery-report,web,add-venue,update-venues} ...
 
 Global options
 --------------
@@ -17,9 +17,12 @@ These apply to ``paperpush`` itself (before the subcommand):
 ``--version``
    Print the installed PaperPush version and exit.
 
-``--venues``
+``--venues [{all,submit}]``
    List every supported venue, grouped by type (preprint server, journal,
    conference), with its slug, then exit. See :doc:`../venues`.
+   ``--venues submit`` lists only the venues ``paperpush submit`` can submit
+   to (validate-only venues are left out); ``--venues`` alone is the same as
+   ``--venues all``.
 
 Common options
 --------------
@@ -47,6 +50,7 @@ The commands, in workflow order
    requirements
    login
    submit
+   recovery-report
    web
    add-venue
    update-venues

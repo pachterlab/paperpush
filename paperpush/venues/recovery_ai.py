@@ -269,7 +269,21 @@ def _opening_text(failure: FailedAction, snap: dict[str, Any]) -> str:
         f"Page title: {snap.get('title')}\n\n"
         f"Accessibility tree of the page now{' (truncated)' if snap.get('aria_snapshot_truncated') else ''}:\n"
         f"{snap.get('aria_snapshot')}\n\n"
+        f"{_earlier_fix_text(snap.get('earlier_fix'))}"
         "A screenshot of the page is attached. Fix the step, then call `finish`."
+    )
+
+
+def _earlier_fix_text(fix: dict[str, Any] | None) -> str:
+    """Describe how a similar failure earlier in this run was fixed, if one was."""
+    if not fix:
+        return ""
+    return (
+        "A similar step failed earlier in this run (it may differ only in a row number or value):\n"
+        f"  failed: {fix.get('action')} on {fix.get('target')}\n"
+        f"  fixed with: {json.dumps(fix.get('actions'))}\n"
+        f"  then: {fix.get('resolution')}" + (f" ({fix.get('note')})" if fix.get("note") else "") + "\n"
+        "Adapt that fix to this step (its index and values) rather than copying it.\n\n"
     )
 
 

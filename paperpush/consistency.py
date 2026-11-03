@@ -15,7 +15,11 @@ compares them word for word, ignoring case, punctuation, and line breaks:
   in the front matter, in the same order as the ``.sub`` lists them; e-mail
   addresses and ORCID iDs the front matter prints must agree;
 * **keywords** -- the manuscript's "Keywords:" line (or ``\\keywords``)
-  against the ``.sub``'s list, as sets.
+  against the ``.sub``'s list, as sets;
+* **stated counts** -- a word count on the title page against the main text
+  (and an abstract word count against the ``.sub``'s abstract), and a stated
+  number of figures, tables, or display items against those the manuscript
+  cites (see :func:`stated_counts` and :func:`main_text_scopes`).
 
 An identical value passes; a near match is a WARNING listing the first few
 differing words; a value the manuscript does not contain at all is a WARNING
@@ -32,7 +36,7 @@ from pathlib import Path
 
 from . import document
 from .database import Field, Venue
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked, unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +160,8 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("consistency.authors", "Authors in the .sub match the manuscript (names, order, emails, ORCIDs)", CONSISTENCY, _authors_check, venue, values)
     checks.run("consistency.keywords", "Keywords in the .sub match the manuscript", CONSISTENCY, _keywords_check, venue, values, by_id)
     checks.run("consistency.statements", "Statements in the .sub match the manuscript", CONSISTENCY, _statements_check, venue, values)
+    checks.run("consistency.word_counts", "Word counts stated on the title page match the manuscript", CONSISTENCY, _word_counts_check, venue, values)
+    checks.run("consistency.display_counts", "Figure and table counts stated on the title page match the manuscript", CONSISTENCY, _display_counts_check, venue, values)
 
 
 def _title_check(venue: Venue, values: dict[str, str], by_id: dict[str, Field]) -> Outcome:
@@ -333,3 +339,325 @@ def _statements_check(venue: Venue, values: dict[str, str]) -> Outcome:
         if detail:
             matched.append(f.label)
     return Outcome(issues, f"{len(matched)} statement(s) match: {', '.join(matched)}" if matched else "")
+
+
+# --- counts stated on the title page ---------------------------------------------------
+#
+# Title pages often state the manuscript's word count and its number of figures
+# and tables, and those numbers go stale with every revision. Each stated count
+# is compared with the manuscript itself.
+#
+# Word counts are measured from where the main text starts (the Introduction,
+# a venue's ``main_text_start_headings``, or else the end of the abstract) to
+# each place the venue's count could plausibly stop: the first back-matter
+# heading (acknowledgements, declarations, figure legends), a Methods section
+# placed after the results, or the reference list. Venues and word processors
+# count differently, so a stated count passes when any of those scopes, or the
+# whole document, is within WORD_COUNT_TOLERANCE of it (and at least
+# WORD_COUNT_SLACK words).
+
+WORD_COUNT_TOLERANCE = 0.05
+WORD_COUNT_SLACK = 50
+ABSTRACT_COUNT_SLACK = 10
+
+_NUMBER_WORDS = {w: i for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
+_COUNT = re.compile(
+    rf"(?<![\w.,])(\d{{1,3}}(?:,\d{{3}})+|\d+|{'|'.join(_NUMBER_WORDS)})(?![\w]|[.,]\d)",
+    re.IGNORECASE,
+)
+# A stated limit or a range ("Word limit: 3,000", "150-250 words") is not a count.
+_LIMIT_WORDS = re.compile(
+    r"\blimit|\bmax(?:imum)?\b|\bup\s+to\b|\bat\s+most\b|\bno\s+more\s+than\b|\bnot\s+exceed|[<\u2264]",
+    re.IGNORECASE,
+)
+_RANGE = re.compile(r"^\s*(?:[\u2013-]|to)\s*\d")
+# Word counts of parts this check does not measure.
+_UNMEASURED_WORD_COUNT = re.compile(
+    r"legend|caption|method|reference|title|character|summary|significance|highlight|keyword|supplement",
+    re.IGNORECASE,
+)
+_SEGMENT_SPLIT = re.compile(r"\n|;|\||\u00b7|\u2022")
+_PARENTHETICAL = re.compile(r"\([^()]*\)|\[[^\[\]]*\]")
+_DISPLAY_NOUNS = (
+    ("display_items", r"display\s+items?"),
+    ("figures", r"(?:main(?:\s+text)?\s+)?(?:figures?|figs?\.?)"),
+    ("tables", r"(?:main(?:\s+text)?\s+)?tables?"),
+)
+_START_HEADINGS = ("Introduction", "Background", "Main")
+_BACK_MATTER_HEADINGS = (
+    "Acknowledgements", "Acknowledgments", "Acknowledgement", "Acknowledgment", "Author contributions", "Contributions",
+    "Competing interests", "Competing interest", "Conflicts of interest", "Conflict of interest", "Declaration of interests",
+    "Declarations", "Data availability", "Code availability", "Data and code availability", "Funding", "Figure legends",
+    "Figure captions", "Figure titles and legends", "Supplementary information", "Supplementary material", "Supplementary materials",
+    "Ethics statement", "Additional information", "Disclosures", "Author information",
+)  # fmt: skip
+_METHODS_HEADINGS = (
+    "Methods",
+    "Materials and methods",
+    "Online methods",
+    "Experimental procedures",
+    "STAR Methods",
+    "Method details",
+)
+_RESULTS_HEADINGS = (
+    "Results",
+    "Discussion",
+    "Results and discussion",
+    "Conclusion",
+    "Conclusions",
+)
+
+
+def _count_value(token: str) -> int:
+    token = token.lower()
+    return _NUMBER_WORDS[token] if token in _NUMBER_WORDS else int(token.replace(",", ""))
+
+
+def _tidy(quote: str) -> str:
+    return re.sub(r"\s+([:=])", r"\1", re.sub(r"\s+", " ", quote)).strip()
+
+
+def stated_counts(front: str) -> list[tuple[str, int, str]]:
+    """Counts the title page states, as ``(kind, number, text)``.
+
+    ``kind`` is ``"abstract"`` or ``"text"`` for a word count, ``"figures"``,
+    ``"tables"``, or ``"display_items"`` for a count of display items. Each
+    number is labelled by the words before it on its line (since the previous
+    number), with parenthetical remarks set aside: "Word count (excluding
+    Methods): 3,500" is a main-text count. Stated limits ("word limit: 3000"),
+    ranges, and counts of parts not measured here (legends, methods,
+    references, the title, supplementary items) are left out.
+    """
+    out: list[tuple[str, int, str]] = []
+    for segment in _SEGMENT_SPLIT.split(front):
+        text = re.sub(r"\s+", " ", segment).strip()
+        bare = _PARENTHETICAL.sub(" ", text)
+        if not bare or len(bare) > 200:
+            continue
+        previous = 0
+        for m in _COUNT.finditer(bare):
+            left, right = bare[previous : m.start()], bare[m.end() :]
+            previous = m.end()
+            label_end = re.split(r"[,.]\s", left)[-1]
+            if _LIMIT_WORDS.search(label_end) or _RANGE.match(right) or re.search(r"(?:[\u2013-]|\bto)\s*$", left):
+                continue
+            number = _count_value(m.group(1))
+            words_after = re.match(r"\s*words?\b", right, re.IGNORECASE)
+            if words_after or re.search(r"\bwords?\b|word\s*count", label_end, re.IGNORECASE) and re.search(r"[:=]\s*$", left):
+                quote = _tidy(label_end + m.group(0) + (words_after.group(0) if words_after else ""))
+                if re.search(r"\babstract\b", label_end, re.IGNORECASE):
+                    out.append(("abstract", number, quote))
+                elif not _UNMEASURED_WORD_COUNT.search(label_end):
+                    out.append(("text", number, quote))
+                continue
+            for kind, noun in _DISPLAY_NOUNS:
+                before = re.search(rf"(?:number\s+of\s+)?\b{noun}\s*[:=]\s*$", left, re.IGNORECASE)
+                after = re.match(rf"\s+{noun}(?!\s*\d)", right, re.IGNORECASE)
+                if before or after:
+                    if re.search(
+                        r"supplement|extended\s+data|appendix",
+                        label_end + (right[: after.end()] if after else ""),
+                        re.IGNORECASE,
+                    ):
+                        break
+                    out.append(
+                        (
+                            kind,
+                            number,
+                            _tidy(label_end + m.group(0) + (after.group(0) if after else "")),
+                        )
+                    )
+                    break
+    return out
+
+
+def _heading_positions(text: str, headings: tuple[str, ...]) -> list[int]:
+    from .manuscript import _extra_heading_pattern
+
+    pattern = _extra_heading_pattern(headings)
+    return [] if pattern is None else [m.start() for m in pattern.finditer(text)]
+
+
+def _abstract_end(text: str, abstract: str) -> int | None:
+    """Where the ``.sub``'s abstract ends in ``text`` (by its last few words), or None."""
+    words = re.findall(r"[A-Za-z0-9]+", abstract)[-8:]
+    if len(words) < 4:
+        return None
+    match = re.search(r"\W+".join(re.escape(w) for w in words) + r"\S*", text, re.IGNORECASE)
+    return match.end() if match else None
+
+
+def main_text_scopes(
+    text: str,
+    start_headings: tuple[str, ...],
+    end_headings: tuple[str, ...],
+    abstract: str = "",
+) -> dict[str, int] | None:
+    """Word counts of the main text under each plausible scope, by description.
+
+    None when the start of the main text cannot be found.
+    """
+    from .manuscript import _REFERENCE_HEADING, main_text_end
+
+    starts = _heading_positions(text, start_headings or _START_HEADINGS)
+    start_label = "the Introduction" if not start_headings else f"'{start_headings[0]}'"
+    if starts:
+        start = starts[0]
+    else:
+        start = _abstract_end(text, abstract) if abstract else None
+        start_label = "the end of the abstract"
+        if start is None:
+            return None
+    body = text[start:]
+    ends: dict[str, int] = {}
+    venue_end = main_text_end(body, end_headings)
+    if venue_end is not None:
+        ends[("the references" if _REFERENCE_HEADING.match(venue_end.group(0)) else f"'{venue_end.group(0).strip()}'")] = venue_end.start()
+    back = _heading_positions(body, _BACK_MATTER_HEADINGS)
+    if back:
+        ends["the back matter (acknowledgements, declarations, legends)"] = back[0]
+    results = _heading_positions(body, _RESULTS_HEADINGS)
+    methods = [m for m in _heading_positions(body, _METHODS_HEADINGS) if results and m > results[0]]
+    if methods:
+        ends["Methods"] = methods[0]
+    if not ends:
+        ends["the end of the document"] = len(body)
+    return {f"from {start_label} to {where}": len(body[:end].split()) for where, end in ends.items()}
+
+
+def _title_page_source(venue: Venue, values: dict[str, str]) -> tuple[Field, Path, str]:
+    """The separate title page if one is attached, else the manuscript's front matter."""
+    from .requirements_check import _existing, _paths, manuscript_files
+
+    for f in venue.fields:
+        if "title_page" in f.id and f.type in ("file", "filelist"):
+            for path in _existing(_paths(f, values)):
+                text = document.get(path).text
+                if text is not None:
+                    return f, path, document.normalize(text)
+    files = manuscript_files(venue, values)
+    if not files:
+        raise NotApplicable("no manuscript or title-page file to read")
+    field, path = files[0]
+    return field, path, _front(document.get(path))
+
+
+def _word_counts_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    from .requirements import get_requirements, resolve
+    from .requirements_check import _fields_for, manuscript_files
+
+    tp_field, tp_path, front = _title_page_source(venue, values)
+    stated = [(kind, n, text) for kind, n, text in stated_counts(front) if kind in ("text", "abstract")]
+    if not stated:
+        raise NotApplicable(f"no word count stated on the title page of {tp_path.name}")
+    issues: list[Issue] = []
+    details: list[str] = []
+    abstract = next(
+        (values.get(f.id, "").strip() for f in _fields_for(venue, "abstract") if values.get(f.id, "").strip()),
+        "",
+    )
+    for kind, n, text in stated:
+        if kind != "abstract":
+            continue
+        if not abstract:
+            issues.append(
+                unchecked(
+                    tp_field.id,
+                    f"the title page states '{text}', but the .sub has no abstract to count",
+                )
+            )
+            continue
+        words = len(abstract.split())
+        if abs(words - n) > max(WORD_COUNT_TOLERANCE * n, ABSTRACT_COUNT_SLACK):
+            issues.append(
+                Issue(
+                    WARNING,
+                    tp_field.id,
+                    f"the title page of {tp_path.name} states '{text}', but the abstract in the .sub is {words} words; update the stated count",
+                )
+            )
+        else:
+            details.append(f"abstract: {n} stated, {words} counted")
+    text_counts = [(n, text) for kind, n, text in stated if kind == "text"]
+    if text_counts:
+        files = manuscript_files(venue, values)
+        if not files:
+            raise NotApplicable("no manuscript file to count")
+        _, path = files[0]
+        full = _text(document.get(path))
+        base = get_requirements(venue.slug)
+        rules = resolve(base, values).manuscript if base is not None else None
+        start_headings = tuple((rules.main_text_start_headings if rules else None) or ())
+        end_headings = tuple((rules.main_text_end_headings if rules else None) or ())
+        scopes = main_text_scopes(full, start_headings, end_headings, abstract)
+        if scopes is None:
+            issues.append(
+                unchecked(
+                    tp_field.id,
+                    f"could not find where the main text of {path.name} starts (no Introduction heading, and the .sub's abstract was not found); the stated word count was not checked",
+                )
+            )
+        else:
+            scopes = {**scopes, "in the whole document": len(full.split())}
+            for n, text in text_counts:
+                where, words = min(scopes.items(), key=lambda kv: abs(kv[1] - n))
+                if abs(words - n) <= max(WORD_COUNT_TOLERANCE * n, WORD_COUNT_SLACK):
+                    details.append(f"main text: {n} stated, about {words} counted {where}")
+                    continue
+                main_where, main_words = next(iter(scopes.items()))
+                shown = ", ".join(f"{w} {d}" for d, w in list(scopes.items())[:3])
+                issues.append(
+                    Issue(
+                        WARNING,
+                        tp_field.id,
+                        f"the title page of {tp_path.name} states '{text}', but {path.name} has about {main_words} words {main_where} ({100 * (main_words - n) / max(n, 1):+.0f}%; counted: {shown}); update the stated count",
+                    )
+                )
+    return Outcome(issues, "; ".join(details))
+
+
+def _display_counts_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    from .citation_check import _attached_count, _manuscript_mentions
+
+    tp_field, tp_path, front = _title_page_source(venue, values)
+    stated = [(kind, n, text) for kind, n, text in stated_counts(front) if kind in ("figures", "tables", "display_items")]
+    if not stated:
+        raise NotApplicable(f"no figure or table count stated on the title page of {tp_path.name}")
+    found, _ = _manuscript_mentions(venue, values)
+    actual: dict[str, set[int]] = {}
+    for kind, series, role in (
+        ("figures", "figure", "figures"),
+        ("tables", "table", "tables"),
+    ):
+        cited = {m.number for m in found if m.series == series}
+        counts = {max(cited)} if cited else set()
+        attached = _attached_count(venue, values, role)
+        if attached:
+            counts.add(attached)
+        if not counts and not found:
+            raise Unchecked(f"found no figure or table citations in the manuscript to count")
+        actual[kind] = counts or {0}
+    actual["display_items"] = {f + t for f in actual["figures"] for t in actual["tables"]}
+    issues: list[Issue] = []
+    details: list[str] = []
+    names = {
+        "figures": "main figures",
+        "tables": "main tables",
+        "display_items": "display items (figures and tables)",
+    }
+    for kind, n, text in stated:
+        if n in actual[kind]:
+            details.append(f"{n} {names[kind]}")
+            continue
+        counted = " or ".join(str(c) for c in sorted(actual[kind]))
+        issues.append(
+            Issue(
+                WARNING,
+                tp_field.id,
+                f"the title page of {tp_path.name} states '{text}', but the manuscript has {counted} {names[kind]}; update the stated count",
+            )
+        )
+    return Outcome(
+        issues,
+        (("stated counts match: " + ", ".join(details)) if details and not issues else ""),
+    )

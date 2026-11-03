@@ -114,6 +114,12 @@ fly. See step 1.
    `submit_resume` (put what had changed in `note`). Tell the user what you
    fixed. Never try to send the submission; it is refused anyway.
 
+   Fix a failing step on the live page, never by editing paperpush's installed
+   code. If steps needed recovery, then once the user is done, offer them the
+   redacted bug report: `recovery_report(pid)` (CLI: `paperpush
+   recovery-report <dir>`). Show them the draft and give them the issue link to
+   file it themselves if they want the venue fixed for everyone.
+
 ## Rules
 
 - **Always use absolute paths** for the `.sub` file and the manuscript directory.

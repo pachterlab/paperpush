@@ -409,13 +409,7 @@ def _text_field_issues(venue: Venue, reqs: ManuscriptRequirements, values: dict[
             issues.append(Issue(WARNING, field.id, f"{field.label}: {words} words is under the {rules.min_words}-word minimum in the author guidelines"))
         if rules.max_characters is not None and field.character_count is None and len(raw) > rules.max_characters:
             issues.append(Issue(ERROR, field.id, f"{field.label}: {len(raw)} characters exceeds the {rules.max_characters}-character limit in the author guidelines"))
-        if rules.structured and rules.structured_headings:
-            lower = raw.lower()
-            missing = [h for h in rules.structured_headings if h.lower() not in lower]
-            if missing:
-                issues.append(Issue(WARNING, field.id, f"{field.label}: the author guidelines ask for a structured abstract with the headings {', '.join(rules.structured_headings)}; missing: {', '.join(missing)}"))
-        if rules.no_references and re.search(r"\[\d+(?:[,–-]\s*\d+)*\]|\bet al\.,?\s*\(?(?:19|20)\d{2}", raw):
-            issues.append(Issue(WARNING, field.id, f"{field.label}: looks like it cites references, which the author guidelines do not allow in the abstract"))
+        # abstract.structured and abstract.no_references: see front_matter_check.
     for field in _fields_for(venue, "title"):
         raw = values.get(field.id, "").strip()
         if not raw:
@@ -645,7 +639,7 @@ def _title_page_file_issues(venue: Venue, values: dict[str, str]) -> list[Issue]
 HANDLED_RULES = frozenset(
     {
         "manuscript.formats", "manuscript.max_file_size_mb", "manuscript.max_words", "manuscript.max_words_before_refs",
-        "manuscript.max_pages", "manuscript.max_pages_before_refs", "manuscript.main_text_end_headings",
+        "manuscript.max_pages", "manuscript.max_pages_before_refs", "manuscript.main_text_end_headings", "manuscript.main_text_start_headings",
         "manuscript.max_display_items", "manuscript.line_numbers", "manuscript.double_spacing", "manuscript.page_numbers",
         "manuscript.font", "manuscript.font_size_pt", "manuscript.margins_mm", "manuscript.page_size",
         "manuscript.single_file", "manuscript.figures_placement", "manuscript.tables_placement", "manuscript.anonymized",
@@ -795,7 +789,7 @@ def _length_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, 
 
 def _text_fields_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
     a, t, k = reqs.abstract, reqs.title_page, reqs.keywords
-    _need(any(v is not None and v is not False for v in (a.max_words, a.min_words, a.max_characters, a.structured, a.no_references, t.title_max_characters, t.title_max_words, t.running_title_max_characters, k.min, k.max)), "the guidelines set no title, abstract, or keyword limit")
+    _need(any(v is not None and v is not False for v in (a.max_words, a.min_words, a.max_characters, t.title_max_characters, t.title_max_words, t.running_title_max_characters, k.min, k.max)), "the guidelines set no title, abstract, or keyword limit")
     return _text_field_issues(venue, reqs, values)
 
 

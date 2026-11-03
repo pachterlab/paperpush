@@ -56,7 +56,7 @@ from .. import credentials
 from ..database import get_venue
 from .common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, save_storage
 from .common import session_path as _slug_session_path
-from .common import wait_for_human
+from .common import wait_for_manual_sign_in
 from .login import VenueLoginError, first_visible, orcid_unsupported
 
 logger = logging.getLogger(__name__)
@@ -335,7 +335,7 @@ class Venue(ABC):
             return False
 
         logger.info("Falling back to a manual %s sign-in", name)
-        wait_for_human(f"Sign in to {name} in the browser window")
+        wait_for_manual_sign_in(name, self.slug)
         save_storage(context, session)
         return True
 

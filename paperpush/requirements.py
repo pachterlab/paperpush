@@ -142,6 +142,7 @@ class ManuscriptRules:
     max_pages: Annotated[Optional[int], PField(description="Maximum page count of the whole document.")] = None
     max_pages_before_refs: Annotated[Optional[int], PField(description="Maximum page count of the main text (before the reference list).")] = None
     main_text_end_headings: Annotated[Optional[list[str]], PField(description="Headings other than the reference list that end the main text for the before-refs limits (e.g. Appendix).")] = None
+    main_text_start_headings: Annotated[Optional[list[str]], PField(description="Headings that start the main text the venue's word count covers, when it is not the Introduction (e.g. Main, Results). Used to check a word count stated on the title page.")] = None
     count_excludes: Annotated[Optional[list[str]], PField(description="Parts of the manuscript the venue leaves out of its word/page count (informational).")] = None
     count_includes: Annotated[Optional[list[str]], PField(description="Parts the venue explicitly counts that authors might not expect (informational).")] = None
     max_display_items: Annotated[Optional[int], PField(description="Maximum number of figures and tables combined.")] = None

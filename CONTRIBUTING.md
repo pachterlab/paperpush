@@ -22,6 +22,10 @@ Each `Venue` subclass must implement the following:
 
 See `paperpush/venues/template/template.py` for a copy-ready starting point.
 
+Keep the selectors most likely to break as named constants at the top of the runner (see `paperpush/venues/scholarone/nucleic_acids_research.py`): portal-generated ids (ScholarOne `CUSTOM_FIELD_RESPONSE_ID…` numbers), button names, and CSS for custom widgets. When a portal changes, the fix is then usually one line, and a recovery report's failing selector points straight at it.
+
+Issues labelled `venue-recovery` come from `paperpush recovery-report`: each one records a step that failed on a real run and the actions that fixed it in the browser. They are usually the fastest way to find what to change.
+
 It is easiest to fill out these forms by making an account for the venue of interest (if you do not have one already), running `playwright codegen <login_url>`, clicking through the submission portal, then copying the generated code into `login()` and `submit()`. You can then replace hard-coded values with values and conditions that can be derived from the submission_forms.json fields.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for tips on using playwright, debugging, and running unit tests.

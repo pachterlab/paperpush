@@ -61,6 +61,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `max_pages` | integer or null | Maximum page count of the whole document. |
 | `max_pages_before_refs` | integer or null | Maximum page count of the main text (before the reference list). |
 | `main_text_end_headings` | list of string or null | Headings other than the reference list that end the main text for the before-refs limits (e.g. Appendix). |
+| `main_text_start_headings` | list of string or null | Headings that start the main text the venue's word count covers, when it is not the Introduction (e.g. Main, Results). Used to check a word count stated on the title page. |
 | `count_excludes` | list of string or null | Parts of the manuscript the venue leaves out of its word/page count (informational). |
 | `count_includes` | list of string or null | Parts the venue explicitly counts that authors might not expect (informational). |
 | `max_display_items` | integer or null | Maximum number of figures and tables combined. |

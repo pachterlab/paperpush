@@ -145,14 +145,8 @@
     if (rules.max_words != null && w > rules.max_words) out.push(issue("error", field.id, `${field.label}: ${w} words exceeds the ${rules.max_words}-word limit ${where}`));
     if (rules.min_words != null && w < rules.min_words) out.push(issue("warning", field.id, `${field.label}: ${w} words is under the ${rules.min_words}-word minimum ${where}`));
     if (rules.max_characters != null && value.length > rules.max_characters) out.push(issue("error", field.id, `${field.label}: ${value.length} characters exceeds the ${rules.max_characters}-character limit ${where}`));
-    if (rules.structured_headings && rules.structured_headings.length) {
-      const lower = value.toLowerCase();
-      const missing = rules.structured_headings.filter((h) => !lower.includes(h.toLowerCase()));
-      if (missing.length) out.push(issue("warning", field.id, `${field.label}: the author guidelines ask for a structured abstract with the headings ${rules.structured_headings.join(", ")}; missing: ${missing.join(", ")}`));
-    }
-    if (rules.no_references && /\[\d+(?:[,–-]\s*\d+)*\]|\bet al\.,?\s*\(?(?:19|20)\d{2}/.test(value)) {
-      out.push(issue("warning", field.id, `${field.label}: looks like it cites references, which the author guidelines do not allow in the abstract`));
-    }
+    // A structured abstract and citations in the abstract are checked on the
+    // server (front_matter_check.py), against the manuscript as well.
     if (rules.min_keywords != null || rules.max_keywords != null) {
       const n = value.split(/[,;\n]/).filter((k) => k.trim()).length;
       if (rules.min_keywords != null && n < rules.min_keywords) out.push(issue("error", field.id, `${field.label}: ${n} keywords given; the author guidelines require at least ${rules.min_keywords}`));

@@ -98,6 +98,20 @@ it was on, and the error. Then:
    runs the step again, and `abort` fails the run. Say in `note` what had
    changed, because it is logged so the venue script can be fixed.
 
+If a similar step already failed earlier in the run (upload row 2 after row
+1), `recovery.paused` and `submit_page` include `earlier_fix`: the actions that
+worked last time and the note. Adapt it (index, values) rather than copying it.
+An identical failure that was fixed only by waiting or clicking a named button
+is repeated by the run itself, without pausing.
+
+**Never fix a run by editing paperpush's installed code.** A user who installed
+with `pip` would lose the change on the next upgrade, and no one else would get it.
+Fix the live page with the tools above. When steps needed recovery,
+`submit_status` says so (`recovery.report`): once the author is done, call
+`recovery_report(pid)` and show them the redacted draft (`title`, `body`).
+Give them `issue_url` to file it themselves if they want the venue fixed for
+everyone. Never open or submit it for them.
+
 You cannot send the submission this way: clicks on `Submit` / `Approve`
 controls, Enter key presses, and uploads of files the `.sub` does not name are
 refused. A paused run you never resume gives up after 30 minutes. Pass
@@ -225,9 +239,12 @@ layout (template, margins, font, spacing, line/page numbers, spelling variant),
 the figures (resolution, lettering size and typeface, panel labels -- attached
 files, or the figures embedded in the manuscript when none are attached), that
 figures, tables, and figure panels are cited in order, and that the title, abstract, authors,
-keywords, and statements in the `.sub` match the manuscript, and proofreads the
-prose mechanically (double spaces, repeated words, punctuation spacing,
-unbalanced brackets and quotes, common misspellings). Warnings from this
+keywords, and statements in the `.sub` match the manuscript; that the abstract
+cites no references (and is structured when the venue asks), the manuscript
+gives a contact e-mail, every reference is cited, and self-citations are not
+excessive; and proofreads the prose mechanically (double spaces, repeated
+words, punctuation spacing, unbalanced brackets and quotes, common
+misspellings, repetitive word choice). Warnings from this
 pass are heuristics over extracted text and images: relay them to the user as
 things to confirm, not as blockers. `--dont-check-manuscript` skips the pass.
 

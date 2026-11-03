@@ -39,7 +39,10 @@ A failed action (`click`, `fill`, `check`, `select_option`, `wait_for`, ...) the
 goes to the handler that the caller set with `recovery.use_handler(...)`. That
 handler fixes the page and continues, retries the action, or aborts. With no
 handler set, every failure aborts, so the run behaves as it did before.
-`HumanHandler` asks in the terminal. When some actions only make sense together,
+`HumanHandler` asks in the terminal; given a `log_dir` (as `submit --recover
+by-hand` and the `--ai` fallback do) it logs each failure to `recoveries.jsonl`
+with `handler: "by-hand"` and the author's optional note on what they changed.
+Every handler writes that log through `recovery_channel.append_log`. When some actions only make sense together,
 such as the click that opens a file chooser plus handing it the file, run them as
 one unit with `page.attempt("attach ms.pdf", fn)`. Steps run through `_try` are
 optional and never go to the handler.
@@ -63,6 +66,27 @@ it. `paperpush/venues/recovery_channel.py` holds the agent side of all this:
 enforces the guardrails. `paperpush/venues/recovery_ai.py` is `submit --ai`: an
 in-process tool-use loop (tools `look`, `act` and `finish`) with one small session
 class per provider. All of them go through the same `PageTools`.
+
+`submit` wraps the agent and AI handlers in `RememberingHandler`, which reuses a
+fix within one run. An identical failure whose fix only waited or clicked a
+named button/link is replayed without pausing. Any other remembered fix is
+handed to the agent as `earlier_fix` (in `paused.json`, snapshots, and the
+`--ai` prompt) when the failure matches apart from numbers (upload row 2 after
+row 1). Fixes that typed, selected, or uploaded are never replayed, because a
+repeated widget would get the previous entry's data.
+
+#### When a run needed recovery: getting the fix to everyone
+
+Each recovery is a bug report waiting to happen: the portal changed, and every
+other install will hit the same step. `paperpush recovery-report [DIR]` (MCP:
+`recovery_report`) drafts a GitHub issue from a run's `recoveries.jsonl`,
+labelled `venue-recovery`. It is redacted in `paperpush/venues/recovery_report.py`:
+typed values, `.sub` values, e-mails, paths, URL query strings. The author files it;
+nothing is sent automatically. Fixes from these reports ship in a release. Keep the
+selectors most likely to break (custom-field ids, button names, widget CSS) as named
+constants at the top of the runner, so that fix is usually one line.
+Never edit an installed copy of paperpush to fix a run: fix the live page through
+the recovery tools, then report it.
 
 
 ## Website
@@ -110,6 +134,12 @@ pytest --run-portal
 
 # Single venue (e.g. Nature)
 pytest --run-portal --venue nature
+
+# Portal tests only (skip all offline tests)
+pytest --run-portal-only
+
+# Portal tests only, for one venue (or several: arxiv,biorxiv)
+pytest --run-portal-only arxiv
 ```
 
 Specifically run browser-based portal tests (requires a browser and login credentials):
@@ -123,6 +153,11 @@ pytest tests/test_submit.py --run-portal -s --venue nature
 
 # Specific subfile (ie not default)
 pytest tests/test_submit.py --run-portal -s --venue nature --subfile tests/sub_files/nature.sub
+
+# Shorthand: only the submit walkthrough, optionally for named venue(s)
+pytest --run-submit-only -s
+pytest --run-submit-only arxiv -s
+pytest --run-submit-only arxiv,biorxiv -s
 ```
 
 Update portal snapshots:

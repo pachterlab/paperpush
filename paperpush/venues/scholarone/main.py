@@ -111,6 +111,8 @@ def _split_figures(raw: str) -> list[str]:
 #: How long to wait for ScholarOne's "Uploading File" modal to close. Large
 #: PDFs routinely take longer than the default per-action timeout.
 UPLOAD_TIMEOUT_MS = 10 * 60 * 1000
+#: Text of ScholarOne's "Uploading File" modal while files transfer.
+UPLOAD_PROGRESS_TEXT = "Upload in progress"
 
 
 def _upload_selected_files(page) -> None:
@@ -120,7 +122,7 @@ def _upload_selected_files(page) -> None:
     Continue" before it is gone times out on any upload over a few MB.
     """
     page.get_by_role("link", name="Upload Selected Files").click()
-    modal = page.get_by_text("Upload in progress", exact=False)
+    modal = page.get_by_text(UPLOAD_PROGRESS_TEXT, exact=False)
     try:
         # A fast upload may never show the modal: that is not a failure, so
         # keep this probe away from the recovery handler.

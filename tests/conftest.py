@@ -43,7 +43,10 @@ from paperpush.database import list_venues  # noqa: E402
 # not touch a live portal -- runs as usual. So a bare ``pytest`` exercises all
 # offline behavior and skips only the network/portal tests. Opt in with
 # ``pytest --run-portal`` or by setting ``PAPERPUSH_RUN_PORTAL=1`` (the
-# monthly CI job does the latter).
+# monthly CI job does the latter). ``pytest --run-portal-only`` runs the portal
+# tests and deselects everything else; ``pytest --run-submit-only`` runs only the
+# live submit walkthrough. Both take optional venue slug(s), e.g.
+# ``pytest --run-submit-only arxiv`` or ``--run-submit-only arxiv,biorxiv``.
 #
 # Mark a test with @pytest.mark.portal ONLY if it talks to a real portal.
 # Offline submit tests should stay unmarked so they run automatically.
@@ -116,6 +119,27 @@ def pytest_addoption(parser):
         help="also run tests marked @pytest.mark.portal (these hit a real " "submission portal and are skipped by default)",
     )
     parser.addoption(
+        "--run-portal-only",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="SLUG[,SLUG...]",
+        help="run ONLY tests marked @pytest.mark.portal (implies --run-portal); "
+        "every offline test is deselected. Optionally name venue slug(s), "
+        "e.g. ``--run-portal-only arxiv`` (same as adding ``--venue arxiv``)",
+    )
+    parser.addoption(
+        "--run-submit-only",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="SLUG[,SLUG...]",
+        help="run ONLY the live-portal submit walkthrough "
+        "(tests/test_submit.py::test_submit_walkthrough; implies --run-portal). "
+        "Optionally name venue slug(s), e.g. ``--run-submit-only arxiv`` or "
+        "``--run-submit-only arxiv,biorxiv`` (same as adding ``--venue``)",
+    )
+    parser.addoption(
         "--update-snapshots",
         action="store_true",
         default=False,
@@ -152,14 +176,20 @@ def _requested_venues(config) -> set[str] | None:
     which is substring), so ``--venue bioinformatics`` never also selects
     ``bmc_bioinformatics``.
     """
-    selected = config.getoption("--venue")
+    selected = list(config.getoption("--venue") or [])
+    # ``--run-portal-only SLUG`` / ``--run-submit-only SLUG`` are shorthand for
+    # adding ``--venue SLUG`` (comma-separated for several).
+    for opt in ("--run-portal-only", "--run-submit-only"):
+        value = config.getoption(opt)
+        if value:
+            selected += [s.strip() for s in value.split(",") if s.strip()]
     if not selected:
         return None
     wanted = list(dict.fromkeys(selected))  # de-dupe, preserve order
     known = {j.slug for j in list_venues()}
     unknown = [s for s in wanted if s not in known]
     if unknown:
-        raise pytest.UsageError(f"--venue: unknown venue slug(s) {unknown}; " f"choose from {sorted(known)}")
+        raise pytest.UsageError(f"--venue/--run-*-only: unknown venue slug(s) {unknown}; " f"choose from {sorted(known)}")
     return set(wanted)
 
 
@@ -202,7 +232,29 @@ def pytest_collection_modifyitems(config, items):
             config.hook.pytest_deselected(items=deselected)
             items[:] = kept
 
-    opted_in = config.getoption("--run-portal") or os.environ.get("PAPERPUSH_RUN_PORTAL") == "1"
+    # --run-portal-only keeps just the portal tests; --run-submit-only keeps
+    # just the live submit walkthrough. Both imply --run-portal.
+    portal_only = config.getoption("--run-portal-only") is not None
+    submit_only = config.getoption("--run-submit-only") is not None
+    if portal_only or submit_only:
+
+        def keep(item) -> bool:
+            if submit_only and item.originalname != "test_submit_walkthrough":
+                return False
+            return "portal" in item.keywords
+
+        kept = [item for item in items if keep(item)]
+        deselected = [item for item in items if not keep(item)]
+        if deselected:
+            config.hook.pytest_deselected(items=deselected)
+            items[:] = kept
+
+    opted_in = (
+        portal_only
+        or submit_only
+        or config.getoption("--run-portal")
+        or os.environ.get("PAPERPUSH_RUN_PORTAL") == "1"
+    )
     if opted_in:
         return
     skip = pytest.mark.skip(reason="real-portal test: pass --run-portal or set " "PAPERPUSH_RUN_PORTAL=1 to run")

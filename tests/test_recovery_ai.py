@@ -20,6 +20,7 @@ from playwright.sync_api import TimeoutError as PWTimeout
 from playwright.sync_api import sync_playwright
 
 from paperpush import cli
+from paperpush.venues.recovery_channel import RememberingHandler
 from paperpush.venues import recovery_ai as ai
 from paperpush.venues.recovery import FallbackHandler, Resolution, guard, step
 from paperpush.venues.recovery_ai import ApiAgentHandler, ModelError, ToolCall
@@ -290,9 +291,14 @@ def test_cli_ai_builds_the_handler(no_keys, monkeypatch, tmp_path, capsys):
     monkeypatch.setattr("importlib.util.find_spec", lambda name: object())
     handler, port = cli._submit_recovery_setup(_args(ai=True, model="claude-test", recover_dir=str(tmp_path)), "biorxiv", "biorxiv", {})
     # pytest's stdin is not a terminal, so there is no person to fall back to.
-    assert isinstance(handler, ApiAgentHandler) and port is None
-    assert (handler.provider, handler.model) == ("anthropic", "claude-test")
-    assert handler.tools.directory == tmp_path
+    # pytest's stdin is not a terminal, so there is no person to fall back to;
+    # the model is wrapped so a fix it makes can be reused within the run.
+    assert isinstance(handler, RememberingHandler) and port is None
+    model = handler.inner
+    assert isinstance(model, ApiAgentHandler)
+    assert (model.provider, model.model) == ("anthropic", "claude-test")
+    assert model.tools.directory == tmp_path and handler.tools is model.tools
+    assert json.loads((tmp_path / "run.json").read_text())["venue"] == "biorxiv"
     assert "screenshot" in capsys.readouterr().out
 
 

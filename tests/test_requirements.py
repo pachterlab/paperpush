@@ -342,8 +342,8 @@ def test_abstract_limits_and_structure(_use):
     _use({"testj": {"abstract": {"max_words": 3, "structured": True, "structured_headings": ["Background", "Results"], "no_references": True}}})
     issues = _check(_venue(ABSTRACT), {"abstract": "Background: one two three four [1]"})
     assert any("exceeds the 3-word limit" in msg for msg in _messages(issues, ERROR))
-    assert any("missing: Results" in msg for msg in _messages(issues, WARNING))
-    assert any("cites references" in msg for msg in _messages(issues, WARNING))
+    # The structure and citations of the abstract are front_matter_check's (tests/test_front_matter_check.py).
+    assert not any("structured" in msg or "cites references" in msg for msg in _messages(issues))
     # A field that already caps words is not double-reported.
     capped = Field(id="abstract", label="Abstract", type="textarea", word_count=250)
     assert not [i for i in _check(_venue(capped), {"abstract": "one two three four"}) if i.level == ERROR]

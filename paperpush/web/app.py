@@ -682,8 +682,7 @@ def live_rules(venue: Venue, values: dict[str, str]) -> dict[str, dict[str, Any]
         max_words=a.max_words if own("abstract", "word_count") is None else None,
         min_words=a.min_words,
         max_characters=(a.max_characters if own("abstract", "character_count") is None else None),
-        structured_headings=list(a.structured_headings or []) if a.structured else None,
-        no_references=a.no_references,
+        structured_headings=list(a.structured_headings or []) if a.structured else None,  # shown as a hint
     )
     put(
         "title",

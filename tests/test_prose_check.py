@@ -15,6 +15,7 @@ from tests.conftest import _build_docx, _build_pdf
 MANUSCRIPT = Field(id="manuscript_file", label="Manuscript", type="file")
 VENUE = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT])
 IDS = [f"prose.{name}" for name in pc._CHECKS]
+ALL_IDS = set(IDS) | {f"prose.{pc.REPETITION}"}
 
 needs_codespell = pytest.mark.skipif(
     pc.misspellings() is None, reason="codespell is not installed"
@@ -126,7 +127,7 @@ def test_docx_runs_every_check(tmp_path):
         ],
     )
     results = _run(doc)
-    assert set(results) == set(IDS)
+    assert set(results) == ALL_IDS
     for cid in IDS:
         status, message, _ = results[cid]
         assert status == report.WARNING, (cid, results[cid])
@@ -208,3 +209,45 @@ def test_no_manuscript_is_not_applicable():
     checks = Checks()
     pc.run_checks(checks, VENUE, {})
     assert all(r.status == report.NOT_APPLICABLE for r in checks.results)
+
+
+# --- repetitive word choice ----------------------------------------------------------------
+
+
+def test_stem_groups_inflections():
+    assert {pc.stem(w) for w in ("result", "results", "resulted", "resulting")} == {"result"}
+    assert pc.stem("studies") == pc.stem("study")
+    assert pc.stem("mapped") == pc.stem("mapping") == "map"
+    assert pc.stem("analysis") == "analysis" and pc.stem("genes") == "gene"
+
+
+def test_repetition_in_sentence_and_openings():
+    found = pc.repetition(["The assay used an assay buffer before each assay ran. We ran it. We saw it. We liked it. We stopped."])
+    assert any("'assay' 3 times" in s for s in found.in_sentence)
+    assert found.openings and "4 sentences in a row open with 'We'" in found.openings[0]
+    assert pc.repetition(["We ran it. We saw it. We liked it. Then we stopped."]).openings == []
+
+
+def test_repetition_spares_topic_words():
+    text = ["Neurons fire when neurons near other neurons fire. " * 3]
+    assert pc.repetition(text).in_sentence
+    assert not pc.repetition(text, topic="How neurons fire").in_sentence
+
+
+def test_repetition_stock_words_and_overused():
+    filler = "However, the cells grew in the dish today. " * 6
+    found = pc.repetition([filler + "Plain words follow here without anything special. " * 4])
+    assert any(s.startswith("'however' 6 times") for s in found.style)
+    noisy = ["The widget moved. " * 30 + "Other text appears here with several different words to read. " * 10]
+    assert any(s.startswith("'widget'") for s in pc.repetition(noisy, topic="A paper").overused)
+    assert not any("widget" in s for s in pc.repetition(noisy, topic="A widget paper").overused)
+    assert pc.repetition(noisy).overused == []  # no topic to tell subject words from filler
+
+
+def test_repetition_check_reports_and_lists_top_words(tmp_path):
+    doc = tmp_path / "ms.docx"
+    _build_docx(doc, ["Title", "We ran it. We saw it. We liked it. We stopped.", "References", "We a. We b. We c. We d."])
+    status, message, detail = _run(doc)["prose.repetition"]
+    assert status == report.WARNING
+    assert "1 run(s) of sentences opening with the same word" in message
+    assert "most frequent:" in detail

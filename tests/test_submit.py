@@ -111,6 +111,48 @@ def test_submit_skips_login_for_loginless_venue(monkeypatch, capsys):
     assert ran
 
 
+def _failing_validation(monkeypatch):
+    """Make validation report one error; returns a list counting its calls."""
+    import importlib
+
+    from paperpush.validate import Issue
+
+    validate_mod = importlib.import_module("paperpush.validate")
+    calls: list = []
+
+    def fake(sub, venue, **kwargs):
+        calls.append(1)
+        return [Issue("error", "title", "title is required")]
+
+    monkeypatch.setattr(validate_mod, "validate", fake)
+    return calls
+
+
+def test_submit_stops_on_validation_errors_and_suggests_skip_validate(monkeypatch, capsys):
+    ran = _stub_submit(monkeypatch)
+    _failing_validation(monkeypatch)
+    monkeypatch.setattr(venues, "login_required", lambda slug: False)
+
+    rc = main(["submit", "biorxiv.sub"])
+    err = capsys.readouterr().err
+
+    assert rc == 1
+    assert "--skip-validate" in err
+    assert not ran
+
+
+def test_submit_skip_validate_does_not_validate(monkeypatch, capsys):
+    ran = _stub_submit(monkeypatch)
+    calls = _failing_validation(monkeypatch)
+    monkeypatch.setattr(venues, "login_required", lambda slug: False)
+
+    rc = main(["submit", "biorxiv.sub", "--skip-validate"])
+
+    assert rc == 0
+    assert not calls
+    assert ran
+
+
 # --- offline CLI wiring: sweep every committed sample ----------------------
 
 
@@ -451,7 +493,8 @@ def test_submit_walkthrough(slug, sub_path, capsys):
     """Open ``sub_path`` in a visible browser and hold the window open.
 
     Identical to the "Debug <Venue>" launch.json config: it runs the real
-    ``submit`` (validation, sign-in, wizard, stop before final submit) and the
+    ``submit`` (sign-in, wizard, stop before final submit; validation is skipped
+    with ``--skip-validate`` since this exercises the portal, not the .sub) and the
     runner's ``hold_open`` pauses on this venue until you press Ctrl+D/Ctrl+C,
     at which point pytest advances to the next venue. ``sub_path`` is the
     venue's canonical ``<slug>/<slug>.sub`` unless overridden with ``--subfile``.
@@ -463,7 +506,9 @@ def test_submit_walkthrough(slug, sub_path, capsys):
     # Either way, without -s pytest's captured stdin makes hold_open's input()
     # raise OSError, which hold_open swallows and returns -- so reaching
     # hold_open counts as success. With -s it instead waits for Ctrl+D/Ctrl+C.
-    argv = ["submit", str(sub)]
+    # --skip-validate: the walkthrough tests the portal automation, so a fixture
+    # .sub that trips a validate check should not stop it reaching the portal.
+    argv = ["submit", str(sub), "--skip-validate"]
     if os.environ.get("PAPERPUSH_WALKTHROUGH_HEADLESS") == "1":
         argv.append("--headless")
     # Portals fail intermittently (a flaky network hop, a slow page, a transient

@@ -81,12 +81,42 @@ def _try(fn, what: str) -> bool:
         return False
 
 
-def wait_for_human(prompt: str) -> None:
-    """Block until the human presses Enter in the terminal."""
+class SignInRequired(RuntimeError):
+    """A portal needs a manual sign-in, but nobody is at the terminal to do it.
+
+    Raised instead of pressing on signed out -- which used to surface only as a
+    timeout on some later wizard selector -- when stdin hits EOF (``</dev/null``,
+    a CI job) at the manual sign-in prompt. The message starts with
+    ``auth_required`` so unattended logs can be grepped for it.
+    """
+
+
+def wait_for_human(prompt: str) -> bool:
+    """Block until the human presses Enter in the terminal.
+
+    Returns ``False`` when there is no human to wait for: stdin is at EOF
+    (``</dev/null``, a CI runner) or unreadable (pytest's captured stdin raises
+    ``OSError``). Returns ``True`` otherwise, including on Ctrl+C, which has
+    always meant "carry on".
+    """
     try:
         input(f"\n>>> {prompt}\n    Press Enter here to continue... ")
-    except (EOFError, KeyboardInterrupt):
+    except KeyboardInterrupt:
         pass
+    except (EOFError, OSError):
+        print()
+        return False
+    return True
+
+
+def wait_for_manual_sign_in(name: str, slug: str) -> None:
+    """Pause for a manual sign-in to ``name``; raise :class:`SignInRequired` if nobody can do it."""
+    if not wait_for_human(f"Sign in to {name} in the browser window"):
+        raise SignInRequired(
+            f"auth_required: {name} needs a sign-in and there is no terminal to do it by hand "
+            f"(the saved session is missing or expired, and stored credentials did not sign in). "
+            f"Run 'paperpush login {slug}' in a terminal (for CI, then refresh the session bundle) and retry."
+        )
 
 
 def hold_open(reason: str | None = None) -> None:

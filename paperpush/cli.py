@@ -3,6 +3,7 @@
 Implemented so far:
 
     paperpush --venues          list supported venues
+    paperpush --venues submit   list only the venues paperpush can submit to
     paperpush subfile <venue>   create a <venue>.sub template
     paperpush options <venue>.<field>
                                       list the allowed values for a field
@@ -107,10 +108,12 @@ def _support_note(venue) -> str:
 
 
 @_validate
-def _print_venues() -> int:
+def _print_venues(submit_only: bool = False) -> int:
     venues = list_venues()
+    if submit_only:
+        venues = [v for v in venues if v.supports_submit]
     if not venues:
-        print("No venues are configured.")
+        print("No venues support submit." if submit_only else "No venues are configured.")
         return 0
     by_type: dict[str, list] = {}
     for venue in venues:
@@ -125,7 +128,8 @@ def _print_venues() -> int:
             print("  (none yet)")
             continue
         for venue in members:
-            print(f"  {venue.name} ({venue.slug}){_support_note(venue)}")
+            note = "" if submit_only else _support_note(venue)
+            print(f"  {venue.name} ({venue.slug}){note}")
 
     print(f"\nFor more details, see {_VENUES_URL}")
     print(f"Venue data: {venue_data.active_source().describe()} (refresh with 'paperpush update-venues')")
@@ -133,6 +137,59 @@ def _print_venues() -> int:
 
 
 @_validate
+def _cmd_recovery_report(args: argparse.Namespace) -> int:
+    """Draft a GitHub issue from a submission run's recovery log.
+
+    When a step of ``submit`` failed and was fixed in the browser, the run
+    logged what failed and what worked. This turns that log into a redacted
+    report (typed values, paths, e-mails, .sub values, and URL query strings
+    removed) and a prefilled ``issues/new`` link. Nothing is sent: the author
+    reads the draft and files it if they are happy to share it.
+    """
+    from .venues import recovery_report
+
+    directory = Path(args.directory).expanduser() if args.directory else recovery_report.latest_run_with_recoveries()
+    if directory is None:
+        print(f"No submission run with recoveries found under {recovery_report.runs_root()}.", file=sys.stderr)
+        print("Pass the run's recovery directory (printed by 'paperpush submit') explicitly.", file=sys.stderr)
+        return 1
+    sub_values = None
+    if args.subfile:
+        from .subfile import load
+
+        try:
+            sub_values = load(args.subfile).values
+        except OSError as exc:
+            print(f"error: cannot read {args.subfile}: {exc}", file=sys.stderr)
+            return 1
+    try:
+        report = recovery_report.build_report(directory, sub_values=sub_values)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(report.as_dict(), indent=2))
+        return 0
+    print(f"# {report.title}\n")
+    print(report.body)
+    print("-" * 72)
+    print("This draft has NOT been sent anywhere. Read it, remove anything you do not want to share,")
+    print("then file it (you need a GitHub account):")
+    print(f"\n  {report.url}\n")
+    if report.truncated:
+        print(f"The link carries a shortened body; paste the full report from {report.saved_to}.")
+    elif report.saved_to:
+        print(f"The report is also saved at {report.saved_to}.")
+    if report.screenshots:
+        print(f"Screenshots ({len(report.screenshots)}) are in {directory}. They show your manuscript, so attach one only if you are happy to.")
+    if args.open:
+        import webbrowser
+
+        webbrowser.open(report.url)
+    return 0
+
+
 def _cmd_update_venues(args: argparse.Namespace) -> int:
     """Fetch the published venue data now, or clear the cached copy.
 
@@ -884,9 +941,13 @@ checks that run without AI:
                     cited in order
   .sub vs paper     title, abstract, authors (names, order, emails, ORCIDs),
                     keywords, and statements match the manuscript word for word
+  front matter      no citations in the abstract, structured abstract headings
+                    (when the venue asks for them), a contact e-mail address
+  references        every reference cited and every citation listed, share of
+                    self-citations (>15, or >80% of the list)
   prose             double spaces mid-sentence, repeated words ("the the"),
                     spacing around punctuation, unbalanced brackets and quotes,
-                    common misspellings (codespell)
+                    common misspellings (codespell), repetitive word choice
 
 checks that need AI (--ai, or an agent via --ai-tasks / --ai-results; add
 --ai-only to run just these):
@@ -988,6 +1049,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             check_hidden_text=getattr(args, "check_hidden_text", True),
             check_openreview=getattr(args, "check_openreview", True),
             initial_submission=getattr(args, "initial_submission", False),
+            cover_letter_max_age_days=getattr(args, "cover_letter_max_age", 7),
             ai_only=ai_only,
         )
     alt = getattr(args, "alt_color", False)
@@ -1098,10 +1160,17 @@ def _cmd_submit(args: argparse.Namespace) -> int:
     if venue_def is not None and not venue_def.has_form:
         print(f"error: {venue_def.slug} is validate-only: {_VALIDATE_ONLY}", file=sys.stderr)
         return 1
-    if venue_def is not None:
+    if venue_def is not None and getattr(args, "skip_validate", False):
+        logger.info("submit: --skip-validate given; not validating %s", args.subfile)
+        print(f"warning: --skip-validate given; submitting {args.subfile} without running validate.", file=sys.stderr)
+    elif venue_def is not None:
         errors = _report_validation(subfile, venue_def, args.subfile)
         if errors:
-            print("\nFix the items above, then run 'paperpush submit' again.", file=sys.stderr)
+            print(
+                "\nFix the items above, then run 'paperpush submit' again "
+                "(or pass --skip-validate to submit without validating).",
+                file=sys.stderr,
+            )
             return 1
 
     try:
@@ -1120,7 +1189,16 @@ def _cmd_submit(args: argparse.Namespace) -> int:
     # sign in unattended. The user may still decline (e.g. to sign in by hand in
     # the browser), so a failed or skipped login is advisory, not blocking.
     needs_login = venues.login_required(cred_slug)
-    if needs_login and credentials.get_credential(cred_slug) is None:
+    env_creds = bool(os.environ.get("PAPERPUSH_USERNAME") and os.environ.get("PAPERPUSH_PASSWORD"))
+    if needs_login and credentials.get_credential(cred_slug) is None and not sys.stdin.isatty() and not env_creds:
+        # No terminal (CI, `</dev/null`, the MCP server's silent pipe) and no
+        # credentials in the environment: the login prompt would block forever
+        # or, worse, read stdin a caller meant for something else -- a CI loop's
+        # list of .sub files, say. Rely on the saved session alone; without one
+        # the run stops with auth_required.
+        logger.info("submit: no stored credentials for %s and no terminal; skipping the login prompt", cred_slug)
+        print(f"No stored credentials for {cred_slug} and no terminal to log in from; relying on a saved session " f"(run 'paperpush login {cred_slug}' in a terminal if there is none).")
+    elif needs_login and credentials.get_credential(cred_slug) is None:
         logger.info("submit: no stored credentials for %s; prompting to log in", cred_slug)
         print(f"Not logged in to {cred_slug}; starting login (Ctrl-C to skip and " "sign in by hand in the browser).")
         try:
@@ -1150,13 +1228,39 @@ def _cmd_submit(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
+    from .venues.common import SignInRequired
     from .venues.recovery import use_handler
     from .venues.recovery_channel import use_cdp_port
 
-    with use_handler(handler), use_cdp_port(cdp_port):
-        run(subfile.values, headless=args.headless, debug=args.debug, new_session=args.new_session, timeout=args.timeout, keep_open_on_failure=not args.close_on_failure)
+    try:
+        with use_handler(handler), use_cdp_port(cdp_port):
+            run(subfile.values, headless=args.headless, debug=args.debug, new_session=args.new_session, timeout=args.timeout, keep_open_on_failure=not args.close_on_failure)
+    except SignInRequired as exc:
+        logger.error("submit: %s", exc)
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        _print_recovery_report_hint(handler)
     logger.info("submit: %s runner returned", venue)
     return 0
+
+
+def _print_recovery_report_hint(handler) -> None:
+    """After a run that needed recovery, say how to report it so the venue gets fixed."""
+    from .venues.recovery_channel import read_log, recovery_dir_of
+
+    directory = recovery_dir_of(handler)
+    if directory is None:
+        return
+    entries = read_log(directory)
+    if not entries:
+        return
+    print(
+        f"\n{len(entries)} step(s) of this run needed recovery. The venue script may be out of date for everyone.\n"
+        f"To help fix it, review a redacted report and file it if you are happy to share it:\n"
+        f"  paperpush recovery-report {directory}",
+        file=sys.stderr,
+    )
 
 
 def _submit_recovery_setup(args: argparse.Namespace, venue: str, base_slug: str, values: dict):
@@ -1167,7 +1271,8 @@ def _submit_recovery_setup(args: argparse.Namespace, venue: str, base_slug: str,
     """
     from . import venues
     from .venues.recovery import HumanHandler
-    from .venues.recovery_channel import AgentHandler, allowed_upload_paths, cdp_endpoint, free_port
+    from .venues.recovery_channel import AgentHandler, RememberingHandler, allowed_upload_paths, cdp_endpoint, free_port, recovery_dir_of
+    from .venues.recovery_report import write_run_info
 
     mode = getattr(args, "recover", None)
     if getattr(args, "ai", False):
@@ -1190,19 +1295,24 @@ def _submit_recovery_setup(args: argparse.Namespace, venue: str, base_slug: str,
         print(f"note: {venue}'s runner does not support recovery yet; --recover and --cdp-port have no effect.", file=sys.stderr)
         return None, None
 
-    if args.recover_dir and mode not in ("agent", "ai"):
-        raise ValueError("--recover-dir only applies with --recover agent or --ai")
+    if args.recover_dir and mode not in ("agent", "ai", "by-hand"):
+        raise ValueError("--recover-dir only applies with --recover agent, by-hand, or --ai")
     handler = None
     if mode == "by-hand":
         if args.headless:
             raise ValueError("--recover by-hand needs a visible browser to fix the page in; drop --headless")
-        handler = HumanHandler()
+        directory = Path(args.recover_dir) if args.recover_dir else _default_recover_dir(venue)
+        subfile = getattr(args, "subfile", None)
+        handler = HumanHandler(log_dir=directory, on_first_log=lambda: write_run_info(directory, venue, base_slug, subfile))
     elif mode == "agent":
         directory = Path(args.recover_dir) if args.recover_dir else _default_recover_dir(venue)
-        handler = AgentHandler(directory, allowed_uploads=allowed_upload_paths(values), final_submit_names=getattr(impl, "final_submit_names", ()))
+        agent = AgentHandler(directory, allowed_uploads=allowed_upload_paths(values), final_submit_names=getattr(impl, "final_submit_names", ()))
+        handler = RememberingHandler(agent, agent.tools)
+        write_run_info(directory, venue, base_slug, getattr(args, "subfile", None))
         print(f"Agent recovery is on: a failed step pauses the run for an agent working through {directory}.")
     elif mode == "ai":
         handler = _ai_recovery_handler(args, venue, impl, values)
+        write_run_info(recovery_dir_of(handler), venue, base_slug, getattr(args, "subfile", None))
 
     if port is not None:
         if port < 0 or port > 65535:
@@ -1220,7 +1330,7 @@ def _ai_recovery_handler(args: argparse.Namespace, venue: str, impl, values: dic
     from .autofill import _SDK_PACKAGES, DEFAULT_MODELS, AutofillApiError, resolve_provider
     from .venues.recovery import FallbackHandler, HumanHandler
     from .venues.recovery_ai import ApiAgentHandler
-    from .venues.recovery_channel import PageTools, allowed_upload_paths
+    from .venues.recovery_channel import PageTools, RememberingHandler, allowed_upload_paths
 
     try:
         provider = resolve_provider(getattr(args, "provider", None), alternative="use --recover by-hand instead")
@@ -1237,11 +1347,12 @@ def _ai_recovery_handler(args: argparse.Namespace, venue: str, impl, values: dic
 
     directory = Path(args.recover_dir) if args.recover_dir else _default_recover_dir(venue)
     tools = PageTools(directory, allowed_uploads=allowed_upload_paths(values), final_submit_names=getattr(impl, "final_submit_names", ()))
-    handler = ApiAgentHandler(tools, provider=provider, model=model)
+    handler = RememberingHandler(ApiAgentHandler(tools, provider=provider, model=model), tools)
     print(f"AI recovery is on ({provider}, {model}). If a step fails, its page (the accessibility tree and a " "screenshot, which can show your manuscript details) is sent to the model so it can fix the step.")
     print(f"  Screenshots and a log of each fix go to {directory}")
     if not args.headless and sys.stdin.isatty():
-        return FallbackHandler(handler, HumanHandler())
+        # What the author does after the model gives up goes in the same log.
+        return FallbackHandler(handler, HumanHandler(log_dir=directory))
     return handler
 
 
@@ -1780,7 +1891,15 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"paperpush {__version__}")
-    parser.add_argument("--venues", action="store_true", help="list supported venues and exit")
+    parser.add_argument(
+        "--venues",
+        nargs="?",
+        const="all",
+        default=None,
+        choices=("all", "submit"),
+        metavar="{all,submit}",
+        help="list supported venues and exit; 'submit' lists only the venues paperpush can submit to (default: all)",
+    )
     parser.add_argument("--agent-guide", dest="agent_guide", action="store_true", help="print the guide for AI agents driving this CLI (AGENTS.md) and exit")
 
     # Verbosity is a per-command concern, so -v/-q live on each subcommand
@@ -1912,6 +2031,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="validate this as an initial submission: every error is reported as a warning, so nothing blocks it. Meant for venues whose guidelines let the initial submission be in any format (the report names the rule at the top when the venue has one; see 'paperpush requirements VENUE').",
     )
+    p_validate.add_argument(
+        "--cover-letter-max-age",
+        dest="cover_letter_max_age",
+        type=int,
+        default=7,
+        metavar="DAYS",
+        help="warn when the date at the top of the cover letter is more than DAYS days old (default: 7). The cover letter is also checked for the name of a different venue, as left over from an earlier submission.",
+    )
     p_validate.add_argument("--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours (blue for passed, vermillion for failed, dark yellow for warnings, grey for not checked) in the terminal and saved report")
     p_validate.add_argument(
         "--ai",
@@ -1975,6 +2102,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_submit.add_argument("--headless", action="store_true", help="run the browser headless (default: headed, so you " "can sign in and review)")
     p_submit.add_argument("--debug", action="store_true", help="open the Playwright Inspector at the first step " "to walk the wizard line by line; reuses a saved " "session from an earlier run to skip sign-in")
     p_submit.add_argument("--new-session", action="store_true", help="discard any saved browser session and sign in " "fresh (use after switching accounts)")
+    p_submit.add_argument("--skip-validate", action="store_true", help="do not run validate on the .sub before opening the browser " "(default: validate first and stop on any error)")
     p_submit.add_argument(
         "--timeout",
         type=float,
@@ -2006,7 +2134,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_submit.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(--ai) LLM provider; defaults to the first of anthropic, openai, google " "whose API key is set (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY)")
     p_submit.add_argument("--model", help="(--ai) model to use (default: the provider's default, as for autofill)")
-    p_submit.add_argument("--recover-dir", metavar="DIR", help="(--recover agent) directory the paused run and the agent exchange " "files through (default: a fresh one under paperpush's config dir)")
+    p_submit.add_argument("--recover-dir", metavar="DIR", help="(--recover agent, by-hand, or --ai) directory for the recovery log, screenshots, and (agent) the " "files the paused run and the agent exchange (default: a fresh one under paperpush's config dir)")
     p_submit.add_argument(
         "--cdp-port",
         type=int,
@@ -2060,6 +2188,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_update.add_argument("--clear", action="store_true", help="delete the cached copy and use the data bundled with this version")
     p_update.set_defaults(func=_cmd_update_venues)
 
+    p_report = sub.add_parser("recovery-report", parents=[verbosity], help="draft a redacted bug report from a submit run whose steps needed recovery")
+    p_report.add_argument("directory", nargs="?", help="the run's recovery directory (default: the latest run with recoveries)")
+    p_report.add_argument("--subfile", metavar="SUB", help="the run's .sub, to mask its values (default: the one the run recorded)")
+    p_report.add_argument("--json", action="store_true", help="print the draft as JSON")
+    p_report.add_argument("--open", action="store_true", help="open the prefilled GitHub issue page in your browser (you still review and submit it)")
+    p_report.set_defaults(func=_cmd_recovery_report)
+
     # Internal command: the autofill front-ends (the Claude skill and the API
     # engine) read field roles from here. Hidden from --help (use 'subfile' to
     # inspect a venue's fields by hand).
@@ -2079,7 +2214,7 @@ def main(argv: list[str] | None = None) -> int:
     logger.debug("dispatch: command=%r", getattr(args, "command", None))
 
     if args.venues:
-        return _print_venues()
+        return _print_venues(submit_only=args.venues == "submit")
 
     if args.agent_guide:
         return _print_agent_guide()

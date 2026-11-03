@@ -602,7 +602,7 @@ def test_build_server_exposes_typed_arguments():
     tool = by_name["validate_subfile"]
     # Renamed from inputSchema to input_schema in MCP SDK 2.0.
     schema = getattr(tool, "input_schema", None) or tool.inputSchema
-    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "alt_color", "initial_submission", "ai_only"}
+    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "alt_color", "initial_submission", "ai_only", "cover_letter_max_age_days"}
     assert schema["required"] == ["subfile"]
 
 
@@ -689,3 +689,31 @@ def test_recovery_tools_refuse_a_run_that_is_not_paused(fake_launch):
     fake_launch.instances[0]._exit_code = 1
     with pytest.raises(ValueError, match="already exited"):
         mcp_server.submit_resume(pid, "abort")
+
+
+def test_a_run_that_needed_recovery_offers_a_report(fake_launch):
+    from paperpush.venues import recovery_channel
+
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    pid = mcp_server.submit(str(VALID_SUB))["pid"]
+    recover_dir = mcp_server._RUNS[pid].recover_dir
+    assert "report" not in mcp_server.submit_status(pid)["recovery"]
+    entry = {"action": "click()", "target": "get_by_role('button', name='Next')", "step": "Authors page", "url": "https://portal/x?token=abc", "error": "TimeoutError: x", "resolution": "retry", "agent_actions": [{"op": "wait", "value": 500}], "note": "slow page", "handler": "agent"}
+    (recover_dir / recovery_channel.LOG_FILE).write_text(json.dumps(entry) + "\n")
+
+    assert "recovery_report" in mcp_server.submit_status(pid)["recovery"]["report"]
+    draft = mcp_server.recovery_report(pid)
+    assert draft["entries"] == 1 and draft["issue_url"].startswith("https://github.com/")
+    assert "token=abc" not in draft["body"] and "slow page" in draft["body"]
+
+    # Still reachable by pid once the run is closed, and by directory.
+    mcp_server.submit_close(pid)
+    assert mcp_server.recovery_report(pid)["title"] == draft["title"]
+    assert mcp_server.recovery_report(directory=str(recover_dir))["title"] == draft["title"]
+
+
+def test_recovery_report_errors(fake_launch, tmp_path):
+    with pytest.raises(ValueError, match="no submission with pid"):
+        mcp_server.recovery_report(424242)
+    with pytest.raises(ValueError, match="no recoveries were logged"):
+        mcp_server.recovery_report(directory=str(tmp_path))

@@ -127,6 +127,18 @@ The passes at a glance
      - yes
      - ``--dont-check-manuscript``
      - no
+   * - :ref:`Cover letter date and venue <vc-cover-letter>`
+     - when a cover letter is attached
+     - ``--dont-check-manuscript``
+     - no
+   * - :ref:`Abstract and front matter <vc-front-matter>`
+     - yes
+     - ``--dont-check-manuscript``
+     - no
+   * - :ref:`Reference list <vc-bibliography>`
+     - yes
+     - ``--dont-check-manuscript``
+     - no
    * - :ref:`Prose <vc-prose>`
      - yes
      - ``--dont-check-manuscript``
@@ -486,6 +498,118 @@ An identical value passes. A near match is a warning that lists the first
 differing words ("'twelve' in the .sub vs 'ten' in the manuscript"); a value
 the manuscript does not contain is a warning too.
 
+**Counts stated on the title page** (in a separate title-page upload if there
+is one, otherwise the manuscript's first pages) are checked as well:
+
+- a **main-text word count** ("Word count: 4,512", "Main text: 4,512 words")
+  against the manuscript, counted from the Introduction (or the venue's
+  ``manuscript.main_text_start_headings``, or else the end of the abstract) to
+  each place a venue's count usually stops: the first back-matter heading
+  (acknowledgements, declarations, figure legends), a Methods section after
+  the results, or the reference list (or the venue's
+  ``main_text_end_headings``). Word processors and venues count differently,
+  so the stated count passes when any of these, or the whole document, is
+  within 5% (and at least 50 words) of it;
+- an **abstract word count** against the ``.sub``'s abstract (within 5% or 10
+  words);
+- a stated number of **figures**, **tables**, or **display items** against the
+  highest main figure and table number the manuscript cites (or the number of
+  figure and table files attached).
+
+Stated limits ("word limit: 3,000"), ranges, supplementary items, and counts of
+parts this check does not measure (legends, Methods, references) are skipped.
+A mismatch is a warning.
+
+.. _vc-cover-letter:
+
+Cover letter
+------------
+
+A cover letter tends to be reused from one submission to the next. When one is
+attached, two things are checked:
+
+- **Date**: the first date in the letterhead (before "Dear ...") must be at
+  most 7 days old (``--cover-letter-max-age DAYS`` changes this) and not in the
+  future. Written dates ("3 November 2026", "Nov. 3rd, 2026"), ISO dates, and
+  numeric dates are read; a numeric date that reads two ways ("03/11/2026") is
+  reported only if both readings are too old. A LaTeX letter dated
+  ``\today`` passes. A letter with no date is reported as not checked.
+- **Venue**: the letter must not name a different venue from paperpush's venue
+  list in a sentence about this submission ("for consideration in Nature",
+  "Dear Editors of Cell"). Sentences that cite earlier work ("published in",
+  "previously", "et al.") are skipped, and a one-word name only counts when
+  capitalized. If the letter names neither this venue nor another one, an AI
+  check (``ai.cover_letter_venue``) reads it to see who it is addressed to.
+
+.. _vc-front-matter:
+
+Abstract and front matter
+-------------------------
+
+These run for every venue:
+
+- **No citations in the abstract.** An abstract is indexed and read apart from
+  the reference list, so a citation there points at nothing. Both the
+  ``.sub``'s abstract and the manuscript's own are read: in LaTeX source,
+  ``\cite`` and its variants (``\citep``, ``\parencite``, ...); in text,
+  bracketed numbers ("[3]", "[2, 5-7]") and author-year citations ("(Smith et
+  al., 2020)", "Smith et al. (2020)"). "[0, 1]" and an acronym with a year
+  ("(NIPS 2017)") are not citations. The manuscript's abstract is the text
+  after its "Abstract" heading (or LaTeX ``abstract`` environment), up to the
+  Introduction, the keywords, or a similar heading; without a heading, it is
+  found by the ``.sub``'s abstract's first and last words. The message names the
+  venue's rule when its guidelines forbid citations (``abstract.no_references``).
+- **Structured abstract**, when the guidelines ask for one
+  (``abstract.structured``). Each heading in ``abstract.structured_headings``
+  must appear *as a label*: at the start of the abstract, a line, or a
+  sentence, followed by a colon, full stop, dash, or line break
+  ("Background: ...", "Results. ..."), or in bold. "The results show" does not
+  count as a Results heading. Singular and plural forms are interchangeable
+  ("Conclusion" for "Conclusions"), and "Intervention(s) or Exposure(s)" is
+  satisfied by any of its forms. With no headings listed, the abstract needs
+  some labelled section.
+- **Contact e-mail.** The manuscript gives at least one e-mail address, so a
+  reader can reach the corresponding author. The title page (a separate
+  title-page upload, or the manuscript's first pages) is read first, then the
+  whole manuscript; LaTeX ``\email{}`` and spelled-out addresses ("jdoe at
+  uni dot edu") count. Not applicable at a double-blind venue. When the
+  guidelines require the corresponding author's e-mail on the title page, the
+  ``guidelines.title_page`` check covers it instead.
+
+Every finding is a warning.
+
+.. _vc-bibliography:
+
+Reference list
+--------------
+
+- **Every reference cited, and every citation listed.** How a citation is
+  matched to its entry depends on the manuscript:
+
+  - LaTeX source: the keys of ``\cite``-family and ``\nocite`` commands
+    against the ``\bibitem`` keys, or the ``.bib`` entries the source names.
+    BibTeX prints only cited entries, so with a ``.bib`` an uncited entry is
+    reported only under ``\nocite{*}``; a cited key missing from the ``.bib``
+    is reported either way.
+  - Numbered references ("1.", "[1]"): the numbers cited in brackets, or as
+    superscripts in a Word file. A PDF that cites by superscript is reported
+    as not checked, since superscripts cannot be told apart from other numbers
+    in extracted text.
+  - Alphabetic labels ("[BMR+20]"): the labels cited in brackets.
+  - Author-year references: each entry's first-author surname and year, looked
+    for together in the text ("Smith et al., 2020", "Smith and Lee (2020)").
+
+  Citations anywhere but the reference list count, including figure legends
+  printed after it.
+- **Self-citations.** An entry is a self-citation when it lists one of the
+  ``.sub``'s authors: the surname next to the author's first initial ("Rich,
+  J.", "J. Rich", "Joseph Rich"), so someone else with the same surname is
+  rarely counted. A warning is raised when more than 15 references, or more
+  than 80% of a list of at least 5, are self-citations. The passing note gives
+  the count either way. With a ``.bib``, only the cited entries count.
+
+Every finding is a warning: references are read from extracted text.
+
 .. _vc-prose:
 
 Prose
@@ -509,13 +633,33 @@ looks for one kind of slip that a pattern finds with few false alarms:
   and jargon are not flagged. Capitalized words and words of three letters or
   fewer are skipped, since in a paper they are mostly names and abbreviations.
   Needs ``codespell``, part of the ``validate`` extra.
+- **Repetitive word choice**, counted the way
+  `word_counter <https://github.com/josephrich98/word_counter>`_ does: case
+  folded, stop words dropped, and inflections grouped ("result", "results",
+  "resulted"). Four patterns are reported:
+
+  - a stock word -- a transition, intensifier, or stock phrase such as
+    "however", "notably", "novel", "robust", or "leverage" -- used at least 5
+    times and at least 2.5 times per 1,000 words;
+  - a word that is not in the title, abstract, or keywords making up more than
+    2.5% of the content words (with at least 25 uses). Words of the paper's
+    subject are expected to recur, which is why those are left out; with no
+    title or abstract to go by, this pattern is skipped;
+  - the same content word three times in one sentence (again leaving out the
+    title, abstract, and keyword words; sentences over 50 words, which are
+    usually tables or author blocks run together, are skipped);
+  - four or more sentences in a row that open with the same word ("We ... We
+    ... We ... We").
+
+  The passing note lists the five most frequent content words.
 
 What is checked depends on the file. Word, Markdown, and plain-text files are
 read as written, so every check runs. LaTeX source is read with its math,
 commands, citations, and URLs masked; double spaces are not checked there,
 because LaTeX does not print them. Text extracted from a PDF has spacing
 artefacts of its own (justified lines, rejoined line breaks), so a PDF gets
-only the repeated-word and spelling checks. The reference list is skipped.
+only the repeated-word, spelling, and repetitive-word-choice checks. The
+reference list is skipped.
 Every finding is a warning, quoting the first five examples in context with
 the problem marked (``␣␣`` for a double space, ``»,«`` around a mark).
 For a full proofread, use an editor or the ``/proofreading`` agent skill.

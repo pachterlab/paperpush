@@ -209,6 +209,14 @@ def test_cli_recover_off_sets_nothing():
 def test_cli_recover_by_hand(capsys):
     handler, port = cli._submit_recovery_setup(_args(recover="by-hand"), "biorxiv", "biorxiv", {})
     assert isinstance(handler, HumanHandler) and port is None
+    # Logs to a fresh run directory, created only once something fails.
+    assert handler.log_dir is not None and not handler.log_dir.exists()
+    assert ch.recovery_dir_of(handler) == handler.log_dir
+
+
+def test_cli_recover_by_hand_logs_to_recover_dir(tmp_path):
+    handler, _ = cli._submit_recovery_setup(_args(recover="by-hand", recover_dir=str(tmp_path / "run")), "biorxiv", "biorxiv", {})
+    assert handler.log_dir == tmp_path / "run"
 
 
 def test_cli_recover_by_hand_needs_a_window():
@@ -218,7 +226,9 @@ def test_cli_recover_by_hand_needs_a_window():
 
 def test_cli_recover_agent_and_cdp(tmp_path, capsys):
     handler, port = cli._submit_recovery_setup(_args(recover="agent", recover_dir=str(tmp_path), cdp_port=0), "biorxiv", "biorxiv", {})
-    assert isinstance(handler, ch.AgentHandler) and handler.directory == tmp_path
+    assert isinstance(handler, ch.RememberingHandler) and isinstance(handler.inner, ch.AgentHandler)
+    assert handler.inner.directory == tmp_path and ch.recovery_dir_of(handler) == tmp_path
+    assert json.loads((tmp_path / "run.json").read_text())["base"] == "biorxiv"
     assert 0 < port < 65536
     assert f"playwright-cli attach --cdp=http://127.0.0.1:{port}" in capsys.readouterr().out
 
@@ -231,6 +241,148 @@ def test_cli_recover_is_a_no_op_for_unconverted_venues(capsys, monkeypatch):
     assert "does not support recovery" in capsys.readouterr().err
 
 
-def test_cli_recover_dir_needs_agent_mode():
-    with pytest.raises(ValueError, match="--recover agent"):
-        cli._submit_recovery_setup(_args(recover="by-hand", recover_dir="/tmp/x"), "biorxiv", "biorxiv", {})
+def test_cli_recover_dir_needs_a_recovery_mode():
+    with pytest.raises(ValueError, match="--recover agent, by-hand"):
+        cli._submit_recovery_setup(_args(recover_dir="/tmp/x", cdp_port=0), "biorxiv", "biorxiv", {})
+
+
+# ---------------------------------------------------------------------------
+# RememberingHandler: reusing a fix within one run
+# ---------------------------------------------------------------------------
+
+from paperpush.venues.recovery import FailedAction, FallbackHandler  # noqa: E402
+
+
+class FakeInner:
+    """Stands in for the agent: logs a fix through the tools, like AgentHandler does."""
+
+    def __init__(self, tools, actions, resolution=Resolution.RETRY):
+        self.tools, self.actions, self.resolution = tools, actions, resolution
+        self.calls: list[tuple[FailedAction, dict | None]] = []
+
+    def recover(self, page, failure):
+        self.calls.append((failure, self.tools.hint))
+        self.tools.log(failure, self.resolution, list(self.actions), "fixed it", handler="agent")
+        return self.resolution
+
+
+def _failure(target="get_by_role('button', name='Save')", action="click()", step_label="Page 2", attempt=1):
+    return FailedAction(action=action, target=target, error=PWTimeout("Timeout 10000ms exceeded."), step=step_label, url="https://portal/x", attempt=attempt)
+
+
+@pytest.fixture
+def remembering(tmp_path, monkeypatch):
+    tools = ch.PageTools(tmp_path)
+    done: list[tuple] = []
+
+    def act(page, op, target=None, value=None):
+        done.append((op, target, value))
+        return {"ok": True}
+
+    monkeypatch.setattr(tools, "act", act)
+    return tools, done
+
+
+def test_a_wait_and_click_fix_is_replayed_for_the_same_failure(remembering):
+    tools, done = remembering
+    fix = [{"op": "wait", "value": 5000}, {"op": "click", "target": {"role": "button", "name": "OK"}}]
+    inner = FakeInner(tools, fix)
+    handler = ch.RememberingHandler(inner, tools, output=lambda *_: None)
+    assert handler.recover(None, _failure()) is Resolution.RETRY
+    assert handler.recover(None, _failure()) is Resolution.RETRY
+    assert len(inner.calls) == 1  # the second one never paused
+    assert done == [("wait", None, 5000), ("click", {"role": "button", "name": "OK"}, None)]
+    assert [e["handler"] for e in ch.read_log(tools.directory)] == ["agent", "replay"]
+
+
+@pytest.mark.parametrize(
+    "fix",
+    [
+        [{"op": "fill", "target": {"label": "Name"}, "value": "Funder One"}],
+        [{"op": "click", "target": {"text": "Funder One"}}],
+        [{"op": "upload", "target": {"label": "File"}, "value": "/a.pdf"}],
+        [],  # fixed by hand: nothing to repeat, and never skip a step silently
+    ],
+)
+def test_fixes_that_carry_data_are_not_replayed(remembering, fix):
+    tools, done = remembering
+    inner = FakeInner(tools, fix)
+    handler = ch.RememberingHandler(inner, tools, output=lambda *_: None)
+    handler.recover(None, _failure())
+    handler.recover(None, _failure())
+    assert len(inner.calls) == 2 and done == []
+    # ...but the agent is told how it was fixed last time.
+    assert inner.calls[1][1]["actions"] == fix
+
+
+def test_a_retried_failure_goes_to_the_agent(remembering):
+    tools, done = remembering
+    inner = FakeInner(tools, [{"op": "wait", "value": 1000}])
+    handler = ch.RememberingHandler(inner, tools, output=lambda *_: None)
+    handler.recover(None, _failure())
+    handler.recover(None, _failure(attempt=2))  # the replayed fix did not hold
+    assert len(inner.calls) == 2
+
+
+def test_a_similar_failure_gets_the_earlier_fix_as_a_hint(remembering):
+    tools, _ = remembering
+    fix = [{"op": "upload", "target": {"label": "FILE_TO_UPLOAD", "nth": 0}, "value": "/m.pdf"}]
+    inner = FakeInner(tools, fix, Resolution.RESOLVED)
+    handler = ch.RememberingHandler(inner, tools, output=lambda *_: None)
+    handler.recover(None, _failure(target="get_by_role('cell', name='Select File 1')", action="set_input_files('/m.pdf')"))
+    handler.recover(None, _failure(target="get_by_role('cell', name='Select File 2')", action="set_input_files('/s.pdf')"))
+    first_hint, second_hint = inner.calls[0][1], inner.calls[1][1]
+    assert first_hint is None
+    assert second_hint["actions"] == fix and second_hint["note"] == "fixed it"
+    assert tools.hint is None  # cleared once the agent is done
+
+
+def test_a_replay_that_no_longer_works_hands_over(remembering, monkeypatch):
+    tools, _ = remembering
+    inner = FakeInner(tools, [{"op": "click", "target": {"role": "button", "name": "OK"}}])
+    handler = ch.RememberingHandler(inner, tools, output=lambda *_: None)
+    handler.recover(None, _failure())
+    monkeypatch.setattr(tools, "act", lambda *a, **k: {"ok": False, "error": "gone"})
+    handler.recover(None, _failure())
+    assert len(inner.calls) == 2
+
+
+def test_aborts_are_not_remembered(remembering):
+    tools, done = remembering
+    inner = FakeInner(tools, [{"op": "wait", "value": 1}], Resolution.ABORT)
+    handler = ch.RememberingHandler(inner, tools, output=lambda *_: None)
+    handler.recover(None, _failure())
+    handler.recover(None, _failure())
+    assert len(inner.calls) == 2 and done == []
+
+
+def test_earlier_runs_in_a_reused_directory_are_not_remembered(remembering):
+    tools, done = remembering
+    tools.log(_failure(), Resolution.RETRY, [{"op": "wait", "value": 1}], "old run", handler="agent")
+    inner = FakeInner(tools, [{"op": "fill", "target": {"label": "x"}, "value": "y"}])
+    handler = ch.RememberingHandler(inner, tools, output=lambda *_: None)
+    handler.recover(None, _failure())
+    handler.recover(None, _failure())
+    assert done == []  # it remembered this run's fill fix, not the old wait
+
+
+def test_hint_reaches_paused_json_and_snapshots(page, tmp_path):
+    handler = ch.AgentHandler(tmp_path, pause_timeout=10)
+    handler.tools.hint = {"actions": [{"op": "wait", "value": 1}], "note": "n"}
+
+    def script(send):
+        assert ch.read_paused(tmp_path)["earlier_fix"]["note"] == "n"
+        assert send("snapshot")["earlier_fix"]["note"] == "n"
+        send("resume", resolution="abort")
+
+    thread, _, errors = agent(tmp_path, script)
+    assert handler.recover(page, _failure()) is Resolution.ABORT
+    finish(thread, errors)
+
+
+def test_recovery_dir_of_looks_through_wrappers(tmp_path):
+    tools = ch.PageTools(tmp_path)
+    wrapped = FallbackHandler(ch.RememberingHandler(FakeInner(tools, []), tools), HumanHandler())
+    assert ch.recovery_dir_of(wrapped) == tmp_path
+    assert ch.recovery_dir_of(HumanHandler()) is None
+    assert ch.recovery_dir_of(None) is None

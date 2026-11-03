@@ -59,6 +59,12 @@ Options
    Discard any saved browser session and sign in fresh. Use this after
    switching accounts.
 
+``--skip-validate``
+   Do not run :doc:`validate` on the ``.sub`` before opening the browser. By
+   default ``submit`` validates first and stops on any error; when it does, the
+   error message suggests this flag. Use it when you have checked the errors
+   and want to submit anyway.
+
 ``--timeout SECONDS``
    Cap how long the browser waits for any action or page load before failing.
    Default: ``10`` seconds; ``0`` waits forever. Increase it on a slow
@@ -73,7 +79,9 @@ Options
    portal has renamed a button. ``off`` (the default) stops the run.
    ``by-hand`` pauses and asks in the terminal: fix the page in the browser
    (or do the step yourself), then press Enter to continue from the next
-   step, ``r`` to retry the step, or ``a`` to abort. ``ai`` is the same as
+   step, ``r`` to retry the step, or ``a`` to abort. After a fix you are asked,
+   optionally, what you changed; that line and the failed step are logged (see
+   ``--recover-dir``), since clicks in the browser cannot be. ``ai`` is the same as
    ``--ai`` (below). ``agent`` pauses for an
    AI agent instead. The MCP server's ``submit`` tool uses it, with the agent
    working through ``submit_page``, ``submit_act`` and ``submit_resume``. Every
@@ -100,10 +108,22 @@ Options
    ``autofill``.
 
 ``--recover-dir DIR``
-   With ``--recover agent`` or ``--ai``, the directory the paused run and the agent
-   exchange files through. Defaults to a fresh one under PaperPush's config
-   directory. It also collects ``recoveries.jsonl``, a record of each failed
-   step and what fixed it.
+   With ``--recover agent``, ``--recover by-hand`` or ``--ai``, where the run
+   keeps its recovery log (and, for ``agent``, the files the paused run and the
+   agent exchange). Defaults to a fresh one under PaperPush's config
+   directory, created only when a step fails. It also collects ``recoveries.jsonl``, a record of each failed
+   step and what fixed it, and ``run.json`` (the venue and PaperPush version).
+
+   Within one run, a fix is reused. When the same action on the same element
+   fails again and the earlier fix only waited or clicked a named button or
+   link, it is repeated without pausing. A fix that typed, selected or uploaded
+   something is never repeated, since on a repeated widget (the second funder,
+   the second upload row) it would enter the previous entry's data. Instead the
+   agent or model is shown it as ``earlier_fix``, to adapt.
+
+   A run that needed recovery ends by printing a
+   :doc:`recovery-report <recovery-report>` command: it drafts a redacted bug
+   report you can choose to file, so the venue gets fixed for everyone.
 
 ``--cdp-port PORT``
    Open a Chrome DevTools Protocol endpoint on ``127.0.0.1:PORT`` (``0`` picks

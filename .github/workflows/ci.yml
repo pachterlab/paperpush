@@ -32,6 +32,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      # The recovery tests drive a headless Chromium against local HTML
+      # fixtures (no real portal), so they need Playwright's browser binary.
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+
       - name: Check README venues table is in sync with the venue databases
         run: python scripts/gen_readme_venues.py --check
 

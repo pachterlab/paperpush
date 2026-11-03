@@ -38,9 +38,11 @@ from __future__ import annotations
 
 import enum
 import logging
+import os
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Iterator, Protocol
 
 from playwright.sync_api import Error as PlaywrightError
@@ -168,15 +170,40 @@ class HumanHandler:
     With no terminal to ask on (stdin closed or captured, as under the MCP
     server), the failure is aborted. The run then fails exactly as it does
     without a handler.
+
+    With ``log_dir``, every failure and its outcome is appended to
+    ``recoveries.jsonl`` there (``handler: "by-hand"``), the same log the agent
+    and ``--ai`` write, so ``paperpush recovery-report`` can turn it into a bug
+    report. Clicks made in the browser cannot be recorded, so after a fix the
+    author is asked, optionally, what they changed; that note is the record.
+    The directory is created on the first failure, and ``on_first_log`` (if
+    given) runs then, to record the run's details next to the log.
     """
 
     PROMPT = "    [Enter] I did it by hand, continue   [r] retry the step   [a] abort the run: "
+    NOTE_PROMPT = "    What did you change? One line helps fix this venue for everyone (Enter to skip): "
 
-    def __init__(self, input_fn: Callable[[str], str] = input, output: Callable[[str], None] = print):
+    def __init__(
+        self,
+        input_fn: Callable[[str], str] = input,
+        output: Callable[[str], None] = print,
+        *,
+        log_dir: str | os.PathLike | None = None,
+        on_first_log: Callable[[], None] | None = None,
+    ):
         self._input = input_fn
         self._print = output
+        self.log_dir = Path(log_dir) if log_dir is not None else None
+        self._on_first_log = on_first_log
+        self._logged = False
 
     def recover(self, page: Any, failure: FailedAction) -> Resolution:
+        resolution = self._ask(failure)
+        note = self._ask_note() if resolution is not Resolution.ABORT and self.log_dir is not None else ""
+        self._log(failure, resolution, note)
+        return resolution
+
+    def _ask(self, failure: FailedAction) -> Resolution:
         self._print(f"\n>>> The run got stuck: {failure.describe()}")
         self._print("    The browser is paused there. Fix the page by hand, or do this step yourself.")
         while True:
@@ -191,6 +218,28 @@ class HumanHandler:
             if answer in ("a", "abort", "q", "quit"):
                 return Resolution.ABORT
             self._print(f"    Unrecognized answer {answer!r}.")
+
+    def _ask_note(self) -> str:
+        try:
+            return self._input(self.NOTE_PROMPT).strip()
+        except (EOFError, KeyboardInterrupt, OSError):
+            return ""
+
+    def _log(self, failure: FailedAction, resolution: Resolution, note: str) -> None:
+        if self.log_dir is None:
+            return
+        # Imported here: recovery_channel imports this module.
+        from .recovery_channel import append_log
+
+        try:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+            if not self._logged and self._on_first_log is not None:
+                self._on_first_log()
+        except OSError as exc:
+            logger.warning("recovery: could not create %s: %s", self.log_dir, exc)
+            return
+        self._logged = True
+        append_log(self.log_dir, failure, resolution, [], note, handler="by-hand")
 
 
 class FallbackHandler:

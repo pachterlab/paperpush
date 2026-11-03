@@ -104,3 +104,23 @@ def test_listings_mark_validate_only(validate_only, capsys):
     assert listed[SLUG]["supports_submit"] is False
     assert listed[SLUG]["supports_validate"] is True
     assert listed["biorxiv"]["supports_submit"] is True
+
+
+def test_venues_submit_hides_validate_only(validate_only, capsys):
+    assert main(["--venues", "submit"]) == 0
+    out = capsys.readouterr().out
+    assert f"({SLUG})" not in out
+    assert "(biorxiv)" in out
+    assert "validate only" not in out
+
+
+def test_venues_all_matches_bare_flag(validate_only, capsys):
+    assert main(["--venues"]) == 0
+    bare = capsys.readouterr().out
+    assert main(["--venues", "all"]) == 0
+    assert capsys.readouterr().out == bare
+
+
+def test_venues_rejects_unknown_filter(capsys):
+    with pytest.raises(SystemExit):
+        main(["--venues", "bogus"])

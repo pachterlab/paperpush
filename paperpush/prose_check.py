@@ -11,6 +11,14 @@ pattern can find with few false alarms, and every finding is a WARNING.
   stop between words ("word,word", "end.Next").
 * ``prose.brackets`` -- a paragraph whose parentheses, square brackets, or
   double quotes do not pair up.
+* ``prose.repetition`` -- repetitive word choice, counted the way
+  `word_counter <https://github.com/josephrich98/word_counter>`_ does (case
+  folded, stop words dropped, inflections grouped): a stock word ("however",
+  "notably", "novel", "robust", ...) used at least 5 times and 2.5 times per
+  1,000 words; a word outside the title, abstract, and keywords that makes up
+  2.5% of the content words (25 uses or more); the same content word (again
+  outside the title, abstract, and keywords) three times in one sentence; and
+  four or more sentences in a row that open with the same word. The passing note lists the most frequent words.
 * ``prose.spelling`` -- words on codespell's list of common misspellings
   ("teh", "recieve", "seperate"). codespell lists known typos rather than
   checking against a dictionary, so gene names, acronyms, and jargon are left
@@ -526,7 +534,202 @@ def _check(name: str, venue: Venue, values: dict[str, str]) -> Outcome:
     return Outcome(issues, "; ".join(details))
 
 
+# --- repetitive word choice -------------------------------------------------------------
+#
+# After josephrich98/word_counter: lower-case the words, drop stop words, fold
+# inflections together, and count. Rather than NLTK's lemmatizer (which needs
+# corpora downloaded at run time) a light suffix-stripper groups "result",
+# "results", "resulted", and "resulting"; the most common spelling names the group.
+
+REPETITION = "repetition"
+# NLTK's English stop-word list.
+_STOP_WORDS = frozenset(
+    """i me my myself we our ours ourselves you your yours yourself yourselves he him his himself she her hers herself it its itself
+    they them their theirs themselves what which who whom this that these those am is are was were be been being have has had having
+    do does did doing a an the and but if or because as until while of at by for with about against between into through during before
+    after above below to from up down in out on off over under again further then once here there when where why how all any both each
+    few more most other some such no nor not only own same so than too very s t can will just don should now d ll m o re ve y ain aren
+    couldn didn doesn hadn hasn haven isn ma mightn mustn needn shan shouldn wasn weren won wouldn also may might could would one two
+    using used use however within without among whether thus""".split()
+)
+# Transitions, intensifiers, and stock phrases that read as filler when leaned on.
+# Reported when used at least _STYLE_MIN_COUNT times and _STYLE_PER_1000 times per 1,000 words.
+_STYLE_WORDS = frozenset(
+    """however moreover furthermore additionally notably importantly interestingly indeed therefore consequently overall
+    specifically particularly clearly crucially ultimately essentially basically very highly extremely remarkably substantially
+    considerably dramatically strikingly novel robust comprehensive crucial pivotal leverage leverages leveraging utilize utilizes
+    utilizing utilized delve delves intricate underscore underscores highlight highlights highlighting showcase showcases seamless
+    seamlessly paramount multifaceted notable potentially vital landscape realm""".split()
+)
+_STYLE_MIN_COUNT = 5
+_STYLE_PER_1000 = 2.5
+# A content word (outside the title, abstract, and keywords) is overused at this many uses and this share of all content words.
+_OVERUSED_MIN_COUNT = 25
+_OVERUSED_SHARE = 0.025
+# The same content word this many times in one sentence.
+_SENTENCE_REPEATS = 3
+# This many consecutive sentences opening with the same word.
+_SAME_OPENINGS = 4
+# Longest sentence read for repeats: a longer one is usually a table, list, or author block run together.
+_MAX_SENTENCE_WORDS = 50
+# Shortest word counted as a content word.
+_MIN_CONTENT_LEN = 4
+# Top words listed in the passing note.
+_TOP_WORDS = 5
+_WORD = re.compile(r"[A-Za-z][A-Za-z'’-]*[A-Za-z]|[A-Za-z]")
+# A sentence break: end punctuation, then space and a capital (or a masked item), not after a common abbreviation.
+_SENTENCE_END = re.compile(r"(?<!\bal)(?<!\bFig)(?<!\bFigs)(?<!\be\.g)(?<!\bi\.e)(?<!\bvs)(?<!\bEq)(?<!\bRef)(?<!\bcf)(?<!\bapprox)(?<!\bNo)(?<![A-Z])[.!?]+[\"')\]]*\s+(?=[A-Z\"(" + _MASK + r"])")
+
+
+def stem(word: str) -> str:
+    """``word`` with its plural or verb ending stripped (a grouping key, not a dictionary form)."""
+    w = word.lower().replace("’", "'")
+    if w.endswith("'s"):
+        w = w[:-2]
+    for suffix, repl in (("ies", "y"), ("ied", "y"), ("sses", "ss"), ("ing", ""), ("ed", ""), ("es", ""), ("s", "")):
+        if not w.endswith(suffix) or len(w) - len(suffix) < 3:
+            continue
+        if suffix == "s" and w.endswith(("ss", "us", "is")):
+            continue
+        if suffix == "es" and not w.endswith(("ches", "shes", "xes", "zes", "sses", "oes")):
+            continue  # "cases", "genes" -> drop just the s
+        base = w[: -len(suffix)] + repl
+        # "running" -> "run", "mapped" -> "map"
+        if suffix in ("ing", "ed") and len(base) >= 4 and base[-1] == base[-2] and base[-1] not in "lsz":
+            base = base[:-1]
+        return base
+    return w
+
+
+def _words(text: str) -> list[str]:
+    return _WORD.findall(text)
+
+
+def _is_content(word: str) -> bool:
+    return len(word) >= _MIN_CONTENT_LEN and word.lower() not in _STOP_WORDS and not (word.isupper() and len(word) > 1)
+
+
+def _sentences(paragraph: str) -> list[str]:
+    return [s for s in _SENTENCE_END.split(paragraph) if s.strip()]
+
+
+def _main_paragraphs(paragraphs: list[str]) -> list[str]:
+    """The paragraphs before the reference list."""
+    from .manuscript import _REFERENCE_HEADING
+
+    for i, p in enumerate(paragraphs):
+        if len(p.split()) <= 4 and _REFERENCE_HEADING.match(p.strip()):
+            return paragraphs[:i]
+    return paragraphs
+
+
+@dataclass
+class Repetition:
+    """What :func:`repetition` found in a text, by kind, plus its most frequent content words."""
+
+    style: list[str] = field(default_factory=list)
+    overused: list[str] = field(default_factory=list)
+    in_sentence: list[str] = field(default_factory=list)
+    openings: list[str] = field(default_factory=list)
+    top: list[tuple[str, int]] = field(default_factory=list)
+    words: int = 0
+
+
+def repetition(paragraphs: list[str], topic: str = "") -> Repetition:
+    """Repetitive word choice in ``paragraphs``.
+
+    ``topic`` (the title, abstract, and keywords) names the subject of the
+    paper: words in it are expected to recur, so they are never reported as
+    overused across the paper.
+    """
+    from collections import Counter
+
+    out = Repetition()
+    all_words = [w for p in paragraphs for w in _words(p)]
+    out.words = len(all_words)
+    if not all_words:
+        return out
+    per_1000 = 1000 / len(all_words)
+
+    style = Counter(w.lower() for w in all_words if w.lower() in _STYLE_WORDS)
+    for word, count in style.most_common():
+        if count >= _STYLE_MIN_COUNT and count * per_1000 >= _STYLE_PER_1000:
+            out.style.append(f"'{word}' {count} times ({count * per_1000:.1f} per 1,000 words)")
+
+    content = [w for w in all_words if _is_content(w)]
+    groups = Counter(stem(w) for w in content)
+    spelling: dict[str, Counter] = {}
+    for w in content:
+        spelling.setdefault(stem(w), Counter())[w.lower()] += 1
+    name = {k: c.most_common(1)[0][0] for k, c in spelling.items()}
+    out.top = [(name[k], n) for k, n in groups.most_common(_TOP_WORDS)]
+    topic_stems = {stem(w) for w in _words(topic)}
+    if topic_stems:
+        for key, count in groups.most_common(10):
+            if count >= _OVERUSED_MIN_COUNT and count / len(content) >= _OVERUSED_SHARE and key not in topic_stems:
+                out.overused.append(f"'{name[key]}' {count} times ({100 * count / len(content):.1f}% of content words)")
+
+    for paragraph in paragraphs:
+        sentences = _sentences(paragraph)
+        for sentence in sentences:
+            tokens = sentence.split()
+            if len(tokens) > _MAX_SENTENCE_WORDS or sum(1 for t in tokens if re.fullmatch(r"[\"'(]*[A-Za-z][A-Za-z'\u2019-]*[.,;:)\"']*", t)) < 0.7 * len(tokens):
+                continue
+            counts = Counter(stem(w) for w in _words(sentence) if _is_content(w) and stem(w) not in topic_stems)
+            for key, count in counts.items():
+                if count >= _SENTENCE_REPEATS:
+                    snippet = re.sub(r"\s+", " ", sentence.strip())
+                    snippet = snippet if len(snippet) <= 160 else snippet[:157] + "..."
+                    out.in_sentence.append(f"'{name.get(key, key)}' {count} times in \"{snippet}\"")
+        run: list[str] = []
+        for sentence in sentences + [""]:
+            first = (_words(sentence)[:1] or [""])[0].lower()
+            if run and first and first == _words(run[0])[0].lower():
+                run.append(sentence)
+                continue
+            if len(run) >= _SAME_OPENINGS:
+                opener = _words(run[0])[0]
+                start = re.sub(r"\s+", " ", run[0].strip())[:60]
+                out.openings.append(f"{len(run)} sentences in a row open with '{opener}' (\"{start}...\")")
+            run = [sentence] if first else []
+    return out
+
+
+_REPETITION_KINDS = (
+    ("style", "stock word(s) used often"),
+    ("overused", "word(s) outside the title, abstract, and keywords used unusually often"),
+    ("in_sentence", "sentence(s) repeating a word"),
+    ("openings", "run(s) of sentences opening with the same word"),
+)
+
+
+def _repetition_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    from .front_matter_check import manuscript_abstract
+
+    topic = " ".join(values.get(k, "") for k in ("title", "abstract", "keywords"))
+    issues: list[Issue] = []
+    details: list[str] = []
+    files = _manuscripts(venue, values)
+    for fld, text in files:
+        if text.why:
+            issues.append(Issue(WARNING, fld.id, text.why, unchecked=True))
+            continue
+        own = manuscript_abstract(document.get(text.path), values.get("abstract", ""))
+        found = repetition(_main_paragraphs(text.paragraphs), topic + " " + (own[0] if own else ""))
+        for kind, noun in _REPETITION_KINDS:
+            hits = getattr(found, kind)
+            if hits:
+                shown = "; ".join(hits[:MAX_EXAMPLES])
+                more = f" (and {len(hits) - MAX_EXAMPLES} more)" if len(hits) > MAX_EXAMPLES else ""
+                issues.append(Issue(WARNING, fld.id, f"{text.path.name}: {len(hits)} {noun}: {shown}{more}; vary the wording"))
+        top = ", ".join(f"{w} ({n})" for w, n in found.top)
+        prefix = f"{text.path.name}: " if len(files) > 1 else ""
+        details.append(f"{prefix}{found.words:,} words; most frequent: {top}" if top else f"{prefix}no words read")
+    return Outcome(issues, "; ".join(details))
+
+
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     logger.info("Proofreading the %s manuscript's prose", venue.slug)
     for name, (title, _, _) in _CHECKS.items():
         checks.run(f"prose.{name}", title, PROSE, _check, name, venue, values)
+    checks.run(f"prose.{REPETITION}", "Varied word choice (no heavily repeated words)", PROSE, _repetition_check, venue, values)

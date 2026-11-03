@@ -191,6 +191,67 @@ def test_human_handler_answers(typed, expected):
     assert "Authors page" in printed[0]
 
 
+def _human(tmp_path, typed, **kw):
+    answers = iter(typed)
+    prompts: list[str] = []
+
+    def ask(prompt):
+        prompts.append(prompt)
+        return next(answers)
+
+    return HumanHandler(input_fn=ask, output=lambda _m: None, log_dir=tmp_path / "run", **kw), prompts
+
+
+def _read_log(directory):
+    import json
+
+    return [json.loads(line) for line in (directory / "recoveries.jsonl").read_text().splitlines()]
+
+
+def test_human_handler_logs_the_fix_and_the_note(tmp_path):
+    started = []
+    handler, prompts = _human(tmp_path, ["", "renamed Next to Continue", "r", ""], on_first_log=lambda: started.append(1))
+    failure = FailedAction(action="click()", target="get_by_role('button', name='Next')", error=PWTimeout("Timeout 300ms exceeded."), step="Authors page", url="https://portal/x")
+    assert handler.recover(None, failure) is Resolution.RESOLVED
+    assert handler.recover(None, failure) is Resolution.RETRY
+    first, second = _read_log(tmp_path / "run")
+    assert first["handler"] == "by-hand" and first["resolution"] == "resolved" and first["note"] == "renamed Next to Continue"
+    assert first["agent_actions"] == [] and first["step"] == "Authors page"
+    assert second["resolution"] == "retry" and second["note"] == ""
+    assert prompts.count(HumanHandler.NOTE_PROMPT) == 2
+    assert started == [1]  # run details recorded once, at the first failure
+
+
+def test_human_handler_logs_an_abort_without_asking_for_a_note(tmp_path):
+    handler, prompts = _human(tmp_path, ["a"])
+    failure = FailedAction(action="click()", target="", error=PWTimeout("x"), step="Files", url="about:blank")
+    assert handler.recover(None, failure) is Resolution.ABORT
+    assert _read_log(tmp_path / "run")[0]["resolution"] == "abort"
+    assert HumanHandler.NOTE_PROMPT not in prompts
+
+
+def test_human_handler_note_survives_ctrl_c(tmp_path):
+    answers = iter([""])
+
+    def ask(prompt):
+        if prompt == HumanHandler.NOTE_PROMPT:
+            raise KeyboardInterrupt
+        return next(answers)
+
+    handler = HumanHandler(input_fn=ask, output=lambda _m: None, log_dir=tmp_path)
+    failure = FailedAction(action="click()", target="", error=PWTimeout("x"), step=None, url="about:blank")
+    assert handler.recover(None, failure) is Resolution.RESOLVED
+    assert _read_log(tmp_path)[0]["note"] == ""
+
+
+def test_human_handler_without_log_dir_writes_nothing(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    handler = HumanHandler(input_fn=lambda _p: "", output=lambda _m: None)
+    failure = FailedAction(action="click()", target="", error=PWTimeout("x"), step=None, url="about:blank")
+    assert handler.recover(None, failure) is Resolution.RESOLVED
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_human_handler_aborts_without_a_terminal():
     def no_stdin(_prompt):
         raise EOFError
