@@ -43,6 +43,8 @@ from playwright.sync_api import sync_playwright
 
 from ...database import get_venue
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
+from ..recovery import guard, step
+from ..recovery_channel import browser_launch_args
 from .main import OpenReviewVenue, lines, parse_profiles
 
 logger = logging.getLogger(__name__)
@@ -105,6 +107,9 @@ class AAAI2027Venue(OpenReviewVenue):
 
     slug = SLUG
     field_validators = FIELD_VALIDATORS
+    #: submit() guards its page, so a failed action can be recovered. OpenReview's
+    #: final control is the generic "Submit".
+    supports_recovery = True
 
     def submit(
         self,
@@ -150,28 +155,37 @@ class AAAI2027Venue(OpenReviewVenue):
         conflicts = _parse_authors(values.get("conflicts", ""))
 
         with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-            browser = playwright.chromium.launch(headless=headless)
+            # browser_launch_args() is empty unless `submit --cdp-port` asked for a CDP endpoint.
+            browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
             context = open_run_context(browser, self.session_path(), new_session=new_session)
             apply_default_timeouts(context, timeout)
             page = context.new_page()
 
             self.ensure_signed_in(page, context, debug=debug)
+            # Sign-in stays unguarded. From here on a failed action goes to the
+            # recovery handler (see DEVELOPMENT.md, "Recovering a run that gets stuck").
+            page = guard(page)
 
             if debug:
                 page.pause()
 
+            step("Open the submission form")
             # Navigate from the signed-in group page into the submission form.
             page.get_by_role("button", name="AAAI 2027 Conference").click()
 
             # Title
+            step("Title")
             page.get_by_role("textbox").nth(1).fill(title)
 
             # Authors: remove the pre-filled author entry, then add each author by
             # OpenReview profile search (by ID or name, see add_profile).
+            step("Authors")
             page.get_by_role("button", name="remove").click()
-            for author in authors:
+            for i, author in enumerate(authors):
+                step(f"Authors: author {i + 1} of {len(authors)} ({author['open_review_id'] or author['name']})")
                 self.add_profile(page, author)
 
+            step("TL;DR and abstract")
             # TL;DR (optional).
             if tldr:
                 page.get_by_role("textbox").nth(3).click()
@@ -182,23 +196,27 @@ class AAAI2027Venue(OpenReviewVenue):
             page.locator("textarea").fill(abstract)
 
             # Primary topic (exactly one).
+            step("Primary topic")
             page.locator(".dropdown-select__input-container").first.click()
             page.get_by_role("option", name=primary_topic).click()
 
             # Secondary topics (0-5).
-            for topic in secondary_topics:
+            for i, topic in enumerate(secondary_topics):
+                step(f"Secondary topics: topic {i + 1} of {len(secondary_topics)}")
                 page.locator(".dropdown-select__value-container.dropdown-select__value-container--is-multi > .dropdown-select__input-container").first.click()
                 page.get_by_role("option", name=topic).click()
 
             # Countries of institutions (one or more): select each in turn from
             # the dropdown, typing to filter the long country list each time.
             country_box = page.get_by_role("combobox", name="Select Country Of Institutions")
-            for country in countries:
+            for i, country in enumerate(countries):
+                step(f"Countries of institutions: {country} ({i + 1} of {len(countries)})")
                 country_box.click()
                 country_box.fill(country)
                 page.get_by_role("option", name=country, exact=True).click()
 
             # PDF (optional).
+            step("PDF and supplements")
             if pdf_file:
                 page.locator('input[type="file"]').nth(0).set_input_files(pdf_file)
 
@@ -217,17 +235,18 @@ class AAAI2027Venue(OpenReviewVenue):
             # Code and data supplement (optional).
             if code_data_supplement:
                 page.locator('input[type="file"]').nth(4).set_input_files(code_data_supplement)
-                page.get_by_role("button", name="Choose Code And Data").set_input_files(code_data_supplement)
 
             # Reciprocal reviewer (0 or 1, drawn from the authors): search the
             # author's OpenReview profile and add them.
-            for author in reciprocal:
+            for i, author in enumerate(reciprocal):
+                step(f"Reciprocal reviewer {i + 1} of {len(reciprocal)}")
                 term = author["open_review_id"] or author["name"]
                 page.get_by_role("textbox", name="search profiles by name or").nth(1).click()
                 page.get_by_role("textbox", name="search profiles by name or").nth(1).fill(term)
                 page.get_by_role("button", name="Search").nth(1).click()
                 page.get_by_role("button", name="plus").first.click()
 
+            step("Reviewer-nomination stance")
             # Declare the reviewer-nomination stance based on whether one was nominated.
             if reciprocal:
                 page.get_by_role("radio", name="We have nominated a qualified").check()
@@ -238,11 +257,13 @@ class AAAI2027Venue(OpenReviewVenue):
             # logic as the author list (the reciprocal_reviewer column is unused),
             # but a conflict must NOT be one of the authors, and a profile the
             # search does not return is skipped rather than aborting the run.
-            for conflict in conflicts:
+            for i, conflict in enumerate(conflicts):
+                step(f"Self-declared conflicts: conflict {i + 1} of {len(conflicts)}")
                 if conflict["name"] and conflict["name"].lower() in author_names:
                     raise ValueError(f"self-declared conflict {conflict['name']!r} must not be one of the submission's authors")
                 self.add_profile(page, conflict, search_index=1, required=False)
 
+            step("Consent")
             # Consent, license, and signatures (replayed from the recording).
             page.get_by_role("checkbox", name="I confirm that all authors").check()
 

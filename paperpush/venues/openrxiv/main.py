@@ -28,6 +28,7 @@ from ..common import session_path as _session_path
 from ..common import split_name_first_middle_last as _split_name
 from ..login import VenueLoginError, login_orcid
 from ..recovery import GuardedPage, guard, step
+from ..recovery_channel import browser_launch_args
 
 logger = logging.getLogger(__name__)
 
@@ -444,7 +445,9 @@ def submit_biorxiv(values: dict, headless: bool = False, debug: bool = False, ne
     logger.info("Starting %s submission run (headless=%s, debug=%s): " "%d author(s), %d funder(s), %d figure(s), %d supplementary " "file(s)", cfg.name, headless, debug, len(authors), len(funders), len(figure_files), len(supp_files))
 
     with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-        browser = playwright.chromium.launch(headless=headless)
+        # browser_launch_args() is empty unless `submit --cdp-port` asked for a
+        # CDP endpoint that another client (playwright-cli) can attach to.
+        browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
 
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
@@ -594,6 +597,8 @@ class OpenRxivVenue(Venue):
     logged_in_timeout_ms = 20000
     #: Both servers offer "Log in with ORCiD" beside the credential form.
     supports_orcid_login = True
+    #: submit_biorxiv guards its page, so a failed action can be recovered.
+    supports_recovery = True
 
     @property
     def portal_url(self) -> str:

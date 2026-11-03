@@ -413,3 +413,52 @@ def test_sample_subfiles_reference_real_scenarios():
         assert scenario.path.exists(), f"missing committed sample {scenario.relpath}; regenerate with " "'python tests/sample_subfiles.py'"
     # SAMPLES_DIR is referenced so a relocation of the samples root is noticed.
     assert sample_subfiles.SAMPLES_DIR.is_dir()
+
+
+# ---------------------------------------------------------------------------
+# load(): relative upload paths and quoted scalars
+# ---------------------------------------------------------------------------
+
+
+def test_parse_strips_yaml_quotes():
+    from paperpush.subfile import parse
+
+    sub = parse("@venue: biorxiv\ncover_letter: 'Cover letter.txt'\ntitle: \"A: B\"\n")
+    assert sub.values["cover_letter"] == "Cover letter.txt"
+    assert sub.values["title"] == "A: B"
+
+
+def test_load_resolves_upload_paths_against_sub_folder(tmp_path, monkeypatch):
+    from paperpush.subfile import load
+
+    ms = tmp_path / "ms"
+    ms.mkdir()
+    (ms / "main.pdf").write_bytes(b"%PDF-1.4\n")
+    (ms / "Cover letter.txt").write_text("hi", encoding="utf-8")
+    sub_path = ms / "nucleic_acids_research.sub"
+    sub_path.write_text(
+        "@venue: nucleic_acids_research\n"
+        "manuscript_file: main.pdf\n"
+        "cover_letter: 'Cover letter.txt'\n"
+        "figures: |\n  fig1.png\n",
+        encoding="utf-8",
+    )
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    values = load(sub_path).values
+    assert values["manuscript_file"] == str(ms.resolve() / "main.pdf")
+    assert values["cover_letter"] == str(ms.resolve() / "Cover letter.txt")
+    assert values["figures"] == str(ms.resolve() / "fig1.png")
+
+
+def test_load_keeps_cwd_relative_path_that_only_exists_there(tmp_path, monkeypatch):
+    from paperpush.subfile import load
+
+    ms = tmp_path / "ms"
+    ms.mkdir()
+    sub_path = ms / "nucleic_acids_research.sub"
+    sub_path.write_text("@venue: nucleic_acids_research\nmanuscript_file: main.pdf\n", encoding="utf-8")
+    (tmp_path / "main.pdf").write_bytes(b"%PDF-1.4\n")
+    monkeypatch.chdir(tmp_path)
+    assert load(sub_path).values["manuscript_file"] == "main.pdf"

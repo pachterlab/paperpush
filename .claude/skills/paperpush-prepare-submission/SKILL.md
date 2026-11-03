@@ -107,6 +107,13 @@ fly. See step 1.
    final click so the user reviews everything in the submission system. Make
    clear that the final submit is theirs to click.
 
+   If the paperpush MCP tools are connected, use the `submit` tool instead. A
+   step that fails pauses the run
+   rather than ending it. `submit_status` then shows `recovery.paused`. Look at
+   the page with `submit_page`, fix it with `submit_act`, and continue with
+   `submit_resume` (put what had changed in `note`). Tell the user what you
+   fixed. Never try to send the submission; it is refused anyway.
+
 ## Rules
 
 - **Always use absolute paths** for the `.sub` file and the manuscript directory.

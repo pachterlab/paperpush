@@ -44,6 +44,26 @@ such as the click that opens a file chooser plus handing it the file, run them a
 one unit with `page.attempt("attach ms.pdf", fn)`. Steps run through `_try` are
 optional and never go to the handler.
 
+Watch for probes: an action the script expects might fail and handles itself,
+such as `try: x.wait_for(timeout=2000) except PWTimeout: ...` or "try selector
+A, then B". Put only the probe inside `with unrecovered():`. Otherwise every
+expected miss goes to the handler, which under `--ai` is a paid model call.
+`first_present` / `first_visible` and `ensure_signed_in` already run unrecovered.
+
+Every runner, including `paperpush/venues/template/template.py`, supports recovery,
+and `tests/test_recovery_coverage.py` checks that `supports_recovery` matches
+whether the runner calls `guard(page)`. To convert a runner, set `supports_recovery = True` on its `Venue` class,
+or `submit --recover` reports that it has no effect there. Then launch the
+browser with `args=browser_launch_args()` (from `recovery_channel`) so
+`--cdp-port` works. If the portal's final button has a label that isn't
+generic, list it in `final_submit_names`, so a recovering agent can never press
+it. `paperpush/venues/recovery_channel.py` holds the agent side of all this:
+`AgentHandler`, the file protocol the MCP tools `submit_page` / `submit_act` /
+`submit_resume` use, and `PageTools`, which carries out every agent action and
+enforces the guardrails. `paperpush/venues/recovery_ai.py` is `submit --ai`: an
+in-process tool-use loop (tools `look`, `act` and `finish`) with one small session
+class per provider. All of them go through the same `PageTools`.
+
 
 ## Website
 

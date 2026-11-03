@@ -31,6 +31,8 @@ from ..common import DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts, hold
 from ..common import session_path as _session_path
 from ..common import split_name_first_last as _split_name
 from ..login import VenueLoginError, login_orcid
+from ..recovery import guard, step, unrecovered
+from ..recovery_channel import browser_launch_args
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +248,9 @@ def _dismiss_cookies(page, timeout_ms: int = 4000) -> bool:
     Returns True if clicked, False if no banner appeared (not an error).
     """
     try:
-        page.get_by_role("button", name="Reject optional cookies").click(timeout=timeout_ms)
+        # A probe: an absent banner is expected, so it is not handed to recovery.
+        with unrecovered():
+            page.get_by_role("button", name="Reject optional cookies").click(timeout=timeout_ms)
         return True
     except Exception:  # noqa: BLE001 -- absent banner is fine (a timeout or no match)
         logger.debug("No cookie-consent banner to dismiss")
@@ -416,6 +420,7 @@ def _enter_authors(page, authors: list[dict], author_contributions: str, allowed
         if institution in entered_institutions:
             logger.info("Affiliation %r already entered; skipping", institution)
             continue
+        step(f"Authors page: affiliation {institution!r}")
         _add_affiliation(page, institution, department, city, country, allowed_countries)
 
     try:  # get the list of already-entered authors to avoid duplicates (see #22)
@@ -427,8 +432,10 @@ def _enter_authors(page, authors: list[dict], author_contributions: str, allowed
         if author.get("name", "").strip() in entered_authors:
             logger.info("Author %r already entered; skipping", author.get("name"))
             continue
+        step(f"Authors page: author {index + 1} of {len(authors)} ({author.get('name', '')})")
         _add_author(page, index, author, allowed_countries)
 
+    step("Authors page: corresponding author and contributions")
     # The corresponding-author drop-down is keyed by author index ("0", "1", ...).
     corresponding_selected = bool(page.locator("#primary-corresponding-author").input_value())
     if not corresponding_selected:
@@ -542,21 +549,29 @@ def submit_snapp(values: dict, headless: bool = False, debug: bool = False, new_
     )
 
     with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-        browser = playwright.chromium.launch(headless=headless)
+        # browser_launch_args() is empty unless `submit --cdp-port` asked for a
+        # CDP endpoint that another client (playwright-cli) can attach to.
+        browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
         page = context.new_page()
 
         venue.ensure_signed_in(page, context, debug=debug)
+        # Sign-in stays unguarded (it is the author's to complete). From here on,
+        # a failing action goes to the recovery handler set by the caller (by
+        # default it aborts, as an unguarded run would).
+        page = guard(page)
 
         if debug:
             page.pause()
 
+        step("Opening a new submission")
         _dismiss_cookies(page)
         logger.debug("Signed in; opening a new submission")
         page.goto(cfg.new_submission_url)
         _dismiss_cookies(page)
 
+        step("Files page")
         # Files page: article type, start the submission, then upload the files.
         _try(lambda: page.get_by_label("Article type:").select_option(article_type), f"article type {article_type!r}")
         _try(lambda: page.get_by_role("button", name="Start submission").click(), "start submission")
@@ -567,18 +582,22 @@ def submit_snapp(values: dict, headless: bool = False, debug: bool = False, new_
             page.locator("#supplementary").set_input_files(supplementary_file)
         _click_next(page)
 
+        step("Details page")
         # Details page: title, abstract, cover letter.
         _enter_details(page, title, abstract, cover_letter)
         _click_next(page)
 
+        step("Authors page")
         # Authors page: affiliations, authors, corresponding author, contributions.
         _enter_authors(page, authors, author_contributions, _load_allowed_countries(cfg.country_options_file))
         _click_next(page)
 
+        step("Declarations page")
         # Declarations page.
         _enter_declarations(page, values)
         _click_next(page)
 
+        step("Review page")
         # Review page: answer the preprint-posting question, then stop before the
         # "request check" / final-submit control and leave the browser open.
         _try(lambda: page.get_by_text("want to post our").first.click(), "preprint posting = No")
@@ -608,6 +627,11 @@ class SnappVenue(Venue):
     logged_in_present_means_in = False
     #: The Springer Nature IDP offers "Continue with ORCID" beside that field.
     supports_orcid_login = True
+    #: submit_snapp guards its page, so a failed action can be recovered.
+    supports_recovery = True
+    #: The review page's "request check" control is the final-submit one (see
+    #: submit_snapp: the run stops before it).
+    final_submit_names: tuple[str, ...] = ("Request check",)
 
     # portal_url and display_name are inherited (base returns the venue's
     # submission_url == variant.portal_url, and .name).

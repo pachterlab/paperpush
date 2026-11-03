@@ -250,6 +250,15 @@ def first_present(locators, timeout_ms: int):
     Shared by the base class's login-state check and the eJP/Nature sign-in form
     field lookup, which both need "first of several candidate locators to appear".
     """
+    # A probe: candidates that are absent are expected, so none of these
+    # waits may go to a recovery handler on a guarded page.
+    from .recovery import unrecovered
+
+    with unrecovered():
+        return _first_present(locators, timeout_ms)
+
+
+def _first_present(locators, timeout_ms: int):
     for locator in locators:
         try:
             if locator.first.is_visible():

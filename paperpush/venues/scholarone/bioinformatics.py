@@ -23,11 +23,13 @@ from ...database import get_venue
 from ...validate import parse_authors
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
 from ..common import session_path as _session_path
+from ..recovery import GuardedPage, guard, step
+from ..recovery_channel import browser_launch_args
 
 # Reuse the shared ScholarOne platform engine (author/keyword/reviewer/parse
 # helpers). Sign-in is inherited from ScholarOneVenue.
 from . import main as scholarone
-from .main import AUTHOR_LINK, ScholarOneLoginError, _add_authors, _add_keywords, _add_reviewers, _answer_sanctions, _check_yes_no, _split_figures, _split_keywords, _split_reviewers, _yes  # noqa: F401 -- re-exported as this module's public API
+from .main import AUTHOR_LINK, ScholarOneLoginError, _add_authors, _upload_selected_files, _add_keywords, _add_reviewers, _answer_sanctions, _check_yes_no, _split_figures, _split_keywords, _split_reviewers, _yes  # noqa: F401 -- re-exported as this module's public API
 
 logger = logging.getLogger(__name__)
 
@@ -174,10 +176,20 @@ def _upload_files(page, files: list[tuple[str, str]]) -> None:
             raise ValueError(f"Unknown ScholarOne file type {file_type!r}; expected one of {FILE_TYPE_OPTIONS}")
 
     for index, (path, file_type) in enumerate(files):
+        step(f"File upload: file {index + 1} of {len(files)} ({file_type})")
         logger.info("Attaching file %d (%s) as %s", index + 1, path, file_type)
-        with page.expect_file_chooser() as fc_info:
-            page.get_by_text(f"Select File {index + 1}").click()
-        fc_info.value.set_files(path)
+
+        def attach(page, index=index, path=path) -> None:
+            with page.expect_file_chooser() as fc_info:
+                page.get_by_text(f"Select File {index + 1}").click()
+            fc_info.value.set_files(path)
+
+        # The click and the file chooser it opens only make sense together, so
+        # they are one recoverable unit when the page is guarded.
+        if isinstance(page, GuardedPage):
+            page.attempt(f"attach {path!r} with Select File {index + 1}", attach)
+        else:
+            attach(page)
         dropdown = page.locator(f'select[file-index="{index}"]')
         if index == 0:
             live = dropdown.locator("option").all_inner_texts()
@@ -224,16 +236,21 @@ def submit_bioinformatics(values: dict, headless: bool = False, debug: bool = Fa
     logger.info("Starting Bioinformatics (ScholarOne) submission run " "(headless=%s, debug=%s, manuscript=%s, %d file(s) to upload, %d author(s))", headless, debug, manuscript_file, len(upload_files), len(authors))
 
     with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-        browser = playwright.chromium.launch(headless=headless)
+        # browser_launch_args() is empty unless `submit --cdp-port` asked for a CDP endpoint.
+        browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
         page = context.new_page()
 
         venue.ensure_signed_in(page, context, debug=debug)
+        # Sign-in stays unguarded. From here on a failed action goes to the
+        # recovery handler (see DEVELOPMENT.md, "Recovering a run that gets stuck").
+        page = guard(page)
 
         if debug:
             page.pause()
 
+        step("Dashboard: start new submission")
         logger.debug("Signed in; starting a new submission")
         page.wait_for_timeout(3000)
         page.get_by_role("button", name="Reject All").click()
@@ -242,6 +259,7 @@ def submit_bioinformatics(values: dict, headless: bool = False, debug: bool = Fa
         page.get_by_role("link", name="Begin Submission").click()
         page.get_by_role("link", name="or continue without pre-").click()
 
+        step("Type, title and abstract")
         article_type = values.get("article_type", "Original Paper").strip()
         page.get_by_role("radio", name=f"Choice {article_type}").check()
         # Guard required fields so a blank .sub value doesn't overwrite the portal.
@@ -265,36 +283,43 @@ def submit_bioinformatics(values: dict, headless: bool = False, debug: bool = Fa
         radios.nth(2 if ml_yes else 3).check()
         page.get_by_role("button", name="Save & Continue ").click()
 
+        step("File upload")
         _upload_files(page, upload_files)
-        page.get_by_role("link", name="Upload Selected Files").click()
+        _upload_selected_files(page)
         page.get_by_role("button", name="Save & Continue ").click()
 
+        step("Keywords")
         _add_keywords(page, _split_keywords(values["portal_keywords"]), portal=True)
         _add_keywords(page, _split_keywords(values.get("keywords", "")), portal=False)
         page.get_by_role("button", name="Save & Continue ").click()
 
         # Sanctions / export-control declaration. All three default to "No"
         # (the portal default), so this is a no-op unless the .sub answers Yes.
+        step("Sanctions")
         _answer_sanctions(page, values)
 
         # Authors step: drop the error-prone pre-filled author, add each .sub
         # author by email lookup (creating any unknown ones by hand), and assign
         # the corresponding author.
+        step("Authors")
         _add_authors(page, authors, venue_label="bioinformatics")
 
         page.get_by_role("checkbox", name="checkbox").check()
         page.get_by_role("button", name="Save & Continue ").click()
 
+        step("Reviewers")
         _add_reviewers(page, _split_reviewers(values.get("reviewers", "")), venue_label="bioinformatics")
         page.get_by_role("button", name="Save & Continue ").click()
 
         # File upload step.
+        step("Details and comments: cover letter")
         page.get_by_label("Select File").set_input_files(values["cover_letter"].strip())
         page.get_by_role("button", name=" 2. Attach File").click()
 
         # Declarations (funding / resubmission / conflict of interest / cited
         # unpublished works), driven from the .sub values rather than the
         # recorded test answers.
+        step("Details and comments: declarations")
         _answer_declarations(page, values)
 
         num_pages = values.get("num_pages", "").strip()
@@ -316,6 +341,7 @@ def submit_bioinformatics(values: dict, headless: bool = False, debug: bool = Fa
 
         # Reproducibility checklist (code/data availability and ML/DL questions),
         # driven from the .sub values rather than the recorded test answers.
+        step("Details and comments: reproducibility checklist")
         _answer_reproducibility(page, values)
 
         page.locator('input[name="CUSTOM_FIELD_RESPONSE_ID113840"]').nth(1).check()
@@ -331,6 +357,8 @@ class BioinformaticsVenue(scholarone.ScholarOneVenue):
     """The Bioinformatics venue: a ScholarOne deployment (login shared, wizard local)."""
 
     slug = "bioinformatics"
+    #: submit_bioinformatics guards its page, so a failed action can be recovered.
+    supports_recovery = True
 
     def submit(
         self,

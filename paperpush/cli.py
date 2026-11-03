@@ -34,6 +34,7 @@ start already authenticated.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import getpass
 import json
 import logging
@@ -265,6 +266,70 @@ def _open_web(sub_path: Path, *, manuscript_dirs=(), action: str | None = None) 
     return serve_local(Path(sub_path), manuscript_dirs=tuple(manuscript_dirs), action=action)
 
 
+# How long a preview server started by 'subfile'/'autofill' waits for a request
+# before stopping by itself (an open page pings it every minute).
+_PREVIEW_IDLE_SECONDS = 30 * 60
+
+
+def _stdout_is_terminal() -> bool:
+    return sys.stdout.isatty()
+
+
+def _print_web_link(sub_path: Path, *, manuscript_dirs=(), blank_line: bool = False) -> None:
+    """Print a localhost link that shows ``sub_path`` in the web page, served in the background.
+
+    Starts ``paperpush web FILE`` as a detached process that stops once
+    nobody has used the page for a while, so the command itself still returns
+    at once. Skipped quietly when stdout is not a terminal (scripts, tests, the
+    MCP server), when the web extra is not installed, or when
+    ``PAPERPUSH_NO_WEB_LINK`` is set.
+    """
+    import importlib.util
+
+    if os.environ.get("PAPERPUSH_NO_WEB_LINK") or not _stdout_is_terminal():
+        return
+    if blank_line:
+        print()
+    if importlib.util.find_spec("fastapi") is None or importlib.util.find_spec("uvicorn") is None:
+        print("  (pip install 'paperpush[web]' to get a link that shows it in your browser)")
+        return
+    import secrets
+    import socket
+    import subprocess  # nosec B404
+
+    from .subfile import parse
+
+    try:
+        venue = parse(sub_path.read_text(encoding="utf-8")).venue or sub_path.stem
+    except (OSError, UnicodeDecodeError):
+        return
+    host = "127.0.0.1"
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind((host, 0))
+        port = sock.getsockname()[1]
+    token = secrets.token_urlsafe(24)
+    cmd = [sys.executable, "-m", "paperpush", "web", str(sub_path.resolve()), "--no-browser", "--port", str(port), "--idle-timeout", str(_PREVIEW_IDLE_SECONDS)]
+    for d in manuscript_dirs:
+        cmd += ["-d", str(Path(d).resolve())]
+    try:
+        subprocess.Popen(  # nosec B603
+            cmd,
+            env={**os.environ, "PAPERPUSH_WEB_TOKEN": token},
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        logger.warning("could not start the preview server: %s", exc)
+        return
+    from .web.app import local_url
+
+    url = local_url(host, port, token, venue)
+    print(f"  View and edit it in your browser: {url}")
+    print(f"  (served from this computer; edits save to {sub_path}; stops after {_PREVIEW_IDLE_SECONDS // 60} min unused)")
+
+
 def _cmd_web(args: argparse.Namespace) -> int:
     """``paperpush web [FILE.sub]``: serve the web page on this machine, optionally with a .sub open in it.
 
@@ -301,7 +366,14 @@ def _cmd_web(args: argparse.Namespace) -> int:
     if missing:
         print(f"error: not a directory: {', '.join(map(str, missing))}", file=sys.stderr)
         return 1
-    return serve_local(path, manuscript_dirs=dirs, port=args.port, open_browser=open_browser)
+    return serve_local(
+        path,
+        manuscript_dirs=dirs,
+        port=args.port,
+        open_browser=open_browser,
+        token=os.environ.get("PAPERPUSH_WEB_TOKEN") or None,
+        idle_timeout=args.idle_timeout,
+    )
 
 
 def _cmd_subfile(args: argparse.Namespace) -> int:
@@ -344,6 +416,7 @@ def _cmd_subfile(args: argparse.Namespace) -> int:
         print(f"  {len(venue.fields)} fields ({required} required).")
         return _open_web(Path(path))
     print(f"  {len(venue.fields)} fields ({required} required). " "Open it in your editor and fill in the values.")
+    _print_web_link(Path(path))
     return 0
 
 
@@ -815,7 +888,8 @@ checks that run without AI:
                     spacing around punctuation, unbalanced brackets and quotes,
                     common misspellings (codespell)
 
-checks that need AI (--ai, or an agent via --ai-tasks / --ai-results):
+checks that need AI (--ai, or an agent via --ai-tasks / --ai-results; add
+--ai-only to run just these):
   lettering size, typeface, and panel labels in raster figures, and that
   each of their labelled panels is cited; title-page
   items found only by reading (postal address, author footnotes, one-sentence
@@ -838,7 +912,8 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     checked (needs AI, not implemented, or could not run here), and why. With
     ``--ai`` the checks only an LLM can judge go to a provider's API; with
     ``--ai-results`` they are taken from an agent's verdicts, and
-    ``--ai-tasks`` writes those tasks out for the agent. ``-o`` saves the report
+    ``--ai-tasks`` writes those tasks out for the agent; ``--ai-only`` reports
+    just those checks. ``-o`` saves the report
     (PDF by default; .html, .md, or .txt by extension). Exits 0 when the file is
     ready to submit, 1 when it has errors, and 2 when the venue is unknown.
     """
@@ -863,6 +938,14 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         print(f"error: unknown venue '{venue}'", file=sys.stderr)
         print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
         return 2
+
+    ai_only = getattr(args, "ai_only", False)
+    if ai_only and not getattr(args, "check_manuscript", True):
+        print("error: --ai-only cannot be combined with --dont-check-manuscript: the manuscript checks decide which AI checks apply", file=sys.stderr)
+        return 1
+    if ai_only and getattr(args, "web", False):
+        print("error: --ai-only is not supported with --web", file=sys.stderr)
+        return 1
 
     if getattr(args, "web", False):
         action = "validate-ai" if getattr(args, "ai", False) else "validate"
@@ -890,20 +973,23 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
         ai = AiOptions.api(provider=args.provider, model=args.model)
 
-    result = validate_report_for(
-        subfile,
-        venue_def,
-        args.subfile,
-        ai=ai,
-        check_sensitive=getattr(args, "check_sensitive", True),
-        check_links=getattr(args, "check_links", True),
-        check_references=getattr(args, "check_references", True),
-        check_manuscript=getattr(args, "check_manuscript", True),
-        check_anonymous=getattr(args, "check_anonymous", None),
-        check_hidden_text=getattr(args, "check_hidden_text", True),
-        check_openreview=getattr(args, "check_openreview", True),
-        initial_submission=getattr(args, "initial_submission", False),
-    )
+    with _validate_progress_bar() as progress:
+        result = validate_report_for(
+            subfile,
+            venue_def,
+            args.subfile,
+            ai=ai,
+            progress=progress,
+            check_sensitive=getattr(args, "check_sensitive", True),
+            check_links=getattr(args, "check_links", True),
+            check_references=getattr(args, "check_references", True),
+            check_manuscript=getattr(args, "check_manuscript", True),
+            check_anonymous=getattr(args, "check_anonymous", None),
+            check_hidden_text=getattr(args, "check_hidden_text", True),
+            check_openreview=getattr(args, "check_openreview", True),
+            initial_submission=getattr(args, "initial_submission", False),
+            ai_only=ai_only,
+        )
     alt = getattr(args, "alt_color", False)
     report_mod.print_report(result, alt_color=alt)
 
@@ -912,7 +998,8 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
         tasks_path = Path(args.ai_tasks).expanduser()
         tasks_path.write_text(json.dumps(tasks_payload(result.ai_tasks, venue_def, args.subfile), indent=2) + "\n", encoding="utf-8")
-        print(f"\nWrote {len(result.ai_tasks)} AI check(s) to {tasks_path}; have an agent answer them, then run 'paperpush validate {args.subfile} --ai-results <results.json>'.")
+        again = " --ai-only" if ai_only else ""
+        print(f"\nWrote {len(result.ai_tasks)} AI check(s) to {tasks_path}; have an agent answer them, then run 'paperpush validate {args.subfile}{again} --ai-results <results.json>'.")
     if getattr(args, "output", None) is not None:
         out = report_mod.output_path(args.output, args.subfile)
         try:
@@ -925,11 +1012,49 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     if result.errors:
         print("\nFix the errors above, then run 'paperpush validate' again.", file=sys.stderr)
         return 1
+    if ai_only:
+        print(f"\nRan only the AI checks on {args.subfile}; run 'paperpush validate' without --ai-only for the full pre-submission checks.")
+        return 0
     if result.downgraded:
         print(f"\n{args.subfile} passed validation for {venue} as an initial submission ({result.downgraded} error(s) shown as warnings); ready to submit.")
     else:
         print(f"\n{args.subfile} passed validation for {venue}; ready to submit.")
     return 0
+
+
+@contextlib.contextmanager
+def _validate_progress_bar():
+    """A ``progress`` callback for :func:`validate_report` drawing a tqdm bar on stderr.
+
+    Yields None (no bar) when tqdm is not installed (``pip install
+    'paperpush[validate]'``) or stderr is not a terminal, so piped and logged
+    output stays clean. The bar is cleared when validation ends, before the
+    report prints.
+    """
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        yield None
+        return
+    if not sys.stderr.isatty():
+        yield None
+        return
+    bars: list = []
+
+    def progress(done: int, total: int, label: str) -> None:
+        if not bars:
+            bars.append(tqdm(total=total, unit="stage", leave=False, file=sys.stderr, bar_format="Validating {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} {desc}"))
+        bar = bars[0]
+        bar.total = total
+        bar.n = done
+        bar.set_description_str("" if label == "done" else f"· {label}", refresh=False)
+        bar.refresh()
+
+    try:
+        yield progress
+    finally:
+        for bar in bars:
+            bar.close()
 
 
 def validate_report_for(subfile, venue_def, subfile_path: str, *, ai=None, **flags):
@@ -1019,9 +1144,113 @@ def _cmd_submit(args: argparse.Namespace) -> int:
         print(f"Opening {venue} to run the submission for {args.subfile}…")
         print("This portal does not require login. Field values come from the " ".sub file; the wizard stops before the final submit.")
     logger.info("submit: launching %s runner (headless=%s, debug=%s, timeout=%ss, " "keep_open_on_failure=%s)", venue, args.headless, args.debug, args.timeout, not args.close_on_failure)
-    run(subfile.values, headless=args.headless, debug=args.debug, new_session=args.new_session, timeout=args.timeout, keep_open_on_failure=not args.close_on_failure)
+    try:
+        handler, cdp_port = _submit_recovery_setup(args, venue, cred_slug, subfile.values)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    from .venues.recovery import use_handler
+    from .venues.recovery_channel import use_cdp_port
+
+    with use_handler(handler), use_cdp_port(cdp_port):
+        run(subfile.values, headless=args.headless, debug=args.debug, new_session=args.new_session, timeout=args.timeout, keep_open_on_failure=not args.close_on_failure)
     logger.info("submit: %s runner returned", venue)
     return 0
+
+
+def _submit_recovery_setup(args: argparse.Namespace, venue: str, base_slug: str, values: dict):
+    """Build the recovery handler and CDP port that ``submit``'s flags ask for.
+
+    Returns ``(handler, cdp_port)``; either may be ``None``. Raises
+    :class:`ValueError` for a combination that cannot work.
+    """
+    from . import venues
+    from .venues.recovery import HumanHandler
+    from .venues.recovery_channel import AgentHandler, allowed_upload_paths, cdp_endpoint, free_port
+
+    mode = getattr(args, "recover", None)
+    if getattr(args, "ai", False):
+        if mode not in (None, "ai"):
+            raise ValueError(f"--ai and --recover {mode} ask for different things; pick one")
+        mode = "ai"
+    mode = mode or "off"
+    if mode != "ai" and (getattr(args, "provider", None) or getattr(args, "model", None)):
+        raise ValueError("--provider and --model only apply with --ai")
+    port = getattr(args, "cdp_port", None)
+    if mode == "off" and port is None:
+        return None, None
+
+    try:
+        impl = venues.get_venue_impl(base_slug)
+    except (KeyError, ImportError):
+        impl = None
+    supported = bool(getattr(impl, "supports_recovery", False))
+    if not supported:
+        print(f"note: {venue}'s runner does not support recovery yet; --recover and --cdp-port have no effect.", file=sys.stderr)
+        return None, None
+
+    if args.recover_dir and mode not in ("agent", "ai"):
+        raise ValueError("--recover-dir only applies with --recover agent or --ai")
+    handler = None
+    if mode == "by-hand":
+        if args.headless:
+            raise ValueError("--recover by-hand needs a visible browser to fix the page in; drop --headless")
+        handler = HumanHandler()
+    elif mode == "agent":
+        directory = Path(args.recover_dir) if args.recover_dir else _default_recover_dir(venue)
+        handler = AgentHandler(directory, allowed_uploads=allowed_upload_paths(values), final_submit_names=getattr(impl, "final_submit_names", ()))
+        print(f"Agent recovery is on: a failed step pauses the run for an agent working through {directory}.")
+    elif mode == "ai":
+        handler = _ai_recovery_handler(args, venue, impl, values)
+
+    if port is not None:
+        if port < 0 or port > 65535:
+            raise ValueError(f"--cdp-port must be between 0 and 65535, not {port}")
+        port = port or free_port()
+        print(f"CDP endpoint: {cdp_endpoint(port)}  (attach with: playwright-cli attach --cdp={cdp_endpoint(port)})")
+        print("  Anything on this machine can drive the signed-in browser through it while the run is open.")
+    return handler, port
+
+
+def _ai_recovery_handler(args: argparse.Namespace, venue: str, impl, values: dict):
+    """The ``--ai`` handler: the model first, then (in a terminal, with a window) the person."""
+    import importlib.util
+
+    from .autofill import _SDK_PACKAGES, DEFAULT_MODELS, AutofillApiError, resolve_provider
+    from .venues.recovery import FallbackHandler, HumanHandler
+    from .venues.recovery_ai import ApiAgentHandler
+    from .venues.recovery_channel import PageTools, allowed_upload_paths
+
+    try:
+        provider = resolve_provider(getattr(args, "provider", None), alternative="use --recover by-hand instead")
+    except AutofillApiError as exc:
+        raise ValueError(f"--ai: {exc}") from None
+    module = {"anthropic": "anthropic", "openai": "openai", "google": "google.genai"}[provider]
+    try:
+        found = importlib.util.find_spec(module) is not None
+    except ModuleNotFoundError:
+        found = False
+    if not found:
+        raise ValueError(f"--ai with {provider} needs the {_SDK_PACKAGES[provider]} package; install it with 'pip install paperpush[autofill-{provider}]'")
+    model = getattr(args, "model", None) or DEFAULT_MODELS[provider]
+
+    directory = Path(args.recover_dir) if args.recover_dir else _default_recover_dir(venue)
+    tools = PageTools(directory, allowed_uploads=allowed_upload_paths(values), final_submit_names=getattr(impl, "final_submit_names", ()))
+    handler = ApiAgentHandler(tools, provider=provider, model=model)
+    print(f"AI recovery is on ({provider}, {model}). If a step fails, its page (the accessibility tree and a " "screenshot, which can show your manuscript details) is sent to the model so it can fix the step.")
+    print(f"  Screenshots and a log of each fix go to {directory}")
+    if not args.headless and sys.stdin.isatty():
+        return FallbackHandler(handler, HumanHandler())
+    return handler
+
+
+def _default_recover_dir(venue: str) -> Path:
+    """A fresh recovery directory for one ``submit --recover agent`` run."""
+    from datetime import datetime
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    return credentials.config_dir() / "submit-runs" / f"{venue}-{stamp}"
 
 
 # Document formats accepted as a direct ``autofill -d`` input (besides
@@ -1194,6 +1423,8 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
     if getattr(args, "web", False) and not args.dry_run:
         print()
         return _open_web(out_path, manuscript_dirs=search_dirs)
+    if not args.dry_run:
+        _print_web_link(out_path, manuscript_dirs=search_dirs, blank_line=True)
     return 0
 
 
@@ -1689,6 +1920,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_validate.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(--ai) LLM provider; defaults to the first whose API key is set")
     p_validate.add_argument("--model", help="(--ai) model to use (default: the provider's default, as for autofill)")
+    p_validate.add_argument(
+        "--ai-only",
+        dest="ai_only",
+        action="store_true",
+        help="report only the checks that need AI, skipping the deterministic checks (form, links, DOIs, sensitive data, hidden text, ...). Combine with --ai, --ai-tasks, or --ai-results; on its own it lists the AI checks that apply. The manuscript is still read to find which AI checks apply.",
+    )
     p_validate.add_argument("--ai-tasks", dest="ai_tasks", metavar="FILE", help="write the AI checks to FILE as JSON, for an agent (Claude Code, Codex, ...) to run with its own subscription; see the paperpush-validate skill")
     p_validate.add_argument("--ai-results", dest="ai_results", metavar="FILE", help='merge an agent\'s verdicts on the AI checks (JSON: {"results": [{"id", "status": pass|fail|unclear|not_applicable, "details"}]}) into the report instead of calling an API')
     p_validate.set_defaults(func=_cmd_validate, arxiv_latex_cleaner=False, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True, check_anonymous=None, check_hidden_text=True, check_openreview=True, initial_submission=False)
@@ -1750,6 +1987,35 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="close the browser when the run fails (default: leave the " "window open at the step that broke so you can see the page " "and finish by hand); --headless always closes",
     )
+    p_submit.add_argument(
+        "--recover",
+        choices=["off", "by-hand", "ai", "agent"],
+        default=None,
+        help="what to do when one step of the click-through fails. off (default): stop the run. "
+        "by-hand: pause and ask here; fix the page in the browser, then continue or retry the step. "
+        "ai: have an LLM fix the page (same as --ai). "
+        "agent: pause for an AI agent to fix the page through --recover-dir (the MCP server uses this). "
+        "Sign-in is never part of recovery; a venue whose runner does not support it ignores the option",
+    )
+    p_submit.add_argument(
+        "--ai",
+        action="store_true",
+        help="when a step fails, send the page (its accessibility tree and a screenshot) to an LLM, which fixes it "
+        "in the browser so the run can carry on; it is never allowed to send the submission. Needs an API key, "
+        "as for 'autofill --engine api'. In a terminal, a step the model gives up on is handed to you",
+    )
+    p_submit.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(--ai) LLM provider; defaults to the first of anthropic, openai, google " "whose API key is set (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY)")
+    p_submit.add_argument("--model", help="(--ai) model to use (default: the provider's default, as for autofill)")
+    p_submit.add_argument("--recover-dir", metavar="DIR", help="(--recover agent) directory the paused run and the agent exchange " "files through (default: a fresh one under paperpush's config dir)")
+    p_submit.add_argument(
+        "--cdp-port",
+        type=int,
+        metavar="PORT",
+        help="open a Chrome DevTools Protocol endpoint on 127.0.0.1:PORT (0 picks a free port), so another "
+        "client such as 'playwright-cli attach --cdp=<url>' can drive the same browser. Anything on this "
+        "machine can then control the signed-in browser, and the agent guardrails (no final submit, "
+        "uploads limited to .sub files) do not apply to it",
+    )
     p_submit.set_defaults(func=_cmd_submit)
 
     p_web = sub.add_parser(
@@ -1764,6 +2030,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_web.add_argument("-d", "--directory", action="append", metavar="DIR", help="a manuscript directory whose files the page offers in its file pickers (with a .sub file; may be repeated)")
     p_web.add_argument("--port", type=int, default=0, help="port to listen on (default: any free port)")
     p_web.add_argument("--no-browser", action="store_true", help="print the address instead of opening a browser")
+    # Used by the background preview 'subfile' and 'autofill' start: stop after this many idle seconds.
+    p_web.add_argument("--idle-timeout", type=float, default=None, help=argparse.SUPPRESS)
     p_web.set_defaults(func=_cmd_web)
 
     p_add = sub.add_parser(

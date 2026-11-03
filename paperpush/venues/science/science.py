@@ -19,6 +19,8 @@ from ...validate import parse_authors
 from ..base import Venue
 from ..common import DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
 from ..login import VenueLoginError
+from ..recovery import GuardedPage, guard, step, unrecovered
+from ..recovery_channel import browser_launch_args
 
 logger = logging.getLogger(__name__)
 
@@ -294,10 +296,19 @@ def _attach_file(page, path: str) -> bool:
     file_input = page.locator(SEL_FILE_INPUT)
     if file_input.count():
         return _try(lambda: file_input.last.set_input_files(path), f"attach {path}")
-    try:
+
+    def attach(page) -> None:
         with page.expect_file_chooser() as fc:
             page.get_by_role("button", name=BTN_CHOOSE_FILE).first.click()
-        fc.value.set_input_files(path)
+        fc.value.set_files(path)
+
+    try:
+        # The click and the file chooser it opens only make sense together, so
+        # they are one recoverable unit when the page is guarded.
+        if isinstance(page, GuardedPage):
+            page.attempt(f"attach {path!r} via {BTN_CHOOSE_FILE!r}", attach)
+        else:
+            attach(page)
         return True
     except Exception as exc:  # noqa: BLE001
         logger.warning("Science: could not attach %s (%s)", path, exc)
@@ -356,7 +367,9 @@ def _select_org(page, org_id: str) -> str:
             logger.warning("Science: no institution result to select for id %s", org_id)
             return ""
         name = page.locator(f"xpath=//span[normalize-space()='({org_id})']" f"/ancestor::li[1]//div[@ng-click='vm.selectOrg(item)']").first.inner_text().strip()
-        target.click()
+        # A failed selection is handled below (best-effort), so not recovered.
+        with unrecovered():
+            target.click()
     except Exception as exc:  # noqa: BLE001 -- best-effort optional step
         logger.warning("Science: skipped select organization %s (%s)", org_id, exc)
         return ""
@@ -463,12 +476,13 @@ def _select_first_funder_match(page, settle_ms: int = 1000) -> None:
 
 def _add_funding(page, funders: list[dict]) -> None:
     """Add each funding source: funder (via typeahead), award number, and investigator."""
-    for funder in funders:
+    for funder_index, funder in enumerate(funders):
         name = funder.get("funder", "").strip()
         if not name:
             continue
         award = funder.get("award_number", "").strip()
         investigator = funder.get("investigator", "").strip()
+        step(f"Manuscript information: funding source {funder_index + 1} of {len(funders)} ({name})")
         logger.info("Adding funding source %s (award %s)", name, award or "(none)")
         if not _try(lambda: _click(page, BTN_ADD_FUNDER), "open Add Funding Source"):
             continue
@@ -491,6 +505,7 @@ def _add_subject_areas(page, subject_areas: list[str]) -> None:
         area = area.strip()
         if not area:
             continue
+        step(f"Manuscript information: subject area {index + 1} of {min(len(subject_areas), 2)} ({area})")
         logger.info("Adding subject area %s", area)
         toggle = page.locator(SEL_SUBJECT_TOGGLE).nth(index + 1)  # the first toggle is the desired editor
         if not _try(lambda t=toggle: t.click(), f"open subject-area picker {index + 2}"):
@@ -505,11 +520,12 @@ def _add_subject_areas(page, subject_areas: list[str]) -> None:
 
 def _add_datasets(page, datasets: list[dict]) -> None:
     """Add each additional dataset: choose the repository, type the URI, click "Add"."""
-    for dataset in datasets:
+    for dataset_index, dataset in enumerate(datasets):
         repository = dataset.get("repository", "").strip()
         uri = dataset.get("uri", "").strip()
         if not repository and not uri:
             continue
+        step(f"Additional datasets: dataset {dataset_index + 1} of {len(datasets)} ({repository or uri})")
         logger.info("Adding dataset %s (%s)", repository or "(no repository)", uri or "(no URI)")
         if repository:
             _try(
@@ -528,7 +544,7 @@ def _add_reviewers(page, reviewers: list[dict], add_button: str, what: str, extr
     ``extra`` goes to a second optional box (department) or, when
     ``extra_in_textarea``, the excluded form's free-text reason textarea.
     """
-    for reviewer in reviewers:
+    for reviewer_index, reviewer in enumerate(reviewers):
         first = reviewer.get("first_name", "").strip()
         last = reviewer.get("last_name", "").strip()
         email = reviewer.get("email", "").strip()
@@ -536,6 +552,7 @@ def _add_reviewers(page, reviewers: list[dict], add_button: str, what: str, extr
             continue
         institution = reviewer.get("institution", "").strip()
         extra = reviewer.get("extra", "").strip()
+        step(f"Reviewers page: {what} {reviewer_index + 1} of {len(reviewers)} ({first} {last})")
         logger.info("Adding %s %s %s", what, first, last)
         if not _try(lambda: _click(page, add_button), f"open {what} form"):
             continue
@@ -564,11 +581,13 @@ def _enter_manuscript_info(
     datasets: list[dict] | None = None,
 ) -> None:
     """Fill the manuscript-information step: title, abstract, funding, subject areas, datasets."""
+    step("Manuscript information page")
     _fill_first(page, SEL_TITLE_CANDIDATES, title, "title")
     _fill_first(page, SEL_ABSTRACT_CANDIDATES, abstract, "abstract")
     _add_funding(page, funders or [])
     _add_subject_areas(page, subject_areas or [])
     _try(lambda: _click(page, BTN_SAVE_PROCEED), "save and proceed")
+    step("Additional datasets page")
     _add_datasets(page, datasets or [])
     _try(lambda: _click(page, BTN_PROCEED), "proceed")
 
@@ -611,16 +630,22 @@ def submit_science(values: dict, headless: bool = False, debug: bool = False, ne
     )
 
     with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-        browser = playwright.chromium.launch(headless=headless)
+        # browser_launch_args() is empty unless `submit --cdp-port` asked for a
+        # CDP endpoint that another client (playwright-cli) can attach to.
+        browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
         page = context.new_page()
 
         venue.ensure_signed_in(page, context, debug=debug)
 
+        # Signed in: from here a failed action goes to the recovery handler.
+        page = guard(page)
+
         if debug:
             page.pause()
 
+        step("Dashboard: New Submission")
         logger.debug("Signed in; starting a new manuscript submission")
         new_link = page.get_by_role("link", name=LINK_NEW_SUBMISSION)
         if not new_link.first.is_visible():
@@ -628,11 +653,13 @@ def submit_science(values: dict, headless: bool = False, debug: bool = False, ne
         new_link.first.wait_for(state="visible", timeout=30000)
         _click_link(page, LINK_NEW_SUBMISSION)
 
+        step("New Submission page: publication and article type")
         # Choose the AAAS venue first (it repopulates the article-type menu), then the type.
         _select_publication(page, publication)
         _select_article_type(page, article_type)
         _try(lambda: _click(page, BTN_SAVE_PROCEED), "save and proceed past article type")
 
+        step("Terms page")
         # Terms: tick the agreement checkbox (its ng-disabled binding gates
         # "Save And Continue To Submission") and leave it checked, then continue.
         _try(lambda: _click(page, BTN_CONTINUE_TERMS), "continue to terms")
@@ -641,11 +668,15 @@ def submit_science(values: dict, headless: bool = False, debug: bool = False, ne
         _try(lambda: _click(page, BTN_SAVE_CONTINUE), "save and continue past terms")
 
         # File-upload step: the two manuscript slots, then an optional cover letter/supplement.
+        step("File upload page: manuscript and combined PDF")
         _upload_manuscript_files(page, manuscript_file, combined_pdf)
         if cover_letter:
+            step("File upload page: cover letter")
             _upload_file(page, cover_letter, "Cover Letter")
         if supplementary_material:
+            step("File upload page: supplementary material")
             _upload_file(page, supplementary_material, "Supplementary Material")
+        step("File upload page: proceed")
         _try(lambda: _click(page, BTN_PROCEED), "proceed past file upload")
         _try(lambda: _click(page, BTN_OK, exact=True), "confirm file upload")
 
@@ -658,16 +689,18 @@ def submit_science(values: dict, headless: bool = False, debug: bool = False, ne
             key = (ringgold, ror)
             if (ringgold or ror) and key not in seen_institutions:
                 seen_institutions.add(key)
+                step(f"Authors page: institution {len(seen_institutions)} (ringgold={ringgold or '-'}, ror={ror or '-'})")
                 name = _add_institution(page, ringgold, ror)
                 # Map both ids to the resolved name for the picker later.
                 if ringgold:
                     inst_names[ringgold] = name
                 if ror:
                     inst_names[ror] = name
-        for author in authors:
+        for author_index, author in enumerate(authors):
             submitter = _is_yes(author.get("submitter"))
             if submitter:
                 continue  # the submitting author is already present on the step
+            step(f"Authors page: author {author_index + 1} of {len(authors)} ({author.get('first_name', '')} {author.get('last_name', '')})")
             _add_author(page, author, inst_names)
 
         # add institution for submitting author
@@ -675,6 +708,7 @@ def submit_science(values: dict, headless: bool = False, debug: bool = False, ne
             submitter = _is_yes(author.get("submitter"))
             if not submitter:
                 continue
+            step(f"Authors page: submitting author {author_pos + 1} of {len(authors)} ({author.get('first_name', '')} {author.get('last_name', '')})")
             page.locator("a[ng-click='grid.appScope.updateAuthor(row.entity)']").first.click()
             if not _is_yes(author.get("first_author")):  # defaults first author
                 _check_author_flag(page, FLAG_CO_FIRST_AUTHOR, "mark co-first author")
@@ -697,12 +731,14 @@ def submit_science(values: dict, headless: bool = False, debug: bool = False, ne
                 for i in range(author_pos):
                     page.locator("button[ng-click=\"grid.appScope.setOrderDirection(row.entity,'down')\"]").first.click()
 
+        step("Authors page: proceed")
         _try(lambda: _click(page, BTN_PROCEED), "proceed past authors")
 
         # Manuscript-information step: title, abstract, funding, subject areas, datasets.
         _enter_manuscript_info(page, title, abstract, funders, subject_areas, datasets)
 
         # Reviewers step: add the suggested reviewers, then the excluded ones.
+        step("Reviewers page")
         _add_reviewers(page, suggested_reviewers, BTN_ADD_SUGGESTED_REVIEWER, "suggested reviewer")
         _add_reviewers(page, excluded_reviewers, BTN_ADD_EXCLUDED_REVIEWER, "excluded reviewer", extra_in_textarea=True)
         _try(lambda: _click(page, BTN_PROCEED), f"proceed with Reviewers")
@@ -728,6 +764,8 @@ class ScienceVenue(Venue):
     logged_in_names = (LINK_NEW_SUBMISSION, *LOGOUT_LINK_NAMES)
     # CTS is a slow-loading SPA, so the login-state check waits a little longer.
     logged_in_timeout_ms = 8000
+    #: submit_science guards its page, so a failed action can be recovered.
+    supports_recovery = True
 
     @property
     def login_url(self) -> str:

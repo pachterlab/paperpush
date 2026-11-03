@@ -141,6 +141,11 @@ _TITLE_PAGE_LABELS = {
 _STATEMENT_LABELS = {"ai_use": "AI-use", "ethics_statement": "ethics", "reproducibility": "reproducibility", "lead_contact": "lead contact", "consent_to_publish": "consent for publication"}
 
 
+def upload_role_ids(role: str) -> tuple[str, ...]:
+    """The ids of the upload box for ``role`` (``"figures"``, ``"tables"``, ...) across venues."""
+    return _ROLE_FIELD_IDS.get(role, ())
+
+
 def _fields_for(venue: Venue, role: str) -> list[Field]:
     ids = _ROLE_FIELD_IDS.get(role, ())
     by_id = {f.id: f for f in venue.fields}

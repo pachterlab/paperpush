@@ -1,12 +1,14 @@
 // The checks the page runs as the author types.
 //
-// A port of the form-level checks in paperpush/validate.py (_field_checks,
-// _check_length, _check_url, _check_authors, _check_subfields) and of
+// A port of the form-level checks in paperpush/validate.py (_schema_issues,
+// _field_checks, _check_length, _check_url, _check_authors, _check_subfields) and of
 // requirements_check._text_fields_check, which compares the title, abstract,
 // and keywords against the author-guideline limits the server sends as
 // `liveRules` (see paperpush/web/app.py:live_rules). The ids and titles match
 // the checks `paperpush validate` reports, so the page can show either
-// result in the same place. tests/test_web.py runs these against the Python
+// result in the same place. A venue's own field validators (Nature's subject
+// tree, ...) exist only in Python: the server reports what they find as the
+// plan's `schema_issues`, passed in here as `serverIssues`. tests/test_web.py runs these against the Python
 // versions; change both together.
 (function (root) {
   "use strict";
@@ -17,6 +19,7 @@
   const AUTHOR_SPECIAL = new Set(["name", "first_name", "last_name", "open_review_id", "corresponding"]);
 
   const TITLES = {
+    "form.schema": ["Field values have the right type and known field ids", "Submission form"],
     "form.required": ["Required fields are filled and confirmations given", "Submission form"],
     "form.options": ["Choices are valid options", "Submission form"],
     "form.counts": ["Item counts within the form's limits", "Submission form"],
@@ -158,6 +161,47 @@
     return out;
   }
 
+  // The generic part of validate.py's pydantic schema: known field ids, closed
+  // choices, yes/no answers, whole numbers within bounds, and filelist types.
+  // `filled` holds the stripped non-blank values.
+  function checkSchema(fields, filled, venue) {
+    const out = [];
+    const byId = new Map(fields.map((f) => [f.id, f]));
+    for (const [id, value] of Object.entries(filled)) {
+      const field = byId.get(id);
+      if (!field) {
+        out.push(issue("error", id, `unknown field '${id}' is not part of the ${venue || "venue's"} template; remove it or fix the spelling`));
+        continue;
+      }
+      const label = field.label;
+      if (field.type === "choice" && field.options && field.options.length && !field.options_recommended) {
+        if (!field.options.includes(value)) out.push(issue("error", id, `${label}: '${value}' is not a valid option; choose one of: ${field.options.join(", ")}`));
+      } else if (field.type === "boolean") {
+        if (!truthy(value) && !falsey(value)) out.push(issue("error", id, `${label}: expected a yes/no value (e.g. yes, no, true, false)`));
+      } else if (field.type === "int") {
+        if (!/^[+-]?\d+(?:_\d+)*$/.test(value)) out.push(issue("error", id, `${label}: '${value}' is not a whole number`));
+        else {
+          const n = Number(value.replace(/_/g, ""));
+          if (field.min_value != null && n < field.min_value) out.push(issue("error", id, `${label}: must be at least ${field.min_value} (got ${n})`));
+          else if (field.max_value != null && n > field.max_value) out.push(issue("error", id, `${label}: must be at most ${field.max_value} (got ${n})`));
+        }
+      } else if (field.type === "filelist" && field.type_options && field.type_options.length) {
+        const allowed = new Set(field.type_options.map((o) => o.toLowerCase()));
+        const lines = value.split(/\r\n|\r|\n/);
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const parts = line.split("|").map((x) => x.trim());
+          if (parts.length >= 2 && parts[1] && !allowed.has(parts[1].toLowerCase())) {
+            out.push(issue("error", id, `${label}: line ${i + 1}: file type '${parts[1]}' is not allowed; choose one of: ${field.type_options.join(", ")}`));
+            break; // validate.py stops at the first bad line
+          }
+        }
+      }
+    }
+    return out;
+  }
+
   function statusFor(issues) {
     if (issues.some((i) => i.level === "error")) return "failed";
     if (issues.length) return "warning";
@@ -165,12 +209,25 @@
   }
 
   // Run every live check. Returns {checks: [{id, title, category, status,
-  // issues}], byField: {fieldId: [issue, ...]}}.
-  function run(fields, values, liveRules = {}) {
+  // issues}], byField: {fieldId: [issue, ...]}}. `opts.venue` names the venue
+  // in messages; `opts.serverIssues` are the venue validators' findings.
+  function run(fields, values, liveRules = {}, opts = {}) {
     const buckets = {};
     for (const id of Object.keys(TITLES)) buckets[id] = [];
     const applied = new Set(["form.required"]);
     const byId = new Map(fields.map((f) => [f.id, f]));
+
+    const filled = {};
+    for (const [k, v] of Object.entries(values)) if (v && v.trim()) filled[k] = v.trim();
+    if (Object.keys(filled).length) {
+      applied.add("form.schema");
+      buckets["form.schema"].push(...checkSchema(fields, filled, opts.venue));
+      // A field the generic schema already rejects is not run through the venue's validator.
+      const flagged = new Set(buckets["form.schema"].map((i) => i.field));
+      for (const i of opts.serverIssues || []) {
+        if (filled[i.field] && !flagged.has(i.field)) buckets["form.schema"].push(issue(i.level || "error", i.field, i.message));
+      }
+    }
 
     for (const field of fields) {
       const raw = values[field.id] || "";
@@ -194,15 +251,17 @@
       }
       if (!present) continue;
 
-      if (field.options && field.options.length && (field.type === "choice" || field.type === "multichoice")) {
+      if (field.options && field.options.length && ["choice", "multichoice", "text"].includes(field.type)) {
         applied.add("form.options");
-        const chosen = field.type === "choice" ? [raw.trim()] : raw.split(",").map((c) => c.trim());
+        // Options written "code (Label)" (arXiv categories) also take the bare code.
+        const accepted = new Set(field.accepted_options || field.options);
+        const chosen = field.type === "multichoice" ? raw.split(",").map((c) => c.trim()) : [raw.trim()];
         for (const choice of chosen) {
-          if (!choice || field.options.includes(choice)) continue;
+          if (!choice || accepted.has(choice)) continue;
           if (field.options_recommended) {
             const entered = field.type === "multichoice" ? "added as a custom keyword" : "entered as custom text";
             buckets["form.options"].push(issue("warning", field.id, `${field.label}: '${choice}' is not in the recommended list; it will be ${entered}`));
-          } else if (field.type === "multichoice") {
+          } else if (field.type === "multichoice" || field.type === "text") {
             // A closed single choice is a <select> here, and validate reports a bad one under form.schema.
             buckets["form.options"].push(issue("error", field.id, `${field.label}: '${choice}' is not a valid option`));
           }

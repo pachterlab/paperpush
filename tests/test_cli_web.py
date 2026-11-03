@@ -43,7 +43,7 @@ def test_web_with_a_sub_file_opens_it_filled_in(served, tmp_path):
     [(kind, args, kwargs)] = served
     assert kind == "local"
     assert args == (sub,)
-    assert kwargs == {"manuscript_dirs": (tmp_path,), "port": 0, "open_browser": False}
+    assert kwargs == {"manuscript_dirs": (tmp_path,), "port": 0, "open_browser": False, "token": None, "idle_timeout": None}
 
 
 def test_web_refuses_a_missing_file(served, tmp_path, capsys):
@@ -72,3 +72,44 @@ def test_web_refuses_a_missing_directory(served, tmp_path, capsys):
     assert main(["web", str(sub), "-d", str(tmp_path / "missing")]) == 1
     assert "not a directory" in capsys.readouterr().err
     assert served == []
+
+
+# -- the localhost link 'subfile' and 'autofill' print -----------------------
+
+
+@pytest.fixture
+def spawned(monkeypatch):
+    """Pretend stdout is a terminal and record the preview server instead of starting it."""
+    import subprocess
+
+    calls: list[tuple[list, dict]] = []
+    monkeypatch.delenv("PAPERPUSH_NO_WEB_LINK", raising=False)
+    monkeypatch.setattr("paperpush.cli._stdout_is_terminal", lambda: True)
+    monkeypatch.setattr(subprocess, "Popen", lambda cmd, **kw: calls.append((cmd, kw)))
+    return calls
+
+
+def test_subfile_prints_a_link_and_serves_the_file_in_the_background(spawned, tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert main(["subfile", "biorxiv"]) == 0
+    out = capsys.readouterr().out
+    [(cmd, kw)] = spawned
+    token = kw["env"]["PAPERPUSH_WEB_TOKEN"]
+    port = cmd[cmd.index("--port") + 1]
+    assert f"http://127.0.0.1:{port}/?local={token}#/v/biorxiv" in out
+    assert cmd[cmd.index("web") + 1] == str((tmp_path / "biorxiv.sub").resolve())
+    assert "--idle-timeout" in cmd and kw["start_new_session"]
+
+
+def test_no_link_when_turned_off(spawned, tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PAPERPUSH_NO_WEB_LINK", "1")
+    assert main(["subfile", "biorxiv"]) == 0
+    assert not spawned and "127.0.0.1" not in capsys.readouterr().out
+
+
+def test_web_passes_the_token_and_idle_timeout_on(served, monkeypatch):
+    monkeypatch.setenv("PAPERPUSH_WEB_TOKEN", "tok")
+    assert main(["web", str(SUB), "--no-browser", "--idle-timeout", "60"]) == 0
+    [(_, _, kw)] = served
+    assert kw["token"] == "tok" and kw["idle_timeout"] == 60

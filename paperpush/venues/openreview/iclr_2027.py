@@ -53,6 +53,8 @@ from playwright.sync_api import sync_playwright
 from ...database import get_venue
 from ...validate import _truthy_bool
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
+from ..recovery import guard, step
+from ..recovery_channel import browser_launch_args
 from .main import OpenReviewVenue, lines, parse_profiles
 
 logger = logging.getLogger(__name__)
@@ -176,6 +178,9 @@ class ICLR2027Venue(OpenReviewVenue):
 
     slug = SLUG
     field_validators = FIELD_VALIDATORS
+    #: submit() guards its page, so a failed action can be recovered. OpenReview's
+    #: final control is the generic "Submit".
+    supports_recovery = True
 
     def _open_dropdown(self, page, placeholder: str) -> None:
         """Open the single-select dropdown whose placeholder reads ``placeholder``.
@@ -234,19 +239,25 @@ class ICLR2027Venue(OpenReviewVenue):
             raise ValueError("ICLR 2027 requires every author to have read and committed to the ICLR Code " "of Ethics; set code_of_ethics to yes")
 
         with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-            browser = playwright.chromium.launch(headless=headless)
+            # browser_launch_args() is empty unless `submit --cdp-port` asked for a CDP endpoint.
+            browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
             context = open_run_context(browser, self.session_path(), new_session=new_session)
             apply_default_timeouts(context, timeout)
             page = context.new_page()
 
             self.ensure_signed_in(page, context, debug=debug)
+            # Sign-in stays unguarded. From here on a failed action goes to the
+            # recovery handler (see DEVELOPMENT.md, "Recovering a run that gets stuck").
+            page = guard(page)
 
             if debug:
                 page.pause()
 
+            step("Open the submission form")
             # Navigate from the signed-in group page into the submission form.
             page.get_by_role("button", name="ICLR 2027 Conference").click()
 
+            step("Title")
             # Title. The form's text inputs are addressed by position, as recorded:
             # 0 is OpenReview's site-wide search box, 1 the title, 2 the author
             # profile search, 3 the keywords, 4 the TL;DR.
@@ -255,10 +266,13 @@ class ICLR2027Venue(OpenReviewVenue):
             # Authors: remove the pre-filled author entry (the submitter, added by
             # OpenReview), then add each author by profile search (by ID or name,
             # see add_profile).
+            step("Authors")
             page.get_by_role("button", name="remove", exact=True).click()
-            for author in authors:
+            for i, author in enumerate(authors):
+                step(f"Authors: author {i + 1} of {len(authors)} ({author['open_review_id'] or author['name']})")
                 self.add_profile(page, author)
 
+            step("Keywords, TL;DR, and abstract")
             # Keywords (comma-separated, as typed).
             page.get_by_role("textbox").nth(3).fill(keywords)
 
@@ -269,6 +283,7 @@ class ICLR2027Venue(OpenReviewVenue):
             # Abstract -- the only textarea on the form.
             page.locator("textarea").fill(abstract)
 
+            step("PDF and supplementary material")
             # PDF (optional until the full-paper deadline) and the single zipped
             # supplementary-material file (optional): set the file inputs directly
             # rather than clicking their "Choose ..." buttons, which would open the
@@ -279,9 +294,11 @@ class ICLR2027Venue(OpenReviewVenue):
                 page.get_by_label("supplementary_material", exact=True).set_input_files(supplementary_material)
 
             # Primary area (exactly one).
+            step("Primary area")
             self._open_dropdown(page, "Select Primary Area")
             page.get_by_role("option", name=primary_area).click()
 
+            step("Declarations")
             # The three required declarations: the Code of Ethics, confirmed by
             # the .sub, plus the two policy acknowledgements the runner ticks
             # itself (see AUTOMATIC_DECLARATIONS).
@@ -290,7 +307,8 @@ class ICLR2027Venue(OpenReviewVenue):
 
             # Reciprocal reviewing author(s): the only multi-select on the form,
             # listing this submission's authors by profile name.
-            for author in reciprocal:
+            for i, author in enumerate(reciprocal):
+                step(f"Reciprocal reviewing author {i + 1} of {len(reciprocal)} ({author['name']})")
                 page.locator(".dropdown-select__value-container.dropdown-select__value-container--is-multi > .dropdown-select__input-container").first.click()
                 page.get_by_role("option", name=author["name"], exact=True).click()
 
@@ -298,6 +316,7 @@ class ICLR2027Venue(OpenReviewVenue):
             # "different reason" option was chosen. _check_reciprocal_reviewing
             # has already established that the two agree with each other and with
             # the nomination above.
+            step("Reciprocal reviewing exemption")
             self._open_dropdown(page, "Select Reciprocal Reviewing Exemption")
             page.get_by_role("option", name=exemption).click()
             if exemption_reason:
@@ -307,10 +326,12 @@ class ICLR2027Venue(OpenReviewVenue):
                 page.get_by_role("textbox").filter(has_text=re.compile(r"^$")).nth(5).fill(exemption_reason)
 
             # AI assistance disclosure (one or more checkboxes).
+            step("AI assistance disclosure")
             for answer in ai_assistance:
                 page.get_by_role("checkbox", name=answer).check()
 
             # License (ICLR 2027 offers only CC BY 4.0).
+            step("License")
             placeholder = page.get_by_text("Select License...", exact=True)
             placeholder.locator("xpath=ancestor::div[contains(@class, 'dropdown-select__control')]").click()
             page.get_by_role("option", name=license_name).click()

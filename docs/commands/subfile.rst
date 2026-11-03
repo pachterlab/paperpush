@@ -82,6 +82,12 @@ Options
    Every edit is saved to the ``.sub`` file. If the file already exists, it is
    opened instead of refused. Needs ``pip install 'paperpush[web]'``.
 
+   Without ``--web``, the command still ends by printing a link to
+   ``http://127.0.0.1:PORT/...`` that shows the ``.sub`` in the web page, served by
+   a background process that stops after 30 minutes unused. It is printed only to
+   a terminal with the web extra installed; set ``PAPERPUSH_NO_WEB_LINK=1`` to
+   turn it off.
+
 ``--venue-order``
    List the fields in the order the venue's submission form asks for them,
    instead of grouped into the sections every venue shares (see `Field order`_).

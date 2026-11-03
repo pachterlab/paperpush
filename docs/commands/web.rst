@@ -59,30 +59,28 @@ Options
 ``--no-browser``
    Print the page's address instead of opening it in your browser.
 
-Sharing the page
-----------------
+The buttons at the bottom of the page
+-------------------------------------
 
-**Share for editing** (on the hosted site)
-   Puts the form online and copies a link. Everyone who opens the link edits
-   the same form, with the same word counts, options, and checks, and each
-   edit is saved a moment after it is made. If two people change *different*
-   fields at once, both changes are kept. If they change the *same* field,
-   the one who saves second chooses which value to keep. The form is
-   encrypted in the browser with a key that exists only in the link (after
-   the ``#``, which browsers never send to a server), so the server stores
-   only ciphertext. Anyone with the link can read and edit the form, and a
-   lost link cannot be recovered. Uploaded files are not shared: each person
-   uploads their own to validate. **Delete for everyone** removes the shared
-   form; a form nobody edits for 90 days is deleted. Not available for
-   ``--web`` pages, which only run on your computer.
+**Download .sub**
+   The ``.sub`` file the form writes. (The file itself is also shown, and
+   editable, in the collapsed *The .sub file* section above the checks.)
 
-**Copy share link**
-   A link holding a frozen copy of the form (inside the link itself, so
-   nothing is stored on a server). Whoever opens it gets their own copy to
-   edit, saved in their browser; their changes do not come back to you
-   unless they send you a new link.
+**Download .zip**
+   One folder holding the ``.sub`` file and every file it names. Whatever is
+   in the figures upload box goes in a ``figures/`` subfolder, the tables
+   box in ``tables/``, and the supplementary box in ``supplementary/``;
+   everything else sits beside the ``.sub``. The ``.sub`` inside names the files
+   where they now are, so ``paperpush validate`` and ``paperpush submit``
+   work from inside the unzipped folder, and the page can open the zip again
+   later. On a ``--web`` page the files come from your computer; on the
+   website, from your uploads (uploads the ``.sub`` does not name come along
+   too). If a file the ``.sub`` names cannot be found, nothing is downloaded
+   and the page lists the missing paths.
 
-At the bottom of the page, **Save this page as**:
+**Download checks**
+   The last validation's report as a text file, like
+   ``paperpush validate -o report.txt``. Validate first.
 
 **HTML**
    A single file to send to a PI or collaborator. It opens in any browser
@@ -90,7 +88,25 @@ At the bottom of the page, **Save this page as**:
    switch, and copy buttons still work, but the fields are read-only. A link
    at the top opens an editable copy on the website.
 
-**PDF**
-   Opens the browser's print dialog; choose *Save as PDF*. The PDF is laid out
-   for paper: light colours, without the editing controls, every check open,
-   text boxes at full height, and only the chosen options of long checklists.
+**Share**
+   (On the hosted site.) Puts the form online and copies a link. Everyone who
+   opens the link edits the same form, with the same word counts, options,
+   and checks, and each edit is saved a moment after it is made. If two
+   people change *different* fields at once, both changes are kept. If they
+   change the *same* field, the one who saves second chooses which value to
+   keep. The form is encrypted in the browser with a key that exists only in
+   the link (after the ``#``, which browsers never send to a server), so the
+   server stores only ciphertext. Anyone with the link can read and edit the
+   form, and a lost link cannot be recovered. Uploaded files are not shared:
+   each person uploads their own to validate. **Delete for everyone** removes
+   the shared form; a form nobody edits for 90 days is deleted.
+
+   On a ``--web`` page, which only runs on your computer, **Share** opens
+   the form, filled in, on the paperpush website (the values travel inside
+   the link, after the ``#``, so nothing is stored on a server). Press
+   **Share** there to edit it with others. Uploaded files stay on your
+   computer.
+
+**Portal**
+   Fills out the venue's submission portal, stopping before the final submit
+   button.

@@ -338,16 +338,75 @@ def parse(text: str) -> SubFile:
                     break
             values[key] = "\n".join(block).strip("\n")
         else:
+            # YAML-style quoting ('Cover letter.txt', "a: b"): drop the quotes.
+            if len(rest) >= 2 and rest[0] == rest[-1] and rest[0] in "'\"":
+                rest = rest[1:-1]
             values[key] = rest
 
     logger.debug("Parsed .sub: venue=%r, %d field value(s)", venue, len(values))
     return SubFile(venue=venue, values=values)
 
 
+def _resolve_one(raw: str, base: Path) -> str:
+    """Resolve one relative upload path against ``base`` (the .sub's folder).
+
+    An absolute path is kept. A relative one that exists beside the .sub wins;
+    one that exists only relative to the working directory is kept as written
+    (older .sub files were run from their own folder); anything else is
+    resolved against ``base`` so a "file not found" error names the right place.
+    """
+    text = raw.strip()
+    if not text:
+        return raw
+    p = Path(text).expanduser()
+    if p.is_absolute():
+        return str(p)
+    beside = base / p
+    if beside.exists() or not p.exists():
+        return str(beside)
+    return text
+
+
+def resolve_paths(sub: SubFile, base: str | Path) -> SubFile:
+    """Make the relative paths in a .sub's file/filelist fields absolute.
+
+    Paths in a .sub are relative to the .sub file itself, not to wherever the
+    command happens to run. Unknown venues are returned unchanged.
+    """
+    from .database import get_venue
+
+    try:
+        venue = get_venue(sub.venue)
+    except KeyError:
+        return sub
+    base = Path(base).expanduser().resolve()
+    values = dict(sub.values)
+    for field in venue.fields:
+        raw = values.get(field.id)
+        if not raw or not raw.strip():
+            continue
+        if field.type == "file":
+            values[field.id] = _resolve_one(raw, base)
+        elif field.type == "filelist":
+            lines = []
+            for line in raw.splitlines():
+                if not line.strip():
+                    lines.append(line)
+                    continue
+                head, sep, rest = line.partition("|")
+                lines.append(_resolve_one(head, base) + (" " + sep + rest if sep else ""))
+            values[field.id] = "\n".join(lines)
+    return SubFile(venue=sub.venue, values=values)
+
+
 def load(path: str | Path) -> SubFile:
-    """Read and parse a ``.sub`` file from disk."""
+    """Read and parse a ``.sub`` file from disk.
+
+    Relative upload paths are resolved against the .sub file's own folder.
+    """
     logger.debug("Loading .sub file %s", path)
-    return parse(Path(path).read_text(encoding="utf-8"))
+    path = Path(path)
+    return resolve_paths(parse(path.read_text(encoding="utf-8")), path.parent)
 
 
 def find_block(text: str, key: str) -> str | None:

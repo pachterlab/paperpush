@@ -316,6 +316,37 @@ def test_recommended_choice_over_character_limit_is_error():
     assert any("21 characters" in i.message and "20-character" in i.message for i in errs)
 
 
+# --- "code (Label)" options (arXiv categories) -------------------------------
+
+_CATEGORIES = ["cs.AI (Artificial Intelligence)", "cs.LG (Machine Learning)", "hep-th (High Energy Physics - Theory)"]
+
+
+def _coded_venue() -> Venue:
+    return _venue(
+        Field(id="primary_category", label="Primary category", type="text", options=_CATEGORIES),
+        Field(id="crosslist_categories", label="Cross-list categories", type="multichoice", options=_CATEGORIES),
+    )
+
+
+def test_coded_options_accept_bare_code_and_full_text():
+    j = _coded_venue()
+    values = {"primary_category": "hep-th", "crosslist_categories": "cs.LG, cs.AI (Artificial Intelligence)"}
+    assert _errors(_validate(j, values)) == []
+
+
+def test_coded_options_reject_unknown_code():
+    j = _coded_venue()
+    errs = _errors(_validate(j, {"primary_category": "cs.FOO", "crosslist_categories": "cs.LG, bogus.XX"}))
+    assert {i.field for i in errs} == {"primary_category", "crosslist_categories"}
+    assert all("not a valid option" in i.message for i in errs)
+
+
+def test_partly_coded_options_do_not_accept_prefix():
+    # One "Other (please specify)" among plain choices is not a code list.
+    j = _venue(Field(id="kind", label="Kind", type="multichoice", options=["Article", "Other (please specify)"]))
+    assert _for(_errors(_validate(j, {"kind": "Other"})), "kind")
+
+
 # --- boolean parsing -------------------------------------------------------
 
 

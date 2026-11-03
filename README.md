@@ -37,9 +37,9 @@ See [`docs/example-session.md`](docs/example-session.md) for a full worked examp
    - **a.** *fill out manually*
    - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
    - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY [MORE_DIRS_OR_FILES ...] --engine api VENUE.sub`: Use an LLM API (Anthropic, OpenAI, or Google; pick one with `--provider`, otherwise the first one with an API key set is used). Requires that provider's API key and `pip install "paperpush[autofill]"`. `-d` takes one or more directories and/or documents (`.tex`, `.doc`, `.docx`, `.odt`, `.rtf`, `.txt`, `.md`, `.rst`, `.pdf`), up to the next flag or the `.sub` file, and can be repeated.
-3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count), its page layout (template, margins, font, spacing, line/page numbers), its figures (resolution, lettering size and typeface, panel labels — in attached files or embedded in the manuscript), the order figures and tables are cited in, and whether the title, abstract, authors, and keywords in the `.sub` match the manuscript. It prints a colour-coded report of what passed (green), failed (red), warnings (amber), and was not checked and why (yellow; `--alt-color` for a colour-blind-friendly palette); for venues that accept an initial submission in any format (Nature, Cell, PLOS Comp Bio, PNAS, ...) it notes the rule at the top, and `--initial-submission` reports every error as a warning; `-o` also saves it as PDF (or `.html`/`.md`/`.txt`). Checks that need a reader's judgement — lettering in raster figures, the guidelines' free-text rules — run with `--ai` (an Anthropic, OpenAI, or Gemini API key), or with your own Claude Code/Codex subscription through the `paperpush-validate` skill (`--ai-tasks` / `--ai-results`).
+3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count), its page layout (template, margins, font, spacing, line/page numbers), its figures (resolution, lettering size and typeface, panel labels — in attached files or embedded in the manuscript), the order figures and tables are cited in, and whether the title, abstract, authors, and keywords in the `.sub` match the manuscript. It prints a colour-coded report of what passed (green), failed (red), warnings (amber), and was not checked and why (yellow; `--alt-color` for a colour-blind-friendly palette); for venues that accept an initial submission in any format (Nature, Cell, PLOS Comp Bio, PNAS, ...) it notes the rule at the top, and `--initial-submission` reports every error as a warning; `-o` also saves it as PDF (or `.html`/`.md`/`.txt`). Checks that need a reader's judgement — lettering in raster figures, the guidelines' free-text rules — run with `--ai` (an Anthropic, OpenAI, or Gemini API key), or with your own Claude Code/Codex subscription through the `paperpush-validate` skill (`--ai-tasks` / `--ai-results`); `--ai-only` reports just those checks.
 4. `paperpush login VENUE`: log in to the VENUE submission portal.
-5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
+5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. If a portal has changed and a step fails partway, `--recover by-hand` pauses so you can fix that step in the browser and carry on. `--ai` has an LLM fix it instead, with the same API keys and `--provider`/`--model` as `autofill --engine api`. The model can never send the submission.
 
 Helper commands:
 - `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
@@ -137,12 +137,14 @@ paperpush web biorxiv.sub       # the same page with biorxiv.sub filled in; edit
 `paperpush web` runs the page locally rather than on the hosted site, so it opens at
 once and your files stay on your computer.
 
-To work on the form with co-authors, use **Share for editing** on the hosted site: everyone
-with the link edits the same form (with its word counts, options, and checks), edits to
-different fields merge, and the server stores it encrypted with a key that only the link
-holds. **Copy share link** sends a frozen copy instead, and **Save this page as HTML**
-saves a single read-only file that opens in any browser, with the side menu, filters,
-and search still working. **PDF** saves a printable copy. (`paperpush-web --host 0.0.0.0` serves the page for a
+The buttons at the bottom of the page download the `.sub` file, a `.zip` bundle (one
+folder with the `.sub` and every file it names, figures, tables, and supplements each in their own subfolder), the last
+validation's report, or the page as a single read-only **HTML** file that
+opens in any browser, with the side menu, filters, and search still working. **Share**
+on the hosted site lets co-authors work on the form with you: everyone with the link
+edits the same form (with its word counts, options, and checks), edits to different
+fields merge, and the server stores it encrypted with a key that only the link holds. On a `paperpush web` page, **Share** opens the form, filled in, on the hosted site,
+where you can share it for editing. **Portal** fills out the venue's submission portal. (`paperpush-web --host 0.0.0.0` serves the page for a
 deployment.)
 
 Autofill and the AI checks require a visitor to enter their provider and API key
@@ -169,6 +171,12 @@ paperpush subfile biorxiv --web                     # create biorxiv.sub, fill i
 paperpush autofill -d paper/ biorxiv.sub --web      # the page autofills from paper/, then you review
 paperpush validate biorxiv.sub --web [--ai]         # run the checks in the page, fix, re-validate
 ```
+
+Without `--web`, `subfile` and `autofill` still end by printing a localhost link that
+shows the `.sub` in the same page. The page is served by a background process, so the
+command returns at once. The server stops on its own after 30 minutes with the page
+closed. The link is printed only when the output is a terminal and the web extra is
+installed. Set `PAPERPUSH_NO_WEB_LINK=1` to turn it off.
 
 With `--web` and no `--values`/`--engine api`, `autofill` leaves the extraction to the
 page. The page uses an API key typed into it, or one set in your environment

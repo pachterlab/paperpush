@@ -116,6 +116,12 @@ Options
    the environment. The page also sets the manuscript field from the inputs if
    it is empty. Needs ``pip install 'paperpush[web]'``.
 
+   Without ``--web``, the command still ends by printing a link to
+   ``http://127.0.0.1:PORT/...`` that shows the ``.sub`` in the web page, served by
+   a background process that stops after 30 minutes unused. It is printed only to
+   a terminal with the web extra installed; set ``PAPERPUSH_NO_WEB_LINK=1`` to
+   turn it off.
+
 Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags.
 
 Examples

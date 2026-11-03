@@ -19,6 +19,8 @@ from ...validate import parse_authors
 from ..base import Venue
 from ..common import DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context, split_name_first_last
 from ..login import VenueLoginError
+from ..recovery import GuardedPage, guard, step, unrecovered
+from ..recovery_channel import browser_launch_args
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +57,11 @@ def _accept_cookies(page) -> None:
     """Dismiss the cookie banner if it is showing (it reappears across navigations)."""
     banner = page.get_by_role("button", name=COOKIE_ACCEPT)
     try:
-        if banner.first.is_visible():
-            banner.first.click()
+        # A banner that vanishes between the check and the click is expected,
+        # so the click is not handed to the recovery handler.
+        with unrecovered():
+            if banner.first.is_visible():
+                banner.first.click()
     except Exception:  # noqa: BLE001 -- a missing banner is fine
         pass
 
@@ -86,10 +91,18 @@ def _attach_upload(page, path: str, slot_index: int) -> None:
     The upload control is a ``<button>`` that opens a native file chooser, not an
     ``<input type=file>``, so we set the files on the chooser the click raises.
     """
-    button = page.get_by_test_id("upload-button").nth(slot_index)
-    with page.expect_file_chooser() as fc_info:
-        button.click()
-    fc_info.value.set_files(path)
+    def attach(page) -> None:
+        button = page.get_by_test_id("upload-button").nth(slot_index)
+        with page.expect_file_chooser() as fc_info:
+            button.click()
+        fc_info.value.set_files(path)
+
+    # The click and the file chooser it opens only make sense together, so they
+    # are one recoverable unit when the page is guarded.
+    if isinstance(page, GuardedPage):
+        page.attempt(f"attach {path!r} to upload slot {slot_index}", attach)
+    else:
+        attach(page)
     page.wait_for_timeout(2000)  # let the upload progress bar finish
 
 
@@ -153,6 +166,8 @@ class DiscreteMathematicsVenue(Venue):
     SITE_URL = _VENUE.site_url
     PORTAL_URL = _VENUE.submission_url  # inherited portal_url resolves to this
     LOGIN_URL = "https://submit.elsevier.com/DISCM"
+    #: submit() guards its page, so a failed action can be recovered.
+    supports_recovery = True
 
     @property
     def login_url(self) -> str:
@@ -168,7 +183,8 @@ class DiscreteMathematicsVenue(Venue):
             timeout_ms = self.logged_in_timeout_ms
         marker = page.get_by_test_id(START_SUBMISSION_TESTID)
         try:
-            marker.first.wait_for(state="visible", timeout=timeout_ms)
+            with unrecovered():
+                marker.first.wait_for(state="visible", timeout=timeout_ms)
             return True
         except Exception:  # noqa: BLE001 -- not visible within the budget means signed out
             return False
@@ -234,16 +250,21 @@ class DiscreteMathematicsVenue(Venue):
         logger.info("Starting Discrete Mathematics submission run (headless=%s, debug=%s): manuscript=%s, %d author(s)", headless, debug, manuscript_file, len(authors))
 
         with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-            browser = playwright.chromium.launch(headless=headless)
+            # browser_launch_args() is empty unless `submit --cdp-port` asked for a CDP endpoint.
+            browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
             context = open_run_context(browser, self.session_path(), new_session=new_session)
             apply_default_timeouts(context, timeout)
             page = context.new_page()
 
             self.ensure_signed_in(page, context, debug=debug)
+            # Sign-in stays unguarded. From here on a failed action goes to the
+            # recovery handler (see DEVELOPMENT.md, "Recovering a run that gets stuck").
+            page = guard(page)
 
             if debug:
                 page.pause()
 
+            step("Dashboard: terms and start submission")
             _accept_cookies(page)
             label = page.get_by_label("I accept Elsevier's terms and")
             if label.count():
@@ -253,16 +274,19 @@ class DiscreteMathematicsVenue(Venue):
             page.get_by_test_id(START_SUBMISSION_TESTID).click()
 
             # Article type.
+            step("Article type")
             page.get_by_label(article_type).check()
             page.get_by_label("Save and continue").click()
 
             # File uploads: manuscript is the first required item.
+            step("File uploads: manuscript")
             slot = 0
             logger.info("Uploading manuscript %s", manuscript_file)
             _select_upload_item(page, REQUIRED_ITEMS_DROPDOWN, "Manuscript")
             _attach_upload(page, manuscript_file, slot)
             slot += 1
 
+            step("File uploads: competing interests")
             # Competing interests: upload a declaration, or tick the "none" confirmation.
             if no_competing_interests:
                 checkbox = page.locator("#doiCheckbox")
@@ -276,17 +300,20 @@ class DiscreteMathematicsVenue(Venue):
                 slot += 1
 
             # Optional items (figures, LaTeX source, supplements) each open a fresh slot.
-            for figure in figures:
+            for i, figure in enumerate(figures):
+                step(f"File uploads: figure {i + 1} of {len(figures)}")
                 logger.info("Uploading figure %s", figure)
                 _select_upload_item(page, OPTIONAL_ITEMS_DROPDOWN, "Figure")
                 _attach_upload(page, figure, slot)
                 slot += 1
             if latex_source:
+                step("File uploads: LaTeX source")
                 logger.info("Uploading LaTeX source %s", latex_source)
                 _select_upload_item(page, OPTIONAL_ITEMS_DROPDOWN, "LaTeX source files")
                 _attach_upload(page, latex_source, slot)
                 slot += 1
-            for supplement in supplements:
+            for i, supplement in enumerate(supplements):
+                step(f"File uploads: supplementary file {i + 1} of {len(supplements)}")
                 logger.info("Uploading supplementary material %s", supplement)
                 _select_upload_item(page, OPTIONAL_ITEMS_DROPDOWN, "Supplementary material")
                 _attach_upload(page, supplement, slot)
@@ -295,6 +322,7 @@ class DiscreteMathematicsVenue(Venue):
             page.wait_for_timeout(2000)  # let the upload progress bars finish
             page.get_by_label("Save and continue").click()
 
+            step("Metadata")
             # Metadata (keywords are semicolon-separated).
             page.get_by_test_id("title-field-container").get_by_label("Your title").fill(title)
             page.get_by_test_id("abstract-field-container").get_by_label("Your abstract").fill(abstract)
@@ -302,12 +330,15 @@ class DiscreteMathematicsVenue(Venue):
             page.get_by_label("Save and continue").click()
 
             # Authors.
+            step("Authors")
             for i, author in enumerate(authors):
+                step(f"Authors: author {i + 1} of {len(authors)}")
                 if i > 0:
                     page.get_by_label("Add another author").click()
                 _add_author(page, author)
             page.get_by_label("Save and continue").click()
 
+            step("Research data")
             # Research data: either link the deposited dataset, or decline and
             # pick a statement (an off-list one goes in the "Other" free-text box).
             # Wait for this distinct screen before looking up its controls: a loose
@@ -339,6 +370,7 @@ class DiscreteMathematicsVenue(Venue):
                     page.locator("textarea").last.fill(data_statement)
             page.get_by_label("Save and continue").click()
 
+            step("Final declarations")
             # Final declarations: tick the standard boxes only when the author confirmed.
             if declarations_confirmed:
                 page.get_by_label("I have read and accept the ethics in publishing policy").check()

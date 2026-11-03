@@ -91,6 +91,11 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
    Your verdicts appear marked "(AI)". A failed AI check is a warning, never a
    blocking error.
 
+   If the user asks for the AI checks only, add `--ai-only` to both commands
+   (MCP: `ai_only=true`): the report then lists just the AI checks and gives
+   no ready-to-submit verdict. Leave it off otherwise, so the summary covers
+   the deterministic checks too.
+
 4. **Summarise for the user**, in this order: blocking errors (must fix),
    warnings (deterministic first, then AI), what could not be checked and why
    (could not run / not implemented), and where the saved report is. Relay

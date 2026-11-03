@@ -10,6 +10,8 @@ from ...validate import parse_authors
 from ..base import Venue
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context, _try
 from ..login import VenueLoginError
+from ..recovery import guard, step
+from ..recovery_channel import browser_launch_args
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,10 @@ logger = logging.getLogger(__name__)
 class TemplateVenue(Venue):  #!!! change to the name of the venue
     slug = "template"  #!!! change to the slug name of the venue
     logged_in_names = ("NAME1", "NAME2", ...)  #!!! change to the names of buttons/links that appear when signed in
+    # The runner below guards its page, so `submit --recover` / `--ai` can fix a failed step. Keep this True only while submit() keeps the guard() call.
+    supports_recovery = True
+    # Labels of this portal's control that sends the submission, if they aren't generic ("Submit", "Approve ..."); a recovering agent may never click them.
+    final_submit_names: tuple[str, ...] = ()  #!!! e.g. ("Build PDF for Approval",)
     _VENUE = get_venue(slug)
 
     # * login
@@ -56,18 +62,21 @@ class TemplateVenue(Venue):  #!!! change to the name of the venue
         #!!! define variables from values dict here
 
         with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-            browser = playwright.chromium.launch(headless=headless)
+            # browser_launch_args() is empty unless `submit --cdp-port` asked for a CDP endpoint.
+            browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
 
             context = open_run_context(browser, self.session_path(), new_session=new_session)
             apply_default_timeouts(context, timeout)
             page = context.new_page()
 
             self.ensure_signed_in(page, context, debug=debug)
+            # Sign-in stays unguarded. From here on a failed action goes to the recovery handler (see DEVELOPMENT.md, "Recovering a run that gets stuck"): label each page with step(), run a click plus the file chooser it opens as one page.attempt(...), and wrap any probe you expect to fail (try/except around a short wait) in `with unrecovered():`.
+            page = guard(page)
 
             if debug:
                 page.pause()
 
-            #!!! write the submission script here
+            #!!! write the submission script here, starting each page with step("<page name>")
 
             logger.info("Completed the recorded steps; leaving the browser open " "for review (cross-list categories, license, and the final " "submit are left to you)")
 

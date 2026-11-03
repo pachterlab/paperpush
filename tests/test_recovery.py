@@ -197,3 +197,30 @@ def test_human_handler_aborts_without_a_terminal():
 
     failure = FailedAction(action="click()", target="", error=PWTimeout("x"), step=None, url="about:blank")
     assert HumanHandler(input_fn=no_stdin, output=lambda _m: None).recover(None, failure) is Resolution.ABORT
+
+
+def test_frame_locators_and_content_frame_stay_guarded(browser):
+    context = browser.new_context()
+    context.set_default_timeout(300)
+    page = context.new_page()
+    page.set_content('<iframe name="content" srcdoc="<button>Inside</button>"></iframe>')
+    page.frame_locator('iframe[name="content"]').get_by_role("button", name="Inside").wait_for()
+    handler = Scripted(Resolution.ABORT)
+    guarded = guard(page, handler)
+    guarded.frame_locator('iframe[name="content"]').get_by_role("button", name="Inside").click()
+    via_content = guarded.locator('iframe[name="content"]').content_frame.get_by_role("button", name="Missing")
+    assert isinstance(via_content, GuardedLocator)
+    with pytest.raises(PWTimeout):
+        via_content.click()
+    assert handler.failures[0].target == "locator('iframe[name=\"content\"]').content_frame.get_by_role('button', name='Missing')"
+    context.close()
+
+
+def test_shared_probes_never_reach_the_handler(page):
+    from paperpush.venues.login import first_visible
+
+    handler = Scripted()
+    guarded = guard(page, handler)
+    assert first_visible(guarded, "link", ("Not here", "Nor here"), 600) is None
+    assert first_visible(guarded, "button", ("Go",), 600) is not None
+    assert handler.failures == []

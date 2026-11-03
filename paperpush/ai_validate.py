@@ -245,7 +245,13 @@ def resolve(checks, venue: Venue, values: dict[str, str], ai: Optional[AiOptions
     """Record a result for every AI task in ``checks``, according to ``ai``; return the tasks."""
     from . import report
 
-    tasks = all_tasks(checks, venue, values)
+    tasks = []
+    for task in all_tasks(checks, venue, values):
+        # Every AI check reads the submission's files; with none attached there is nothing to judge.
+        if task.files:
+            tasks.append(task)
+        else:
+            checks.record(task.id, task.title, task.category, report.NOT_APPLICABLE, detail="no files attached")
     if not tasks:
         return tasks
     verdicts: dict[str, dict] = {}

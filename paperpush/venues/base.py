@@ -116,6 +116,17 @@ class Venue(ABC):
     #: :func:`paperpush.venues.orcid_login_offered`, which says whether the
     #: ``--orcid`` *option* applies to the venue at all.
     supports_orcid_login: bool = False
+    #: Whether this venue's runner wraps its page with
+    #: :func:`paperpush.venues.recovery.guard`, so ``submit --recover`` (and the
+    #: MCP server's agent recovery) can resume it after a failed action. Venues
+    #: whose runner has not been converted leave this ``False``, and the flag is
+    #: then reported as having no effect.
+    supports_recovery: bool = False
+    #: Labels of this portal's control that sends the submission, beyond the
+    #: generic ones in
+    #: :data:`paperpush.venues.recovery_channel.DEFAULT_FINAL_SUBMIT_NAMES`. A
+    #: recovering agent is refused any click on a control with one of these labels.
+    final_submit_names: tuple[str, ...] = ()
 
     # -- The two venue-specific operations (required) --------------------------
 
@@ -276,7 +287,17 @@ class Venue(ABC):
         Returns ``True`` if it left the page signed in. Returns ``False`` only in
         debug mode's manual path, where the caller's ``page.pause()`` lets you sign
         in by hand in the Inspector.
+
+        Sign-in is never recovered: on a guarded page every action in here runs
+        unrecovered, because a password, CAPTCHA or two-factor prompt is the
+        author's to handle.
         """
+        from .recovery import unrecovered
+
+        with unrecovered():
+            return self._ensure_signed_in(page, context, debug=debug)
+
+    def _ensure_signed_in(self, page, context, *, debug: bool = False) -> bool:
         name = self.display_name
 
         if not self.requires_login:

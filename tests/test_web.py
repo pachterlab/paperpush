@@ -24,9 +24,9 @@ pytest.importorskip("httpx")
 from fastapi.testclient import TestClient
 
 from paperpush.database import get_venue, list_venues
-from paperpush.subfile import parse, render_template, replace_block, replace_scalar
+from paperpush.subfile import default_filename, parse, render_template, replace_block, replace_scalar
 from paperpush.validate import validate_report
-from paperpush.web.app import LIVE_CHECKS, Settings, create_app, live_rules, localize_values, safe_name
+from paperpush.web.app import LIVE_CHECKS, Settings, create_app, live_rules, localize_values, safe_name, venue_schema_issues
 
 VENUE = "biorxiv"
 STATIC = Path(__file__).parents[1] / "paperpush" / "web" / "static"
@@ -184,8 +184,23 @@ def test_plan_groups_every_check_without_results(client, ws):
     assert "status" not in res["checks"][0]
     by_id = _checks(res)
     assert by_id["form.required"]["group"] == "live"
+    assert by_id["form.schema"]["group"] == "live"
     assert by_id["integrity.links"]["group"] == "validate"
     assert all(c["group"] == "ai" for c in res["checks"] if c["id"].startswith("ai."))
+
+
+def test_validate_streams_progress_then_the_result(client, ws):
+    text = _filled_template()
+    plain = client.post(f"/api/workspaces/{ws}/validate", json={"text": text}).json()
+    res = client.post(f"/api/workspaces/{ws}/validate", json={"text": text, "stream": True})
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("application/x-ndjson")
+    events = [json.loads(line) for line in res.text.splitlines() if line.strip()]
+    progress = [e["progress"] for e in events[:-1]]
+    assert progress and all(set(p) == {"done", "total", "label"} for p in progress)
+    assert progress[-1]["label"] == "done" and progress[-1]["done"] == progress[-1]["total"]
+    assert [p["done"] for p in progress] == sorted(p["done"] for p in progress)
+    assert events[-1]["result"]["counts"] == plain["counts"]
 
 
 def test_validate_resolves_uploads_and_hides_workspace_paths(client, ws):
@@ -207,7 +222,7 @@ def test_validate_resolves_uploads_and_hides_workspace_paths(client, ws):
     assert not res["ok"]
     # Network checks are off in these tests, and the note says so in the page's words.
     assert by_id["integrity.links"]["detail"] == "switched off on this server"
-    # The text report behind "Download validate file", with workspace paths hidden too.
+    # The text report behind "Download checks", with workspace paths hidden too.
     assert "file not found" not in res["report_text"]
     assert "title" in res["report_text"]
     assert ws not in res["report_text"]
@@ -283,9 +298,11 @@ def test_visitor_brings_their_own_api_key(tmp_path, monkeypatch, caplog):
         info = client.get("/api/info").json()
         assert info["ai"] is True and info["ai_provider"] is None
         ws = client.post("/api/workspaces").json()["id"]
+        # The AI checks only run on attached files.
+        client.post(f"/api/workspaces/{ws}/files", files=[("files", ("manuscript.pdf", b"%PDF-1.4", "application/pdf"))])
         res = client.post(
             f"/api/workspaces/{ws}/validate",
-            json={"text": _filled_template(), "ai": True},
+            json={"text": _filled_template(manuscript_file="manuscript.pdf"), "ai": True},
             headers={"X-LLM-Key": "sk-ant-visitor"},
         ).json()
     assert seen["api_key"] == "sk-ant-visitor"
@@ -348,8 +365,48 @@ def test_bundle_holds_the_sub_and_every_upload(client, ws):
     res = client.post(f"/api/workspaces/{ws}/bundle", json={"text": text})
     assert res.headers["content-type"] == "application/zip"
     with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
-        assert sorted(zf.namelist()) == ["biorxiv.sub", "manuscript.pdf"]
-        assert zf.read("biorxiv.sub").decode() == text
+        assert sorted(zf.namelist()) == ["biorxiv-submission/biorxiv.sub", "biorxiv-submission/manuscript.pdf"]
+        assert zf.read("biorxiv-submission/biorxiv.sub").decode() == text
+
+
+def test_bundle_puts_figures_in_a_folder_and_rewrites_the_sub(client, ws):
+    client.post(
+        f"/api/workspaces/{ws}/files",
+        files=[("files", (n, b"x", "application/octet-stream")) for n in ("manuscript.pdf", "fig1.png", "notes.txt")],
+    )
+    text = _filled_template(manuscript_file="some/dir/manuscript.pdf", figure_files="fig1.png | Figure 1")
+    res = client.post(f"/api/workspaces/{ws}/bundle", json={"text": text})
+    with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
+        names = sorted(zf.namelist())
+        sub = parse(zf.read("biorxiv-submission/biorxiv.sub").decode()).values
+    # Uploads the .sub does not name come along too.
+    assert names == [f"biorxiv-submission/{n}" for n in ("biorxiv.sub", "figures/fig1.png", "manuscript.pdf", "notes.txt")]
+    assert sub["manuscript_file"] == "manuscript.pdf"
+    assert sub["figure_files"].strip() == "figures/fig1.png | Figure 1"
+
+
+def test_bundle_sorts_by_upload_box_not_by_file_name(client, ws):
+    names = ("manuscript.pdf", "plot.png", "results.xlsx", "figure_legends.docx")
+    client.post(f"/api/workspaces/{ws}/files", files=[("files", (n, b"x", "application/octet-stream")) for n in names])
+    venue = get_venue("acl_arr")
+    text = render_template(
+        venue,
+        fill_defaults=True,
+        values={"manuscript_file": "manuscript.pdf", "figure_files": "plot.png", "table_files": "results.xlsx", "supplementary_files": "figure_legends.docx"},
+    )
+    res = client.post(f"/api/workspaces/{ws}/bundle", json={"text": text})
+    assert res.status_code == 200, res.text
+    folder = f"{Path(default_filename(venue)).stem}-submission"
+    with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
+        got = set(zf.namelist())
+    assert {f"{folder}/figures/plot.png", f"{folder}/tables/results.xlsx", f"{folder}/supplementary/figure_legends.docx"} <= got
+
+
+def test_bundle_refuses_when_a_named_file_is_missing(client, ws):
+    text = _filled_template(manuscript_file="manuscript.pdf", figure_files="fig9.png")
+    res = client.post(f"/api/workspaces/{ws}/bundle", json={"text": text})
+    assert res.status_code == 400
+    assert "manuscript.pdf" in res.json()["detail"] and "fig9.png" in res.json()["detail"]
 
 
 # --- subfile.js matches subfile.py -----------------------------------------
@@ -450,7 +507,7 @@ _LIVE_HARNESS = """
 const checks = require(process.argv[1]);
 const cases = JSON.parse(require('fs').readFileSync(0, 'utf8'));
 const out = cases.map(c => {
-  const res = checks.run(c.fields, c.values, c.rules);
+  const res = checks.run(c.fields, c.values, c.rules, c.opts);
   return Object.fromEntries(res.checks.map(k => [k.id, {status: k.status, issues: k.issues.map(i => [i.level, i.field, i.message])}]));
 });
 process.stdout.write(JSON.stringify(out));
@@ -486,6 +543,20 @@ def _live_cases():
                 long_values[f.id] = "no"
         long_values["keywords"] = ", ".join(f"kw{i}" for i in range(20))
         cases.append((venue, long_values))
+        # Values of the wrong type, for form.schema.
+        bad = {"not_a_field": "x"}
+        for f in venue.fields:
+            if f.type == "choice" and f.options and not f.options_recommended:
+                bad[f.id] = "Not an option"
+            elif f.type == "boolean":
+                bad[f.id] = "maybe"
+            elif f.type == "int":
+                bad[f.id] = "-5" if f.min_value is not None else "three"
+            elif f.type == "filelist" and f.type_options:
+                bad[f.id] = "a.pdf\nb.pdf | not a type"
+            elif f.type == "textarea" and not f.fields:
+                bad[f.id] = "Unknown > Subject"  # what a venue validator (Nature's subject tree) rejects
+        cases.append((venue, bad))
     return cases
 
 
@@ -531,13 +602,6 @@ def test_checks_js_matches_validate_py():
 
     payload, expected = [], []
     for venue, values in _live_cases():
-        payload.append(
-            {
-                "fields": [dataclasses.asdict(f) for f in venue.fields],
-                "values": values,
-                "rules": live_rules(venue, values),
-            }
-        )
         report = validate_report(
             SubFile(venue=venue.slug, values=values),
             venue,
@@ -546,6 +610,14 @@ def test_checks_js_matches_validate_py():
             check_openreview=False,
             check_sensitive=False,
             check_hidden_text=False,
+        )
+        payload.append(
+            {
+                "fields": [dataclasses.asdict(f) for f in venue.fields],
+                "values": values,
+                "rules": live_rules(venue, values),
+                "opts": {"venue": venue.slug, "serverIssues": venue_schema_issues(venue, report)},
+            }
         )
         got = {}
         for r in report.results:
@@ -726,7 +798,25 @@ def test_local_uploads_land_beside_the_manuscript_and_nothing_is_deleted(local_c
     assert c.delete("/api/workspaces/local/files/cover.pdf").status_code == 403
     assert c.delete("/api/workspaces/local").json() == {"deleted": False}
     assert (local.root / "paper" / "cover.pdf").is_file()
-    assert c.post("/api/workspaces/local/bundle", json={"text": local.sub_path.read_text()}).status_code == 400
+
+
+def test_local_bundle_packs_the_files_from_this_computer(local_client):
+    c, local = local_client
+    (local.root / "figs").mkdir()
+    (local.root / "figs" / "fig1.png").write_bytes(b"png")
+    text = replace_block(local.sub_path.read_text(), "figure_files", "figs/fig1.png")
+    res = c.post("/api/workspaces/local/bundle", json={"text": text})
+    assert res.status_code == 200, res.text
+    with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
+        assert sorted(zf.namelist()) == [f"biorxiv-submission/{n}" for n in ("biorxiv.sub", "figures/fig1.png", "manuscript.pdf")]
+        sub = parse(zf.read("biorxiv-submission/biorxiv.sub").decode()).values
+        assert zf.read("biorxiv-submission/manuscript.pdf") == (local.root / "paper" / "manuscript.pdf").read_bytes()
+    assert sub["manuscript_file"] == "manuscript.pdf" and sub["figure_files"].strip() == "figures/fig1.png"
+    # A path that is not on this computer is named, relative to where paperpush ran.
+    missing = replace_block(text, "figure_files", "figs/gone.png")
+    res = c.post("/api/workspaces/local/bundle", json={"text": missing})
+    assert res.status_code == 400 and "figs/gone.png" in res.json()["detail"]
+    assert str(local.root) not in res.json()["detail"]
 
 
 def test_local_ai_falls_back_to_the_environment_key(local_client, monkeypatch):

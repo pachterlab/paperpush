@@ -82,11 +82,36 @@ def test_every_check_gets_a_status(_use):
     _use({})
     rep = _report(_venue(TITLE), {})
     assert _result(rep, "form.required").status == report.FAILED
-    assert _result(rep, "integrity.links").status == report.UNCHECKED
-    assert "--dont-check-links" in _result(rep, "integrity.links").detail
-    assert _result(rep, "form.urls").status == report.NOT_APPLICABLE
-    assert _result(rep, "form.schema").status == report.PASSED
+    # Nothing filled in and no files: the checks that read them have nothing to look at.
+    for check_id in ("integrity.links", "integrity.dois", "form.urls", "form.schema"):
+        assert _result(rep, check_id).status == report.NOT_APPLICABLE, check_id
     assert not rep.ok
+
+
+def test_switched_off_file_checks_are_unchecked_when_files_exist(_use, tmp_path):
+    _use({})
+    manuscript = tmp_path / "manuscript.pdf"
+    manuscript.write_bytes(b"%PDF-1.4\n")
+    rep = _report(_venue(TITLE, MANUSCRIPT), {"title": "A title", "manuscript_file": str(manuscript)})
+    assert _result(rep, "form.schema").status == report.PASSED
+    for check_id in ("integrity.links", "integrity.dois"):
+        assert _result(rep, check_id).status == report.UNCHECKED, check_id
+    assert "--dont-check-links" in _result(rep, "integrity.links").detail
+
+
+def test_file_scans_not_applicable_without_attachments(_use):
+    _use({"testj": {"figures": {}}})
+    rep = _report(_venue(TITLE, MANUSCRIPT, FIGURES), {}, check_links=True, check_references=True, check_sensitive=True, check_hidden_text=True, check_anonymous=True)
+    for check_id in ("integrity.links", "integrity.dois", "integrity.sensitive", "integrity.hidden_text", "integrity.anonymity", "figures.lettering"):
+        assert _result(rep, check_id).status == report.NOT_APPLICABLE, check_id
+
+
+def test_ai_checks_not_applicable_without_attachments(_use):
+    _use({"testj": {"notes": ["Use Arial throughout."], "references": {"style": "Vancouver"}}})
+    rep = _report(_venue(TITLE, MANUSCRIPT), {})
+    assert rep.ai_tasks == []
+    for check_id in ("ai.notes.general", "ai.reference_format"):
+        assert _result(rep, check_id).status == report.NOT_APPLICABLE, check_id
 
 
 def test_validate_is_the_reports_flat_issue_list(_use):
@@ -142,7 +167,8 @@ def _sample_report() -> report.ValidationReport:
             report.CheckResult("d", "Judgement", "Cat", report.NEEDS_AI, detail="run with --ai"),
             report.CheckResult("e", "Rule", "Cat", report.NOT_IMPLEMENTED, detail="check by hand"),
             report.CheckResult("f", "Off", "Cat", report.UNCHECKED, detail="switched off"),
-            report.CheckResult("g", "Irrelevant", "Cat", report.NOT_APPLICABLE),
+            report.CheckResult("g", "Irrelevant", "Cat", report.NOT_APPLICABLE, detail="no such rule"),
+            report.CheckResult("h", "Also irrelevant", "Other", report.NOT_APPLICABLE),
         ],
     )
 
@@ -152,6 +178,8 @@ def test_text_and_markdown_list_every_section():
     text = report.to_text(rep)
     for marker in ("[PASS] [Cat] Passes", "[FAIL] [Cat] Breaks", "[WARN]", "[AI] [Cat] Judgement", "[TODO] [Cat] Rule", "[SKIP] [Cat] Off", "error: [title] title is required"):
         assert marker in text
+    # Not-applicable checks get a line each, without their reasons.
+    assert "  [NA] [Cat] Irrelevant\n  [NA] [Other] Also irrelevant\n" in text and "no such rule" not in text
     assert text.index("FAILED") < text.index("PASSED")
     md = report.to_markdown(rep)
     assert "## ✖ Failed (1)" in md and "## ✔ Passed (1)" in md
@@ -278,6 +306,40 @@ def test_cli_ai_without_a_key_says_so_and_still_reports(_use, tmp_path, monkeypa
     assert "AI checks could not run: no API key found" in out
 
 
+def test_cli_ai_only_reports_just_the_ai_checks(_use, tmp_path, monkeypatch, capsys):
+    pdf = _manuscript_with_notes(_use, tmp_path)
+    _cli_venue(monkeypatch, TITLE, MANUSCRIPT)
+    # An empty title would be a blocking error in a full run; --ai-only never checks it.
+    sub = _sub(tmp_path, f"manuscript_file: {pdf}\n")
+    tasks = tmp_path / "tasks.json"
+    assert main(["validate", str(sub), "--ai-only", "--ai-tasks", str(tasks)]) == 0
+    out = capsys.readouterr().out
+    assert "Title is required" not in out and "NEEDS AI" in out and "AI checks only (--ai-only)" in out
+    assert "--ai-only --ai-results" in out
+    assert "ai.notes.general" in {t["id"] for t in json.loads(tasks.read_text())["tasks"]}
+
+    results = tmp_path / "results.json"
+    results.write_text(json.dumps({"results": [{"id": "ai.notes.general", "status": "fail", "details": "pages are not numbered"}]}))
+    assert main(["validate", str(sub), "--ai-only", "--ai-results", str(results)]) == 0
+    out = capsys.readouterr().out
+    assert "pages are not numbered" in out and "Ran only the AI checks" in out
+
+
+def test_ai_only_drops_every_deterministic_result(_use, tmp_path):
+    pdf = _manuscript_with_notes(_use, tmp_path)
+    rep = _report(_venue(TITLE, MANUSCRIPT), {"manuscript_file": str(pdf)}, ai_only=True)
+    assert rep.ai_only and rep.results
+    assert {r.id for r in rep.results} == {t.id for t in rep.ai_tasks}
+    assert rep.to_dict()["ai_only"] is True
+
+
+def test_cli_ai_only_needs_the_manuscript_checks(_use, tmp_path, monkeypatch, capsys):
+    _use({})
+    _cli_venue(monkeypatch, TITLE)
+    assert main(["validate", str(_sub(tmp_path, "title: A study\n")), "--ai-only", "--dont-check-manuscript"]) == 1
+    assert "--ai-only cannot be combined with --dont-check-manuscript" in capsys.readouterr().err
+
+
 # ===========================================================================
 # AI tasks
 # ===========================================================================
@@ -333,6 +395,8 @@ def test_mcp_validate_returns_checks_and_ai_tasks(_use, tmp_path, monkeypatch):
     merged = mcp_server.validate_subfile(str(sub), check_links=False, check_references=False, ai_results=[{"id": "ai.notes.general", "status": "pass", "details": "ok"}])
     assert next(c for c in merged["checks"] if c["id"] == "ai.notes.general")["status"] == "passed"
     assert mcp_server.validation_ai_tasks(str(sub))["tasks"]
+    only = mcp_server.validate_subfile(str(sub), ai_only=True)
+    assert only["ai_only"] and {c["id"] for c in only["checks"]} == {t["id"] for t in only["ai_tasks"]}
 
 
 # ===========================================================================
@@ -821,3 +885,31 @@ def test_real_any_format_venues_carry_the_rule():
         assert r.any_format_initial_rule(slug), slug
     for slug in ("biorxiv", "arxiv", "science"):
         assert not r.any_format_initial_rule(slug), slug
+
+
+def test_progress_reports_every_stage_in_order_then_done():
+    events = []
+    _report(_venue(TITLE), {"title": "A paper"}, progress=lambda done, total, label: events.append((done, total, label)))
+    totals = {total for _, total, _ in events}
+    assert len(totals) == 1
+    total = totals.pop()
+    assert [done for done, _, _ in events] == list(range(total)) + [total]
+    labels = [label for _, _, label in events]
+    assert labels[0] == "Submission form"
+    assert labels[-2:] == ["AI checks", "done"]
+    # Switched-off checks are not stages.
+    assert "Links" not in labels and "Reference DOIs" not in labels
+
+
+def test_progress_callback_errors_do_not_break_validation():
+    def boom(*_):
+        raise RuntimeError("display broke")
+
+    rep = _report(_venue(TITLE), {"title": "A paper"}, progress=boom)
+    assert _result(rep, "form.required").status == report.PASSED
+
+
+def test_progress_in_ai_only_mode():
+    events = []
+    _report(_venue(TITLE), {"title": "A paper"}, ai_only=True, progress=lambda *e: events.append(e))
+    assert events[-1][0] == events[-1][1] and events[-1][2] == "done"

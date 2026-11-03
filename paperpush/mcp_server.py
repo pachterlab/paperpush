@@ -371,6 +371,7 @@ def validate_subfile(
     output: Optional[str] = None,
     alt_color: bool = False,
     initial_submission: bool = False,
+    ai_only: bool = False,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file and report every check.
 
@@ -417,7 +418,9 @@ def validate_subfile(
     `ai_tasks`: do each task yourself by reading the files it names, then call
     this tool again with `ai_results` = `[{"id", "status": "pass"|"fail"|
     "unclear"|"not_applicable", "details", "evidence"}]` to merge your verdicts
-    (or get the same list from `validation_ai_tasks`).
+    (or get the same list from `validation_ai_tasks`). `ai_only` reports just
+    those checks and skips the deterministic ones (the manuscript is still read
+    to find which apply; it cannot be combined with `check_manuscript=false`).
 
     `initial_submission` validates the file as an initial submission: every
     error comes back as a warning, so nothing blocks it. Use it when the venue
@@ -436,7 +439,7 @@ def validate_subfile(
 
     path, text, venue = _load_subfile(subfile, manuscript_dir)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
-    result = _run_validate_report(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, ai=ai, subfile_path=str(path))
+    result = _run_validate_report(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, ai=ai, subfile_path=str(path), ai_only=ai_only)
     out: dict[str, Any] = {
         "path": str(path),
         "venue": venue.slug,
@@ -444,6 +447,7 @@ def validate_subfile(
         "initial_submission_rule": result.initial_submission_rule,
         "initial_submission": result.initial_submission,
         "downgraded": result.downgraded,
+        "ai_only": result.ai_only,
         "errors": _issue_dicts(result.errors),
         "warnings": _issue_dicts(result.warnings),
         "counts": result.counts(),
@@ -762,8 +766,10 @@ def login(
 class SubmissionRun:
     """A detached ``paperpush submit`` process and the log it is writing."""
 
-    def __init__(self, process: subprocess.Popen, log_path: Path, log_file: IO[bytes], venue: str, subfile: Path):
+    def __init__(self, process: subprocess.Popen, log_path: Path, log_file: IO[bytes], venue: str, subfile: Path, recover_dir: Optional[Path] = None, cdp_port: Optional[int] = None):
         self.process = process
+        self.recover_dir = recover_dir
+        self.cdp_port = cdp_port
         self.log_path = log_path
         self.log_file = log_file
         self.venue = venue
@@ -781,7 +787,7 @@ class SubmissionRun:
             lines = self.log_path.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             lines = []
-        return {
+        report: dict[str, Any] = {
             "pid": self.pid,
             "venue": self.venue,
             "subfile": str(self.subfile),
@@ -791,6 +797,23 @@ class SubmissionRun:
             "log_path": str(self.log_path),
             "log_tail": lines[-LOG_TAIL_LINES:],
         }
+        if self.recover_dir is not None:
+            from .venues import recovery_channel
+
+            paused = recovery_channel.read_paused(self.recover_dir) if exit_code is None else None
+            report["recovery"] = {
+                "enabled": True,
+                "directory": str(self.recover_dir),
+                "paused": paused,
+                "resolved_so_far": recovery_channel.read_log(self.recover_dir),
+            }
+            if paused:
+                report["next_step"] = _PAUSED_NEXT_STEP
+        if self.cdp_port is not None:
+            from .venues.recovery_channel import cdp_endpoint
+
+            report["cdp_endpoint"] = cdp_endpoint(self.cdp_port)
+        return report
 
 
 def _submit_log_path(venue: str) -> Path:
@@ -814,12 +837,61 @@ def _reap_finished_runs() -> None:
             del _RUNS[pid]
 
 
+_PAUSED_NEXT_STEP = (
+    "A step failed and the run is paused in its browser, waiting for you. Call submit_page to see "
+    "the page (accessibility snapshot plus a screenshot path) and what the script was trying to do. "
+    "Then use submit_act to make the page look the way that step should have left it (click, fill, "
+    "select, check, upload a .sub file). Finally call submit_resume with 'resolved' if the step is "
+    "now done, 'retry' to have the script try it again, or 'abort' to stop. Never try to send the "
+    "submission; it is refused, and that step is the author's."
+)
+
+
+def _supports_recovery(base_slug: str) -> bool:
+    """Whether the venue's runner can pause and resume on a failed step."""
+    try:
+        return bool(getattr(venues_pkg.get_venue_impl(base_slug), "supports_recovery", False))
+    except (KeyError, ImportError):
+        return False
+
+
+def _submit_run_dir(venue: str) -> Path:
+    """A fresh recovery directory for one submission run."""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    directory = credentials.config_dir() / "submit-runs" / f"{venue}-{stamp}"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def _paused_run(pid: int) -> "SubmissionRun":
+    run = _RUNS.get(pid)
+    if run is None:
+        raise ValueError(f"no submission with pid {pid} was started by this server; " f"known pids: {sorted(_RUNS) or 'none'}")
+    if run.recover_dir is None:
+        raise ValueError(f"submission {pid} was started without recovery, so it cannot be paused or resumed")
+    exit_code = run.process.poll()
+    if exit_code is not None:
+        raise ValueError(f"submission {pid} has already exited (code {exit_code})")
+    return run
+
+
+def _send(run: "SubmissionRun", command: dict[str, Any]) -> dict[str, Any]:
+    from .venues import recovery_channel
+
+    try:
+        return recovery_channel.send_command(run.recover_dir, command, is_alive=lambda: run.process.poll() is None)
+    except recovery_channel.ChannelError as exc:
+        raise ValueError(f"submission {run.pid}: {exc}") from None
+
+
 def submit(
     subfile: str,
     manuscript_dir: Optional[str] = None,
     headless: bool = False,
     new_session: bool = False,
     close_on_failure: bool = False,
+    recover: bool = True,
+    expose_cdp: bool = False,
 ) -> dict[str, Any]:
     """Open the venue's portal and fill in the submission form from a `.sub` file.
 
@@ -848,6 +920,18 @@ def submit(
     the saved browser session and signs in fresh, for use after switching
     accounts. `close_on_failure` shuts the browser if the run breaks partway;
     the default leaves it open at the step that failed so the page can be read.
+
+    `recover` (default on, for venues whose runner supports it) pauses the run
+    when one step fails instead of failing it. `submit_status` then reports
+    `recovery.paused` with what failed. Look at the page with `submit_page`,
+    fix it with `submit_act`, and continue with `submit_resume`. The paused run
+    waits 30 minutes for that, then fails as it would without `recover`.
+
+    `expose_cdp` also opens a Chrome DevTools Protocol endpoint on 127.0.0.1
+    (reported as `cdp_endpoint`), so a client with a shell can attach with
+    `playwright-cli attach --cdp=<endpoint>`. Leave it off unless that is
+    needed: anything on the machine can then drive the signed-in browser, and
+    the guardrails `submit_act` enforces do not apply there.
     """
     path, _, venue = _load_subfile(subfile, manuscript_dir)
 
@@ -880,6 +964,17 @@ def submit(
         }
 
     command = _paperpush_command("submit", str(path))
+    recover_dir: Optional[Path] = None
+    cdp_port: Optional[int] = None
+    if (recover or expose_cdp) and _supports_recovery(base):
+        if recover:
+            recover_dir = _submit_run_dir(venue.slug)
+            command += ["--recover", "agent", "--recover-dir", str(recover_dir)]
+        if expose_cdp:
+            from .venues.recovery_channel import free_port
+
+            cdp_port = free_port()
+            command += ["--cdp-port", str(cdp_port)]
     if headless:
         command.append("--headless")
     if new_session:
@@ -910,7 +1005,7 @@ def submit(
         log_file.close()
         raise ValueError(f"could not start the submission: {exc}") from exc
 
-    run = SubmissionRun(process, log_path, log_file, venue.slug, path)
+    run = SubmissionRun(process, log_path, log_file, venue.slug, path, recover_dir=recover_dir, cdp_port=cdp_port)
     _RUNS[run.pid] = run
     logger.info("submit: launched %s for %s as pid %d (log: %s)", venue.slug, path, run.pid, log_path)
 
@@ -921,7 +1016,9 @@ def submit(
         "subfile": str(path),
         "log_path": str(log_path),
         "headless": headless,
-        "next_step": ("The browser is opening and the wizard will fill itself in from the .sub file. " "Poll submit_status for progress. It stops before the final submit -- tell the " "user to review the form in the browser and click submit themselves, then call " "submit_close to shut the browser."),
+        "recovery": recover_dir is not None,
+        **({"cdp_endpoint": f"http://127.0.0.1:{cdp_port}"} if cdp_port is not None else {}),
+        "next_step": ("The browser is opening and the wizard will fill itself in from the .sub file. " "Poll submit_status for progress. If it reports recovery.paused, a step failed: " "inspect it with submit_page, fix it with submit_act, then call submit_resume. " "It stops before the final submit -- tell the " "user to review the form in the browser and click submit themselves, then call " "submit_close to shut the browser."),
     }
 
 
@@ -981,6 +1078,70 @@ def submit_close(pid: int) -> dict[str, Any]:
     return snapshot
 
 
+def submit_page(pid: int) -> dict[str, Any]:
+    """Look at the page a paused submission is stuck on.
+
+    Returns the URL, the step label, what the script was trying to do and the
+    error it got (`failure`), an accessibility snapshot of the page
+    (`aria_snapshot`, roles and accessible names, which are what `submit_act`
+    targets), and the path of a fresh screenshot to view.
+
+    Only works while `submit_status` reports `recovery.paused`.
+    """
+    return _send(_paused_run(pid), {"op": "snapshot"})
+
+
+def submit_act(
+    pid: int,
+    action: Literal["click", "fill", "select", "check", "uncheck", "press", "upload", "wait"],
+    target: Optional[dict[str, Any]] = None,
+    value: Optional[str] = None,
+) -> dict[str, Any]:
+    """Do one thing on the page of a paused submission.
+
+    `target` picks the element and names exactly one of:
+    `{"role": "button", "name": "Save / Continue"}` (optionally `"exact": true`),
+    `{"label": "First Name"}`, `{"text": "No, I don't have funding"}`,
+    `{"placeholder": "..."}`, or `{"css": "#reuse_cc_by"}`. Add `"nth": 0` when
+    several elements match.
+
+    `value` is the text for `fill`, the option label (or value) for `select`, the
+    key for `press` (e.g. `Tab`, `Escape`), an absolute file path for `upload`,
+    or milliseconds for `wait` (no target; at most 10000).
+
+    Refused: anything whose label reads as the final submit (`Submit`,
+    `Approve`, ...), pressing Enter, and uploading a file the `.sub` does not
+    name. The reply has `ok` and, on failure, `error`. Call `submit_page` again
+    to see the result.
+    """
+    command: dict[str, Any] = {"op": action}
+    if target is not None:
+        command["target"] = target
+    if value is not None:
+        command["value"] = value
+    if action != "wait" and target is None:
+        raise ValueError(f"{action} needs a target")
+    return _send(_paused_run(pid), command)
+
+
+def submit_resume(pid: int, resolution: Literal["resolved", "retry", "abort"], note: str = "") -> dict[str, Any]:
+    """Let a paused submission carry on.
+
+    - `resolved`: the page is now in the state the failed step should have left
+      it in, so the script skips that step and goes on with the next one.
+    - `retry`: the obstacle is gone (a dialog closed, a slow page loaded); run
+      the failed step again.
+    - `abort`: give up. The run fails as it would without recovery, with the
+      browser left open at that page.
+
+    `note` says what was wrong and what fixed it, e.g. "button renamed to
+    'Next'". It is saved with the run's recovery log so the venue script can be
+    fixed later.
+    """
+    reply = _send(_paused_run(pid), {"op": "resume", "resolution": resolution, "note": note})
+    return {**reply, "pid": pid, "next_step": "Poll submit_status: the run continues, and may pause again at a later step."}
+
+
 # ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
@@ -1013,6 +1174,9 @@ TOOLS = (
     login,
     submit,
     submit_status,
+    submit_page,
+    submit_act,
+    submit_resume,
     submit_close,
 )
 
@@ -1054,7 +1218,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; call submit_close when the " "author says they are done. It needs a .sub file that passes validation and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. It needs a .sub file that passes validation and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
     )
     for tool in TOOLS:
         server.tool()(tool)

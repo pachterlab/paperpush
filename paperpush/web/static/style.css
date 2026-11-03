@@ -235,6 +235,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-weak
   box-shadow: 0 3px 10px var(--shadow);
 }
 .btn-small { padding: 4px 10px; font-size: 13px; }
+.btn-two-line { display: inline-block; text-align: center; line-height: 1.25; padding: 6px 14px; }
 .link { border: 0; background: none; padding: 0; font: inherit; color: var(--accent); cursor: pointer; text-decoration: underline; }
 
 /* ---- venue combobox */
@@ -394,15 +395,13 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
   background: transparent; color: var(--text);
 }
 .tcell textarea::placeholder { color: var(--muted); opacity: 0.6; }
-.tedit.editing .tcell textarea { border-color: var(--border); background: var(--input-bg); }
-.tedit.editing .tcell textarea:focus { border-color: var(--accent); outline: 2px solid var(--accent-weak); }
+.tedit .tcell textarea { border-color: var(--border); background: var(--input-bg); }
+.tedit .tcell textarea:focus { border-color: var(--accent); outline: 2px solid var(--accent-weak); }
 .card.review .tcell textarea { background: var(--review-input-bg); }
 .tedit .tbool { text-align: center; padding-top: 6px; }
-.tedit .tbool input { display: none; }
-.tedit.editing .tbool input { display: inline-block; margin-top: 4px; }
-.tedit.editing .tbool .pill { display: none; }
+.tedit .tbool input { display: inline-block; margin-top: 4px; }
+.tedit .tbool .pill { display: none; }
 .tedit .tdel { width: 1%; padding-left: 4px; }
-.tedit:not(.editing) .tdel .icon-btn { visibility: hidden; }
 .tedit .tdel .icon-btn { min-width: 26px; height: 26px; margin-top: 2px; }
 .tedit > .btn { margin-top: 8px; }
 .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; }
@@ -457,6 +456,16 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .check-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 4px 0 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 #checks-panel { margin-top: 28px; padding: 0; background: none; border: 0; scroll-margin-top: calc(var(--topbar-h) + 12px); }
 #checks-panel .checks-head h2 { font-size: 17px; }
+/* The .sub file and the checks fold away: the summary is the heading row. */
+#sub-text-panel, #checks-panel { scroll-margin-top: calc(var(--topbar-h) + 12px); }
+#sub-text-panel { margin-top: 28px; }
+#sub-text-panel > summary, #checks-panel > summary { cursor: pointer; list-style: none; }
+#sub-text-panel > summary::-webkit-details-marker, #checks-panel > summary::-webkit-details-marker { display: none; }
+#sub-text-panel > summary h2, #checks-panel > summary h2 { display: inline-flex; gap: 8px; align-items: baseline; margin: 0; font-size: 17px; }
+#sub-text-panel > summary h2::before, #checks-panel > summary h2::before { content: "▸"; color: var(--muted); font-size: 14px; }
+#sub-text-panel[open] > summary h2::before, #checks-panel[open] > summary h2::before { content: "▾"; }
+#sub-text-panel[open] > summary { margin-bottom: 10px; }
+#checks-panel:not([open]) > summary { margin-bottom: 0; }
 #validate-status.err { color: var(--st-failed); }
 .verdict { margin: 0 0 12px; padding: 10px 12px; border-radius: 6px; font-weight: 600; }
 .verdict.ok { background: var(--st-passed-bg); color: var(--st-passed); }
@@ -468,6 +477,8 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .initial-notice b { color: var(--st-warning); }
 .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -2px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.validate-progress { width: 180px; max-width: 45%; height: 8px; vertical-align: middle; margin-right: 8px; accent-color: var(--accent, currentColor); }
+.validate-progress-label { vertical-align: middle; }
 
 /* ---- bottom actions, dialog, toast */
 .final-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; padding: 18px 0 0; border-top: 1px solid var(--border); }
@@ -480,6 +491,17 @@ dialog { background: var(--panel); }
 .dialog-inner li { margin-bottom: 12px; line-height: 1.5; }
 .cmd { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
 .cmd code { flex: 1; padding: 6px 9px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; overflow-x: auto; white-space: nowrap; }
+.cmd code.wrap { white-space: normal; overflow-wrap: anywhere; }
+#portal-body .portal-tabs { display: inline-flex; gap: 2px; padding: 3px; margin: 12px 0 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+#portal-body .portal-download + .portal-tabs { margin-top: 14px; }
+#portal-body .portal-tabs:first-child { margin-top: 0; }
+#portal-body .portal-tab { font: inherit; font-size: 13px; padding: 5px 14px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+#portal-body .portal-tab:hover { color: inherit; }
+#portal-body .portal-tab.active { background: var(--border); color: inherit; font-weight: 600; }
+#portal-body .portal-panel > p:first-child { margin-top: 0; }
+#portal-body .portal-panel > ol { margin-top: 0; }
+#portal-body .portal-download { margin-bottom: 4px; }
+#portal-body .portal-download p { margin: 0 0 4px; }
 .dialog-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 .toast {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 50; max-width: calc(100% - 32px);
@@ -492,7 +514,7 @@ dialog { background: var(--panel); }
   .layout.with-nav main { padding: 20px 16px 64px; }
   .sidenav { display: none; }
 }
-/* Save as PDF prints the page. viewer.js gets it ready first (light
+/* Printing the page (the browser's own Print). viewer.js gets it ready first (light
    colours, every section open, text boxes as tall as their text). */
 @media print {
   body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

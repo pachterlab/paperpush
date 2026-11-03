@@ -71,7 +71,7 @@ environment.) Everything else in this document maps to a tool too —
 `list_supported_venues`, `describe_venue` for the schema, `field_options`,
 `create_subfile`, `read_subfile`, `autofill_subfile` (same `values.json` shape,
 passed as the `values` argument), `validate_subfile`, `submit`, `submit_status`,
-and `submit_close`. Pass **absolute paths**: the server has its own working
+`submit_page`, `submit_act`, `submit_resume`, and `submit_close`. Pass **absolute paths**: the server has its own working
 directory, so a relative path means something different to it than it does to
 you.
 
@@ -82,6 +82,32 @@ for progress, tell the user to review and send the form themselves, and call
 `submit_close` when they say they are done. It refuses to open a browser at all
 unless the `.sub` validates and, when the portal requires authentication, the
 venue already has a stored login — so run the login check above first.
+
+**When a step fails, the run pauses for you instead of failing** (on every venue
+with a submission runner; sign-in is never part of it). `submit_status` then
+reports `recovery.paused` with what the script was trying to do, the step
+it was on, and the error. Then:
+
+1. `submit_page(pid)`: the page's accessibility snapshot plus a screenshot path.
+2. `submit_act(pid, action, target, value)`: click, fill, select, check,
+   upload, and so on, to make the page look the way the failed step should have
+   left it. Target elements by role and name (`{"role": "button", "name":
+   "Next"}`), by label, by text, or by CSS.
+3. `submit_resume(pid, "resolved" | "retry" | "abort", note)`. `resolved`
+   means the step is done and the script moves on to its next line, `retry`
+   runs the step again, and `abort` fails the run. Say in `note` what had
+   changed, because it is logged so the venue script can be fixed.
+
+You cannot send the submission this way: clicks on `Submit` / `Approve`
+controls, Enter key presses, and uploads of files the `.sub` does not name are
+refused. A paused run you never resume gives up after 30 minutes. Pass
+`expose_cdp=True` to `submit` only if you need to drive the browser with
+another tool (`playwright-cli attach --cdp=<cdp_endpoint>`). That endpoint
+bypasses these guardrails, so never use it to send the submission.
+
+Don't add `paperpush submit --ai` yourself. It pays for an LLM API to do the
+recovery that you can do through the tools above, so use it only if the user has
+an API key set and asked for it, the same rule as `autofill --engine api`.
 
 ## Run the full pipeline, autofilling yourself
 
@@ -231,7 +257,8 @@ API key:
    lettering size as a fraction of the image width; measure against it.
 3. Write `{"results": [{"id", "status", "details", "evidence"}]}` and run
    `paperpush validate <abs .sub> --ai-results <that file>` (MCP:
-   `validate_subfile(ai_results=[...])`).
+   `validate_subfile(ai_results=[...])`). Add `--ai-only` (MCP:
+   `ai_only=True`) to report just the AI checks, e.g. when re-checking them.
 
 An AI `fail` is a warning, never a blocking error; do not mark a task `pass`
 you could not verify. With an API key, `paperpush validate --ai` does the same

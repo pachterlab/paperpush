@@ -414,7 +414,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         if not applies:
             checks.record(check_id, title, FIGURES, NOT_APPLICABLE, detail=reason)
         elif not inv.figures:
-            checks.record(check_id, title, FIGURES, NOT_APPLICABLE if "no figure files attached and no figures" in inv.why_empty else UNCHECKED, detail=inv.why_empty)
+            checks.record(check_id, title, FIGURES, NOT_APPLICABLE if inv.why_empty.startswith(("no figure files attached and no figures", "no figure files and no manuscript")) else UNCHECKED, detail=inv.why_empty)
         else:
             checks.run(check_id, title, FIGURES, fn, *args)
 

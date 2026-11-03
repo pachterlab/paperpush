@@ -80,6 +80,11 @@
     live: { checks: [], byField: {} },
     results: null, // /validate response
     resultsStale: false,
+    // A file was removed or replaced since the last validation: the checks
+    // that read files (the validate and AI blocks) go back to grey. Adding a
+    // file leaves them as they were (out of date): they still describe the
+    // files that are still there.
+    filesChanged: false,
     initialSubmission: false, // "initial submission (any format)" ticked: errors become warnings
     touched: false, // the author has changed something: colour the live checks
     showRequired: false, // flag empty required fields (after the first Validate)
@@ -128,6 +133,34 @@
   const getJSON = async (path) => (await api(path)).json();
   const postJSON = async (path, body, headers = {}) =>
     (await api(path, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) })).json();
+
+  // POST `body` with `stream: true` and read the NDJSON answer: call
+  // `onProgress` for each {"progress"} line and resolve with the {"result"}.
+  async function postStream(path, body, headers = {}, onProgress = () => {}) {
+    const res = await api(path, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify({ ...body, stream: true }) });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let result = null;
+    const handle = (line) => {
+      if (!line.trim()) return;
+      const event = JSON.parse(line);
+      if (event.progress) onProgress(event.progress);
+      else if (event.error) throw new Error(event.error);
+      else if ("result" in event) result = event.result;
+    };
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      lines.forEach(handle);
+    }
+    handle(buffer + decoder.decode());
+    if (result === null) throw new Error("The server stopped before validation finished. Try again.");
+    return result;
+  }
 
   function llmHeaders() {
     if (!state.llm.key) return {};
@@ -230,17 +263,6 @@
     const alt = store.get("palette") === "alt";
     document.documentElement.dataset.palette = alt ? "alt" : "default";
     $("#opt-colorblind").checked = alt;
-    const showText = store.get("subtext") === "1";
-    $("#sub-text-panel").hidden = !showText;
-    $("#show-sub").textContent = showText ? "Hide .sub file" : "Show .sub file";
-    $("#show-sub").setAttribute("aria-expanded", String(showText));
-  }
-
-  function toggleSubText() {
-    const show = $("#sub-text-panel").hidden;
-    store.set("subtext", show ? "1" : "0");
-    applySettings();
-    if (show) $("#sub-text-panel").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function wireSettings() {
@@ -372,6 +394,7 @@
       requirements: venue.manuscript_requirements,
       results: null,
       resultsStale: false,
+      filesChanged: false,
       initialSubmission: false,
       touched: false,
       showRequired: false,
@@ -459,6 +482,7 @@
       const listed = new Set(res.files.map((f) => f.name));
       state.files = [...res.files, ...state.files.filter((f) => !listed.has(f.name))];
       refreshFileWidgets();
+      noteReplacedUploads(res.saved);
       toast(`Uploaded ${res.saved.join(", ")}`);
       return res.saved;
     } catch (err) {
@@ -604,6 +628,7 @@
     state.text = next;
     state.touched = true;
     if (state.results) state.resultsStale = true;
+    if (state.results && fileRemoved(before, Subfile.parse(next).values)) state.filesChanged = true;
     if (state.local) saveLocal();
     else if (state.shared) schedulePush();
     else store.set(`draft:${state.venue.slug}`, next);
@@ -612,9 +637,36 @@
     const after = Subfile.parse(next).values;
     // The manuscript box and file pickers follow the text too.
     if (state.venue.manuscript_field && before[state.venue.manuscript_field] !== after[state.venue.manuscript_field]) renderManuscript();
+    // arXiv's category dropdown lists only the chosen archive's categories.
+    if (before.primary_archive !== after.primary_archive) state.widgets.get("primary_category")?.set(after.primary_category ?? "");
     runLive();
     renderChecks();
     schedulePlan();
+  }
+
+  // The paths a file or filelist value names (a filelist line is 'path | type | ...').
+  const filePaths = (value) => String(value ?? "").split("\n").map((l) => l.split("|")[0].trim()).filter(Boolean);
+  const fileFields = () => (state.venue ? state.venue.fields.filter((f) => f.type === "file" || f.type === "filelist") : []);
+
+  // Did a file field lose a path (removed, or replaced by another file)?
+  function fileRemoved(before, after) {
+    return fileFields().some((f) => {
+      const kept = new Set(filePaths(after[f.id]));
+      return filePaths(before[f.id]).some((p) => !kept.has(p));
+    });
+  }
+
+  // An upload under a name the form already uses replaces that file's
+  // contents without changing the text, so setText never sees it.
+  function noteReplacedUploads(saved) {
+    if (!state.results || !saved.length) return;
+    const vals = values();
+    const used = new Set(fileFields().flatMap((f) => filePaths(vals[f.id])));
+    if (!saved.some((n) => used.has(n))) return;
+    state.resultsStale = true;
+    state.filesChanged = true;
+    renderFieldIssues();
+    renderChecks();
   }
 
   // Write the text back to the local .sub file (--web), a moment after the last edit.
@@ -939,11 +991,15 @@
     switch (f.type) {
       case "boolean": return booleanWidget(f, id);
       case "choice": return f.options && f.options.length ? choiceWidget(f, id) : textWidget(f, id);
-      case "multichoice": return f.options && f.options.length ? multiWidget(f, id) : tagWidget(f, id);
+      case "multichoice":
+        if (!f.options || !f.options.length) return tagWidget(f, id);
+        return isCoded(f) ? codeMultiWidget(f, id) : multiWidget(f, id);
       case "file": return fileWidget(f, id);
       case "filelist": return fileListWidget(f, id);
       case "int": return textWidget(f, id, "number");
-      case "text": return /keyword/i.test(f.id) ? tagWidget(f, id) : textWidget(f, id);
+      case "text":
+        if (f.options && f.options.length) return codeChoiceWidget(f, id);
+        return /keyword/i.test(f.id) ? tagWidget(f, id) : textWidget(f, id);
       case "textarea":
       case "authorlist": return textareaWidget(f, id);
       default: return textWidget(f, id);
@@ -1016,6 +1072,92 @@
         const val = /^(yes|y|true|1|on)$/.test(t) ? "yes" : /^(no|n|false|0|off)$/.test(t) ? "no" : "";
         opts.forEach(([r]) => (r.checked = r.value === val));
       },
+    };
+  }
+
+  // A text field backed by a vocabulary of "code (Label)" entries (arXiv's
+  // primary_category): a dropdown that shows the label but stores the bare code,
+  // grouped by archive and narrowed to the chosen primary_archive when set.
+  const CODED = /^(\S+) \((.+)\)$/;
+  const isCoded = (f) => f.options.every((o) => CODED.test(o.trim()));
+  const codeOf = (v) => { const m = v.trim().match(CODED); return m ? m[1] : v.trim(); };
+  function codedEntries(f) {
+    return f.options.map((o) => {
+      const code = codeOf(o);
+      return { code, text: o, group: code.split(".")[0] };
+    });
+  }
+  function groupedOptions(entries) {
+    const groups = new Map();
+    entries.forEach((e) => { if (!groups.has(e.group)) groups.set(e.group, []); groups.get(e.group).push(e); });
+    return [...groups].map(([g, list]) => el("optgroup", { label: g }, list.map((e) => el("option", { value: e.code, text: e.text }))));
+  }
+
+  function codeChoiceWidget(f, id) {
+    const entries = codedEntries(f);
+    const select = el("select", { id, class: "input" });
+    const fill = (current) => {
+      const archive = (values().primary_archive || "").trim();
+      const shown = archive && entries.some((e) => e.group === archive) ? entries.filter((e) => e.group === archive) : entries;
+      select.replaceChildren(el("option", { value: "", text: "Choose…" }));
+      if (current && !entries.some((e) => e.code === current)) select.append(el("option", { value: current, text: `${current} (not an option)` }));
+      else if (current && !shown.some((e) => e.code === current)) select.append(el("option", { value: current, text: `${current} (not in ${archive})` }));
+      select.append(...groupedOptions(shown));
+      select.value = current;
+    };
+    select.addEventListener("change", () => onWidgetChange(f, select.value));
+    select.addEventListener("blur", () => markTouched(f.id));
+    fill("");
+    return { node: select, set(v) { fill(v.trim()); } };
+  }
+
+  // A multichoice over "code (Label)" options (arXiv's crosslist_categories):
+  // pick from a grouped dropdown to add a chip; the .sub stores the bare codes.
+  // arXiv pairs each cross-list category with the archive at the same position
+  // in crosslist_archives, so that field is rewritten to match (each code's
+  // prefix: "q-bio.GN" -> "q-bio").
+  function codeMultiWidget(f, id) {
+    const entries = codedEntries(f);
+    const byCode = new Map(entries.map((e) => [e.code, e]));
+    const pairedId = f.id === "crosslist_categories" ? "crosslist_archives" : null;
+    let selected = [];
+    const chips = el("div", { class: "chips" });
+    const select = el("select", { id, class: "input" });
+    const counter = counterFor(f);
+    const emit = () => {
+      const v = selected.join(", ");
+      counter.update(v);
+      const paired = pairedId && state.venue.fields.find((x) => x.id === pairedId);
+      if (paired) {
+        state.review.delete(f.id);
+        state.widgets.get(f.id)?.card?.classList.remove("review");
+        const archives = selected.map((c) => c.split(".")[0]).join(", ");
+        setText(Subfile.setField(Subfile.setField(state.text, f, v), paired, archives));
+        state.widgets.get(pairedId)?.set(archives);
+      } else onWidgetChange(f, v);
+    };
+    const render = () => {
+      chips.replaceChildren(...selected.map((c) => {
+        const known = byCode.has(c) || f.options.includes(c);
+        return el("span", { class: `chip ${known ? "" : "warn"}`, title: byCode.get(c)?.text || "not an option" }, byCode.get(c)?.text || c,
+          el("button", { type: "button", "aria-label": `Remove ${c}`, onclick: () => { selected = selected.filter((x) => x !== c); render(); emit(); } }, "×"));
+      }));
+      select.replaceChildren(el("option", { value: "", text: selected.length ? "Add another category…" : "Add a category…" }),
+        ...groupedOptions(entries.filter((e) => !selected.includes(e.code))));
+      select.value = "";
+    };
+    select.addEventListener("change", () => {
+      if (!select.value) return;
+      selected = [...selected, select.value];
+      render();
+      emit();
+    });
+    select.addEventListener("blur", () => markTouched(f.id));
+    render();
+    return {
+      node: el("div", { class: "multi" }, chips, select),
+      counter,
+      set(v) { selected = [...new Set(v.split(",").map(codeOf).filter(Boolean))]; counter.update(v); render(); },
     };
   }
 
@@ -1288,9 +1430,8 @@
   const BOOL_COLUMNS = new Set(["corresponding", "first_author", "contributed_equally", "submitter"]);
 
   // Authors, reviewers, funders: a table that reads like the saved report
-  // (columns as wide as their longest word, long values wrapping). Click into
-  // it and every cell turns into a text box that wraps the same way; click
-  // away and it is a table again. Each cell is a textarea laid over an
+  // (columns as wide as their longest word, long values wrapping). Every cell
+  // is an always-visible text box that wraps the same way. Each cell is a textarea laid over an
   // invisible copy of its text, so the copy sets the column widths and row
   // heights and the box always matches them.
   // `opts.fields` overrides the columns, `opts.onChange` replaces saving the
@@ -1340,7 +1481,7 @@
     const render = () => {
       const head = el("thead", {}, el("tr", {},
         el("th", { class: "num", text: "#" }),
-        cols.map((c) => el("th", { text: label(c) + (c.optional ? "" : " *") })),
+        cols.map((c) => el("th", { text: label(c) + (c.optional ? "" : "\u00a0*") })),
         el("th", { class: "tdel" })));
       const body = el("tbody", {}, rows.map((r, ri) =>
         el("tr", {},
@@ -1351,19 +1492,15 @@
       const add = el("button", { type: "button", class: "btn btn-small", onclick: () => {
         rows.push(cols.map((c) => (BOOL_COLUMNS.has(c.name) && !c.optional ? "no" : "")));
         render();
-        wrap.classList.add("editing");
         wrap.querySelector("tbody tr:last-child textarea")?.focus();
       } }, opts.addLabel || (f.type === "authorlist" ? "+ Add author" : "+ Add row"));
       wrap.replaceChildren(el("div", { class: "tscroll" }, el("table", {}, head, body)), add);
     };
-    // Editing while focus (or the pointer's last press) is inside the table.
-    wrap.addEventListener("pointerdown", () => wrap.classList.add("editing"));
-    wrap.addEventListener("focusin", () => wrap.classList.add("editing"));
+    // Mark the field touched once focus leaves the table.
     wrap.addEventListener("focusout", (e) => {
       if (e.relatedTarget && wrap.contains(e.relatedTarget)) return;
-      setTimeout(() => { if (!wrap.contains(document.activeElement)) { wrap.classList.remove("editing"); markTouched(f.id); } }, 0);
+      setTimeout(() => { if (!wrap.contains(document.activeElement)) markTouched(f.id); }, 0);
     });
-    document.addEventListener("pointerdown", (e) => { if (!wrap.contains(e.target) && !wrap.contains(document.activeElement)) wrap.classList.remove("editing"); });
     render();
     return {
       node: wrap,
@@ -1457,7 +1594,7 @@
   }
 
   function runLive() {
-    const live = LiveChecks.run(state.venue.fields, values(), state.liveRules);
+    const live = LiveChecks.run(state.venue.fields, values(), state.liveRules, { venue: state.venue.slug, serverIssues: state.plan?.schema_issues });
     state.live = state.initialSubmission ? asInitialSubmission(live) : live;
     renderFieldIssues();
   }
@@ -1596,7 +1733,9 @@
       statsRow.hidden = true;
       return;
     }
-    const c = r.counts;
+    // Once a file is removed or replaced, the last validation's tally no
+    // longer describes the files: show none until Validate runs again.
+    const c = state.filesChanged ? { passed: 0, failed: 0, warning: 0, needs_ai: 0 } : r.counts;
     const ran = c.passed + c.failed + c.warning;
     $("#stat-checks").textContent = `${c.passed}/${ran}`;
     $("#stat-checks-label").textContent = state.resultsStale ? "checks passed (out of date)" : "checks passed";
@@ -1629,7 +1768,9 @@
     if (group === "live") {
       return state.live.checks.map((c) => ({ ...c, group, applicable: c.status !== "not_applicable", status: !state.touched && c.status !== "not_applicable" ? "pending" : c.status }));
     }
-    const results = new Map((state.results?.checks || []).map((c) => [c.id, c]));
+    // Results that read files no longer describe the files in the form.
+    const ignored = state.filesChanged && (group === "validate" || group === "ai");
+    const results = new Map(ignored ? [] : (state.results?.checks || []).map((c) => [c.id, c]));
     const plan = state.plan ? state.plan.checks : [];
     const ids = new Set();
     const out = [];
@@ -1641,7 +1782,7 @@
       else out.push({ ...p, status: p.applicable ? (group === "manual" ? "not_implemented" : "pending") : "not_applicable" });
     }
     // Checks a validation added that the plan did not foresee (AI tasks queued once files were read).
-    for (const r of state.results?.checks || []) if (r.group === group && !ids.has(r.id)) out.push(r);
+    if (!ignored) for (const r of state.results?.checks || []) if (r.group === group && !ids.has(r.id)) out.push(r);
     return out;
   }
 
@@ -1676,7 +1817,9 @@
     }
     if ($("#toc").children.length) renderCheckStatus();
     if (state.results && state.resultsStale) {
-      root.append(el("p", { class: "hint", text: "You have changed the form since the last validation. Validate again to refresh these results." }));
+      root.append(el("p", { class: "hint", text: state.filesChanged
+        ? "You have removed or replaced a file since the last validation, so the checks that read files are grey again. Validate again to refresh them."
+        : "You have changed the form since the last validation. Validate again to refresh these results." }));
     } else if (state.results) {
       const ok = state.results.ok;
       const errors = state.results.checks.filter((c) => c.status === "failed").length;
@@ -1724,6 +1867,7 @@
       const plan = await postJSON(`/api/workspaces/${state.ws}/plan`, { text: state.text });
       if (seq !== planSeq || plan.venue !== state.venue.slug) return;
       const rulesChanged = JSON.stringify(plan.live_rules) !== JSON.stringify(state.liveRules);
+      const schemaChanged = JSON.stringify(plan.schema_issues || []) !== JSON.stringify(state.plan?.schema_issues || []);
       state.plan = plan;
       state.liveRules = plan.live_rules || {};
       if (plan.requirements) state.requirements = plan.requirements;
@@ -1731,8 +1875,8 @@
       if (rulesChanged) {
         for (const fid of state.widgets.keys()) updateLimits(fid);
         syncWidgets(); // redraws the counters against the new limits
-        runLive();
       }
+      if (rulesChanged || schemaChanged) runLive();
       renderRequirements();
       renderChecks();
     } catch (err) {
@@ -1746,12 +1890,21 @@
     const buttons = [$("#validate-btn"), $("#validate-ai-btn")];
     buttons.forEach((b) => (b.disabled = true));
     status.className = "small";
-    status.replaceChildren(el("span", { class: "spinner" }), withAi ? " Validating, with the AI checks (this can take a minute)…" : " Validating…");
+    const bar = el("progress", { class: "validate-progress", max: "1", value: "0", "aria-label": "Validation progress" });
+    const label = el("span", { class: "validate-progress-label", text: withAi ? "Validating, with the AI checks (this can take a minute)…" : "Validating…" });
+    status.replaceChildren(bar, label);
+    const onProgress = ({ done, total, label: stage }) => {
+      bar.max = total || 1;
+      bar.value = done;
+      const pct = total ? Math.round((100 * done) / total) : 0;
+      label.textContent = stage === "done" ? "Finishing…" : `${pct}% · ${stage}${withAi && stage === "AI checks" ? " (this can take a minute)" : ""}…`;
+    };
     state.showRequired = true;
     try {
-      const res = await postJSON(`/api/workspaces/${state.ws}/validate`, { text: state.text, ai: withAi, initial_submission: state.initialSubmission }, withAi ? llmHeaders() : {});
+      const res = await postStream(`/api/workspaces/${state.ws}/validate`, { text: state.text, ai: withAi, initial_submission: state.initialSubmission }, withAi ? llmHeaders() : {}, onProgress);
       state.results = res;
       state.resultsStale = false;
+      state.filesChanged = false;
       state.touched = true;
       const c = res.counts;
       const notes = [];
@@ -1765,9 +1918,10 @@
     } finally {
       buttons[0].disabled = false;
       renderReportButton();
-      renderAiAvailability();
+        renderAiAvailability();
       runLive();
       renderChecks();
+      $("#checks-panel").open = true;
       $("#checks-panel").scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
@@ -1801,6 +1955,7 @@
 
   async function downloadBundle() {
     try {
+      if (!state.ws) await ensureWorkspace();
       const res = await api(`/api/workspaces/${state.ws}/bundle`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: state.text }) });
       download(await res.blob(), `${state.venue.subfile_name.replace(/\.sub$/, "")}-submission.zip`);
     } catch (err) {
@@ -1812,12 +1967,6 @@
   // collaborator: the form's values, the requirements, and the check
   // results, with the styles inlined. Of the scripts only viewer.js comes
   // along, so the side menu, filters, search, and copy buttons still work.
-  // Save as PDF goes through the browser's print dialog, which every browser
-  // can save as a PDF; viewer.js lays the page out for paper first.
-  function savePdf() {
-    toast("In the print dialog, choose “Save as PDF” as the destination.");
-    setTimeout(() => window.PaperpushViewer.print(), 50);
-  }
 
   async function savePage() {
     let css = "";
@@ -1837,6 +1986,7 @@
       if (!node.hasAttribute("data-keep")) copy.setAttribute("disabled", "");
     });
     $$("script, dialog, #toast, .settings, #add-venue-link, .topbar-key, .final-actions, .check-actions, .autofill, #restored, #shared-note, #venue-options", doc).forEach((n) => n.remove());
+    $("#sub-text-panel", doc)?.remove();
     $$("details", doc).forEach((d) => d.setAttribute("open", ""));
     const link = $("link[rel=stylesheet]", doc);
     if (link) link.replaceWith(Object.assign(document.createElement("style"), { textContent: css }));
@@ -1860,26 +2010,34 @@
   // A link that opens this form, filled in and editable, on the website:
   // the .sub rides in the URL's #fragment, so nothing is stored on a server
   // and the recipient needs no install. Uploaded files are not in it.
-  async function shareLink() {
-    const base = state.local ? PUBLIC_SITE : `${location.origin}${location.pathname}`;
+  async function shareLink({ website = false } = {}) {
+    const base = website || state.local ? PUBLIC_SITE : `${location.origin}${location.pathname}`;
     return `${base}#/v/${encodeURIComponent(state.venue.slug)}/s/${await Subfile.toShareCode(state.text)}`;
   }
 
-  async function copyShareLink() {
+  // Whether this server keeps shared forms: the hosted site does; a
+  // `paperpush web` page on this computer does not.
+  const canShareHere = () => Boolean(state.info?.shared) && !state.local;
+
+  // Share where this server cannot keep a shared form: open the form, filled
+  // in, on the public website (the .sub rides in the link's #fragment, which
+  // is never sent to a server). The author presses Share there to edit it
+  // with others.
+  async function openOnWebsite() {
+    const tab = window.open("", "_blank"); // open now, while the click still counts
     let link;
     try {
-      link = await shareLink();
+      link = await shareLink({ website: true });
     } catch (err) {
+      tab?.close();
       toast(`Could not make a link: ${err.message}`, "error");
       return;
     }
-    const note = (state.files || []).length ? " Your uploaded files are not in it: send them separately, or the bundle (.zip)." : "";
-    try {
-      await navigator.clipboard.writeText(link);
-      toast(`Link copied. Whoever opens it gets this form, filled in and editable.${note}`);
-    } catch {
-      window.prompt("Copy this link:", link); // clipboard blocked (http, or permissions)
-    }
+    if (!tab) { toast("Your browser blocked the new tab. Allow pop-ups for this page and press Share again.", "error"); return; }
+    tab.opener = null;
+    tab.location.href = link;
+    const files = (state.files || []).length ? " Your uploaded files stay here: upload them there to validate." : "";
+    toast(`Opened this form on the paperpush website. Press Share there to edit it with others.${files}`);
   }
 
   // ---------------------------------------------------------- shared forms
@@ -1908,7 +2066,10 @@
   function renderSharedNote() {
     const sh = state.shared;
     $("#shared-note").hidden = !sh;
-    $("#share-edit").hidden = Boolean(sh) || !state.info?.shared || Boolean(state.local);
+    $("#share-btn").hidden = Boolean(sh);
+    $("#share-btn").title = !canShareHere()
+      ? "Open this form, filled in, on the paperpush website, where you can share it for editing. Your uploaded files stay here."
+      : "Put this form online so others can edit it with you. It is encrypted with a key in the link, so the server cannot read it.";
     $("#venue-search").disabled = Boolean(sh || state.local);
     $("#venue-toggle").hidden = Boolean(sh || state.local);
     for (const sel of ["#reset-btn", "#discard-draft"]) { const n = $(sel); if (n) n.hidden = Boolean(sh || state.local); }
@@ -1922,7 +2083,7 @@
 
   async function startSharing() {
     if (!state.venue || state.shared) return;
-    const btn = $("#share-edit");
+    const btn = $("#share-btn");
     btn.disabled = true;
     try {
       const key = SharedCrypto.newKey();
@@ -2139,8 +2300,8 @@
     });
   }
 
-  function command(text) {
-    const code = el("code", { text });
+  function command(text, { wrap = false } = {}) {
+    const code = el("code", { text, class: wrap ? "wrap" : "" });
     const copy = el("button", { type: "button", class: "btn btn-small", text: "Copy" });
     copy.addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(text); copy.textContent = "Copied"; setTimeout(() => (copy.textContent = "Copy"), 1500); } catch { /* clipboard unavailable */ }
@@ -2170,27 +2331,44 @@
       $("#portal-dialog").showModal();
       return;
     }
+    const submitHint = () => el("p", { class: "hint", text: "paperpush validates again, opens a browser, and fills in the portal. It stops before the final submit button, so you can look everything over and press it yourself." });
+    const loginStep = () => el("li", {}, el("strong", { text: `Log in to ${v.name}` }), " once. paperpush keeps the login in your system keychain:", command(`paperpush login ${v.slug}`));
+    // The two routes are alternatives, so show them as tabs: one visible at a time.
+    const routes = (subPath, where, stepList) => {
+      const ai = el("div", { class: "portal-panel", role: "tabpanel" },
+        el("p", {}, `Ask Claude Code (or another AI assistant that can run commands)${where}:`),
+        command(`Submit ${subPath} to ${v.name} with paperpush.`, { wrap: true }),
+        el("p", { class: "hint", text: `The assistant installs paperpush if needed, validates the .sub, and fills in the portal, stopping before the final submit button.${v.login_required ? ` It will ask you to run paperpush login ${v.slug} yourself, since only you can sign in.` : ""}` }));
+      const manual = el("div", { class: "portal-panel", role: "tabpanel" }, el("ol", {}, stepList));
+      const panels = [ai, manual];
+      const tabs = ["With AI", "Yourself"].map((label, i) => el("button", {
+        type: "button", class: "portal-tab", role: "tab", text: label,
+        onclick: () => select(i),
+      }));
+      function select(i) {
+        tabs.forEach((t, j) => { t.classList.toggle("active", i === j); t.setAttribute("aria-selected", String(i === j)); });
+        panels.forEach((p, j) => { p.hidden = i !== j; });
+      }
+      select(0);
+      return [el("div", { class: "portal-tabs", role: "tablist" }, tabs), ...panels];
+    };
     if (state.local) {
-      if (v.login_required) steps.push(el("li", {}, el("strong", { text: `Log in to ${v.name}` }), " once. paperpush keeps the login in your system keychain:", command(`paperpush login ${v.slug}`)));
-      steps.push(el("li", {}, el("strong", { text: "Submit" }), " from the same directory:", command(`paperpush submit ${state.local.path}`),
-        el("p", { class: "hint", text: "paperpush validates again, opens a browser, and fills in the portal. It stops before the final submit button, so you can look everything over and press it yourself." })));
-      body.replaceChildren(el("ol", {}, steps));
+      if (v.login_required) steps.push(loginStep());
+      steps.push(el("li", {}, el("strong", { text: "Submit" }), " from the same directory:", command(`paperpush submit ${state.local.path}`), submitHint()));
+      body.replaceChildren(...routes(state.local.path, "", steps));
       $("#portal-dialog").showModal();
       return;
     }
-    steps.push(el("li", {},
-      el("strong", { text: "Download your submission." }), ` The bundle holds ${sub} and the files you uploaded; unzip it into a folder. (Already have the files? The .sub alone is enough if it sits next to them.)`,
+    const download = el("div", { class: "portal-download" },
+      el("p", {}, el("strong", { text: "First, download your submission." }), ` The bundle holds ${sub} and the files you uploaded; unzip it into a folder. (Already have the files? The .sub alone is enough if it sits next to them.)`),
       el("div", { class: "cmd" },
         el("button", { type: "button", class: "btn primary btn-small", onclick: downloadBundle, text: "Download bundle (.zip)" }),
         el("button", { type: "button", class: "btn btn-small", onclick: downloadSub, text: `Download ${sub} only` })),
-    ));
+    );
     steps.push(el("li", {}, el("strong", { text: "Install paperpush" }), " (Python 3.10 or later), and the browser it drives:", command("pip install paperpush"), command("playwright install chromium")));
-    if (v.login_required) {
-      steps.push(el("li", {}, el("strong", { text: `Log in to ${v.name}` }), " once. paperpush keeps the login in your system keychain:", command(`paperpush login ${v.slug}`)));
-    }
-    steps.push(el("li", {}, el("strong", { text: "Submit" }), " from inside the unzipped folder:", command(`paperpush submit ${sub}`),
-      el("p", { class: "hint", text: "paperpush validates again, opens a browser, and fills in the portal. It stops before the final submit button, so you can look everything over and press it yourself." })));
-    body.replaceChildren(el("ol", {}, steps));
+    if (v.login_required) steps.push(loginStep());
+    steps.push(el("li", {}, el("strong", { text: "Submit" }), " from inside the unzipped folder:", command(`paperpush submit ${sub}`), submitHint()));
+    body.replaceChildren(download, ...routes(sub, ", started in the unzipped folder", steps));
     $("#portal-dialog").showModal();
   }
 
@@ -2276,15 +2454,13 @@
     $("#validate-ai-btn").addEventListener("click", () => runValidate(true));
     $("#initial-submission").addEventListener("change", (e) => setInitialSubmission(e.target.checked));
     $("#download-sub").addEventListener("click", downloadSub);
+    $("#download-zip").addEventListener("click", downloadBundle);
     $("#download-report").addEventListener("click", downloadReport);
-    $("#show-sub").addEventListener("click", toggleSubText);
     $("#save-page").addEventListener("click", savePage);
-    $("#share-link").addEventListener("click", copyShareLink);
-    $("#share-edit").addEventListener("click", startSharing);
+    $("#share-btn").addEventListener("click", () => (canShareHere() ? startSharing() : openOnWebsite()));
     $("#shared-copy").addEventListener("click", copySharedLink);
     $("#shared-stop").addEventListener("click", stopSharingForAll);
     document.addEventListener("visibilitychange", () => { if (state.shared && document.visibilityState === "visible") poll(); });
-    $("#save-pdf").addEventListener("click", savePdf);
     $("#portal-btn").addEventListener("click", openPortalDialog);
     $("#form").addEventListener("submit", (e) => e.preventDefault());
     window.addEventListener("hashchange", route);
@@ -2327,6 +2503,10 @@
       return false;
     }
     Object.assign(state.local, local);
+    // Keep the local server up while this page is open (a preview server
+    // started by `paperpush subfile`/`autofill` stops once nothing pings it).
+    setInterval(() => { if (document.visibilityState === "visible") api("/api/local/ping").catch(() => {}); }, 60000);
+    renderSharedNote();
     state.ws = "local";
     state.files = local.files;
     $("#venue-search").disabled = true;

@@ -46,6 +46,8 @@ Some features need extra dependencies, declared as optional extras:
      your LaTeX source before checking it.
    - ``codespell``, whose list of common misspellings the prose check uses.
      Without it the spelling check is reported as not checked.
+   - ``tqdm``, for the progress bar ``validate`` shows in a terminal while it
+     runs. Without it ``validate`` runs silently until the report prints.
 
    .. code-block:: bash
 

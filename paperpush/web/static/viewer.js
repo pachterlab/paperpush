@@ -111,6 +111,7 @@
       // Not a plain #anchor jump: on the live page the hash is the router.
       e.preventDefault();
       const target = document.getElementById(t.dataset.target);
+      if (target?.tagName === "DETAILS") target.open = true;
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
     } else if (t.id === "desc-toggle") {
       const hide = document.body.classList.toggle("hide-desc");

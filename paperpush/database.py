@@ -28,6 +28,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import re
 from dataclasses import dataclass
 from dataclasses import fields as dataclass_fields
 from dataclasses import field as dataclass_field
@@ -68,6 +69,32 @@ def _load_options_file(name: str) -> list[str]:
     logger.debug("Loading field options from %s", path)
     lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines()]
     return [line for line in lines if line]
+
+
+_CODED_OPTION = re.compile(r"^(\S+) \((.+)\)$")
+
+
+def option_code(option: str) -> str:
+    """The bare code of a ``"code (Label)"`` option (``"cs.AI (Artificial Intelligence)"`` -> ``"cs.AI"``).
+
+    Anything else comes back unchanged (stripped).
+    """
+    m = _CODED_OPTION.match(option.strip())
+    return m.group(1) if m else option.strip()
+
+
+def accepted_options(field: "Field") -> list[str]:
+    """Every value a ``.sub`` may give for ``field``: its options, plus their bare codes.
+
+    When *every* option reads ``"code (Label)"`` (the arXiv category list), the
+    portal takes the code, so the code alone is a valid entry as well as the
+    full text. A list that only partly looks like that (e.g. one ``"Other
+    (please specify)"`` among plain choices) is left as it is.
+    """
+    options = list(field.options or [])
+    if options and all(_CODED_OPTION.match(o.strip()) for o in options):
+        options += [option_code(o) for o in options]
+    return options
 
 
 def options_command(venue_slug: str, field_id: str) -> str:

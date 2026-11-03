@@ -5,11 +5,13 @@ import logging
 from playwright.sync_api import TimeoutError as PWTimeout
 from playwright.sync_api import sync_playwright
 
-from ...database import get_venue
+from ...database import get_venue, option_code
 from ...validate import _truthy_bool, parse_authors
 from ..base import Venue
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context, _try
 from ..login import VenueLoginError, login_orcid
+from ..recovery import guard, step
+from ..recovery_channel import browser_launch_args
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,8 @@ class ArxivVenue(Venue):
     slug = "arxiv"  # * slug name
     logged_in_names = ("START NEW SUBMISSION",)  # * a button I expect to see when signed in
     supports_orcid_login = True  # * arXiv offers "Log in with ORCiD" beside the credential form
+    # * submit() guards its page, so `submit --recover` / `--ai` can fix a failed step. arXiv's final "Submit" button is covered by the generic labels.
+    supports_recovery = True
 
     _VENUE = get_venue(slug)
     SITE_URL = _VENUE.site_url
@@ -147,7 +151,9 @@ class ArxivVenue(Venue):
         # grab values from the .sub file
         license = license_url(values.get("license", ""))
         primary_archive = values.get("primary_archive", "").strip()
-        primary_category = values.get("primary_category", "").strip()
+        # A category may be written as the bare code or as the full "cs.AI
+        # (Artificial Intelligence)" option; the form's drop-downs want the code.
+        primary_category = option_code(values.get("primary_category", ""))
         manuscript_file = values.get("manuscript_file", "").strip()
         title = values.get("title", "")
         abstract = values.get("abstract", "")
@@ -170,21 +176,26 @@ class ArxivVenue(Venue):
         logger.info("Starting arXiv submission run (headless=%s, debug=%s, archive=%s, " "category=%s, manuscript=%s)", headless, debug, primary_archive, primary_category, manuscript_file)
 
         with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-            browser = playwright.chromium.launch(headless=headless)
+            # browser_launch_args() is empty unless `submit --cdp-port` asked for a CDP endpoint.
+            browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
 
             context = open_run_context(browser, self.session_path(), new_session=new_session)
             apply_default_timeouts(context, timeout)
             page = context.new_page()
 
             self.ensure_signed_in(page, context, debug=debug)
+            # Sign-in stays unguarded. From here on a failed action goes to the recovery handler (see DEVELOPMENT.md, "Recovering a run that gets stuck").
+            page = guard(page)
 
             if debug:
                 page.pause()
 
+            step("Start new submission")
             logger.debug("Signed in; starting a new submission")
             page.get_by_role("link", name="START NEW SUBMISSION").click()
 
             # Terms/policy acknowledgement
+            step("Terms and policy acknowledgement")
             page.locator('input[name="userinfo"]').check()
             checkbox = page.locator('input[name="agree_terms_conditions"]')
             checkbox.click()
@@ -193,6 +204,7 @@ class ArxivVenue(Venue):
             page.get_by_role("button", name="Accept these Terms and return").click()
 
             # License/policy + category
+            step("License and primary category")
             radios = page.get_by_role("radio")
             radios.first.check()
 
@@ -209,10 +221,16 @@ class ArxivVenue(Venue):
             page.get_by_role("button", name="Continue").nth(1).click()
 
             # Upload manuscript
+            step("Upload files")
             logger.info("Uploading manuscript file %s", manuscript_file)
-            with page.expect_file_chooser() as fc_info:
-                page.get_by_role("button", name="Choose File").click()
-            fc_info.value.set_files(manuscript_file)
+
+            def choose_manuscript(page) -> None:
+                with page.expect_file_chooser() as fc_info:
+                    page.get_by_role("button", name="Choose File").click()
+                fc_info.value.set_files(manuscript_file)
+
+            # The click and the file chooser it opens only make sense together, so they are one recoverable unit.
+            page.attempt(f"attach {manuscript_file!r} with Choose File", choose_manuscript)
             page.get_by_role("button", name="Upload").click()
             page.wait_for_timeout(3_000)
             page.locator("#check-files-button-top").click()
@@ -230,6 +248,7 @@ class ArxivVenue(Venue):
             page.get_by_role("link", name="Continue").click()
 
             # Fill in the metadata form.
+            step("Metadata form")
             page.get_by_role("textbox", name="*Title").fill(title)
             page.get_by_role("textbox", name="*Author(s)").fill(authors)
             page.locator('textarea[name="abstract"]').fill(abstract)
@@ -247,10 +266,17 @@ class ArxivVenue(Venue):
                 page.locator('input[name="doi"]').fill(doi)
             page.get_by_role("button", name="Save and Continue").first.click()
 
-            if crosslist_archives and crosslist_categories:
-                for crosslist_archive, crosslist_category in zip(crosslist_archives.split(","), crosslist_categories.split(",")):
-                    page.locator("#select_arch").select_option(crosslist_archive.strip())
-                    page.locator("#select_sc").select_option(crosslist_category.strip())
+            if crosslist_categories:
+                # Each category is paired with the archive at the same position;
+                # where that is missing, the archive is the code's prefix
+                # ("q-bio.GN" -> "q-bio"), which is what it must be anyway.
+                categories = [option_code(c) for c in crosslist_categories.split(",") if c.strip()]
+                archives = [a.strip() for a in crosslist_archives.split(",")] if crosslist_archives else []
+                for i, crosslist_category in enumerate(categories):
+                    step(f"Cross-list categories: {crosslist_category} ({i + 1} of {len(categories)})")
+                    crosslist_archive = archives[i] if i < len(archives) and archives[i] else crosslist_category.split(".")[0]
+                    page.locator("#select_arch").select_option(crosslist_archive)
+                    page.locator("#select_sc").select_option(crosslist_category)
 
             logger.info("Completed the recorded arXiv steps; leaving the browser open " "for review (cross-list categories, license, and the final " "submit are left to you)")
 

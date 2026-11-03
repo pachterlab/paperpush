@@ -7,7 +7,11 @@ click-through, filling out the form from your ``.sub`` file.
 .. code-block:: text
 
    usage: paperpush submit [-h] [-v] [-q] [--headless] [--debug] [--new-session]
-                           [--timeout SECONDS]
+                           [--timeout SECONDS] [--close-on-failure]
+                           [--recover {off,by-hand,ai,agent}] [--ai]
+                           [--provider {anthropic,openai,google}]
+                           [--model MODEL] [--recover-dir DIR]
+                           [--cdp-port PORT]
                            subfile
 
 .. important::
@@ -60,6 +64,55 @@ Options
    Default: ``10`` seconds; ``0`` waits forever. Increase it on a slow
    connection or a sluggish portal.
 
+``--close-on-failure``
+   Close the browser when the run fails. By default the window stays open at
+   the step that broke so you can see the page and finish by hand.
+
+``--recover {off,by-hand,ai,agent}``
+   What to do when one step of the click-through fails, for example when the
+   portal has renamed a button. ``off`` (the default) stops the run.
+   ``by-hand`` pauses and asks in the terminal: fix the page in the browser
+   (or do the step yourself), then press Enter to continue from the next
+   step, ``r`` to retry the step, or ``a`` to abort. ``ai`` is the same as
+   ``--ai`` (below). ``agent`` pauses for an
+   AI agent instead. The MCP server's ``submit`` tool uses it, with the agent
+   working through ``submit_page``, ``submit_act`` and ``submit_resume``. Every
+   venue's runner supports recovery. Sign-in is never part of it, since a
+   password, CAPTCHA or two-factor prompt is yours to handle.
+
+``--ai``
+   When a step fails, send the page (its accessibility tree and a screenshot,
+   which can show your manuscript's details) to an LLM. The model fixes the step
+   in the browser: it clicks, fills, selects and uploads, then checks the
+   result, and the run carries on from the next step. The model can never send
+   the submission. Clicks on ``Submit``/``Approve`` controls, the Enter key,
+   uploads of files the ``.sub`` does not name, navigation and scripts are all
+   refused. It gets at most 25 model calls per failed step and 5 failed steps
+   per run. In a terminal with a visible browser, a step the model gives up on
+   is handed to you, as with ``by-hand``. Uses the same API keys as
+   ``autofill --engine api`` (``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``,
+   ``GEMINI_API_KEY``/``GOOGLE_API_KEY``) and needs that provider's SDK
+   (``pip install "paperpush[autofill]"``).
+
+``--provider {anthropic,openai,google}`` / ``--model MODEL``
+   With ``--ai``: which provider and model to use. They default to the first
+   provider with an API key set, and to that provider's default model, as for
+   ``autofill``.
+
+``--recover-dir DIR``
+   With ``--recover agent`` or ``--ai``, the directory the paused run and the agent
+   exchange files through. Defaults to a fresh one under PaperPush's config
+   directory. It also collects ``recoveries.jsonl``, a record of each failed
+   step and what fixed it.
+
+``--cdp-port PORT``
+   Open a Chrome DevTools Protocol endpoint on ``127.0.0.1:PORT`` (``0`` picks
+   a free port) so another tool can drive the same browser, for example
+   ``playwright-cli attach --cdp=http://127.0.0.1:PORT``. While the run is
+   open, anything on your machine can then control the signed-in browser, and
+   the agent guardrails (no final submit, uploads limited to ``.sub`` files)
+   do not apply to it.
+
 Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags. Use ``-vv``
 to see each portal step as it runs — helpful when a venue changes its form.
 
@@ -100,6 +153,18 @@ Step through the wizard with the Playwright Inspector:
 .. code-block:: bash
 
    paperpush submit biorxiv.sub --debug
+
+Have an LLM fix any step the portal has changed, using your OpenAI key:
+
+.. code-block:: bash
+
+   paperpush submit biorxiv.sub --ai --provider openai
+
+Pause on a failed step so you can fix it in the browser and carry on:
+
+.. code-block:: bash
+
+   paperpush submit biorxiv.sub --recover by-hand
 
 Sign in fresh after switching accounts, with a longer timeout:
 

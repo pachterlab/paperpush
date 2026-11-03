@@ -27,11 +27,13 @@ from ...manuscript import manuscript_text
 from ...validate import parse_authors
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
 from ..common import session_path as _session_path
+from ..recovery import guard, step, unrecovered
+from ..recovery_channel import browser_launch_args
 
 # Reuse the shared ScholarOne platform engine (author/keyword/reviewer/parse
 # helpers). Sign-in is inherited from ScholarOneVenue.
 from . import main as scholarone
-from .main import ScholarOneLoginError, _add_authors, _add_keywords, _add_reviewers, _answer_sanctions, _split_figures, _split_keywords, _split_reviewers, _yes  # noqa: F401 -- re-exported as this module's public API
+from .main import ScholarOneLoginError, _add_authors, _upload_selected_files, _add_keywords, _add_reviewers, _answer_sanctions, _split_figures, _split_keywords, _split_reviewers, _yes  # noqa: F401 -- re-exported as this module's public API
 
 logger = logging.getLogger(__name__)
 
@@ -204,8 +206,10 @@ def _upload_files(page, files: list[tuple[str, str]]) -> None:
             raise ValueError(f"Unknown NAR designation {designation!r}; expected one of {FILE_TYPE_OPTIONS}")
 
     for index, (path, designation) in enumerate(files):
-        cell = page.get_by_role("cell", name=re.compile(rf"FILE_TO_UPLOAD.*Select File {index + 1}"))
-        cell.get_by_label("FILE_TO_UPLOAD").set_input_files(path)
+        # The rows are addressed by position: ScholarOne sometimes renders them
+        # with styled "Select File N" buttons and sometimes as bare native file
+        # inputs with no number in the row's text.
+        page.get_by_label("FILE_TO_UPLOAD", exact=True).nth(index).set_input_files(path)
         page.locator(f'select[file-index="{index}"]').select_option(label=designation)
 
 
@@ -321,21 +325,57 @@ def _add_funders(page, funders: list[tuple[str, str]]) -> None:
     report_radios.nth(0).check()
     for funder, grant_id in funders:
         try:
-            page.get_by_role("button", name="Add Funder").click()
-            page.wait_for_timeout(1000)
-            select = page.locator("#SUB_FUNDER_ID_SELECT")
-            select.click()
-            select.fill(funder)
-            page.wait_for_timeout(1000)
-            page.locator("li.ui-menu-item, li.x-boundlist-item").first.click()
-            if grant_id:
-                grant_box = page.locator("#FUNDREF_GRANT_NO_0")
-                grant_box.click()
-                grant_box.fill(grant_id)
-            page.get_by_role("button", name="Save").click()
-            page.wait_for_timeout(1000)
+            # The whole modal is best-effort (failures are logged below), so its
+            # actions are not handed to the recovery handler one by one.
+            with unrecovered():
+                page.get_by_role("button", name="Add Funder").click()
+                page.wait_for_timeout(1000)
+                name_box = page.locator("[role=dialog] input[type=text]").first
+                name_box.click()
+                # Type the last character as a key press: a bare fill() does not
+                # fire the keyup that opens the Crossref-funder suggestion list.
+                name_box.fill(funder[:-1])
+                name_box.press(funder[-1])
+                page.wait_for_timeout(2000)
+                _pick_funder_suggestion(page, funder)
+                if grant_id:
+                    grant_box = page.locator("[role=dialog] tr:has-text('Grant / Award') input[type=text]").first
+                    grant_box.fill(grant_id)
+                # The modal's "+ Add Funder" button is exposed as "Confirm".
+                page.get_by_role("button", name="Confirm").click()
+                page.wait_for_timeout(1000)
         except Exception as exc:  # noqa: BLE001 -- best-effort optional modal step
             logger.warning("nucleic_acids_research: could not add funder %r via the modal (%s); " "leaving it to be finished by hand", funder, exc)
+            # Never leave the modal open: it covers every later control on the page.
+            try:
+                with unrecovered():
+                    page.get_by_role("button", name="Close").click(timeout=3000)
+            except Exception:  # noqa: BLE001 -- modal may never have opened
+                pass
+
+
+#: Pages of funder suggestions to look through for an exact name match.
+MAX_FUNDER_PAGES = 10
+
+
+def _pick_funder_suggestion(page, funder: str) -> None:
+    """Click the suggestion whose name is exactly ``funder``.
+
+    The list is paged and alphabetical, and the first entries are often other
+    funders whose aliases mention the name (e.g. "All of Us Research Program"
+    for "National Institutes of Health"), so the first item is not the match.
+    """
+    for _ in range(MAX_FUNDER_PAGES):
+        match = page.locator(".x-boundlist").get_by_text(funder, exact=True)
+        if match.count():
+            match.first.click()
+            return
+        next_page = page.locator(".x-tbar-page-next")
+        if not next_page.count() or "x-item-disabled" in (next_page.first.get_attribute("class") or "") or "x-btn-disabled" in (next_page.first.locator("xpath=ancestor::*[contains(@class,'x-btn')][1]").get_attribute("class") or ""):
+            break
+        next_page.first.click()
+        page.wait_for_timeout(1500)
+    raise LookupError(f"no funder suggestion named exactly {funder!r}")
 
 
 def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, keep_open_on_failure: bool = True, *, venue) -> None:
@@ -373,20 +413,26 @@ def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: b
     logger.info("Starting Nucleic Acids Research (ScholarOne) submission run " "(headless=%s, debug=%s, manuscript=%s, %d file(s) to upload, %d author(s))", headless, debug, manuscript_file, len(upload_files), len(authors))
 
     with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-        browser = playwright.chromium.launch(headless=headless)
+        # browser_launch_args() is empty unless `submit --cdp-port` asked for a CDP endpoint.
+        browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
         page = context.new_page()
 
         venue.ensure_signed_in(page, context, debug=debug)
+        # Sign-in stays unguarded. From here on a failed action goes to the
+        # recovery handler (see DEVELOPMENT.md, "Recovering a run that gets stuck").
+        page = guard(page)
 
         if debug:
             page.pause()
 
+        step("Dashboard: start new submission")
         logger.debug("Signed in; starting a new submission")
         page.wait_for_timeout(3000)
         try:
-            page.get_by_role("button", name="Reject All").click(timeout=2000)
+            with unrecovered():
+                page.get_by_role("button", name="Reject All").click(timeout=2000)
         except Exception as exc:  # noqa: BLE001 -- best-effort; button may not be present
             pass
         page.get_by_role("link", name=AUTHOR_LINK).click()
@@ -396,6 +442,7 @@ def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: b
 
         # Page 1: article type, title, abstract, key points. NAR has no subject
         # category, NGS, or machine-learning questions here.
+        step("Page 1: type, title, abstract, key points")
         article_type = values.get("article_type", "Standard Article").strip()
         page.get_by_role("radio", name=f"Choice {article_type}").check()
         page.get_by_role("textbox", name="DOCUMENT_TITLE").click()
@@ -408,28 +455,34 @@ def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: b
         key_points = values.get("key_points", "").strip()
         if key_points:
             try:
-                page.locator('textarea[name="CUSTOM_FIELD_RESPONSE_ID1181588"]').fill(key_points)
+                with unrecovered():
+                    page.locator('textarea[name="CUSTOM_FIELD_RESPONSE_ID1181588"]').fill(key_points)
             except Exception as exc:  # noqa: BLE001 -- best-effort; selector may need re-recording
                 logger.warning("nucleic_acids_research: could not fill the Key Points box (%s); " "fill it by hand in the open browser", exc)
         page.get_by_role("button", name="Save & Continue ").click()
 
         # Page 2: upload files with their Designation.
+        step("Page 2: file upload")
         _upload_files(page, upload_files)
-        page.get_by_role("link", name="Upload Selected Files").click()
+        _upload_selected_files(page)
         page.get_by_role("button", name="Save & Continue ").click()
 
         # Page 3: free keywords (required, 3-5); NAR has no portal-keyword list.
+        step("Page 3: keywords")
         _add_keywords(page, _split_keywords(values.get("keywords", "")), portal=False, keywords_box_name="Key Words")
         page.get_by_role("button", name="Save & Continue ").click()
 
         # Page 4: sanctions (no-op; NAR carries no sanctions fields), authors, the
         # institution-verification radio, then the page checkbox.
+        step("Page 4: authors")
         _answer_sanctions(page, values)
         _add_authors(page, authors, venue_label=_SLUG)
+        step("Page 4: institution verification")
         _select_institution_verification(page, values.get("institution_verification", "verified"))
         page.get_by_role("checkbox", name="checkbox").check()
         page.get_by_role("button", name="Save & Continue ").click()
 
+        step("Page 5: referees")
         # Page 5: referees (>=6 recommended, <=3 opposed, reason required).
         _add_reviewers(
             page,
@@ -443,6 +496,7 @@ def submit_nucleic_acids_research(values: dict, headless: bool = False, debug: b
         page.get_by_role("checkbox", name="checkbox").check()
         page.get_by_role("button", name="Save & Continue ").click()
 
+        step("Page 6: declarations")
         # Page 6: declarations (entirely NAR-specific).
         _answer_declarations(page, values)
         page.get_by_role("button", name="Save & Continue ").click()
@@ -490,6 +544,8 @@ class NucleicAcidsResearchVenue(scholarone.ScholarOneVenue):
 
     slug = "nucleic_acids_research"
     field_validators = FIELD_VALIDATORS
+    #: submit_nucleic_acids_research guards its page, so a failed action can be recovered.
+    supports_recovery = True
 
     def submit(
         self,

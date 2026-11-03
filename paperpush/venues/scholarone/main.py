@@ -13,6 +13,7 @@ from playwright.sync_api import TimeoutError as PWTimeout
 
 from ..base import Venue
 from ..login import VenueLoginError, fill_login_form
+from ..recovery import step, unrecovered
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,31 @@ def _split_figures(raw: str) -> list[str]:
     return paths
 
 
+#: How long to wait for ScholarOne's "Uploading File" modal to close. Large
+#: PDFs routinely take longer than the default per-action timeout.
+UPLOAD_TIMEOUT_MS = 10 * 60 * 1000
+
+
+def _upload_selected_files(page) -> None:
+    """Click "Upload Selected Files" and wait for the upload modal to close.
+
+    The modal covers the page while files transfer, so clicking "Save &
+    Continue" before it is gone times out on any upload over a few MB.
+    """
+    page.get_by_role("link", name="Upload Selected Files").click()
+    modal = page.get_by_text("Upload in progress", exact=False)
+    try:
+        # A fast upload may never show the modal: that is not a failure, so
+        # keep this probe away from the recovery handler.
+        with unrecovered():
+            modal.first.wait_for(state="visible", timeout=5000)
+    except PWTimeout:
+        logger.debug("Upload modal never appeared (fast upload); continuing")
+        return
+    logger.info("Waiting for ScholarOne to finish uploading files")
+    modal.first.wait_for(state="hidden", timeout=UPLOAD_TIMEOUT_MS)
+
+
 def _split_name(full_name: str) -> tuple[str, str]:
     """Split a ``.sub`` name into (given, family) on the last whitespace token.
 
@@ -155,7 +181,10 @@ def _create_author(page, author: dict) -> None:
     inst_box.click()
     inst_box.press_sequentially(institution, delay=100)
     try:
-        page.locator("li.x-boundlist-item:visible").first.click(timeout=1000)  # select first from dropdown
+        # A probe: no dropdown is an expected case handled below, so it is not
+        # handed to the recovery handler.
+        with unrecovered():
+            page.locator("li.x-boundlist-item:visible").first.click(timeout=1000)  # select first from dropdown
     except:
         page.keyboard.press("Enter")  # commit whatever is typed if no dropdown appears
         page.get_by_role("button", name="OK").click(timeout=2000)
@@ -235,12 +264,14 @@ def _add_authors(page, authors: list[dict], *, venue_label: str = "scholarone") 
     for index, author in enumerate(authors):
         if index:
             page.wait_for_timeout(1000)
+        step(f"Authors: author {index + 1} of {len(authors)}")
         logger.debug("Adding author %d/%d", index + 1, len(authors))
         _add_author(page, author)
 
     # Assign the corresponding author via its row's Actions menu. The trailing
     # word boundary pins the row number so "Drag 1" won't match "Drag 10".
     corr_row = corresponding[0] + 1
+    step("Authors: assign corresponding author")
     logger.info("Assigning author %d as the corresponding author", corr_row)
     row = page.get_by_role("row", name=re.compile(rf"Drag {corr_row}\b"))
     row.get_by_label("Actions").select_option("Assign")
@@ -327,6 +358,7 @@ def _add_reviewers(
     for index, reviewer in enumerate(reviewers):
         if index:
             page.wait_for_timeout(1000)
+        step(f"Reviewers: reviewer {index + 1} of {len(reviewers)}")
         _add_reviewer(page, reviewer, add_button=add_button, submit_button=submit_button)
 
 

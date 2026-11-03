@@ -33,7 +33,7 @@ from typing import Annotated, Any, Literal, Optional
 
 from pydantic import AfterValidator, BeforeValidator, ConfigDict, ValidationError, create_model
 
-from .database import Field, Venue, options_command
+from .database import Field, Venue, accepted_options, options_command
 from .subfile import SubFile
 
 logger = logging.getLogger(__name__)
@@ -341,6 +341,8 @@ def _schema_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     Each pydantic complaint becomes one ERROR :class:`Issue`.
     """
     filled = {k: v.strip() for k, v in values.items() if v and v.strip()}
+    if not filled:
+        raise NotApplicable("no fields filled in")
     try:
         _model_for(venue).model_validate(filled)
     except ValidationError as exc:
@@ -640,6 +642,14 @@ def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> 
     return issues
 
 
+def _upload_paths_or_skip(venue: Venue, values: dict[str, str]) -> list[Path]:
+    """The existing upload files, or :class:`NotApplicable` when none are attached."""
+    paths = list(_iter_upload_paths(venue, values))
+    if not paths:
+        raise NotApplicable("no files attached")
+    return paths
+
+
 def _findings_to_issues(findings) -> list[Issue]:
     """Turn scanner :class:`~paperpush.sensitive.Finding` objects into WARNINGs.
 
@@ -666,7 +676,7 @@ def _link_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     """
     from . import sensitive
 
-    paths = list(_iter_upload_paths(venue, values))
+    paths = _upload_paths_or_skip(venue, values)
     logger.info("Checking %d upload file(s) for unreachable links (%s)", len(paths), venue.slug)
     return _findings_to_issues(sensitive.scan_links(paths))
 
@@ -685,7 +695,7 @@ def _reference_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     """
     from . import references
 
-    paths = list(_iter_upload_paths(venue, values))
+    paths = _upload_paths_or_skip(venue, values)
     logger.info("Checking %d upload file(s) for reference DOI problems (%s)", len(paths), venue.slug)
     return _findings_to_issues(references.scan_references(paths))
 
@@ -709,7 +719,7 @@ def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     """
     from . import sensitive
 
-    paths = list(_iter_upload_paths(venue, values))
+    paths = _upload_paths_or_skip(venue, values)
     logger.info("Scanning %d upload file(s) for sensitive information (%s)", len(paths), venue.slug)
     findings = sensitive.scan_paths(paths)
     findings.extend(sensitive.scan_missing_code_link(paths))
@@ -736,6 +746,8 @@ def _anonymity_issues(venue: Venue, values: dict[str, str], *, check_repos: bool
     paths = list(_iter_upload_paths(venue, values))
     terms = anonymity.identity_terms(venue, values)
     field_texts = {f.label or f.id: values[f.id] for f in venue.fields if f.type in ("text", "textarea") and values.get(f.id, "").strip()}
+    if not paths and not field_texts:
+        raise NotApplicable("no files attached and no free-text fields filled in")
     logger.info("Checking %d upload file(s) for identifying information (%s, %d identity term(s))", len(paths), venue.slug, len(terms))
     return _findings_to_issues(anonymity.scan_submission(paths, terms, field_texts, check_repos=check_repos))
 
@@ -752,7 +764,7 @@ def _hidden_text_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     """
     from . import hidden_text
 
-    paths = list(_iter_upload_paths(venue, values))
+    paths = _upload_paths_or_skip(venue, values)
     logger.info("Checking %d upload file(s) for hidden text (%s)", len(paths), venue.slug)
     issues: list[Issue] = []
     for finding in hidden_text.scan_paths(paths):
@@ -935,6 +947,98 @@ class Checks:
         self.ai_tasks.append(task)
 
 
+def _record_switched_off(checks: "Checks", check_id: str, title: str, category: str, venue: Venue, values: dict[str, str], detail: str) -> None:
+    """Record a file-reading check that was switched off: unchecked, or not applicable when no files are attached."""
+    from . import report
+
+    try:
+        _upload_paths_or_skip(venue, values)
+    except NotApplicable as exc:
+        checks.record(check_id, title, category, report.NOT_APPLICABLE, detail=str(exc))
+        return
+    checks.record(check_id, title, category, report.UNCHECKED, detail=detail)
+
+
+class _Progress:
+    """Reports how far :func:`validate_report` has got to an optional callback.
+
+    ``callback(done, total, label)`` is called as each stage starts (``label``
+    names it, ``done`` stages are finished) and once more at the end with
+    ``done == total`` and ``label == "done"``. A failing callback is logged and
+    ignored: a progress display must never break validation.
+    """
+
+    def __init__(self, callback, stages: list[str]) -> None:
+        self._callback = callback
+        self._total = len(stages)
+        self._done = 0
+
+    def _emit(self, label: str) -> None:
+        if self._callback is None:
+            return
+        try:
+            self._callback(self._done, self._total, label)
+        except Exception:  # noqa: BLE001 -- a progress display must not break validation
+            logger.debug("validate progress callback failed", exc_info=True)
+
+    def run(self, label: str, fn, *args, **kwargs):
+        """Report ``label`` as started, run ``fn``, then count the stage done."""
+        self._emit(label)
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            self._done = min(self._done + 1, self._total)
+
+    def finish(self) -> None:
+        self._done = self._total
+        self._emit("done")
+
+
+# The manuscript-check modules validate_report runs, in order, with the stage
+# name the progress bar shows for each.
+_MANUSCRIPT_STAGES = (
+    ("requirements_check", "Author guidelines"),
+    ("layout_check", "Page layout"),
+    ("figure_check", "Figures"),
+    ("citation_check", "Figure and table order"),
+    ("consistency", "Form against the manuscript"),
+    ("prose_check", "Spelling and prose"),
+)
+
+
+def _run_manuscript_stages(bar: _Progress, checks: Checks, venue: Venue, values: dict[str, str]) -> None:
+    import importlib
+
+    for name, label in _MANUSCRIPT_STAGES:
+        module = importlib.import_module(f".{name}", __package__)
+        bar.run(label, module.run_checks, checks, venue, values)
+
+
+def _ai_only_report(checks: Checks, subfile: SubFile, venue: Venue, *, ai, subfile_path: str, initial_submission: bool, progress=None):
+    """The :func:`validate_report` for ``ai_only``: just the checks that need AI."""
+    from . import ai_validate, report
+    from .requirements import any_format_initial_rule
+
+    values = subfile.values
+    bar = _Progress(progress, [label for _, label in _MANUSCRIPT_STAGES] + ["AI checks"])
+    # These checks queue the AI tasks that apply (raster figures, a PDF's
+    # template, title-page items, ...); their own results are not reported.
+    _run_manuscript_stages(bar, checks, venue, values)
+    checks.results = []
+    tasks = bar.run("AI checks", ai_validate.resolve, checks, venue, values, ai)
+    bar.finish()
+    result = report.ValidationReport(venue=venue.slug, subfile=subfile_path, results=checks.results, ai_tasks=tasks, ai_only=True)
+    result.initial_submission_rule = any_format_initial_rule(venue.slug, values)
+    if initial_submission:
+        result.initial_submission = True
+        result.downgraded = downgrade_errors(result.results)
+    if ai is not None:
+        result.ai = ai.description
+        result.ai_error = ai.error
+    logger.info("Validated %s subfile (AI checks only): %d AI check(s)", venue.slug, len(tasks))
+    return result
+
+
 def _off(flag: str) -> Unchecked:
     return Unchecked(f"switched off ({flag})")
 
@@ -989,6 +1093,8 @@ def validate_report(
     initial_submission: bool = False,
     ai=None,
     subfile_path: str = "",
+    ai_only: bool = False,
+    progress=None,
 ):
     """Run every check on ``subfile`` and return a :class:`~paperpush.report.ValidationReport`.
 
@@ -1043,8 +1149,17 @@ def validate_report(
     to the checks only an LLM can judge: run them through a provider's API,
     take an agent's answers from a results file, or (None) list them as
     needing AI.
+
+    ``ai_only`` reports only those AI checks. The manuscript checks still run,
+    since they decide which AI checks apply, but their results are dropped, and
+    the form, link, DOI, sensitive-data, anonymity, hidden-text, and OpenReview
+    checks are skipped. It needs ``check_manuscript``.
+
+    ``progress``, if given, is called as ``progress(done, total, label)`` when
+    each stage starts (``label`` names it) and once at the end with
+    ``done == total``; the CLI's progress bar and the web page's use it.
     """
-    from . import report
+    from . import openreview_profiles, report
 
     if check_anonymous is None:
         check_anonymous = venue.anonymous
@@ -1062,61 +1177,77 @@ def validate_report(
     )
     values = subfile.values
     checks = Checks()
+    if ai_only:
+        if not check_manuscript:
+            raise ValueError("ai_only needs check_manuscript: the manuscript checks decide which AI checks apply")
+        return _ai_only_report(checks, subfile, venue, ai=ai, subfile_path=subfile_path, initial_submission=initial_submission, progress=progress)
+
+    openreview_applies = openreview_profiles.applies(venue)
+    optional = (
+        (check_links, "Links"),
+        (check_references, "Reference DOIs"),
+        (check_sensitive, "Sensitive information"),
+        (check_anonymous, "Anonymity"),
+        (check_hidden_text, "Hidden text"),
+        (openreview_applies and check_openreview, "OpenReview profiles"),
+    )
+    stages = ["Submission form"] + [label for on, label in optional if on]
+    if check_manuscript:
+        stages += [label for _, label in _MANUSCRIPT_STAGES] + ["AI checks"]
+    bar = _Progress(progress, stages)
 
     form = "Submission form"
-    checks.run("form.schema", "Field values have the right type and known field ids", form, _schema_issues, venue, values)
-    _field_checks(checks, venue, values)
-    checks.run("files.total_size", "Combined upload size", "Files", _total_size_check, venue, values)
+
+    def _form_checks() -> None:
+        checks.run("form.schema", "Field values have the right type and known field ids", form, _schema_issues, venue, values)
+        _field_checks(checks, venue, values)
+        checks.run("files.total_size", "Combined upload size", "Files", _total_size_check, venue, values)
+
+    bar.run("Submission form", _form_checks)
 
     integrity = "Integrity"
     if check_links:
-        checks.run("integrity.links", "Links cited in the files are reachable", integrity, _link_issues, venue, values)
+        bar.run("Links", checks.run, "integrity.links", "Links cited in the files are reachable", integrity, _link_issues, venue, values)
     else:
-        checks.record("integrity.links", "Links cited in the files are reachable", integrity, report.UNCHECKED, detail="switched off (--dont-check-links)")
+        _record_switched_off(checks, "integrity.links", "Links cited in the files are reachable", integrity, venue, values, "switched off (--dont-check-links)")
     if check_references:
-        checks.run("integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values)
+        bar.run("Reference DOIs", checks.run, "integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values)
     else:
-        checks.record("integrity.dois", "Reference DOIs match the works they cite", integrity, report.UNCHECKED, detail="switched off (--dont-check-references)")
+        _record_switched_off(checks, "integrity.dois", "Reference DOIs match the works they cite", integrity, venue, values, "switched off (--dont-check-references)")
     if check_sensitive:
-        checks.run("integrity.sensitive", "No secrets or private information in the files", integrity, _sensitive_issues, venue, values)
+        bar.run("Sensitive information", checks.run, "integrity.sensitive", "No secrets or private information in the files", integrity, _sensitive_issues, venue, values)
     else:
         checks.record("integrity.sensitive", "No secrets or private information in the files", integrity, report.UNCHECKED, detail="switched off (--dont-check-for-sensitive-info)")
     if check_anonymous:
-        checks.run("integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, _anonymity_issues, venue, values)
+        bar.run("Anonymity", checks.run, "integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, _anonymity_issues, venue, values)
     else:
         checks.record("integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, report.NOT_APPLICABLE, detail="the venue is not double-blind (use --anonymous to check anyway)")
     if check_hidden_text:
-        checks.run("integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, _hidden_text_issues, venue, values)
+        bar.run("Hidden text", checks.run, "integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, _hidden_text_issues, venue, values)
     else:
         checks.record("integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, report.UNCHECKED, detail="switched off (--dont-check-hidden-text)")
     pdf_reader = _pdf_reader_issues(venue, values, check_hidden_text=check_hidden_text, check_manuscript=check_manuscript)
     if pdf_reader:
         checks.record("integrity.pdf_reader", "PDF glyph reader (pdfminer.six) available", integrity, report.UNCHECKED, issues=[replace_unchecked(i) for i in pdf_reader])
-    from . import openreview_profiles
-
-    if not openreview_profiles.applies(venue):
+    if not openreview_applies:
         checks.record("integrity.openreview", "Authors' OpenReview profiles", integrity, report.NOT_APPLICABLE, detail="the venue is not submitted through OpenReview")
     elif check_openreview:
-        checks.run("integrity.openreview", "Authors' OpenReview profiles", integrity, _openreview_profile_issues, venue, values)
+        bar.run("OpenReview profiles", checks.run, "integrity.openreview", "Authors' OpenReview profiles", integrity, _openreview_profile_issues, venue, values)
     else:
         checks.record("integrity.openreview", "Authors' OpenReview profiles", integrity, report.UNCHECKED, detail="switched off (--dont-check-openreview-profiles)")
 
     if check_manuscript:
-        from . import citation_check, consistency, figure_check, layout_check, prose_check, requirements_check
+        from . import requirements_check
 
-        requirements_check.run_checks(checks, venue, values)
-        layout_check.run_checks(checks, venue, values)
-        figure_check.run_checks(checks, venue, values)
-        citation_check.run_checks(checks, venue, values)
-        consistency.run_checks(checks, venue, values)
-        prose_check.run_checks(checks, venue, values)
+        _run_manuscript_stages(bar, checks, venue, values)
         requirements_check.not_implemented(checks, venue, values)
     else:
         checks.record("guidelines", "Manuscript checked against the author guidelines", "Guidelines", report.UNCHECKED, detail="switched off (--dont-check-manuscript)")
 
     from . import ai_validate
 
-    tasks = ai_validate.resolve(checks, venue, values, ai) if check_manuscript else []
+    tasks = bar.run("AI checks", ai_validate.resolve, checks, venue, values, ai) if check_manuscript else []
+    bar.finish()
 
     from .requirements import any_format_initial_rule
 
@@ -1226,12 +1357,15 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         # free-text entry). Otherwise the list is closed. A closed multichoice is
         # not modelled in pydantic, so the ERROR is raised here; a closed
         # ``choice`` is already a ``Literal`` in the schema pass and would only be
-        # reported twice.
-        if field.options and field.type in ("choice", "multichoice"):
+        # reported twice. A ``text`` field with options (arXiv's primary_category,
+        # drawn from a vocabulary file) holds one value from a closed list too.
+        # Options written "code (Label)" also accept the bare code.
+        if field.options and field.type in ("choice", "multichoice", "text"):
             applied.add("options")
-            chosen = [raw.strip()] if field.type == "choice" else [c.strip() for c in raw.split(",")]
+            accepted = set(accepted_options(field))
+            chosen = [c.strip() for c in raw.split(",")] if field.type == "multichoice" else [raw.strip()]
             for choice in chosen:
-                if not choice or choice in field.options:
+                if not choice or choice in accepted:
                     continue
                 if field.options_recommended:
                     entered = "added as a custom keyword" if field.type == "multichoice" else "entered as custom text"
@@ -1242,7 +1376,7 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
                             f"{field.label}: '{choice}' is not in the recommended " f"list; it will be {entered}",
                         )
                     )
-                elif field.type == "multichoice":
+                elif field.type in ("multichoice", "text"):
                     if field.options_file:
                         valid = f"run '{options_command(venue.slug, field.id)}' to list the valid options"
                     else:

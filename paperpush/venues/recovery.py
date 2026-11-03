@@ -88,11 +88,14 @@ LOCATOR_FACTORIES = frozenset(
         "filter",
         "and_",
         "or_",
+        "frame_locator",
     }
 )
 
-#: Locator properties that return another locator.
-LOCATOR_PROPERTIES = frozenset({"first", "last"})
+#: Locator / frame-locator properties that return another locator. ``content_frame``
+#: turns an ``iframe`` locator into a frame locator, the way Editorial Manager
+#: and SNAPP reach their wizards.
+LOCATOR_PROPERTIES = frozenset({"first", "last", "content_frame", "owner"})
 
 
 class Resolution(enum.Enum):
@@ -190,6 +193,24 @@ class HumanHandler:
             self._print(f"    Unrecognized answer {answer!r}.")
 
 
+class FallbackHandler:
+    """Ask each handler in turn until one does not abort.
+
+    ``submit --ai`` in a terminal uses this as AI first, then the person, so a
+    step the model gives up on is still the author's to fix by hand.
+    """
+
+    def __init__(self, *handlers: RecoveryHandler):
+        self.handlers = handlers
+
+    def recover(self, page: Any, failure: FailedAction) -> Resolution:
+        for handler in self.handlers:
+            resolution = handler.recover(page, failure)
+            if resolution is not Resolution.ABORT:
+                return resolution
+        return Resolution.ABORT
+
+
 _handler: ContextVar[RecoveryHandler | None] = ContextVar("paperpush_recovery_handler", default=None)
 _step: ContextVar[str | None] = ContextVar("paperpush_recovery_step", default=None)
 # >0 while inside an attempt() unit or an optional step, where single actions are
@@ -227,9 +248,14 @@ def current_step() -> str | None:
 def unrecovered() -> Iterator[None]:
     """Turn off per-action recovery inside this block.
 
-    For best-effort steps whose failure the caller already handles, such as
-    :func:`paperpush.venues.common._try`. Asking a person or an agent to fix a
-    step the script would skip anyway would only slow the run down.
+    For any action whose failure the caller already expects and handles: a
+    best-effort step (:func:`paperpush.venues.common._try`), or a probe such as
+    ``try: x.wait_for(timeout=2000) except PWTimeout: <other branch>``. Without
+    this, every such expected failure would first go to the handler, which under
+    ``--ai`` means a model call. Wrap the probe::
+
+        with unrecovered():
+            x.wait_for(state="visible", timeout=2000)
     """
     token = _suspended.set(_suspended.get() + 1)
     try:
@@ -279,7 +305,11 @@ class _GuardState:
 
 
 class GuardedLocator:
-    """A Playwright locator whose actions go through the recovery handler."""
+    """A Playwright locator (or frame locator) whose actions go through the recovery handler.
+
+    A frame locator has no actions of its own, only the factories that reach
+    into the frame, so the same wrapper serves both.
+    """
 
     __slots__ = ("_locator", "_state", "_desc")
 
@@ -288,20 +318,14 @@ class GuardedLocator:
         self._state = state
         self._desc = desc
 
-    @property
-    def first(self) -> GuardedLocator:
-        return GuardedLocator(self._locator.first, self._state, f"{self._desc}.first")
-
-    @property
-    def last(self) -> GuardedLocator:
-        return GuardedLocator(self._locator.last, self._state, f"{self._desc}.last")
-
     def unwrap(self) -> Any:
         """The real locator (for ``expect`` and other APIs that type-check it)."""
         return self._locator
 
     def __getattr__(self, name: str) -> Any:
         attr = getattr(self._locator, name)
+        if name in LOCATOR_PROPERTIES:
+            return GuardedLocator(attr, self._state, f"{self._desc}.{name}")
         if name in LOCATOR_FACTORIES:
             return _wrap_factory(attr, self._state, f"{self._desc}.", name)
         if name in LOCATOR_ACTIONS:

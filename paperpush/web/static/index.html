@@ -110,7 +110,7 @@
         <div class="stat jump" role="button" tabindex="0" data-target="checks-panel" id="stat-checks-tile" title="Go to the checks"><b id="stat-checks">–</b><span id="stat-checks-label">checks passed (not run yet)</span></div>
       </div>
 
-      <p class="restored" id="local-note" hidden>Editing <code id="local-path"></code> on this computer. Your changes are saved to the file as you make them. <span id="local-status" class="small muted" role="status"></span></p>
+      <p class="restored" id="local-note" hidden>Editing <code id="local-path"></code>. <span id="local-status" class="small muted" role="status"></span></p>
       <p class="restored shared-note" id="shared-note" hidden><strong>Shared form.</strong> Everyone with the link edits this same copy, and edits are saved as you make them. Uploaded files are not shared.<span id="shared-expiry"></span>
         <button type="button" class="link" id="shared-copy">Copy link</button> · <button type="button" class="link" id="shared-stop">Delete for everyone</button>
         <span id="shared-status" class="small muted" role="status"></span></p>
@@ -150,8 +150,14 @@
         <div id="field-groups"></div>
       </form>
 
-      <section class="panel" id="checks-panel">
-        <div class="checks-head">
+      <details class="panel" id="sub-text-panel">
+        <summary><h2>The .sub file</h2></summary>
+        <p class="hint">This is the file the form writes. Edit it here and the form follows.</p>
+        <textarea id="sub-text" class="mono" spellcheck="false" rows="16"></textarea>
+      </details>
+
+      <details class="panel" id="checks-panel" open>
+        <summary class="checks-head">
           <h2>Checks</h2>
           <p class="legend-row" aria-label="Legend">
             <span class="mark st-passed">✔ passed</span>
@@ -159,7 +165,7 @@
             <span class="mark st-warning">▲ warning</span>
             <span class="mark st-pending">○ not checked yet</span>
           </p>
-        </div>
+        </summary>
         <div class="check-actions">
           <button type="button" class="btn primary" id="validate-btn">Validate</button>
           <span class="ai-button-wrap" id="validate-ai-wrap" tabindex="0"><button type="button" class="btn" id="validate-ai-btn" disabled><span aria-hidden="true">✨</span> Validate, extended with AI</button></span>
@@ -168,26 +174,15 @@
         </div>
         <div class="stats" id="check-stats" hidden></div>
         <div id="check-groups"></div>
-      </section>
+      </details>
 
       <section class="final-actions">
-        <button type="button" class="btn" id="show-sub" aria-expanded="false" aria-controls="sub-text-panel">Show .sub file</button>
-        <button type="button" class="btn" id="download-sub">Download .sub file</button>
-        <button type="button" class="btn" id="share-edit" hidden title="Put this form online so others can edit it with you. It is encrypted with a key in the link, so the server cannot read it.">Share for editing</button>
-        <button type="button" class="btn" id="share-link" title="A link that opens this form, filled in and editable, on the paperpush website. Nothing is stored on a server; uploaded files are not included.">Copy share link</button>
-        <button type="button" class="btn" id="download-report" disabled title="Validate first">Download validate file</button>
-        <div class="save-as" role="group" aria-label="Save this page">
-          <span class="save-label">Save this page as</span>
-          <button type="button" class="btn" id="save-page" title="A standalone page to send: the side menu, filters, and search still work">HTML</button>
-          <button type="button" class="btn" id="save-pdf" title="Opens the print dialog: choose “Save as PDF”">PDF</button>
-        </div>
-        <button type="button" class="btn primary" id="portal-btn">Fill out submission portal</button>
-      </section>
-
-      <section class="panel" id="sub-text-panel" hidden>
-        <h3>The .sub file</h3>
-        <p class="hint">This is the file the form writes. Edit it here and the form follows.</p>
-        <textarea id="sub-text" class="mono" spellcheck="false" rows="16"></textarea>
+        <button type="button" class="btn" id="download-sub">Download .sub</button>
+        <button type="button" class="btn" id="download-zip" title="The .sub file and your uploaded files, together">Download .zip</button>
+        <button type="button" class="btn" id="download-report" disabled title="Validate first">Download checks</button>
+        <button type="button" class="btn" id="save-page" title="A standalone page to send: the side menu, filters, and search still work">HTML</button>
+        <button type="button" class="btn primary" id="share-btn" hidden title="Put this form online so others can edit it with you. It is encrypted with a key in the link, so the server cannot read it.">Share</button>
+        <button type="button" class="btn primary btn-two-line" id="portal-btn">Fill out submission portal<br>automatically</button>
       </section>
     </div>
   </main>

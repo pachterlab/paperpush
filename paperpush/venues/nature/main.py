@@ -29,6 +29,8 @@ from ..common import DEFAULT_TIMEOUT_SECONDS, _try, apply_default_timeouts, hold
 from ..common import session_path as _session_path
 from ..common import split_name_first_last as _split_name
 from ..login import VenueLoginError
+from ..recovery import guard, step, unrecovered
+from ..recovery_channel import browser_launch_args
 
 logger = logging.getLogger(__name__)
 
@@ -613,10 +615,12 @@ def _upload_files(page, files: list[tuple]) -> None:
     files = [(entry[0], entry[1]) for entry in files if entry[0]]
 
     for i, (path, type_label) in enumerate(files):
+        step(f"Upload step: file {i + 1} of {len(files)} ({Path(path).name})")
         logger.info("Uploading %s as %r", path, type_label or "(default type)")
         page.locator(f"input[name='file_{i}']").set_input_files(path)
         page.wait_for_timeout(1500)
 
+    step("Upload step: upload files and set file types")
     _click_button(page, "Upload Files", timeout=120000)
 
     # eJP names each type drop-down ``object_file_type_<id>``, the id incrementing
@@ -682,6 +686,11 @@ def _open_contrib_pane(page, n: int) -> None:
     page.wait_for_timeout(300)
 
 
+def _author_label(author: dict) -> str:
+    """A short name for an author, for step labels."""
+    return " ".join(part for part in (author.get("first_name", "").strip(), author.get("last_name", "").strip()) if part) or author.get("name", "").strip() or "unnamed"
+
+
 def _enter_authors(page, authors: list[dict]) -> None:
     """Fill every author on the eJP authors step, not just the corresponding one.
 
@@ -694,10 +703,12 @@ def _enter_authors(page, authors: list[dict]) -> None:
     if not authors:
         return
     corr_index = next((i for i, a in enumerate(authors) if _is_corresponding(a)), 0)
+    step(f"Authors step: corresponding author ({_author_label(authors[corr_index])})")
     _fill_author_fields(page, authors[corr_index], CORR_AUTHOR_PREFIX)
 
     others = [a for i, a in enumerate(authors) if i != corr_index]
     for n, author in enumerate(others, start=1):
+        step(f"Authors step: additional author {n} of {len(others)} ({_author_label(author)})")
         _open_contrib_pane(page, n)
         _fill_author_fields(page, author, CONTRIB_AUTHOR_PREFIX.format(n=n))
 
@@ -740,7 +751,9 @@ def _select_manuscript_type(page, label: str) -> None:
     # an empty option list. Wait for at least one type radio to attach first; if
     # none ever appears the scrape below still raises with the offered options.
     try:
-        page.locator(SEL_MS_TYPE_RADIO).first.wait_for(state="attached", timeout=20000)
+        # A probe: a miss is handled below, so it is not a recovery.
+        with unrecovered():
+            page.locator(SEL_MS_TYPE_RADIO).first.wait_for(state="attached", timeout=20000)
     except Exception:
         pass
     options = page.locator(SEL_MS_TYPE_RADIO).evaluate_all("""els => els.map(e => {
@@ -907,7 +920,8 @@ def _select_subjects(page, subject_value: str, settle_ms: int = 3000) -> None:
     worth surfacing).
     """
     paths = validate_subjects(subject_value)
-    for path in paths:
+    for i, path in enumerate(paths):
+        step(f"Subjects step: category {i + 1} of {len(paths)} ({' | '.join(path)})")
         _select_one_subject(page, path, settle_ms=settle_ms)
 
 
@@ -919,6 +933,7 @@ def _enter_declarations(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     Review, plus the open-access and external-consultation controls where the
     variant offers them. Every control is best-effort.
     """
+    step("Declarations step")
     # Competing interests (required). 'yes' selects the interests-declared radio
     # and types the statement paragraph; anything else declares none.
     if _is_yes(values.get("competing_interests", "")):
@@ -987,12 +1002,14 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
 
     # Wait for the submission link before clicking it: the dashboard loads slowly,
     # and clicking before it appears was a prior failure.
+    step("Dashboard: start a new manuscript")
     submit_link = page.get_by_role("link", name=cfg.submit_new_link)
     submit_link.wait_for(state="visible", timeout=30000)
     submit_link.click()
 
     # Manuscript-type splash: pick the type named in the ``.sub`` (left at eJP's
     # default when blank, as for the monthly category check).
+    step("Manuscript-type step")
     _select_manuscript_type(page, values.get("manuscript_type", ""))
     _click_button(page, BTN_CONTINUE)
 
@@ -1010,6 +1027,7 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     # title per figure/supplementary object, a color radio per figure, and an
     # optional description per supplementary file. Titles fall back to the file
     # name; the id increments with upload order.
+    step("Per-object metadata step")
     title_names = page.locator(SEL_OBJECT_TITLE).evaluate_all("els => els.map(e => e.name)")
     if title_names:
         # eJP renders a title box for every uploaded object (Article File and
@@ -1033,7 +1051,8 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
                 len(objects),
                 len(described),
             )
-        for (_, name, obj_id, is_figure), (path, _type, title, extra) in zip(objects, described):
+        for i, ((_, name, obj_id, is_figure), (path, _type, title, extra)) in enumerate(zip(objects, described)):
+            step(f"Per-object metadata step: object {i + 1} of {min(len(objects), len(described))} ({Path(path).name})")
             title = title or Path(path).stem
             _try(
                 lambda n=name, t=title: page.locator(f"input[name='{n}']").fill(t),
@@ -1056,6 +1075,7 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
                 )
         _click_button(page, BTN_SAVE_CONTINUE)
 
+    step("File-confirmation step")
     # Include all files in merged PDF (Nature only; other family venues omit this).
     if cfg.slug == "nature":
         checkboxes = page.locator('input[name="include_object[]"]')
@@ -1069,6 +1089,7 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     # Code Ocean / figshare deposition step. A code-availability statement sets
     # created=Yes, fills the text, and answers the obligatory enabled radio (No);
     # otherwise decline (the default). figshare is always declined.
+    step("Code Ocean / figshare step")
     code_availability = values.get("code_availability", "").strip()
     if code_availability:
         _try(lambda: page.locator(SEL_CODE_OCEAN_YES).check(), "code-ocean = Yes")
@@ -1081,6 +1102,7 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     _click_button(page, BTN_SAVE_CONTINUE)
 
     # Title and abstract.
+    step("Title/abstract step")
     if manuscript_title:
         page.locator(SEL_TITLE).fill(manuscript_title)
     if abstract:
@@ -1089,6 +1111,7 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
 
     # Authors step: confirm authorship, set the author count, redraw the form,
     # then fill every author (corresponding sub-form plus each additional pane).
+    step("Authors step: author count")
     _try(lambda: page.locator(SEL_AUTHORSHIP_IND).check(), "authorship confirmation")
     if cfg.author_count_mode == "additional":
         # These venues show four author panes by default and only ask for more
@@ -1142,7 +1165,9 @@ def submit_nature(values: dict, headless: bool = False, debug: bool = False, new
     logger.info("Starting %s submission run (headless=%s, debug=%s): " "manuscript=%s", cfg.name, headless, debug, manuscript_file)
 
     with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-        browser = playwright.chromium.launch(headless=headless)
+        # browser_launch_args() is empty unless `submit --cdp-port` asked for a
+        # CDP endpoint that another client (playwright-cli) can attach to.
+        browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
         page = context.new_page()
@@ -1152,11 +1177,17 @@ def submit_nature(values: dict, headless: bool = False, debug: bool = False, new
         if debug:
             page.pause()
 
+        # Sign-in stays unguarded (it is for the author); from here on a failed
+        # action goes to the recovery handler.
+        page = guard(page)
+
         logger.debug("Signed in; starting a new manuscript submission")
         _advance_to_subjects(page, values, cfg)
 
         logger.debug("Reached subject category page")
+        step("Subjects step")
         _select_subjects(page, values.get("subject_level", ""))
+        step("Subjects step: save and continue")
         _click_button(page, BTN_SAVE_CONTINUE)
 
         _enter_declarations(page, values, cfg)
@@ -1335,6 +1366,8 @@ class EJPVenue(Venue):
     field_option_listers = FIELD_OPTION_LISTERS
     #: Log-out control marking an authenticated eJP dashboard (see is_logged_in).
     logged_in_names = LOGOUT_LINK_NAMES
+    #: submit_nature guards its page, so a failed action can be recovered.
+    supports_recovery = True
 
     def submit(
         self,

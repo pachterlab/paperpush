@@ -11,6 +11,7 @@ here never touch the developer's real keychain.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -601,5 +602,90 @@ def test_build_server_exposes_typed_arguments():
     tool = by_name["validate_subfile"]
     # Renamed from inputSchema to input_schema in MCP SDK 2.0.
     schema = getattr(tool, "input_schema", None) or tool.inputSchema
-    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "alt_color", "initial_submission"}
+    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "alt_color", "initial_submission", "ai_only"}
     assert schema["required"] == ["subfile"]
+
+
+# --- recovering a paused submission ------------------------------------------
+
+
+def test_submit_turns_on_agent_recovery_for_a_venue_that_supports_it(fake_launch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    result = mcp_server.submit(str(VALID_SUB))
+    command = fake_launch.instances[0].command
+    assert command[command.index("--recover") + 1] == "agent"
+    recover_dir = Path(command[command.index("--recover-dir") + 1])
+    assert recover_dir.is_dir()
+    assert result["recovery"] is True
+    assert "--cdp-port" not in command
+    status = mcp_server.submit_status(result["pid"])
+    assert status["recovery"] == {"enabled": True, "directory": str(recover_dir), "paused": None, "resolved_so_far": []}
+
+
+def test_submit_can_leave_recovery_off(fake_launch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    result = mcp_server.submit(str(VALID_SUB), recover=False)
+    assert "--recover" not in fake_launch.instances[0].command
+    assert result["recovery"] is False
+    with pytest.raises(ValueError, match="without recovery"):
+        mcp_server.submit_page(result["pid"])
+
+
+def test_submit_skips_recovery_for_an_unconverted_runner(fake_launch, monkeypatch):
+    impl = mcp_server.venues_pkg.get_venue_impl(LOGINLESS_VENUE)
+    monkeypatch.setattr(type(impl), "supports_recovery", False)
+    result = mcp_server.submit(str(LOGINLESS_SUB))
+    assert "--recover" not in fake_launch.instances[0].command
+    assert result["recovery"] is False
+
+
+def test_submit_exposes_cdp_only_when_asked(fake_launch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    result = mcp_server.submit(str(VALID_SUB), expose_cdp=True)
+    command = fake_launch.instances[0].command
+    port = int(command[command.index("--cdp-port") + 1])
+    assert result["cdp_endpoint"] == f"http://127.0.0.1:{port}"
+    assert mcp_server.submit_status(result["pid"])["cdp_endpoint"] == result["cdp_endpoint"]
+
+
+def test_status_reports_a_pause_and_the_tools_reach_the_run(fake_launch, monkeypatch):
+    from paperpush.venues import recovery_channel
+
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    pid = mcp_server.submit(str(VALID_SUB))["pid"]
+    recover_dir = mcp_server._RUNS[pid].recover_dir
+    (recover_dir / recovery_channel.PAUSED_FILE).write_text(json.dumps({"summary": "click() failed during 'Authors page'"}))
+
+    status = mcp_server.submit_status(pid)
+    assert status["recovery"]["paused"] == {"summary": "click() failed during 'Authors page'"}
+    assert "submit_page" in status["next_step"]
+
+    sent = []
+
+    def fake_send(directory, command, **kw):
+        sent.append(command)
+        return {"ok": True}
+
+    monkeypatch.setattr(recovery_channel, "send_command", fake_send)
+    mcp_server.submit_page(pid)
+    mcp_server.submit_act(pid, "click", {"role": "button", "name": "Next"})
+    mcp_server.submit_act(pid, "wait", value="500")
+    assert mcp_server.submit_resume(pid, "resolved", "renamed")["ok"] is True
+    assert sent == [
+        {"op": "snapshot"},
+        {"op": "click", "target": {"role": "button", "name": "Next"}},
+        {"op": "wait", "value": "500"},
+        {"op": "resume", "resolution": "resolved", "note": "renamed"},
+    ]
+    with pytest.raises(ValueError, match="needs a target"):
+        mcp_server.submit_act(pid, "click")
+
+
+def test_recovery_tools_refuse_a_run_that_is_not_paused(fake_launch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    pid = mcp_server.submit(str(VALID_SUB))["pid"]
+    with pytest.raises(ValueError, match="not paused"):
+        mcp_server.submit_page(pid)
+    fake_launch.instances[0]._exit_code = 1
+    with pytest.raises(ValueError, match="already exited"):
+        mcp_server.submit_resume(pid, "abort")

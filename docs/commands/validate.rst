@@ -15,7 +15,7 @@ Run the pre-submission checks on a filled ``.sub`` file. Run this before
                              [--arxiv-latex-cleaner] [--initial-submission]
                              [-o [PATH]] [--alt-color]
                              [--ai] [--provider {anthropic,openai,google}]
-                             [--model MODEL] [--ai-tasks FILE]
+                             [--model MODEL] [--ai-only] [--ai-tasks FILE]
                              [--ai-results FILE]
                              subfile
 
@@ -262,6 +262,15 @@ Arguments
    "evidence"}]}`` with ``status`` one of ``pass``, ``fail``, ``unclear``,
    ``not_applicable``.
 
+``--ai-only``
+   Report only the checks that need AI, without the deterministic ones (form
+   fields, files, links, DOIs, sensitive data, hidden text, OpenReview
+   profiles, and the manuscript's measured checks). The manuscript is still
+   read, offline, to find which AI checks apply. Combine it with ``--ai``,
+   ``--ai-tasks``, or ``--ai-results``; on its own it lists the AI checks as
+   needing AI. The report carries no ready-to-submit verdict, and it cannot be
+   combined with ``--dont-check-manuscript`` or ``--web``.
+
 Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags. Use ``-v``
 to see the checks as they run.
 
@@ -297,6 +306,12 @@ Let an agent do the AI checks, then merge its answers:
    paperpush validate biorxiv.sub --ai-tasks tasks.json
    # ... the agent writes results.json ...
    paperpush validate biorxiv.sub --ai-results results.json -o
+
+Re-run just the AI checks, e.g. after fixing a figure:
+
+.. code-block:: bash
+
+   paperpush validate biorxiv.sub --ai-only --ai-results results.json
 
 Clean arXiv LaTeX source and check the result:
 

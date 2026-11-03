@@ -36,6 +36,8 @@ from ..common import save_storage
 from ..common import split_name_first_last as _split_name
 from ..common import wait_for_human
 from ..login import VenueLoginError, login_orcid
+from ..recovery import GuardedPage, guard, step, unrecovered
+from ..recovery_channel import browser_launch_args
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +201,9 @@ def _click_first(locators, what: str, timeout_ms: int = 5000) -> bool:
     last: Exception | None = None
     for locator in locators:
         try:
-            locator.click(timeout=timeout_ms)
+            # A probe: a spelling that does not match is expected, so not recovered.
+            with unrecovered():
+                locator.click(timeout=timeout_ms)
             return True
         except Exception as exc:  # noqa: BLE001 -- try the next spelling
             last = exc
@@ -284,7 +288,8 @@ def _pick_or_enter_institution(cf, institution: str) -> bool:
     suggestions = cf.locator("ul.ui-autocomplete:visible li")
 
     try:
-        suggestions.first.wait_for(state="visible", timeout=1500)
+        with unrecovered():  # a probe: no suggestion is an expected outcome
+            suggestions.first.wait_for(state="visible", timeout=1500)
         suggestions.first.click()
         return True
     except PlaywrightTimeoutError:
@@ -310,7 +315,8 @@ def _pick_funder(cf, value: str) -> None:
 
     suggestions = cf.locator("ul.ui-autocomplete:visible li")
     try:
-        suggestions.first.wait_for(state="visible", timeout=2000)
+        with unrecovered():  # a probe: no suggestion is an expected outcome
+            suggestions.first.wait_for(state="visible", timeout=2000)
         suggestions.first.click()
     except PlaywrightTimeoutError:
         logger.warning("No funder suggestion appeared for %r; leaving typed text", value)
@@ -587,9 +593,18 @@ PLOS_MANUSCRIPT_ITEM_TYPE = "6"
 def _upload(page, cf, path: str) -> None:
     """Attach one file: "Browse..." is a button (not a file input), so intercept
     the native file chooser it opens and hand it the file."""
-    with page.expect_file_chooser() as fc_info:
-        cf.get_by_role("button", name="Browse...").click()
-    fc_info.value.set_files(path)
+
+    def attach(page) -> None:
+        with page.expect_file_chooser() as fc_info:
+            cf.get_by_role("button", name="Browse...").click()
+        fc_info.value.set_files(path)
+
+    # The click and the file chooser it opens only make sense together, so they
+    # are one recoverable unit when the page is guarded.
+    if isinstance(page, GuardedPage):
+        page.attempt(f"attach {path!r} via the Browse... button", attach)
+    else:
+        attach(page)
 
 
 def _attached_row(cf, path: str) -> tuple[int, str]:
@@ -697,27 +712,33 @@ def _attach_files(page, cf, manuscript_file: str, cover_letter: str, declaration
     for _ in range(2):
         try:
             page.wait_for_timeout(2000)
-            page.get_by_role("button", name="Close").click(timeout=4000)
+            with unrecovered():  # a probe: the popup may not appear
+                page.get_by_role("button", name="Close").click(timeout=4000)
         except:  # Button didn't appear, continue
             pass
 
     # The manuscript takes the main-document type: the default on the Cell
     # family, an explicit type on deployments that ask for one (PLOS).
+    step(f"Attach Files page: manuscript ({Path(manuscript_file).name})")
     _attach_one(page, cf, manuscript_file, PLOS_MANUSCRIPT_ITEM_TYPE if cfg.annotate_manuscript_manually else "", "manuscript", description="Manuscript" if cfg.annotate_manuscript_manually else "")
 
     _try(lambda: page.get_by_role("button", name="Close").click(timeout=3000), "Close popup")
 
     if cover_letter:
+        step(f"Attach Files page: cover letter ({Path(cover_letter).name})")
         _attach_one(page, cf, cover_letter, cfg.cover_letter_label, "cover letter")
 
     if declaration_file:
+        step(f"Attach Files page: declaration of interests ({Path(declaration_file).name})")
         _attach_one(page, cf, declaration_file, DECLARATION_ITEM_TYPE, "declaration of interests")
 
-    for figure, label in figure_files or []:
+    for i, (figure, label) in enumerate(figure_files or []):
+        step(f"Attach Files page: figure {i + 1} of {len(figure_files)} ({Path(figure).name})")
         _attach_one(page, cf, figure, FIGURE_ITEM_TYPE, "figure", description=label)
 
     _try(lambda: page.get_by_role("button", name="Close").click(timeout=3000), "Close popup")
 
+    step("Attach Files page: Proceed")
     # Proceed off the attach-files step, then past the file-order confirmation.
     cf.get_by_role("button", name=" Proceed").click()
 
@@ -1039,7 +1060,8 @@ def _click_save(cf, name: str) -> None:
     button second.
     """
     try:
-        cf.locator(".fl-flToolSave:visible").first.click(timeout=3000)
+        with unrecovered():  # a probe: the icon is absent on some deployments
+            cf.locator(".fl-flToolSave:visible").first.click(timeout=3000)
     except Exception:  # noqa: BLE001 -- fall back to the labelled button
         cf.get_by_role("button", name=name).first.click(timeout=5000)
 
@@ -1122,7 +1144,8 @@ def _enter_authors(page, cf, authors: list[dict]) -> None:
     # The pre-filled row is the corresponding author; fall back to the first line.
     corresponding = next((a for a in authors if _is_corresponding(a)), authors[0])
 
-    for author in authors:
+    for i, author in enumerate(authors):
+        step(f"Authors section: author {i + 1} of {len(authors)} ({author.get('name', '')})")
         page.wait_for_timeout(2000)
         if author is corresponding:
 
@@ -1149,6 +1172,7 @@ def _enter_authors(page, cf, authors: list[dict]) -> None:
     # drag corresponding from 0 to the index of corresponding author
     corresponding_index = authors.index(corresponding)
     if corresponding_index != 0:
+        step("Authors section: move the corresponding author into place")
         _drag_author(cf, page, 0, corresponding_index)
 
 
@@ -1197,6 +1221,7 @@ def _enter_reviewers(page, cf, reviewers: list[dict]) -> None:
 
     def _add_all(group: list[dict]) -> None:
         for index, reviewer in enumerate(group):
+            step(f"Reviewers page: {reviewer['stance']} reviewer {index + 1} of {len(group)} ({reviewer.get('name', '')})")
             if index:
                 page.wait_for_timeout(2000)
             _try(lambda r=reviewer: _add_reviewer(page, cf, r), f"add reviewer {reviewer.get('name', '')}".strip())
@@ -1238,7 +1263,8 @@ def _enter_funding(page, cf, funders: list[dict], cfg: Variant = _DEFAULT) -> No
                 return
         raise RuntimeError(f"No visible {toolname} button found")
 
-    for funder in funders:
+    for i, funder in enumerate(funders):
+        step(f"Funding Information section: funder {i + 1} of {len(funders)} ({funder['name']})")
 
         def _add(f=funder) -> None:
             cf.get_by_role("button", name="+Add a Funding Source").nth(1).click()
@@ -1265,7 +1291,8 @@ def _select_publishing_options(page, cf, open_access: bool, cfg: Variant = _DEFA
     # Opens a separate window (captured via expect_popup); the button only appears
     # once the PDF build is far enough along, so allow a generous wait.
     try:
-        with page.expect_popup() as popup_info:
+        # A probe: the button may never appear, which skips this optional step.
+        with unrecovered(), page.expect_popup() as popup_info:
             cf.get_by_role("button", name="Publishing Options").click(timeout=15000)
         popup = popup_info.value
     except Exception as exc:  # noqa: BLE001 -- best-effort optional step
@@ -1337,7 +1364,9 @@ def editorialmanager_run(values: dict, headless: bool = False, debug: bool = Fal
     logger.info("Starting %s submission run (headless=%s, debug=%s, type=%s, " "manuscript=%s, authors=%d, reviewers=%d, figures=%d)", cfg.name, headless, debug, article_type, manuscript_file, len(authors), len(reviewers), len(figure_files))
 
     with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-        browser = playwright.chromium.launch(headless=headless)
+        # browser_launch_args() is empty unless `submit --cdp-port` asked for a
+        # CDP endpoint that another client (playwright-cli) can attach to.
+        browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
         context = open_run_context(browser, venue.session_path(), new_session=new_session)
         apply_default_timeouts(context, timeout)
         page = context.new_page()
@@ -1347,8 +1376,15 @@ def editorialmanager_run(values: dict, headless: bool = False, debug: bool = Fal
         if debug:
             page.pause()
 
+        # Sign-in stays unguarded (it is the author's to complete). From here on,
+        # a failed action goes to the recovery handler set by the caller (by
+        # default it aborts, as an unguarded run would). The Publishing Options
+        # and Classifications popups are raw pages, so actions there are not.
+        page = guard(page)
+
         cf = _content(page)
 
+        step("Main Menu: start a new submission")
         logger.debug("Signed in; opening the Main Menu, then starting a new submission")
         _open_main_menu(page)
         cf.get_by_role("link", name=SUBMIT_NEW_LINK).click()
@@ -1356,12 +1392,17 @@ def editorialmanager_run(values: dict, headless: bool = False, debug: bool = Fal
         _try(lambda: cf.get_by_role("button", name="Start a new submission").click(timeout=5000), "start-new-submission popup")
         _try(lambda: cf.get_by_role("button", name="Close").click(timeout=5000), "new-submission popup")
 
+        step("Article Type page")
         _select_article_type(cf, article_type)
 
+        step("Attach Files page")
         _attach_files(page, cf, manuscript_file, cover_letter, declaration_file, figure_files, cfg=cfg)
         if cfg.has_section_classifications:
+            step("Section/Category and Classifications page")
             _enter_section_classifications(page, cf, section, classifications)
+        step("Reviewers page")
         _enter_reviewers(page, cf, reviewers)
+        step("Additional Information (declarations) page")
         if cfg.plos_declarations:
             _answer_declarations_plos(
                 page,
@@ -1379,14 +1420,20 @@ def editorialmanager_run(values: dict, headless: bool = False, debug: bool = Fal
         else:
             _answer_declarations(cf, related_work, original_code, code_url, alternate_contact, confirm_declarations, cfg=cfg)
         if cfg.has_comments_page:
+            step("Comments page")
             _enter_comments(page, cf, values.get("comments", ""))
+        step("Manuscript Data page: title, abstract, keywords")
         _enter_metadata(cf, title, abstract, keywords, short_title)
+        step("Manuscript Data page: Authors section")
         _enter_authors(page, cf, authors)
+        step("Manuscript Data page: Funding Information section")
         _enter_funding(page, cf, funders, cfg=cfg)
 
+        step("Build PDF for Approval")
         # "Save & Submit Later" is avoided here: it erases entered manuscript data.
         _try(lambda: cf.get_by_role("button", name="Build PDF for Approval").click(), "Build PDF for Approval")
 
+        step("Publishing Options")
         # After the PDF is built, set the open-access publishing option.
         _select_publishing_options(page, cf, open_access, cfg=cfg)
 
@@ -1413,6 +1460,12 @@ class EditorialManagerVenue(Venue):
     #: Every Editorial Manager deployment offers "Login using ORCID" on its
     #: sign-in panel, so this holds for the whole portal rather than per variant.
     supports_orcid_login = True
+    #: editorialmanager_run guards its page, so a failed action can be recovered.
+    supports_recovery = True
+    #: Nothing beyond the generic labels: "Build PDF for Approval" and "Approve
+    #: Submission" (the control that actually sends an EM submission) are both
+    #: already matched by recovery_channel.FINAL_SUBMIT_PREFIX_RE.
+    final_submit_names: tuple[str, ...] = ()
 
     # display_name is inherited: the base returns get_venue(slug).name == variant.name.
 
@@ -1525,55 +1578,59 @@ class EditorialManagerVenue(Venue):
         Overrides the base orchestrator for two quirks: a settle after loading the
         portal (the content frame is slow to populate), and the
         :func:`_login_available` shortcut for when Cell lands already signed in.
+
+        Runs unrecovered, like the base orchestrator: a password, CAPTCHA or
+        two-factor prompt is the author's to handle.
         """
-        cfg = self.variant
-        session = self.session_path()
+        with unrecovered():
+            cfg = self.variant
+            session = self.session_path()
 
-        if session.exists():
-            logger.debug("Trying the saved %s session at %s", cfg.name, session)
-            page.goto(cfg.portal_url)
-            page.wait_for_timeout(2000)
-            if self.is_logged_in(page):
-                logger.info("Reusing the saved %s session", cfg.name)
-                return True
-            logger.info("Saved %s session expired; re-authenticating", cfg.name)
+            if session.exists():
+                logger.debug("Trying the saved %s session at %s", cfg.name, session)
+                page.goto(cfg.portal_url)
+                page.wait_for_timeout(2000)
+                if self.is_logged_in(page):
+                    logger.info("Reusing the saved %s session", cfg.name)
+                    return True
+                logger.info("Saved %s session expired; re-authenticating", cfg.name)
 
-        cred = None
-        try:
-            cred = credentials.get_credential(cfg.slug)
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("Could not load stored %s credentials (%s)", cfg.name, exc)
             cred = None
+            try:
+                cred = credentials.get_credential(cfg.slug)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Could not load stored %s credentials (%s)", cfg.name, exc)
+                cred = None
 
-        # Shared branch: an ORCID credential signs in with orcid=True, anything
-        # else through the Editorial Manager credential form.
-        if self._sign_in_with_credential(page, cred):
-            save_storage(context, session)
-            logger.info("Signed in to %s; saved the session for reuse", cfg.name)
-            print("Signed in; saved the session for next time.")
-            return True
-
-        # Manual fallback: reached when there are no usable credentials or the auto
-        # sign-in failed. An Elsevier institutional sign-in fails part-way with
-        # its institution picker open (see _login_elsevier); that page is left
-        # for the human rather than reloading the portal over it.
-        off_portal = page.url.startswith("http") and "editorialmanager.com" not in page.url
-        if not off_portal:
-            page.goto(cfg.login_url)
-            _dismiss_cookies(page)
-
-            # When no sign-in control is offered, Cell already kept us signed in:
-            # save the session and skip the manual step.
-            if not _login_available(page):
-                logger.info("%s already kept us signed in; skipping the sign-in step", cfg.name)
+            # Shared branch: an ORCID credential signs in with orcid=True, anything
+            # else through the Editorial Manager credential form.
+            if self._sign_in_with_credential(page, cred):
                 save_storage(context, session)
+                logger.info("Signed in to %s; saved the session for reuse", cfg.name)
+                print("Signed in; saved the session for next time.")
                 return True
 
-        if debug:
-            logger.debug("Debug mode: leaving sign-in to the Inspector pause")
-            return False
+            # Manual fallback: reached when there are no usable credentials or the auto
+            # sign-in failed. An Elsevier institutional sign-in fails part-way with
+            # its institution picker open (see _login_elsevier); that page is left
+            # for the human rather than reloading the portal over it.
+            off_portal = page.url.startswith("http") and "editorialmanager.com" not in page.url
+            if not off_portal:
+                page.goto(cfg.login_url)
+                _dismiss_cookies(page)
 
-        logger.info("Falling back to a manual %s sign-in", cfg.name)
-        wait_for_human(f"Sign in to {cfg.name} in the browser window")
-        save_storage(context, session)
-        return True
+                # When no sign-in control is offered, Cell already kept us signed in:
+                # save the session and skip the manual step.
+                if not _login_available(page):
+                    logger.info("%s already kept us signed in; skipping the sign-in step", cfg.name)
+                    save_storage(context, session)
+                    return True
+
+            if debug:
+                logger.debug("Debug mode: leaving sign-in to the Inspector pause")
+                return False
+
+            logger.info("Falling back to a manual %s sign-in", cfg.name)
+            wait_for_human(f"Sign in to {cfg.name} in the browser window")
+            save_storage(context, session)
+            return True

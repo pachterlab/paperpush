@@ -35,7 +35,7 @@ to it:
 - **Passed** -- the check ran and found nothing wrong, often with a note of
   what it measured ("2 raster figures, lowest 600 dpi").
 - **Not applicable** -- the venue sets no such rule, or the submission has
-  nothing for the check to look at. Listed in one line at the end.
+  nothing for the check to look at. Listed at the end, one check per line.
 
 In the terminal the sections are coloured: green for passed, red for failed,
 amber for warnings, yellow for anything not checked. ``--alt-color`` switches
@@ -542,6 +542,9 @@ unless one of these runs them:
   ``--ai-results FILE`` merges its answers. The ``paperpush-validate`` Claude
   skill does exactly this, and the MCP server offers ``validation_ai_tasks`` and
   ``validate_subfile(ai_results=...)``.
+
+Add ``--ai-only`` (MCP: ``validate_subfile(ai_only=True)``) to report just the
+AI checks and skip the deterministic ones.
 
 An AI verdict is marked "(AI)" in the report. A failed AI check is a warning:
 it is a judgement, not a measurement, so it never blocks submission.

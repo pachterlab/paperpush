@@ -62,7 +62,7 @@ _HEADINGS = {
 # Markers for the terminal, HTML, and Markdown, and the ASCII ones the PDF's
 # standard fonts can draw.
 _MARKS = {FAILED: "✖", WARNING: "▲", UNCHECKED: "?", NEEDS_AI: "?", NOT_IMPLEMENTED: "–", PASSED: "✔", NOT_APPLICABLE: "·"}
-_ASCII_MARKS = {FAILED: "[FAIL]", WARNING: "[WARN]", UNCHECKED: "[SKIP]", NEEDS_AI: "[AI]", NOT_IMPLEMENTED: "[TODO]", PASSED: "[PASS]", NOT_APPLICABLE: "[N/A]"}
+_ASCII_MARKS = {FAILED: "[FAIL]", WARNING: "[WARN]", UNCHECKED: "[SKIP]", NEEDS_AI: "[AI]", NOT_IMPLEMENTED: "[TODO]", PASSED: "[PASS]", NOT_APPLICABLE: "[NA]"}
 
 
 @dataclass(frozen=True)
@@ -149,6 +149,8 @@ class ValidationReport:
     # warning (``downgraded`` of them).
     initial_submission: bool = False
     downgraded: int = 0
+    # Validated with --ai-only: only the checks that need AI were reported.
+    ai_only: bool = False
 
     def by_status(self, status: str) -> list[CheckResult]:
         return [r for r in self.results if r.status == status]
@@ -183,6 +185,7 @@ class ValidationReport:
             "initial_submission_rule": self.initial_submission_rule,
             "initial_submission": self.initial_submission,
             "downgraded": self.downgraded,
+            "ai_only": self.ai_only,
             "checks": [r.to_dict() for r in self.results],
         }
 
@@ -242,15 +245,14 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True) -> li
     verdict = "Ready to submit: no blocking errors." if report.ok else f"Not ready: {len(report.errors)} error(s) must be fixed before submitting."
     if report.initial_submission:
         verdict = f"Ready to submit as an initial submission: {report.downgraded} error(s) shown as warnings; fix them before the revision." if report.downgraded else "Ready to submit: no blocking errors."
-    lines.append(_Line("summary", verdict, status=PASSED if report.ok else FAILED))
+    if report.ai_only:
+        verdict = "AI checks only (--ai-only): the deterministic checks were not run, so this is not a verdict on whether the submission is ready."
+    lines.append(_Line("summary", verdict, status=WARNING if report.ai_only else PASSED if report.ok else FAILED))
     for status in STATUSES:
         results = report.by_status(status)
         if not results:
             continue
         lines.append(_Line("heading", f"{_HEADINGS[status]} ({len(results)})", status=status))
-        if status == NOT_APPLICABLE:
-            lines.append(_Line("note", ", ".join(f"{r.title}" for r in results), indent=1, status=status))
-            continue
         # A note every check in the section shares (e.g. how to run the AI
         # checks) is said once, under the heading.
         shared = results[0].detail if len(results) > 1 and all(r.detail == results[0].detail and not r.issues for r in results) else ""
@@ -259,7 +261,8 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True) -> li
         for result in results:
             suffix = " (AI)" if result.source == "ai" else ""
             lines.append(_Line("check", f"[{result.category}] {result.title}{suffix}", indent=1, status=status))
-            if result.detail and not shared and (status != PASSED or show_passed_details):
+            # A not-applicable check is listed on one line, without its reason.
+            if result.detail and not shared and status != NOT_APPLICABLE and (status != PASSED or show_passed_details):
                 lines.append(_Line("note", result.detail, indent=2, status=status))
             if status in (PASSED, NOT_APPLICABLE):
                 continue

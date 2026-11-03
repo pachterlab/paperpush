@@ -22,6 +22,8 @@ from playwright.sync_api import sync_playwright
 from ...validate import parse_authors
 from ..base import Venue
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure
+from ..recovery import guard, step, unrecovered
+from ..recovery_channel import browser_launch_args
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,10 @@ def _select_label_or_value(select, choice: str) -> None:
         # EditFlow enhances the editor multi-select with JavaScript and hides
         # the real <select>. Selecting it still fires the normal input/change
         # events, but Playwright needs ``force`` because it is not visible.
-        select.select_option(label=choice, force=True)
+        # The label is a probe (the value fallback below handles a miss), so
+        # its failure is not handed to the recovery handler.
+        with unrecovered():
+            select.select_option(label=choice, force=True)
     except Exception:  # noqa: BLE001 -- a fixture may intentionally use the portal value
         select.select_option(value=choice, force=True)
 
@@ -63,6 +68,9 @@ class EditFlowVenue(Venue):
 
     requires_login = False
     supports_session_capture = False
+    #: submit() guards its page, so a failed action can be recovered. The live
+    #: control on the final page is EditFlow's generic "Submit".
+    supports_recovery = True
 
     def login(self, page, username: str, password: str, *, timeout_ms: int = 15000) -> None:
         """EditFlow has no author login; new submissions use the public form."""
@@ -102,7 +110,8 @@ class EditFlowVenue(Venue):
         logger.info("Starting %s EditFlow submission (%d author(s), headless=%s, debug=%s)", venue, len(authors), headless, debug)
 
         with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
-            browser = playwright.chromium.launch(headless=headless)
+            # browser_launch_args() is empty unless `submit --cdp-port` asked for a CDP endpoint.
+            browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
             # EditFlow starts every new submission without an account or saved
             # session. ``new_session`` is accepted for the uniform runner API but
             # is therefore intentionally immaterial here.
@@ -110,21 +119,27 @@ class EditFlowVenue(Venue):
             apply_default_timeouts(context, timeout)
             page = context.new_page()
             self.ensure_signed_in(page, context, debug=debug)
+            # Sign-in (a no-op here) stays unguarded. From here on a failed action
+            # goes to the recovery handler.
+            page = guard(page)
 
             if debug:
                 page.pause()
 
+            step("Step 0: author agreement")
             # Step 0: this is an author attestation and is checked only because
             # the .sub's never-autofilled confirmation is explicitly affirmative.
             page.get_by_role("checkbox", name="I have read and understood").check()
             _next(page)
 
+            step("Step 1: author count")
             # Step 1: declare the author count. EditFlow then shows an intermediate
             # author-list page before the individual author-details form.
             page.get_by_role("textbox", name="How many authors does your").fill(str(len(authors)))
             _next(page)
             _next(page)
 
+            step("Step 2: author details")
             # Step 2: repeated author controls share accessible names, so address
             # them by author position. Email is entered first because EditFlow may
             # use it to recognize a returning author and prefill the other fields.
@@ -141,6 +156,7 @@ class EditFlowVenue(Venue):
             countries = page.locator('select[id^="author_paper-submission_country"]')
 
             for index, author in enumerate(authors):
+                step(f"Step 2: author details, author {index + 1} of {len(authors)}")
                 emails.nth(index).fill(author.get("email", ""))
                 given_names.nth(index).fill(author.get("first_name", ""))
                 middle = author.get("middle_name", "")
@@ -154,12 +170,14 @@ class EditFlowVenue(Venue):
                 countries.nth(index).select_option(label=author.get("country", ""))
             _next(page)
 
+            step("Step 3: title and MSC classification")
             # Step 3: the MSC control validates on navigation; a venue-specific
             # field validator catches malformed codes before the browser opens.
             page.get_by_role("textbox", name="Article Title").fill(title)
             page.locator("#mscp0").fill(msc_classification)
             _next(page)
 
+            step("Step 4: editor, arXiv reference, abstract, and PDF")
             # Final form page. Editor choice is an author policy decision, so its
             # .sub field is never autofilled. Prefer a readable label; accept the
             # portal's numeric option value for stable test fixtures.

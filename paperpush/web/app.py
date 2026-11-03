@@ -20,9 +20,11 @@ files (``validate``), the ones only an LLM can judge (``ai``), and the
 guideline rules paperpush has no check for (``manual``). ``/plan`` lists them
 before anything has been checked; ``/validate`` runs them.
 
-The downloadable bundle (``.sub`` plus its files in one zip) keeps the bare
-names, so ``paperpush validate`` and ``paperpush submit`` work on it unchanged
-from inside the unzipped folder.
+The downloadable bundle (:func:`write_bundle`) is one folder holding the
+``.sub`` and every file it names, figures, tables, and supplementary files
+in their own subfolders, with
+the ``.sub``'s paths rewritten to match, so ``paperpush validate`` and
+``paperpush submit`` work on it unchanged from inside the unzipped folder.
 
 ``paperpush subfile|autofill|validate --web`` serves the same page for one
 ``.sub`` file on the author's own machine (:func:`serve_local`). That
@@ -47,6 +49,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import webbrowser
 import zipfile
@@ -54,7 +57,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
@@ -65,13 +68,15 @@ from .. import venuefile
 from .. import venues as venues_pkg
 from .._logging import configure_logging
 from ..autofill import effective_role
-from ..database import Venue, get_venue
+from ..database import Venue, accepted_options, get_venue
 from ..filematch import match_files
 from ..mcp_server import field_options, list_supported_venues
 from ..requirements import any_format_initial_rule, get_requirements
 from ..requirements import resolve as resolve_requirements
+from ..requirements_check import upload_role_ids
 from ..subfile import default_filename
 from ..subfile import parse as parse_subfile
+from ..subfile import replace_block, replace_scalar
 from ..subfile import render_template
 from ..validate import validate_report
 from .shared import DEFAULT_TTL_DAYS, SharedFormError, SharedForms
@@ -94,6 +99,7 @@ _UNSAFE_NAME_CHARS = re.compile(r"[|/\\\x00-\x1f\x7f]")
 # ports them); everything they look at is in the form itself.
 LIVE_CHECKS = frozenset(
     {
+        "form.schema",
         "form.required",
         "form.options",
         "form.counts",
@@ -428,6 +434,78 @@ def _bare(path_text: str) -> str:
     return path_text.strip().replace("\\", "/").rsplit("/", 1)[-1]
 
 
+class MissingFiles(Exception):
+    """Files a ``.sub`` names that are not there to bundle."""
+
+    def __init__(self, missing: list[str]):
+        super().__init__(", ".join(missing))
+        self.missing = missing
+
+
+def write_bundle(zf: zipfile.ZipFile, folder: str, sub_name: str, text: str, venue: Optional[Venue], resolve, extra: tuple[Path, ...] = ()) -> None:
+    """Write the ``.sub`` and every file it names into ``folder/`` in ``zf``.
+
+    ``resolve`` turns a path as the ``.sub`` names it into the file to pack.
+    Whatever is in the venue's figures upload box goes in ``folder/figures/``,
+    its tables box in ``folder/tables/``, its supplementary box in
+    ``folder/supplementary/``, every other file beside the ``.sub``, and the ``.sub`` written into the zip names
+    them there, so the unzipped folder validates and submits as it is. Two
+    different files with the same name get ``-2``, ``-3`` ... ``extra`` files
+    (uploads the ``.sub`` does not name) go beside the ``.sub`` too. Raises
+    :class:`MissingFiles`, before writing anything, if a named file is not found.
+    """
+    placed: dict[Path, str] = {}  # source file -> its path inside the folder
+    taken: set[str] = {sub_name}
+
+    def place(src: Path, subdir: str) -> str:
+        key = src.resolve()
+        if key in placed:
+            return placed[key]
+        stem, suffix = Path(src.name).stem, Path(src.name).suffix
+        name, n = f"{subdir}{src.name}", 1
+        while name.lower() in taken:
+            n += 1
+            name = f"{subdir}{stem}-{n}{suffix}"
+        taken.add(name.lower())
+        placed[key] = name
+        return name
+
+    missing: list[str] = []
+    rewrites: list[tuple[str, str, bool]] = []  # field id, new value, is a block
+    for field in venue.fields if venue else ():
+        if field.type not in ("file", "filelist"):
+            continue
+        raw = parse_subfile(text).values.get(field.id, "")
+        if not raw.strip():
+            continue
+        subdir = next((f"{role}/" for role in ("figures", "tables", "supplementary") if field.id in upload_role_ids(role)), "")
+        lines = raw.splitlines() if field.type == "filelist" else [raw.strip()]
+        out_lines = []
+        for line in lines:
+            path_part, sep, rest = line.partition("|")
+            if not path_part.strip():
+                out_lines.append(line)
+                continue
+            src = resolve(path_part.strip())
+            if src is None or not src.is_file():
+                missing.append(path_part.strip())
+                out_lines.append(line)
+                continue
+            new = place(src, subdir)
+            out_lines.append(f"{new} {sep}{rest}" if sep else new)
+        rewrites.append((field.id, "\n".join(out_lines), field.type == "filelist"))
+    if missing:
+        raise MissingFiles(list(dict.fromkeys(missing)))
+    for fid, value, block in rewrites:
+        text = replace_block(text, fid, value) if block else replace_scalar(text, fid, value)
+    for src in extra:
+        if src.is_file() and src.resolve() not in placed:
+            place(src, "")
+    zf.writestr(f"{folder}/{sub_name}", text)
+    for src, name in placed.items():
+        zf.write(src, f"{folder}/{name}")
+
+
 def localize_values(venue: Venue, values: dict[str, str], files: Path) -> dict[str, str]:
     """Point every upload path in ``values`` at the workspace copy of that file.
 
@@ -459,6 +537,41 @@ def _scrub(message: str, files: Path, api_key: Optional[str] = None) -> str:
     if api_key:
         message = message.replace(api_key, "[your API key]")
     return message.replace(f"{files}{os.sep}", "").replace(str(files), "")
+
+
+def _stream_progress(run, files: Path, api_key: Optional[str] = None):
+    """Yield NDJSON lines for ``run(progress)``: progress events, then its result.
+
+    ``run`` works in a thread and reports each stage through ``progress``; this
+    generator relays them as ``{"progress": {"done", "total", "label"}}`` lines
+    and ends with ``{"result": ...}``, or ``{"error": ...}`` if ``run`` raised.
+    """
+    import json
+    import queue
+
+    events: queue.Queue = queue.Queue()
+    sentinel = object()
+
+    def progress(done: int, total: int, label: str) -> None:
+        events.put({"progress": {"done": done, "total": total, "label": label}})
+
+    def work() -> None:
+        try:
+            events.put({"result": run(progress)})
+        except HTTPException as exc:
+            events.put({"error": _scrub(str(exc.detail), files, api_key)})
+        except Exception as exc:  # noqa: BLE001 -- report it to the page
+            logger.exception("validate failed")
+            events.put({"error": _scrub(f"validation failed ({type(exc).__name__}: {exc})", files, api_key)})
+        finally:
+            events.put(sentinel)
+
+    threading.Thread(target=work, name="paperpush-validate", daemon=True).start()
+    while True:
+        event = events.get()
+        if event is sentinel:
+            return
+        yield json.dumps(event) + "\n"
 
 
 def localize_local(venue: Venue, values: dict[str, str], local: LocalSession) -> dict[str, str]:
@@ -507,6 +620,9 @@ def _venue_or_404(slug: str) -> Venue:
 def _field_dict(venue: Venue, field) -> dict[str, Any]:
     data = dataclasses.asdict(field)
     data["role"] = effective_role(field)
+    # Values the live checks accept: the options plus, for "code (Label)"
+    # options (arXiv categories), the bare codes the .sub actually stores.
+    data["accepted_options"] = accepted_options(field)
     # Fields whose options form a tree (Nature's subject areas) are browsed a
     # level at a time through /options rather than shipped as one list.
     data["hierarchical"] = field.id in venues_pkg.get_field_option_listers(venue.slug)
@@ -584,6 +700,21 @@ def live_rules(venue: Venue, values: dict[str, str]) -> dict[str, dict[str, Any]
         max_keywords=k.max if own("keywords", "max_count") is None else None,
     )
     return rules
+
+
+def venue_schema_issues(venue: Venue, report) -> list[dict[str, str]]:
+    """The ``form.schema`` findings of the venue's own field validators.
+
+    ``static/checks.js`` ports the generic schema but not these (Nature's
+    subject tree, ...), so the plan hands them to the page to show as it types.
+    """
+    custom = set(venues_pkg.get_field_validators(venue.slug))
+    if not custom:
+        return []
+    result = next((r for r in report.results if r.id == "form.schema"), None)
+    if result is None:
+        return []
+    return [{"level": i.level, "field": i.field, "message": i.message} for i in result.issues if i.field in custom]
 
 
 def venue_detail(slug: str) -> dict[str, Any]:
@@ -736,6 +867,9 @@ class ValidateRequest(BaseModel):
     anonymous: Optional[bool] = None
     # Report every error as a warning (paperpush validate --initial-submission).
     initial_submission: bool = False
+    # Answer with NDJSON: {"progress": {...}} lines as each stage starts, then
+    # one {"result": {...}} (or {"error": "..."}) line. The page's progress bar.
+    stream: bool = False
 
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
@@ -808,6 +942,12 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             "workspace": LOCAL_WS,
             "files": local.list_files(),
         }
+
+    @app.get("/api/local/ping")
+    def ping_local(x_paperpush_token: Optional[str] = Header(None)) -> dict[str, Any]:
+        """Keep-alive from an open page (a background preview server stops when idle)."""
+        local_session(x_paperpush_token)
+        return {"ok": True}
 
     @app.post("/api/local/pick")
     def pick_local(req: PickRequest, x_paperpush_token: Optional[str] = Header(None)) -> dict[str, Any]:
@@ -988,6 +1128,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             "venue": venue.slug,
             "checks": _report_payload(report, files, with_status=False),
             "live_rules": live_rules(venue, sub.values),
+            "schema_issues": venue_schema_issues(venue, report),
             "requirements": (None if base is None else resolve_requirements(base, sub.values).to_dict()),
             "initial_submission_rule": report.initial_submission_rule,
         }
@@ -999,7 +1140,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         x_llm_provider: Optional[str] = Header(None),
         x_llm_key: Optional[str] = Header(None),
         x_paperpush_token: Optional[str] = Header(None),
-    ) -> dict[str, Any]:
+    ) -> Any:
         files, local = workspace(ws_id, x_paperpush_token)
         sub, venue = _localized_sub(req.text, files, local)
         ai = None
@@ -1009,18 +1150,28 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
             ai = AiOptions.api(provider=provider, api_key=api_key)
         network = settings.network_checks
-        report = validate_report(
-            sub,
-            venue,
-            check_links=req.check_links and network,
-            check_references=req.check_references and network,
-            check_anonymous=req.anonymous,
-            # Uses the server's own stored OpenReview login: the author's only
-            # when paperpush runs on their machine.
-            check_openreview=local is not None,
-            initial_submission=req.initial_submission,
-            ai=ai,
-        )
+
+        def run(progress=None) -> dict[str, Any]:
+            report = validate_report(
+                sub,
+                venue,
+                check_links=req.check_links and network,
+                check_references=req.check_references and network,
+                check_anonymous=req.anonymous,
+                # Uses the server's own stored OpenReview login: the author's only
+                # when paperpush runs on their machine.
+                check_openreview=local is not None,
+                initial_submission=req.initial_submission,
+                ai=ai,
+                progress=progress,
+            )
+            return _validate_payload(report, venue, files, ai, network)
+
+        if not req.stream:
+            return run()
+        return StreamingResponse(_stream_progress(run, files, ai.api_key if ai else None), media_type="application/x-ndjson")
+
+    def _validate_payload(report, venue: Venue, files: Path, ai, network: bool) -> dict[str, Any]:
         return {
             "venue": venue.slug,
             "ok": report.ok,
@@ -1098,20 +1249,33 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.post("/api/workspaces/{ws_id}/bundle")
     def bundle(ws_id: str, req: TextRequest, x_paperpush_token: Optional[str] = Header(None)) -> FileResponse:
+        """The ``.sub`` and its files in one zipped folder (:func:`write_bundle`).
+
+        On a local session the files come from this computer, where the
+        ``.sub``'s paths point; on the website from the workspace, by bare name,
+        along with any upload the ``.sub`` does not name.
+        """
         files, local = workspace(ws_id, x_paperpush_token)
-        if local is not None:
-            raise HTTPException(400, "the files are already on your computer; run 'paperpush submit' on the .sub")
         slug = parse_subfile(req.text).venue
         venue = _venue_or_404(slug) if slug else None
         sub_name = default_filename(venue) if venue else "submission.sub"
-        fd, tmp = tempfile.mkstemp(suffix=".zip", dir=files.parent)
-        os.close(fd)
-        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr(sub_name, req.text)
-            for path in sorted(files.iterdir()):
-                if path.is_file():
-                    zf.write(path, path.name)
         stem = Path(sub_name).stem
+        if local is not None:
+            resolve, extra, tmp_dir = local.resolve, (), None
+        else:
+            resolve = lambda p: files / _bare(p)  # noqa: E731
+            extra = tuple(sorted(p for p in files.iterdir() if p.is_file()))
+            tmp_dir = files.parent
+        fd, tmp = tempfile.mkstemp(suffix=".zip", dir=tmp_dir)
+        os.close(fd)
+        try:
+            with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+                write_bundle(zf, f"{stem}-submission", sub_name, req.text, venue, resolve, extra)
+        except MissingFiles as exc:
+            os.unlink(tmp)
+            where = "on this computer" if local is not None else "among the uploaded files"
+            names = [local.scrub(m) for m in exc.missing] if local is not None else exc.missing
+            raise HTTPException(400, f"Not found {where}: {', '.join(names)}. Fix the path{'s' if len(names) > 1 else ''} in the form, or upload the file{'s' if len(names) > 1 else ''}, then download again.") from None
         return FileResponse(
             tmp,
             media_type="application/zip",
@@ -1218,12 +1382,17 @@ def serve_local(
     action: Optional[str] = None,
     port: int = 0,
     open_browser: bool = True,
+    token: Optional[str] = None,
+    idle_timeout: Optional[float] = None,
 ) -> int:
     """Open ``sub_path`` in the page on this machine and serve it until Ctrl-C (``--web``).
 
     Listens on 127.0.0.1 only. Edits in the page are written back to
     ``sub_path``; relative paths in it resolve against the current directory,
-    as they do for the CLI.
+    as they do for the CLI. ``token`` fixes the session token (so a parent
+    process can print the link before this one is up); with ``idle_timeout``
+    the server stops by itself once that many seconds pass without a request
+    (an open page pings it every minute, so it stays up while one is open).
     """
     import uvicorn
 
@@ -1236,18 +1405,50 @@ def serve_local(
         root=Path.cwd(),
         manuscript_dirs=tuple(Path(d).resolve() for d in manuscript_dirs),
         action=action,
+        **({"token": token} if token else {}),
     )
     settings = dataclasses.replace(Settings.from_env(), local=local)
-    url = f"http://{host}:{port}/?local={local.token}#/v/{venue}"
+    url = local_url(host, port, local.token, venue)
     print(f"{'Opening' if open_browser else 'Open'} {local.display(sub_path)} in your browser: {url}")
     print("Edits in the page are saved to the file as you make them. Press Ctrl-C to stop.")
     if open_browser:
         webbrowser.open(url)
+    app = create_app(settings)
+    server = uvicorn.Server(uvicorn.Config(app, host=host, port=port, log_level="warning"))
+    if idle_timeout:
+        _stop_when_idle(app, server, idle_timeout)
     try:
-        uvicorn.run(create_app(settings), host=host, port=port, log_level="warning")
+        server.run()
     except KeyboardInterrupt:
         pass
     return 0
+
+
+def local_url(host: str, port: int, token: str, venue: str) -> str:
+    """The address of the page with a local ``.sub`` open in it."""
+    return f"http://{host}:{port}/?local={token}#/v/{venue}"
+
+
+def _stop_when_idle(app: FastAPI, server, idle_timeout: float) -> None:
+    """Ask ``server`` to exit once ``idle_timeout`` seconds pass with no request."""
+    import threading
+    import time
+
+    last = [time.monotonic()]
+
+    @app.middleware("http")
+    async def touch(request, call_next):
+        last[0] = time.monotonic()
+        return await call_next(request)
+
+    def watch() -> None:
+        while not server.should_exit:
+            time.sleep(min(30.0, idle_timeout / 4))
+            if time.monotonic() - last[0] > idle_timeout:
+                logger.info("local: no requests for %.0fs; stopping", idle_timeout)
+                server.should_exit = True
+
+    threading.Thread(target=watch, name="paperpush-idle", daemon=True).start()
 
 
 def serve_app(*, port: int = 0, open_browser: bool = True) -> int:
