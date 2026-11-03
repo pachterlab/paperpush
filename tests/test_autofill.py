@@ -10,7 +10,7 @@ the ``paperpush autofill`` CLI.
   with fake ``anthropic``, ``openai``, and ``google.genai`` modules injected into
   ``sys.modules``, and the document-reading / prompt-building helpers are tested
   directly.
-* CLI (``paperpush autofill -d <dir> <subfile>``) -- the manual engine reads
+* CLI (``paperpush autofill -d <dir|file> [...] <subfile>``) -- the manual engine reads
   proposed field values from a ``--values`` JSON file (the same file the Claude
   skill produces), so these exercise the full CLI path without any model or
   network; the api engine is driven with a fake SDK.
@@ -221,6 +221,15 @@ def test_filemap_filelist_preserves_label_columns(skeleton, tmp_path):
     )
     written = parse(result.text).values["figure_files"]
     assert written == f"{tmp_path / 'fig1.png'} | Figure 1"
+
+
+def test_filemap_searches_several_dirs_in_order(skeleton, tmp_path):
+    first, second = tmp_path / "a", tmp_path / "b"
+    first.mkdir()
+    second.mkdir()
+    (second / "paper.pdf").write_bytes(b"%PDF-1.4\n" + b"x" * 2000)
+    result = af.autofill(skeleton, BIORXIV, _extract({"id": "manuscript_file", "value": "paper.pdf", "confidence": "high"}), manuscript_dir=[first, second])
+    assert parse(result.text).values["manuscript_file"] == str(second / "paper.pdf")
 
 
 def test_unresolved_path_is_left_for_validation(skeleton, tmp_path):
@@ -762,6 +771,68 @@ def test_autofill_api_engine_end_to_end(in_tmp, manuscript_dir, monkeypatch):
     assert parsed.values["manuscript_file"] == str(manuscript_dir / "paper.pdf")
     # never-role field ignored even though the model proposed it.
     assert parsed.values["license"] == "CC-BY-NC-ND"
+
+
+# --- multiple -d inputs ----------------------------------------------------
+
+
+def test_autofill_inputs_stop_at_sub_file(in_tmp, manuscript_dir):
+    notes = in_tmp / "notes.md"
+    notes.write_text("notes", encoding="utf-8")
+    values = _write_values(in_tmp / "values.json")
+    rc = main(["autofill", "-d", str(manuscript_dir), str(notes), "biorxiv.sub", "--values", str(values)])
+    assert rc == 0
+    assert subfile.load(in_tmp / "biorxiv.sub").values["manuscript_file"] == str(manuscript_dir / "paper.pdf")
+
+
+def test_autofill_repeated_d_flags_resolve_across_dirs(in_tmp, manuscript_dir):
+    figs = in_tmp / "figs"
+    figs.mkdir()
+    (manuscript_dir / "fig1.png").rename(figs / "fig1.png")
+    values = _write_values(in_tmp / "values.json")
+    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "-d", str(figs), "--values", str(values)])
+    assert rc == 0
+    assert subfile.load(in_tmp / "biorxiv.sub").values["figure_files"] == f"{figs / 'fig1.png'} | Figure 1"
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["autofill", "biorxiv.sub"],  # no -d at all
+        ["autofill", "-d", "biorxiv.sub"],  # -d with only the .sub
+        ["autofill", "-d", "ms", "biorxiv.sub", "extra"],  # stray input after the .sub
+    ],
+)
+def test_autofill_inputs_usage_errors(in_tmp, manuscript_dir, argv):
+    with pytest.raises(SystemExit) as exc:
+        main(argv)
+    assert exc.value.code == 2
+
+
+def test_autofill_requires_a_sub_file(in_tmp, manuscript_dir):
+    values = _write_values(in_tmp / "values.json")
+    assert main(["autofill", "-d", str(manuscript_dir), "--values", str(values)]) == 2
+
+
+def test_autofill_rejects_two_sub_files(in_tmp, manuscript_dir):
+    values = _write_values(in_tmp / "values.json")
+    assert main(["autofill", "a.sub", "-d", str(manuscript_dir), "b.sub", "--values", str(values)]) == 2
+
+
+def test_autofill_rejects_unsupported_or_missing_input(in_tmp, manuscript_dir):
+    values = _write_values(in_tmp / "values.json")
+    assert main(["autofill", "-d", str(manuscript_dir / "fig1.png"), "biorxiv.sub", "--values", str(values)]) == 1
+    assert main(["autofill", "-d", str(in_tmp / "nope"), "biorxiv.sub", "--values", str(values)]) == 1
+    assert not (in_tmp / "biorxiv.sub").exists()
+
+
+def test_autofill_api_uses_document_given_directly(in_tmp, monkeypatch):
+    _install_fake_anthropic(monkeypatch, {"fields": [{"id": "title", "value": "Direct", "confidence": "high", "source": "p.1"}], "unfilled": []})
+    draft = in_tmp / "draft.md"
+    draft.write_text("# Direct\n\nBody.", encoding="utf-8")
+    rc = main(["autofill", "-d", str(draft), "biorxiv.sub", "--engine", "api"])
+    assert rc == 0
+    assert subfile.load(in_tmp / "biorxiv.sub").values["title"] == "Direct"
 
 
 def test_autofill_api_missing_manuscript_errors(in_tmp, monkeypatch, tmp_path):

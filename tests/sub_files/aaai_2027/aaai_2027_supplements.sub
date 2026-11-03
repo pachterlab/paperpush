@@ -3,13 +3,32 @@
 #
 # Edit the values below, then run:  paperpush submit aaai_2027.sub
 # Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web aaai_2027.sub   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
 
 @venue: aaai_2027
 # submission guide: https://aaai.org/conference/aaai/aaai-27/
+# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
+# in the order the venue's submission form asks for them instead.
+
+# ----------------------------------------------------------------------
+# Manuscript details
+# ----------------------------------------------------------------------
 
 # Title (text, REQUIRED)
 #   The full title of the paper.
 title: Title goes here
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract of the paper.
+abstract: |
+  Abstract goes here. It's a really good abstract.
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
 
 # Authors (authorlist, REQUIRED)
 #   One author per line, in order. Format: Open Review ID | Name | Email suffixes | Reciprocal Reviewer(yes/no). If Open Review ID is added, then name and email suffixes are optional. Each author is added to the OpenReview author page by a profile search on the Name column, so the name must match the author's OpenReview profile. Email suffixes should be comma-separated, in decreasing order of likelihood of association with the author. At least one author is required.
@@ -17,14 +36,13 @@ authors: |
   ~Joseph_Rich1 |  |  | no
    | Lior Pachter | caltech.edu | yes
 
+# ----------------------------------------------------------------------
+# Additional information
+# ----------------------------------------------------------------------
+
 # TL;DR (text, optional)
 #   Optional. A one-sentence summary of the paper ("too long; didn't read").
 tldr: 
-
-# Abstract (textarea, REQUIRED)
-#   Plain-text abstract of the paper.
-abstract: |
-  Abstract goes here. It's a really good abstract.
 
 # Primary topic (choice, REQUIRED)
 #   Exactly one primary topic, chosen from the AAAI 2027 topic list (_assets/aaai_2027_topics.txt). Use the full topic label as it appears in the dropdown.

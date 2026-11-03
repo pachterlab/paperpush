@@ -12,7 +12,8 @@ Run the pre-submission checks on a filled ``.sub`` file. Run this before
                              [--dont-check-manuscript] [--anonymous]
                              [--dont-check-hidden-text]
                              [--dont-check-openreview-profiles]
-                             [--arxiv-latex-cleaner] [-o [PATH]] [--alt-color]
+                             [--arxiv-latex-cleaner] [--initial-submission]
+                             [-o [PATH]] [--alt-color]
                              [--ai] [--provider {anthropic,openai,google}]
                              [--model MODEL] [--ai-tasks FILE]
                              [--ai-results FILE]
@@ -26,6 +27,7 @@ Synopsis
    paperpush validate biorxiv.sub
    paperpush validate biorxiv.sub -o              # also save biorxiv_validation.pdf
    paperpush validate biorxiv.sub --ai            # also run the AI checks via an API
+   paperpush validate nature.sub --initial-submission  # errors become warnings
 
 ``validate`` prints a report of every check, grouped and coloured by what
 happened to it: **failed** (red), **warnings** (red), **not checked** --
@@ -130,6 +132,14 @@ embedded in the manuscript when none are attached)
 - Keywords
 - Statements
 
+**Prose** (:ref:`vc-prose`; a mechanical proofread, not a grammar check)
+
+- Double spaces between words (not after a sentence)
+- Repeated words ("the the")
+- Spacing around punctuation ("word ,", "word,word")
+- Unbalanced brackets and quotes
+- Common misspellings (codespell)
+
 Checks that need AI
 ^^^^^^^^^^^^^^^^^^^
 
@@ -156,6 +166,12 @@ Arguments
 
 ``subfile``
    Path to the ``.sub`` file to check, e.g. ``biorxiv.sub``.
+
+``--web``
+   Instead of printing the report, open the ``.sub`` in the paperpush web page
+   on this computer and run the checks there. You can fix fields and
+   re-validate, and every edit is saved to the file. With ``--ai`` the AI checks
+   run too. Needs ``pip install 'paperpush[web]'``.
 
 ``--dont-check-links``
    Skip probing the URLs cited in the uploaded files. Avoids network requests.
@@ -199,6 +215,20 @@ Arguments
    ``.sub`` at the cleaned copies to submit them. Needs the optional package:
    ``pip install "paperpush[validate]"``.
 
+``--initial-submission``
+   Validate the file as an initial submission: every error is reported as a
+   warning, so nothing blocks it, and the command exits 0. Meant for venues
+   whose guidelines let the initial submission be in any format (Nature and
+   its sister journals, the Cell journals, PLOS Computational Biology, PNAS,
+   Bioinformatics, Science Advances, ...; recorded as
+   ``manuscript.initial_submission_any_format``). For those venues the report
+   opens with a "Format for initial submission" note quoting the rule, with or
+   without this flag. Used on a venue without such a rule it still turns
+   errors into warnings, and the note says the venue states no such rule.
+   ``paperpush submit`` still validates normally. On the web page, the
+   "initial submission (any format)" checkbox next to the Validate buttons
+   does the same (it is greyed out for venues without the rule).
+
 ``-o [PATH]``, ``--output [PATH]``
    Also save the report. PDF by default, which keeps the colours; a path ending
    in ``.html``, ``.md``, or ``.txt`` saves that format instead. With no PATH,
@@ -206,7 +236,8 @@ Arguments
 
 ``--alt-color``
    Use colour-blind-friendly colours (blue for passed, vermillion for failed,
-   grey for not checked) in the terminal and the saved report.
+   dark yellow for warnings, grey for not checked) in the terminal and the
+   saved report.
 
 ``--ai``
    Also run the checks that need a reader's judgement through an LLM API, with

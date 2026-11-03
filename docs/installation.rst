@@ -44,6 +44,8 @@ Some features need extra dependencies, declared as optional extras:
      conferences.
    - ``arxiv_latex_cleaner``, which ``validate --arxiv-latex-cleaner`` runs on
      your LaTeX source before checking it.
+   - ``codespell``, whose list of common misspellings the prose check uses.
+     Without it the spelling check is reported as not checked.
 
    .. code-block:: bash
 
@@ -51,8 +53,9 @@ Some features need extra dependencies, declared as optional extras:
 
 ``dev``
    Test and lint tooling (``pytest``, ``bandit``, ``black``, ``jsonschema``,
-   and friends) for contributing to PaperPush. Includes ``pdfminer.six`` and
-   ``arxiv_latex_cleaner`` so the PDF and cleaner tests run.
+   and friends) for contributing to PaperPush. Includes ``pdfminer.six``,
+   ``arxiv_latex_cleaner``, and ``codespell`` so the PDF, cleaner, and
+   spelling tests run.
 
    .. code-block:: bash
 

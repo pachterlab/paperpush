@@ -68,8 +68,13 @@ def _try(fn, what: str) -> bool:
 
         from ..common import _try
     """
+    # An optional step's failure is already handled here, so it is not handed to
+    # the recovery handler (see paperpush.venues.recovery) first.
+    from .recovery import unrecovered
+
     try:
-        fn()
+        with unrecovered():
+            fn()
         return True
     except Exception as exc:  # noqa: BLE001 -- best-effort optional step
         logger.warning("skipped %s (%s)", what, exc)

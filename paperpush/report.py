@@ -20,9 +20,9 @@ ends in one of these states:
 
 The rest of this module renders a report for the terminal (with :mod:`rich`)
 and saves it as PDF, HTML, Markdown, or plain text (see :func:`save`). Colours
-follow the status: green for passed, red for failed, yellow for anything not
-checked; ``alt_color`` swaps in a colour-blind-safe palette (blue / vermillion
-/ grey, after Okabe and Ito), and every line also carries a text marker so the
+follow the status: green for passed, red for failed, amber for warnings,
+yellow for anything not checked; ``alt_color`` swaps in a colour-blind-safe
+palette (blue / vermillion / dark yellow / grey, after Okabe and Ito), and every line also carries a text marker so the
 status never depends on colour alone.
 """
 
@@ -88,11 +88,12 @@ class Palette:
         }[status]
 
 
-# Green / red / yellow, dark enough to read on white paper.
-DEFAULT_PALETTE = Palette(passed="#1a7f37", failed="#cf222e", warning="#d1242f", unchecked="#b08800", not_implemented="#9a6700", muted="#6e7781")
-# Okabe-Ito blue and vermillion, with grey for "not checked": distinguishable
-# under the common forms of colour-blindness.
-ALT_PALETTE = Palette(passed="#0072b2", failed="#d55e00", warning="#d55e00", unchecked="#666666", not_implemented="#666666", muted="#999999")
+# Green / red / amber / yellow, dark enough to read on white paper.
+DEFAULT_PALETTE = Palette(passed="#1a7f37", failed="#cf222e", warning="#b35900", unchecked="#b08800", not_implemented="#9a6700", muted="#6e7781")
+# Okabe-Ito blue and vermillion, dark yellow for warnings, and grey for "not
+# checked": distinguishable under the common forms of colour-blindness. (Same
+# hues as the web page's colour-blind theme.)
+ALT_PALETTE = Palette(passed="#0072b2", failed="#d55e00", warning="#8a6d00", unchecked="#666666", not_implemented="#666666", muted="#999999")
 
 
 def palette(alt_color: bool = False) -> Palette:
@@ -141,6 +142,13 @@ class ValidationReport:
     ai_error: str = ""
     # The AI tasks (paperpush.ai_validate.AiTask) behind the needs-AI checks.
     ai_tasks: list = field(default_factory=list)
+    # The venue's rule that the initial submission may be in any format
+    # (manuscript.initial_submission_any_format), or "" when it has none.
+    initial_submission_rule: str = ""
+    # Validated with --initial-submission: every error was turned into a
+    # warning (``downgraded`` of them).
+    initial_submission: bool = False
+    downgraded: int = 0
 
     def by_status(self, status: str) -> list[CheckResult]:
         return [r for r in self.results if r.status == status]
@@ -172,6 +180,9 @@ class ValidationReport:
             "ai": self.ai,
             "ai_error": self.ai_error,
             "counts": self.counts(),
+            "initial_submission_rule": self.initial_submission_rule,
+            "initial_submission": self.initial_submission,
+            "downgraded": self.downgraded,
             "checks": [r.to_dict() for r in self.results],
         }
 
@@ -180,7 +191,7 @@ class ValidationReport:
 #
 # The report is laid out once as a list of (role, text, indent, status) lines;
 # each renderer only maps roles to its own styling. Roles: "title", "meta",
-# "summary", "heading", "check", "item", "note", "footer".
+# "notice", "summary", "heading", "check", "item", "note", "footer".
 
 
 @dataclass(frozen=True)
@@ -206,13 +217,31 @@ def _ai_hint(report: ValidationReport) -> str:
     return "AI checks: off. Run with --ai (and an ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY), or let an agent do them with the paperpush-validate skill (--ai-tasks / --ai-results)."
 
 
+def initial_submission_notes(report: ValidationReport) -> list[str]:
+    """The notes shown at the top of the report about initial-submission formatting."""
+    notes = []
+    if report.initial_submission_rule:
+        notes.append(f"Format for initial submission: {report.initial_submission_rule}")
+        if not report.initial_submission:
+            notes.append("Validate with --initial-submission to report errors as warnings for this initial submission.")
+    if report.initial_submission:
+        if report.initial_submission_rule:
+            notes.append("Validated as an initial submission (--initial-submission): every error is shown as a warning.")
+        else:
+            notes.append(f"Validated as an initial submission (--initial-submission): every error is shown as a warning, although {report.venue}'s guidelines do not say that an initial submission may be in any format.")
+    return notes
+
+
 def _layout(report: ValidationReport, *, show_passed_details: bool = True) -> list[_Line]:
     lines: list[_Line] = [_Line("title", f"paperpush validation report: {Path(report.subfile).name if report.subfile else report.venue}")]
     if report.subfile:
         lines.append(_Line("meta", f"File: {report.subfile}"))
     lines.append(_Line("meta", f"Venue: {report.venue}"))
     lines.append(_Line("meta", _ai_hint(report)))
+    lines += [_Line("notice", text, status=WARNING) for text in initial_submission_notes(report)]
     verdict = "Ready to submit: no blocking errors." if report.ok else f"Not ready: {len(report.errors)} error(s) must be fixed before submitting."
+    if report.initial_submission:
+        verdict = f"Ready to submit as an initial submission: {report.downgraded} error(s) shown as warnings; fix them before the revision." if report.downgraded else "Ready to submit: no blocking errors."
     lines.append(_Line("summary", verdict, status=PASSED if report.ok else FAILED))
     for status in STATUSES:
         results = report.by_status(status)
@@ -264,6 +293,8 @@ def print_report(report: ValidationReport, *, alt_color: bool = False, console=N
             console.print(Text(line.text, style="bold"))
         elif line.role == "meta":
             console.print(Text(line.text, style="dim"))
+        elif line.role == "notice":
+            console.print(Text(f"{_MARKS[WARNING]} {line.text}", style=f"bold {color}"))
         elif line.role == "summary":
             console.print()
             console.print(Text(line.text, style=f"bold {color}"))
@@ -319,6 +350,8 @@ def to_text(report: ValidationReport) -> str:
         pad = "  " * line.indent
         if line.role == "title":
             out += [line.text, "=" * len(line.text)]
+        elif line.role == "notice":
+            out.append(f"{_ASCII_MARKS[WARNING]} {line.text}")
         elif line.role == "summary":
             out += ["", line.text, "  ".join(f"{_ASCII_MARKS[s]} {t}" for s, t in _summary_line(report))]
         elif line.role == "heading":
@@ -343,6 +376,8 @@ def to_markdown(report: ValidationReport) -> str:
             out += [f"# {_md_escape(line.text)}", ""]
         elif line.role == "meta":
             out += [f"*{_md_escape(line.text)}*", ""]
+        elif line.role == "notice":
+            out += [f"> **{_MARKS[WARNING]} {_md_escape(line.text)}**", ""]
         elif line.role == "summary":
             out += [f"**{_md_escape(line.text)}**", "", " · ".join(f"{_MARKS[s]} {t}" for s, t in _summary_line(report)), ""]
         elif line.role == "heading":
@@ -376,6 +411,8 @@ def to_html(report: ValidationReport, *, alt_color: bool = False) -> str:
             body.append(f"<h1>{text}</h1>")
         elif line.role == "meta":
             body.append(f'<p class="meta">{text}</p>')
+        elif line.role == "notice":
+            body.append(f'<p class="notice" style="color:{color};border-color:{color}">{_MARKS[WARNING]} {text}</p>')
         elif line.role == "summary":
             chips = "".join(f'<span class="chip" style="color:{pal.for_status(s)};border-color:{pal.for_status(s)}">{_MARKS[s]} {html.escape(t)}</span>' for s, t in _summary_line(report))
             body.append(f'<p class="verdict" style="color:{color}">{text}</p><p class="chips">{chips}</p>')
@@ -402,6 +439,7 @@ body {{ background: var(--bg); color: var(--fg); font: 15px/1.5 -apple-system, "
 h1 {{ font-size: 1.5rem; margin-bottom: .25rem; }}
 h2 {{ font-size: 1.1rem; border-bottom: 2px solid; padding-bottom: .2rem; margin-top: 1.75rem; }}
 .meta {{ color: var(--muted); margin: .1rem 0; }}
+.notice {{ font-weight: 600; border-left: 3px solid; padding: .2rem .6rem; margin: .5rem 0; }}
 .verdict {{ font-weight: 700; font-size: 1.1rem; margin-top: 1rem; }}
 .chip {{ display: inline-block; border: 1px solid; border-radius: 999px; padding: 0 .6rem; margin: 0 .35rem .35rem 0; font-size: .9rem; }}
 ul {{ list-style: none; padding-left: 0; }}

@@ -6,7 +6,7 @@ Implemented so far:
     paperpush subfile <venue>   create a <venue>.sub template
     paperpush options <venue>.<field>
                                       list the allowed values for a field
-    paperpush autofill <subfile> -d <dir>
+    paperpush autofill -d <dir|file> [<dir|file> ...] <subfile>
                                       fill a .sub from a manuscript directory
     paperpush validate <subfile>  run the pre-submission checks on a .sub
     paperpush requirements <venue>  show what the venue's author guidelines require of the manuscript
@@ -20,6 +20,8 @@ Implemented so far:
     paperpush login --orcid <j>   store an ORCID iD/password for a journal that
                                       offers "Sign in with ORCID"
     paperpush submit <subfile>    open bioRxiv and run the submission
+    paperpush add-venue --template [<slug>]  write a venue file to fill in
+    paperpush add-venue <file>    add a venue from a filled venue file
     paperpush update-venues       fetch the latest published venue data now
     paperpush --agent-guide       print the guide for AI agents (AGENTS.md)
 
@@ -160,8 +162,150 @@ def _cmd_update_venues(args: argparse.Namespace) -> int:
 
 
 @_validate
+def _cmd_add_venue(args: argparse.Namespace) -> int:
+    """Write a venue file to fill in (``--template``), or merge a filled one into the databases."""
+    from . import venuefile
+
+    if args.template:
+        slug = (args.file or "").strip()
+        if slug.endswith(".txt"):
+            print(f"error: with --template, give the new venue's slug (e.g. 'my_journal'), not a file name; use -o {slug} to name the file", file=sys.stderr)
+            return 2
+        if slug and not venuefile.SLUG_RE.match(slug):
+            print(f"error: {slug!r} is not a valid slug: use lowercase letters, digits and underscores", file=sys.stderr)
+            return 2
+        out = args.output or f"{slug or args.from_slug or 'venue'}.txt"
+        try:
+            text = venuefile.template(slug, from_slug=args.from_slug, filename=Path(out).name if out != "-" else "VENUE.txt")
+        except KeyError:
+            print(f"error: unknown venue '{args.from_slug}'", file=sys.stderr)
+            print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+            return 2
+        if out == "-":
+            sys.stdout.write(text)
+            return 0
+        path = Path(out)
+        if path.exists() and not args.force:
+            print(f"error: {path} already exists (use --force to overwrite)", file=sys.stderr)
+            return 1
+        path.write_text(text, encoding="utf-8")
+        what = f"{args.from_slug}'s current entries" if args.from_slug else "the fields most portals share"
+        print(f"Wrote {path}, starting from {what}.")
+        print("Fill it in from the venue's submission portal and author guidelines (by hand, or ask an AI agent),")
+        print(f"then run:  paperpush add-venue {path}" + (" --force" if args.from_slug and (not slug or slug == args.from_slug) else ""))
+        return 0
+
+    if not args.file:
+        print("error: give a venue file to add, or --template to write one", file=sys.stderr)
+        return 2
+    path = Path(args.file)
+    try:
+        doc = venuefile.load(path)
+    except OSError as exc:
+        print(f"error: cannot read {path}: {exc}", file=sys.stderr)
+        return 1
+    except venuefile.VenueFileError as exc:
+        print(f"error: {path} cannot be read:", file=sys.stderr)
+        for problem in exc.problems:
+            print(f"  {path.name}: {problem}", file=sys.stderr)
+        return 1
+
+    data_dir = Path(args.data_dir) if args.data_dir else None
+    result = venuefile.check(doc, force=args.force, data_dir=data_dir)
+    for warning in result.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    if result.errors:
+        print(f"error: {path} does not describe a venue paperpush can load:", file=sys.stderr)
+        for error in result.errors:
+            print(f"  - {error}", file=sys.stderr)
+        return 1
+
+    if args.dry_run:
+        print(json.dumps(venuefile.doc_to_json(doc), indent=2, ensure_ascii=False))
+        print(f"\n(dry run) {path} is valid; nothing written.", file=sys.stderr)
+        return 0
+
+    merged = venuefile.merge(doc, data_dir=data_dir, force=args.force)
+    where = venuefile.database_paths(data_dir)["venues"].parent
+    for name in merged.written:
+        print(f"Added {doc.slug} to {where / name}")
+    for name in merged.replaced:
+        print(f"Replaced {doc.slug} in {where / name}")
+    for name in merged.kept:
+        print(f"Kept {doc.slug}'s existing entry in {where / name} (the file leaves that part out)")
+
+    print("\nNext:")
+    print(f"  paperpush subfile {doc.slug}          # the .sub for the new venue")
+    if doc.requirements is not None:
+        print(f"  paperpush requirements {doc.slug}     # the guideline rules as validate reads them")
+    if data_dir:
+        print(f"  Use it with PAPERPUSH_VENUE_DATA={data_dir} (otherwise paperpush reads its own copy).")
+    elif venue_data._in_source_checkout():
+        print("  python scripts/gen_subfile_templates.py && python tests/sample_subfiles.py && python scripts/gen_readme_venues.py")
+        if doc.form is not None and doc.requirements is not None:
+            print(f"  python scripts/check_venue_consistency.py {doc.slug}")
+        if doc.form is not None:
+            print(f"  To submit: add a runner at paperpush/venues/<portal>/{doc.slug}.py (see CONTRIBUTING.md)")
+    else:
+        print(f"  The entries are in the installed package ({where}); upgrading paperpush replaces them.")
+        print(f"  To share the venue, open a pull request or issue with {path.name} at {__url__}")
+        if venue_data.active_source().kind == "remote":
+            print("  The published venue data in use does not have this venue yet: set PAPERPUSH_VENUE_DATA=bundled to use your entries.")
+    return 0
+
+
+@_validate
+def _open_web(sub_path: Path, *, manuscript_dirs=(), action: str | None = None) -> int:
+    """Open ``sub_path`` in the paperpush web page on this machine (``--web``) and serve it until Ctrl-C."""
+    try:
+        from .web.app import serve_local
+    except ImportError:
+        print("error: --web needs the web extra: pip install 'paperpush[web]'", file=sys.stderr)
+        return 1
+    return serve_local(Path(sub_path), manuscript_dirs=tuple(manuscript_dirs), action=action)
+
+
+def _cmd_web(args: argparse.Namespace) -> int:
+    """``paperpush web [FILE.sub]``: serve the web page on this machine, optionally with a .sub open in it.
+
+    Runs the page locally rather than pointing at the hosted site, so it opens
+    at once (no cold start) and the .sub's files never leave this computer.
+    """
+    try:
+        from .web.app import serve_app, serve_local
+    except ImportError:
+        print("error: 'paperpush web' needs the web extra: pip install 'paperpush[web]'", file=sys.stderr)
+        return 1
+    open_browser = not args.no_browser
+    if not args.subfile:
+        if args.directory:
+            print("error: --directory needs a .sub file to go with it", file=sys.stderr)
+            return 2
+        return serve_app(port=args.port, open_browser=open_browser)
+    path = Path(args.subfile)
+    if not path.is_file():
+        print(f"error: {path} does not exist (create it with 'paperpush subfile VENUE --web')", file=sys.stderr)
+        return 1
+    from .subfile import parse
+
+    try:
+        venue = parse(path.read_text(encoding="utf-8")).venue
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"error: cannot read {path}: {exc}", file=sys.stderr)
+        return 1
+    if not venue:
+        print(f"error: {path} has no '@venue:' line, so it is not a .sub file", file=sys.stderr)
+        return 1
+    dirs = tuple(Path(d) for d in args.directory or ())
+    missing = [d for d in dirs if not d.is_dir()]
+    if missing:
+        print(f"error: not a directory: {', '.join(map(str, missing))}", file=sys.stderr)
+        return 1
+    return serve_local(path, manuscript_dirs=dirs, port=args.port, open_browser=open_browser)
+
+
 def _cmd_subfile(args: argparse.Namespace) -> int:
-    logger.debug("subfile: requested venue %r, output=%r, fill_defaults=%s, " "force=%s", args.venue, args.output, args.fill_defaults, args.force)
+    logger.debug("subfile: requested venue %r, output=%r, fill_defaults=%s, " "force=%s, venue_order=%s", args.venue, args.output, args.fill_defaults, args.force, getattr(args, "venue_order", False))
     try:
         venue = get_venue(args.venue)
     except KeyError:
@@ -182,8 +326,13 @@ def _cmd_subfile(args: argparse.Namespace) -> int:
             path=target,
             fill_defaults=args.fill_defaults,
             overwrite=args.force,
+            venue_order=getattr(args, "venue_order", False),
         )
     except FileExistsError:
+        if getattr(args, "web", False):
+            # Nothing to create: open the existing file instead.
+            print(f"{target} already exists; opening it (use --force to start from a fresh template).")
+            return _open_web(target)
         logger.info("subfile: refusing to overwrite existing %s", target)
         print(f"error: {target} already exists (use --force to overwrite)", file=sys.stderr)
         return 1
@@ -191,6 +340,9 @@ def _cmd_subfile(args: argparse.Namespace) -> int:
     required = sum(1 for f in venue.fields if f.required)
     logger.info("subfile: wrote template %s for %s (%d fields, %d required)", path, venue.slug, len(venue.fields), required)
     print(f"Created {path} for {venue.slug}.")
+    if getattr(args, "web", False):
+        print(f"  {len(venue.fields)} fields ({required} required).")
+        return _open_web(Path(path))
     print(f"  {len(venue.fields)} fields ({required} required). " "Open it in your editor and fill in the values.")
     return 0
 
@@ -659,6 +811,9 @@ checks that run without AI:
                     cited in order
   .sub vs paper     title, abstract, authors (names, order, emails, ORCIDs),
                     keywords, and statements match the manuscript word for word
+  prose             double spaces mid-sentence, repeated words ("the the"),
+                    spacing around punctuation, unbalanced brackets and quotes,
+                    common misspellings (codespell)
 
 checks that need AI (--ai, or an agent via --ai-tasks / --ai-results):
   lettering size, typeface, and panel labels in raster figures, and that
@@ -709,6 +864,12 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
         return 2
 
+    if getattr(args, "web", False):
+        action = "validate-ai" if getattr(args, "ai", False) else "validate"
+        if getattr(args, "initial_submission", False):
+            action += "+initial"
+        return _open_web(Path(args.subfile), action=action)
+
     if getattr(args, "arxiv_latex_cleaner", False):
         subfile = _clean_latex_sources(subfile, venue_def)
         if subfile is None:
@@ -741,6 +902,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         check_anonymous=getattr(args, "check_anonymous", None),
         check_hidden_text=getattr(args, "check_hidden_text", True),
         check_openreview=getattr(args, "check_openreview", True),
+        initial_submission=getattr(args, "initial_submission", False),
     )
     alt = getattr(args, "alt_color", False)
     report_mod.print_report(result, alt_color=alt)
@@ -763,7 +925,10 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     if result.errors:
         print("\nFix the errors above, then run 'paperpush validate' again.", file=sys.stderr)
         return 1
-    print(f"\n{args.subfile} passed validation for {venue}; ready to submit.")
+    if result.downgraded:
+        print(f"\n{args.subfile} passed validation for {venue} as an initial submission ({result.downgraded} error(s) shown as warnings); ready to submit.")
+    else:
+        print(f"\n{args.subfile} passed validation for {venue}; ready to submit.")
     return 0
 
 
@@ -859,6 +1024,61 @@ def _cmd_submit(args: argparse.Namespace) -> int:
     return 0
 
 
+# Document formats accepted as a direct ``autofill -d`` input (besides
+# directories). Everything else -- figures, data -- is picked up by passing the
+# directory that holds it.
+AUTOFILL_INPUT_SUFFIXES = frozenset({".tex", ".ltx", ".doc", ".docx", ".odt", ".rtf", ".txt", ".md", ".markdown", ".rst", ".pdf"})
+
+
+class _AutofillInputsAction(argparse.Action):
+    """Collect ``-d`` inputs, stopping at the first ``.sub`` file.
+
+    argparse hands an ``nargs="+"`` option every string up to the next flag, so
+    ``-d ms/ notes.md biorxiv.sub`` would swallow the .sub file. This action
+    keeps the inputs before the first ``.sub`` and records that file as the
+    subfile (reconciled with the positional in :func:`_cmd_autofill`). Repeated
+    ``-d`` flags accumulate.
+    """
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        inputs = list(getattr(namespace, self.dest, None) or [])
+        for i, value in enumerate(values):
+            if value.lower().endswith(".sub"):
+                if not inputs:
+                    parser.error(f"{option_string}: expected at least one directory or document before {value}")
+                if getattr(namespace, "_subfile_from_inputs", None):
+                    parser.error(f"more than one .sub file given ({namespace._subfile_from_inputs}, {value})")
+                namespace._subfile_from_inputs = value
+                if values[i + 1 :]:
+                    parser.error(f"unrecognized arguments after {value}: {' '.join(values[i + 1 :])}")
+                break
+            inputs.append(value)
+        setattr(namespace, self.dest, inputs)
+
+
+def _check_autofill_inputs(raw: list[str]) -> tuple[list[Path], list[Path]] | None:
+    """Split ``-d`` inputs into ``(directories, files)``, or print why not.
+
+    Every input must exist and be either a directory or a document in one of
+    :data:`AUTOFILL_INPUT_SUFFIXES`. Returns None after printing an error.
+    """
+    dirs: list[Path] = []
+    files: list[Path] = []
+    for item in raw:
+        path = Path(item).expanduser()
+        if path.is_dir():
+            dirs.append(path)
+        elif path.is_file():
+            if path.suffix.lower() not in AUTOFILL_INPUT_SUFFIXES:
+                print(f"error: {path} is not a directory or a supported document " f"({', '.join(sorted(AUTOFILL_INPUT_SUFFIXES))})", file=sys.stderr)
+                return None
+            files.append(path)
+        else:
+            print(f"error: autofill input not found: {path}", file=sys.stderr)
+            return None
+    return dirs, files
+
+
 @_validate
 def _cmd_autofill(args: argparse.Namespace) -> int:
     """Populate a .sub file from values extracted from a manuscript directory.
@@ -875,10 +1095,19 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
     from .autofill import autofill, parse_extraction
     from .subfile import parse, render_template
 
+    trailing_sub = getattr(args, "_subfile_from_inputs", None)
+    if trailing_sub and args.subfile:
+        print(f"error: two .sub files given ({args.subfile}, {trailing_sub})", file=sys.stderr)
+        return 2
+    args.subfile = args.subfile or trailing_sub
+    if not args.subfile:
+        print("error: no .sub file given, e.g. 'paperpush autofill -d MANUSCRIPT_DIR biorxiv.sub'", file=sys.stderr)
+        return 2
+
     logger.debug(
-        "autofill: subfile=%r dir=%r engine=%s values=%r " "min_confidence=%s dry_run=%s output=%r",
+        "autofill: subfile=%r inputs=%r engine=%s values=%r " "min_confidence=%s dry_run=%s output=%r",
         args.subfile,
-        args.directory,
+        args.inputs,
         args.engine,
         args.values,
         args.min_confidence,
@@ -886,10 +1115,18 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
         args.output,
     )
 
-    manuscript_dir = Path(args.directory)
-    if not manuscript_dir.is_dir():
-        print(f"error: manuscript directory not found: {manuscript_dir}", file=sys.stderr)
+    checked = _check_autofill_inputs(args.inputs)
+    if checked is None:
         return 1
+    input_dirs, input_files = checked
+    # Where relative file paths in the extracted values are looked up: the
+    # given directories first, then the folders holding the given documents.
+    search_dirs = list(dict.fromkeys([*input_dirs, *(f.parent for f in input_files)]))
+
+    # --web without values to apply: the page does the extraction (with the
+    # API key from the page or the environment), on the .sub file on disk.
+    if getattr(args, "web", False) and args.engine == "manual" and not args.values:
+        return _autofill_in_browser(args, input_dirs, input_files, search_dirs)
 
     if args.engine == "manual" and not args.values:
         print(
@@ -924,7 +1161,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
 
     # Obtain the proposed field values: from the API, or from a --values file.
     if args.engine == "api":
-        extraction = _extract_with_api(venue, manuscript_dir, args)
+        extraction = _extract_with_api(venue, input_dirs, input_files, args)
         if extraction is None:
             return 1
     else:
@@ -938,7 +1175,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
             return 1
         extraction = parse_extraction(data)
 
-    result = autofill(text, venue, extraction, manuscript_dir=manuscript_dir, min_confidence=args.min_confidence)
+    result = autofill(text, venue, extraction, manuscript_dir=search_dirs, min_confidence=args.min_confidence)
 
     out_path = Path(args.output) if args.output else sub_path
     if args.dry_run:
@@ -954,7 +1191,58 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
     # are expected and reported as guidance rather than a nonzero exit. 'submit'
     # is what blocks on them.
     _print_autofill_summary(result, extraction, venue, out_path, args.dry_run)
+    if getattr(args, "web", False) and not args.dry_run:
+        print()
+        return _open_web(out_path, manuscript_dirs=search_dirs)
     return 0
+
+
+def _autofill_in_browser(args: argparse.Namespace, input_dirs: list[Path], input_files: list[Path], search_dirs: list[Path]) -> int:
+    """``autofill --web`` with nothing to apply here: open the page and let it run autofill.
+
+    Creates the .sub (or --output) if it is missing, points its manuscript
+    field at the manuscript found among the inputs when it is empty, and
+    opens the page, which starts autofill straight away.
+    """
+    from .subfile import parse, render_template, replace_scalar
+
+    try:
+        from .web.app import manuscript_field
+    except ImportError:
+        print("error: --web needs the web extra: pip install 'paperpush[web]'", file=sys.stderr)
+        return 1
+    if args.dry_run:
+        print("error: --dry-run cannot be combined with --web; the page shows each value before you keep it", file=sys.stderr)
+        return 2
+    sub_path = Path(args.subfile)
+    out_path = Path(args.output) if args.output else sub_path
+    if sub_path.exists():
+        text = sub_path.read_text(encoding="utf-8")
+        slug = parse(text).venue or sub_path.stem
+    else:
+        text, slug = None, sub_path.stem
+    try:
+        venue = get_venue(slug)
+    except KeyError:
+        print(f"error: unknown venue '{slug}'", file=sys.stderr)
+        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        return 2
+    if text is None:
+        text = render_template(venue, fill_defaults=True)
+    if args.output and out_path.exists() and not args.force and out_path.resolve() != sub_path.resolve():
+        print(f"error: {out_path} already exists (use --force to overwrite)", file=sys.stderr)
+        return 1
+
+    field = manuscript_field(venue)
+    if field is not None and not parse(text).values.get(field.id, "").strip():
+        candidates = list(input_files) + [c for d in input_dirs for c in sorted(d.iterdir()) if c.is_file()]
+        manuscript = _find_document(candidates, search_dirs, args.manuscript, ("manuscript", "paper", "ms", "main"))
+        if manuscript is None and input_files:
+            manuscript = input_files[0]
+        if manuscript is not None and manuscript.is_file():
+            text = replace_scalar(text, field.id, str(manuscript))
+    out_path.write_text(text, encoding="utf-8")
+    return _open_web(out_path, manuscript_dirs=search_dirs, action="autofill")
 
 
 def _print_autofill_summary(result, extraction, venue, out_path, dry_run: bool) -> None:
@@ -1008,57 +1296,80 @@ def _print_autofill_summary(result, extraction, venue, out_path, dry_run: bool) 
     print(f"  paperpush submit {out_path}")
 
 
-def _find_document(manuscript_dir: Path, explicit: str | None, stems: tuple[str, ...]) -> Path | None:
-    """Resolve a named document in the manuscript directory.
+def _find_document(candidates: list[Path], search_dirs: list[Path], explicit: str | None, stems: tuple[str, ...]) -> Path | None:
+    """Resolve a named document among the autofill inputs.
 
-    An explicit path is honored (resolved against the directory if relative);
-    otherwise the top-level files are searched for one whose stem matches any of
-    ``stems`` (case-insensitive). Returns None if nothing is found.
+    An explicit path is honored (resolved against the first search directory
+    that has it, if relative and not found as given); otherwise ``candidates``
+    are searched in order for one whose stem matches any of ``stems``
+    (case-insensitive). Returns None if nothing is found.
     """
     if explicit:
         p = Path(explicit)
         if not p.is_absolute() and not p.exists():
-            p = manuscript_dir / explicit
+            for base in search_dirs:
+                if (base / explicit).exists():
+                    return base / explicit
         return p
-    for child in sorted(manuscript_dir.iterdir()):
-        if child.is_file() and child.stem.lower() in stems:
+    for child in candidates:
+        if child.stem.lower() in stems:
             return child
     return None
 
 
-def _list_directory(manuscript_dir: Path) -> list[str]:
-    """Relative paths of the files in the directory, for filemap assignment."""
+def _list_inputs(dirs: list[Path], files: list[Path]) -> list[str]:
+    """Paths of the files the model may assign to file fields.
+
+    With a single directory and nothing else the paths are relative to it (as
+    they always were); otherwise each is given as reachable from the working
+    directory, so files from different inputs cannot be confused.
+    """
+    single = len(dirs) == 1 and not files
     out: list[str] = []
-    for path in sorted(manuscript_dir.rglob("*")):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(manuscript_dir)
-        if any(part.startswith((".", "__")) for part in rel.parts):
-            continue
-        out.append(str(rel))
-    return out
+    for d in dirs:
+        for path in sorted(d.rglob("*")):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(d)
+            if any(part.startswith((".", "__")) for part in rel.parts):
+                continue
+            out.append(str(rel) if single else str(path))
+    out.extend(str(f) for f in files)
+    return list(dict.fromkeys(out))
 
 
-def _extract_with_api(venue, manuscript_dir: Path, args: argparse.Namespace):
+def _extract_with_api(venue, dirs: list[Path], files: list[Path], args: argparse.Namespace):
     """Build the document set and run the API extraction engine.
 
-    Returns an Extraction, or None after printing an error (so the caller can
-    exit nonzero).
+    Documents passed directly with ``-d`` are always sent; the manuscript,
+    title page, and supplement are otherwise picked by name from those files
+    and the top level of each directory. Returns an Extraction, or None after
+    printing an error (so the caller can exit nonzero).
     """
     from .autofill import DEFAULT_MODELS, AutofillApiError, DocumentInput, detect_provider, extract_via_api
 
-    manuscript = _find_document(manuscript_dir, args.manuscript, ("manuscript", "paper", "ms", "main"))
+    search_dirs = list(dict.fromkeys([*dirs, *(f.parent for f in files)]))
+    candidates = list(files) + [c for d in dirs for c in sorted(d.iterdir()) if c.is_file()]
+
+    manuscript = _find_document(candidates, search_dirs, args.manuscript, ("manuscript", "paper", "ms", "main"))
+    if manuscript is None and files:
+        manuscript = files[0]  # the first document given directly
     if manuscript is None or not manuscript.is_file():
-        print("error: could not find the manuscript; pass --manuscript <file>.", file=sys.stderr)
+        print("error: could not find the manuscript; pass --manuscript <file> or the file itself with -d.", file=sys.stderr)
         return None
 
     documents = [DocumentInput("manuscript", manuscript)]
-    title_page = _find_document(manuscript_dir, args.title_page, ("title_page", "titlepage", "title"))
+    title_page = _find_document(candidates, search_dirs, args.title_page, ("title_page", "titlepage", "title"))
     if title_page and title_page.is_file():
         documents.append(DocumentInput("title_page", title_page))
-    supplement = _find_document(manuscript_dir, args.supplement, ("supplement", "supp", "si"))
+    supplement = _find_document(candidates, search_dirs, args.supplement, ("supplement", "supp", "si"))
     if supplement and supplement.is_file():
         documents.append(DocumentInput("supplement", supplement))
+    used = {d.path.resolve() for d in documents}
+    for f in files:
+        if f.resolve() not in used:
+            documents.append(DocumentInput("document", f))
+            used.add(f.resolve())
 
     provider = args.provider or detect_provider()
     model = args.model or (DEFAULT_MODELS[provider] if provider else None)
@@ -1066,7 +1377,7 @@ def _extract_with_api(venue, manuscript_dir: Path, args: argparse.Namespace):
     if provider:
         print(f"Reading {labels} via the {provider} API ({model})…")
     try:
-        return extract_via_api(venue, documents, _list_directory(manuscript_dir), model=model, provider=provider)
+        return extract_via_api(venue, documents, _list_inputs(dirs, files), model=model, provider=provider)
     except AutofillApiError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return None
@@ -1249,7 +1560,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # metavar lists only the public commands; the internal 'schema' command is
     # registered below but deliberately left out so it does not appear in --help.
-    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,requirements,login,submit,update-venues}")
+    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,requirements,login,submit,web,add-venue,update-venues}")
 
     p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub submission template")
     p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv")
@@ -1257,6 +1568,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_subfile.add_argument("--fill-defaults", dest="fill_defaults", action="store_true", help="pre-populate fields with their default values (this is the default)")
     p_subfile.add_argument("--dont-fill-defaults", dest="fill_defaults", action="store_false", help="leave fields with default values empty instead of pre-populating them")
     p_subfile.add_argument("--force", action="store_true", help="overwrite an existing .sub file")
+    p_subfile.add_argument("--web", action="store_true", help="then open the .sub in the paperpush web page on this computer, to fill it in through a form; edits are saved to the file (needs pip install 'paperpush[web]')")
+    p_subfile.add_argument("--venue-order", dest="venue_order", action="store_true", help="list fields in the order the venue's submission form asks for them, instead of grouped into the sections every venue shares")
     p_subfile.set_defaults(func=_cmd_subfile, fill_defaults=True)
 
     p_options = sub.add_parser("options", parents=[verbosity], help="list the allowed values for a field (VENUE.FIELD)")
@@ -1265,8 +1578,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_options.set_defaults(func=_cmd_options)
 
     p_autofill = sub.add_parser("autofill", parents=[verbosity], help="fill a .sub file from a directory of manuscript files")
-    p_autofill.add_argument("subfile", help="the .sub file to fill (created from the filename's venue slug " "if it does not exist yet), e.g. biorxiv.sub")
-    p_autofill.add_argument("-d", "--directory", required=True, metavar="MANUSCRIPTDIR", help="directory holding the manuscript, figures, and other files")
+    p_autofill.add_argument("subfile", nargs="?", help="the .sub file to fill (created from the filename's venue slug " "if it does not exist yet), e.g. biorxiv.sub")
+    p_autofill.add_argument(
+        "-d",
+        "--directory",
+        dest="inputs",
+        nargs="+",
+        action=_AutofillInputsAction,
+        required=True,
+        metavar="INPUT",
+        help="one or more manuscript directories and/or document files (" + ", ".join(sorted(AUTOFILL_INPUT_SUFFIXES)) + "). " "Takes everything up to the next flag or the first .sub file, and may be repeated",
+    )
     p_autofill.add_argument(
         "--engine",
         choices=["manual", "api"],
@@ -1283,6 +1605,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_autofill.add_argument("-o", "--output", help="write the filled file here instead of overwriting the .sub")
     p_autofill.add_argument("--force", action="store_true", help="overwrite --output if it already exists")
     p_autofill.add_argument("--dry-run", action="store_true", help="show what would be filled without writing the file")
+    p_autofill.add_argument("--web", action="store_true", help="open the .sub in the paperpush web page on this computer to review the values; edits are saved to the file. Without --values or --engine api the page runs the autofill itself, with the API key from the page or the environment (needs pip install 'paperpush[web]')")
     p_autofill.set_defaults(func=_cmd_autofill)
 
     p_validate = sub.add_parser(
@@ -1294,6 +1617,7 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_validate.add_argument("subfile", help="path to the .sub file to check, e.g. biorxiv.sub")
+    p_validate.add_argument("--web", action="store_true", help="show the checks in the paperpush web page on this computer instead of the terminal, where you can fix the fields and re-validate; edits are saved to the .sub (with --ai, the AI checks run too). Needs pip install 'paperpush[web]'")
     p_validate.add_argument(
         "--dont-check-links",
         dest="check_links",
@@ -1351,7 +1675,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="also save the report. PDF by default (keeps the colours); give a path ending in .html, .md, or .txt for those formats. With no PATH, writes <subfile>_validation.pdf next to the .sub.",
     )
-    p_validate.add_argument("--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours (blue for passed, vermillion for failed, grey for not checked) in the terminal and saved report")
+    p_validate.add_argument(
+        "--initial-submission",
+        dest="initial_submission",
+        action="store_true",
+        help="validate this as an initial submission: every error is reported as a warning, so nothing blocks it. Meant for venues whose guidelines let the initial submission be in any format (the report names the rule at the top when the venue has one; see 'paperpush requirements VENUE').",
+    )
+    p_validate.add_argument("--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours (blue for passed, vermillion for failed, dark yellow for warnings, grey for not checked) in the terminal and saved report")
     p_validate.add_argument(
         "--ai",
         action="store_true",
@@ -1361,7 +1691,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_validate.add_argument("--model", help="(--ai) model to use (default: the provider's default, as for autofill)")
     p_validate.add_argument("--ai-tasks", dest="ai_tasks", metavar="FILE", help="write the AI checks to FILE as JSON, for an agent (Claude Code, Codex, ...) to run with its own subscription; see the paperpush-validate skill")
     p_validate.add_argument("--ai-results", dest="ai_results", metavar="FILE", help='merge an agent\'s verdicts on the AI checks (JSON: {"results": [{"id", "status": pass|fail|unclear|not_applicable, "details"}]}) into the report instead of calling an API')
-    p_validate.set_defaults(func=_cmd_validate, arxiv_latex_cleaner=False, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True, check_anonymous=None, check_hidden_text=True, check_openreview=True)
+    p_validate.set_defaults(func=_cmd_validate, arxiv_latex_cleaner=False, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True, check_anonymous=None, check_hidden_text=True, check_openreview=True, initial_submission=False)
 
     p_requirements = sub.add_parser("requirements", parents=[verbosity], help="show the manuscript requirements recorded for a venue's author guidelines")
     p_requirements.add_argument("venue", help="venue slug, e.g. nature")
@@ -1421,6 +1751,42 @@ def build_parser() -> argparse.ArgumentParser:
         help="close the browser when the run fails (default: leave the " "window open at the step that broke so you can see the page " "and finish by hand); --headless always closes",
     )
     p_submit.set_defaults(func=_cmd_submit)
+
+    p_web = sub.add_parser(
+        "web",
+        parents=[verbosity],
+        help="open the paperpush web page on this computer; with a .sub file, open it filled in (edits are saved to the file)",
+        description="Serve the paperpush web page on this computer and open it in your browser. "
+        "Given a .sub file, the page opens with it filled in, and every edit there is saved back to the file. "
+        "Needs pip install 'paperpush[web]'.",
+    )
+    p_web.add_argument("subfile", nargs="?", help="a .sub file to open, e.g. biorxiv.sub")
+    p_web.add_argument("-d", "--directory", action="append", metavar="DIR", help="a manuscript directory whose files the page offers in its file pickers (with a .sub file; may be repeated)")
+    p_web.add_argument("--port", type=int, default=0, help="port to listen on (default: any free port)")
+    p_web.add_argument("--no-browser", action="store_true", help="print the address instead of opening a browser")
+    p_web.set_defaults(func=_cmd_web)
+
+    p_add = sub.add_parser(
+        "add-venue",
+        parents=[verbosity],
+        help="add a venue from a venue file (--template writes one to fill in)",
+        description="Add a venue to paperpush, or fix one, from a plain-text venue file.\n\n"
+        "  paperpush add-venue --template my_journal     write my_journal.txt to fill in\n"
+        "  paperpush add-venue --template --from nature  write nature.txt from Nature's current entries\n"
+        "  paperpush add-venue my_journal.txt            check it and merge it into the venue databases\n\n"
+        "The file has a section for the submission portal's form (submission_forms.json) and one for the\n"
+        "author guidelines (manuscript_requirements.json); either may be left out. The web page's\n"
+        "'Add venue' button fills the same file in through a form.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_add.add_argument("file", nargs="?", metavar="FILE", help="the venue file to add; with --template, the new venue's slug (optional)")
+    p_add.add_argument("--template", action="store_true", help="write a venue file to fill in instead of adding one")
+    p_add.add_argument("--from", dest="from_slug", metavar="SLUG", help="(--template) start from an existing venue's entries, e.g. to fix them or to add a sister journal")
+    p_add.add_argument("-o", "--output", metavar="PATH", help="(--template) where to write the file (default: SLUG.txt; '-' prints it)")
+    p_add.add_argument("--force", action="store_true", help="overwrite an existing file (--template), or replace an existing venue's entries")
+    p_add.add_argument("--dry-run", action="store_true", help="check the file and print the entries it would add, without writing them")
+    p_add.add_argument("--data-dir", dest="data_dir", metavar="DIR", help="write the databases in DIR instead of the installed package (copied there first if missing); use them with PAPERPUSH_VENUE_DATA=DIR")
+    p_add.set_defaults(func=_cmd_add_venue)
 
     p_update = sub.add_parser("update-venues", parents=[verbosity], help="fetch the latest published venue data (otherwise refreshed daily)")
     p_update.add_argument("--clear", action="store_true", help="delete the cached copy and use the data bundled with this version")

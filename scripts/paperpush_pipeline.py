@@ -76,6 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     # subfile-only.
     subfile = parser.add_argument_group("subfile step")
     subfile.add_argument("--dont-fill-defaults", dest="fill_defaults", action="store_false", help="leave fields with default values empty instead of pre-populating them")
+    subfile.add_argument("--venue-order", dest="venue_order", action="store_true", help="list fields in the venue's form order instead of the shared section order")
     subfile.set_defaults(fill_defaults=True)
 
     # autofill-only.
@@ -142,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
                 output=sub_path,
                 fill_defaults=args.fill_defaults,
                 force=args.force,
+                venue_order=args.venue_order,
             ),
         ),
         (

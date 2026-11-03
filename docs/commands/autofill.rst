@@ -108,6 +108,14 @@ Options
 ``--dry-run``
    Show what would be filled without writing anything.
 
+``--web``
+   Open the ``.sub`` in the paperpush web page on this computer to review the
+   values, with every edit saved back to the file. With ``--values`` or
+   ``--engine api`` the autofill runs here first. Otherwise the page runs it
+   as soon as it opens, using the API key typed into the page or one set in
+   the environment. The page also sets the manuscript field from the inputs if
+   it is empty. Needs ``pip install 'paperpush[web]'``.
+
 Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags.
 
 Examples

@@ -17,8 +17,10 @@ description: >-
 links, DOIs, sensitive data, hidden text, the venue's author guidelines, page
 layout (margins, font, size, spacing, line/page numbers, template), figures
 (resolution, lettering size and typeface in vector figures, panel labels),
-figure/table citation order, and whether the title, abstract, authors,
-keywords, and statements in the `.sub` match the manuscript.
+figure/table citation order, whether the title, abstract, authors,
+keywords, and statements in the `.sub` match the manuscript, and mechanical
+prose checks (double spaces, repeated words, punctuation spacing, unbalanced
+brackets and quotes, common misspellings).
 
 Some checks need someone to *look* at the files. Without an API key they come
 back as **needs AI**. You are that reader: the CLI writes those checks out as
@@ -32,6 +34,11 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
 - Whether they want the report saved, and where (default: none; `-o` with no
   path writes `<sub stem>_validation.pdf` next to the `.sub`). Mention
   `--alt-color` if they ask for colour-blind-friendly colours.
+- Whether this is an initial submission, if the venue accepts an initial
+  submission in any format (the report's "Format for initial submission" note;
+  `describe_venue` shows `manuscript.initial_submission_any_format`). If so,
+  add `--initial-submission` (MCP: `initial_submission=true`) so errors are
+  reported as warnings.
 
 ## Steps
 
@@ -77,7 +84,7 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
 3. **Merge and report.**
 
    ```
-   paperpush validate <abs .sub> --ai-results <scratch>/validate_results.json [-o <report path>] [--alt-color]
+   paperpush validate <abs .sub> --ai-results <scratch>/validate_results.json [-o <report path>] [--alt-color] [--initial-submission]
    ```
 
    (MCP alternative: `validate_subfile(subfile, ai_results=[...], output=...)`.)

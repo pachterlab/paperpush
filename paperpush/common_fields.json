@@ -1,0 +1,80 @@
+{
+  "$comment": "Section and rank of the field ids many venues share, used to lay out .sub templates (see paperpush.subfile.ordered_fields). Each key is a section, in render order; its list ranks that section's common fields, first listed first. A field's own 'section' key in submission_forms.json overrides this, and a field named nowhere goes to 'additional', listed after the ranked fields in venue order. 'paperpush subfile --venue-order' ignores this file.",
+  "type": [
+    "publication",
+    "article_type",
+    "manuscript_type",
+    "paper_type",
+    "is_revision",
+    "previous_doi"
+  ],
+  "files": [
+    "manuscript_file",
+    "combined_pdf",
+    "figure_files",
+    "figures",
+    "table_files",
+    "tables",
+    "supplementary_files",
+    "supplementary_file",
+    "supplementary_material",
+    "supplementary_tables",
+    "cover_letter",
+    "declaration_file",
+    "additional_files"
+  ],
+  "metadata": [
+    "title",
+    "short_title",
+    "abstract",
+    "keywords",
+    "subject_areas",
+    "subject_category",
+    "section",
+    "subject_level"
+  ],
+  "authors": [
+    "authors",
+    "are_you_corresponding",
+    "corresponding_gender",
+    "alternate_contact"
+  ],
+  "reviewers": [
+    "reviewers",
+    "suggested_reviewers",
+    "excluded_reviewers"
+  ],
+  "declarations": [
+    "funding",
+    "research_funding",
+    "funders",
+    "competing_interests",
+    "competing_interests_statement",
+    "competing_interest",
+    "conflict_of_interest",
+    "data_availability",
+    "data_availability_statement",
+    "data_availability_links",
+    "additional_datasets",
+    "code_availability",
+    "original_code",
+    "code_url",
+    "author_contributions",
+    "acknowledgements",
+    "related_work",
+    "dual_publication",
+    "dual_publication_statement",
+    "preprint_doi",
+    "author_consent",
+    "declarations_confirmed",
+    "agree_terms"
+  ],
+  "additional": [
+    "comments_to_editor",
+    "peer_review",
+    "open_access",
+    "license",
+    "transfer_to_journal",
+    "journal_destination"
+  ]
+}

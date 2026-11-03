@@ -150,6 +150,9 @@ def render_pdf(lines, summary, palette, marks) -> bytes:
             w.space(4)
         elif line.role == "meta":
             w.paragraph([(line.text, "regular", grey)], 9)
+        elif line.role == "notice":
+            w.space(3)
+            w.paragraph([(f"{marks.get(line.status, '')} {line.text}", "bold", color)], 10)
         elif line.role == "summary":
             w.space(8)
             w.paragraph([(line.text, "bold", color)], 12)

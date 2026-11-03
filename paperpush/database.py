@@ -102,6 +102,31 @@ FieldType = Literal[
 ]
 AutofillRole = Literal["extract", "classify", "filemap", "never", ""]
 
+# The sections a .sub template groups its fields under, in the order they are
+# rendered (see paperpush.subfile.ordered_fields). A field takes its section from
+# its own ``section`` key, else from common_fields.json (which ranks the fields
+# many venues share), else lands in "additional".
+FieldSection = Literal[
+    "type",
+    "files",
+    "metadata",
+    "authors",
+    "reviewers",
+    "declarations",
+    "additional",
+]
+
+# Heading printed above each section in a .sub template, in render order.
+SECTION_TITLES: dict[str, str] = {
+    "type": "Manuscript type",
+    "files": "Files",
+    "metadata": "Manuscript details",
+    "authors": "Authors",
+    "reviewers": "Reviewers and editors",
+    "declarations": "Declarations",
+    "additional": "Additional information",
+}
+
 
 @dataclass(frozen=True)
 class ConditionalLimit:
@@ -345,6 +370,14 @@ class Field:
         Optional[str],
         PField(description="Id of another field in the same venue; when that " "field has a non-empty value, this field becomes required. A `boolean` " 'target triggers only on an affirmative answer, since "no" means the ' "dependent fields do not apply. Combined with `required` (unconditional)."),
     ] = None
+    # Which section of a .sub template the field is listed under. Unset means
+    # the section common_fields.json gives this field id, or "additional" when
+    # it names none. Only affects the template's layout: runners and validation
+    # read fields by id, and ``paperpush subfile --venue-order`` ignores it.
+    section: Annotated[
+        Optional[FieldSection],
+        PField(description="Section of the .sub template this field is listed under " "(type, files, metadata, authors, reviewers, declarations, additional). " "Omit to use the section paperpush/common_fields.json gives this field " 'id, or "additional" when it names none. Layout only: ignored by ' "`paperpush subfile --venue-order`, submission and validation."),
+    ] = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Field":
@@ -382,6 +415,7 @@ class Field:
             autofill=data.get("autofill", ""),
             confirm=bool(data.get("confirm", False)),
             required_if=data.get("required_if"),
+            section=data.get("section"),
         )
 
 
@@ -758,6 +792,9 @@ def check_venue_data(root: Path) -> None:
             name = f.get("options_file")
             if name and not (root / venue_data.ASSETS_SUBDIR / name).is_file() and not (ASSETS_DIR / name).is_file():
                 raise ValueError(f"{slug}.{f.get('id')} names a missing options_file {name!r}")
+            section = f.get("section")
+            if section is not None and section not in SECTION_TITLES:
+                raise ValueError(f"{slug}.{f.get('id')} has unknown section {section!r}")
             Field.from_dict({k: v for k, v in f.items() if k != "options_file"})
     requirement_slugs = check_requirements_file(root / venue_data.REQUIREMENTS_FILE)
     unlisted = sorted(set(requirement_slugs) - set(info))

@@ -91,14 +91,14 @@ fi
 
 # ---------------------------------------------------------------------------
 # Keep artifacts generated from the venue databases in sync with them.
-# Both blocks below only run when venues.json, submission_forms.json or
-# manuscript_requirements.json is part of this commit (a validate-only venue's
+# Both blocks below only run when venues.json, submission_forms.json,
+# manuscript_requirements.json or common_fields.json is part of this commit (a validate-only venue's
 # .sub template and the venues table's validate/submit columns depend on all
 # three), and re-stage whatever they regenerate so the committed tree never
 # drifts.
 # ---------------------------------------------------------------------------
 if git diff --cached --name-only --diff-filter=ACM -z \
-    | tr '\0' '\n' | grep -qE '^paperpush/(venues|submission_forms|manuscript_requirements)\.json$'; then
+    | tr '\0' '\n' | grep -qE '^paperpush/(venues|submission_forms|manuscript_requirements|common_fields)\.json$'; then
     # README.md's supported-venues table (and venues.md).
     if python scripts/gen_readme_venues.py; then
         if ! git diff --quiet -- README.md venues.md; then
@@ -121,6 +121,19 @@ if git diff --cached --name-only --diff-filter=ACM -z \
     else
         echo "pre-commit: failed to regenerate .sub templates." >&2
         status=1
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Warn about limits submission_forms.json and manuscript_requirements.json
+# record differently (e.g. the abstract word limit). Only runs when one of the
+# venue databases is part of this commit. Never blocks the commit: a venue's
+# own portal and guidelines sometimes disagree, so a mismatch may be correct.
+# ---------------------------------------------------------------------------
+if git diff --cached --name-only --diff-filter=ACM -z \
+    | tr '\0' '\n' | grep -qE '^paperpush/(venues|submission_forms|manuscript_requirements)\.json$'; then
+    if ! python scripts/check_venue_consistency.py; then
+        echo "pre-commit: could not run the forms/requirements consistency check (see above); not blocking." >&2
     fi
 fi
 

@@ -2,9 +2,7 @@
 
 <!-- [![Documentation Status](https://readthedocs.org/projects/paperpush/badge/?version=latest)](https://paperpush.readthedocs.io/en/latest/?badge=latest) -->
 
-**Website:** [paperpush.onrender.com](https://paperpush.onrender.com) — prepare and validate a submission in your browser, no install needed.
-
-Prepare manuscripts for submission to preprint servers, venues, and conferences with just a few commands. No need to spend hours filling out forms manually. Just provide a manuscript directory and submission venue of interest, and `paperpush` will fill out the submission portal for you.
+Prepare manuscripts for submission to preprint servers, venues, and conferences with just a few commands. No need to spend hours verifying manuscript files for journal compliance and filling out submission portal forms manually. Just provide a manuscript directory and submission venue of interest, and `paperpush` will validate the documents and fill out the submission portal for you.
 
 ## Install
 
@@ -34,17 +32,18 @@ The Claude skill `/paperpush-prepare-submission` helps with this.
 See [`docs/example-session.md`](docs/example-session.md) for a full worked example of this flow.
 
 ## Quickstart
-1. `paperpush subfile VENUE`: creates a file VENUE.sub that is a template for the VENUE submission.
+1. `paperpush subfile VENUE`: creates a file VENUE.sub that is a template for the VENUE submission. Fields are grouped into the same sections for every venue (manuscript type, files, details, authors, reviewers, declarations, additional); add `--venue-order` to list them in the order the venue's portal asks for them instead.
 2. **fill out VENUE.sub - 3 options:**
    - **a.** *fill out manually*
    - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
-   - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE.sub`: Use an LLM API (Anthropic, OpenAI, or Google; pick one with `--provider`, otherwise the first one with an API key set is used). Requires that provider's API key and `pip install "paperpush[autofill]"`.
-3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count), its page layout (template, margins, font, spacing, line/page numbers), its figures (resolution, lettering size and typeface, panel labels — in attached files or embedded in the manuscript), the order figures and tables are cited in, and whether the title, abstract, authors, and keywords in the `.sub` match the manuscript. It prints a colour-coded report of what passed (green), failed (red), and was not checked and why (yellow; `--alt-color` for a colour-blind-friendly palette); `-o` also saves it as PDF (or `.html`/`.md`/`.txt`). Checks that need a reader's judgement — lettering in raster figures, the guidelines' free-text rules — run with `--ai` (an Anthropic, OpenAI, or Gemini API key), or with your own Claude Code/Codex subscription through the `paperpush-validate` skill (`--ai-tasks` / `--ai-results`).
+   - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY [MORE_DIRS_OR_FILES ...] --engine api VENUE.sub`: Use an LLM API (Anthropic, OpenAI, or Google; pick one with `--provider`, otherwise the first one with an API key set is used). Requires that provider's API key and `pip install "paperpush[autofill]"`. `-d` takes one or more directories and/or documents (`.tex`, `.doc`, `.docx`, `.odt`, `.rtf`, `.txt`, `.md`, `.rst`, `.pdf`), up to the next flag or the `.sub` file, and can be repeated.
+3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count), its page layout (template, margins, font, spacing, line/page numbers), its figures (resolution, lettering size and typeface, panel labels — in attached files or embedded in the manuscript), the order figures and tables are cited in, and whether the title, abstract, authors, and keywords in the `.sub` match the manuscript. It prints a colour-coded report of what passed (green), failed (red), warnings (amber), and was not checked and why (yellow; `--alt-color` for a colour-blind-friendly palette); for venues that accept an initial submission in any format (Nature, Cell, PLOS Comp Bio, PNAS, ...) it notes the rule at the top, and `--initial-submission` reports every error as a warning; `-o` also saves it as PDF (or `.html`/`.md`/`.txt`). Checks that need a reader's judgement — lettering in raster figures, the guidelines' free-text rules — run with `--ai` (an Anthropic, OpenAI, or Gemini API key), or with your own Claude Code/Codex subscription through the `paperpush-validate` skill (`--ai-tasks` / `--ai-results`).
 4. `paperpush login VENUE`: log in to the VENUE submission portal.
 5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit.
 
 Helper commands:
 - `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
+- `paperpush add-venue --template [SLUG]` / `paperpush add-venue FILE`: write a venue file to fill in for a journal, preprint server, or conference paperpush does not support yet (or correct one with `--from SLUG`), then add it. On the website, **Add venue** fills in the same file through a form.
 - `paperpush update-venues`: Update the venue data (venues.json, submission_forms.json, manuscript_requirements.json) from the remote venue-data branch.
 - `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
 
@@ -64,6 +63,10 @@ python scripts/paperpush_pipeline.py -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine a
 
 See `python scripts/paperpush_pipeline.py --help` for the full list of options, grouped by step.
 
+## Website
+
+[paperpush.onrender.com](https://paperpush.onrender.com) — prepare and validate a submission in your browser, no install needed.
+
 ## Supported venues
 
 <!-- BEGIN SUPPORTED VENUES -->
@@ -82,7 +85,7 @@ For more details, see [`venues.md`](venues.md)
 
 ## Adding new venues
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for instructions on adding new venues. See [`DEVELOPMENT.md`](DEVELOPMENT.md) for tips on adding new venues and running unit tests.
+The quickest way is a venue file: `paperpush add-venue --template my_journal` writes `my_journal.txt`, with a section for the submission portal's form and one for the author guidelines, every key described. Fill it in (yourself, with an AI agent, or with the website's **Add venue** form), then run `paperpush add-venue my_journal.txt`, which checks it and merges it into the JSON files below. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for instructions on adding new venues. See [`DEVELOPMENT.md`](DEVELOPMENT.md) for tips on adding new venues and running unit tests.
 
 Each venue is listed in `paperpush/venues.json` (the master list of venues and their general metadata). A venue paperpush can submit to has a submission-form entry in `paperpush/submission_forms.json` (the fields the portal asks for), and a venue paperpush can validate against has a manuscript-requirements entry in `paperpush/manuscript_requirements.json` (what the venue's author guidelines demand of the manuscript: file formats and sizes, word/page limits, required sections and statements, title-page items, figure resolution and dimensions, reference rules). A venue may have either or both, so it can be supported by `validate` without `submit` or the other way round; `paperpush --venues` and [`venues.md`](venues.md) show which. Each file has a generated JSON schema, and `paperpush validate` checks a `.sub` against the form and the requirements (a venue without a requirements entry gets only the form checks; a venue without a form gets a default one naming the manuscript files).
 
@@ -118,16 +121,59 @@ type. The checks that read your files run when you press **Validate**, and the o
 that need a reader run with **Validate, extended with AI**. When you are done, download
 the `.sub` (or a zip of the `.sub` plus your files) and run `paperpush submit` on it.
 
+To pick up where you left off, open a `.sub` or that zip on the site (**Open a .sub or
+.zip…**, or drop it onto the page). A zip of your manuscript folder works too: each file
+goes into the upload field its name or folder points to (`main.pdf` → manuscript,
+`figures/Fig1.tif` → figures, `cover_letter.docx` → cover letter, `SuppTable1.xlsx` →
+supplementary tables, …). This uses keyword matching that tolerates typos, not AI, and
+only fills fields that are still empty.
+
 ```bash
 pip install 'paperpush[web]'
-paperpush-web --open            # http://127.0.0.1:8000
+paperpush web                   # the page, served from this computer, opened in your browser
+paperpush web biorxiv.sub       # the same page with biorxiv.sub filled in; edits are saved to it
 ```
+
+`paperpush web` runs the page locally rather than on the hosted site, so it opens at
+once and your files stay on your computer.
+
+To work on the form with co-authors, use **Share for editing** on the hosted site: everyone
+with the link edits the same form (with its word counts, options, and checks), edits to
+different fields merge, and the server stores it encrypted with a key that only the link
+holds. **Copy share link** sends a frozen copy instead, and **Save this page as HTML**
+saves a single read-only file that opens in any browser, with the side menu, filters,
+and search still working. **PDF** saves a printable copy. (`paperpush-web --host 0.0.0.0` serves the page for a
+deployment.)
 
 Autofill and the AI checks require a visitor to enter their provider and API key
 in the page header. The key is sent only with AI requests. Set `PAPERPUSH_WEB_AI=0` to turn them off on a
 public deployment, and `PAPERPUSH_WEB_NETWORK_CHECKS=0` to stop the server from fetching
 the links and DOIs found in uploads. Other settings: `PAPERPUSH_WEB_DATA` (where uploads
 live), `PAPERPUSH_WEB_TTL_HOURS` (default 24), `PAPERPUSH_WEB_MAX_WORKSPACE_MB` (default 500).
+Shared forms are stored in the Postgres database at `PAPERPUSH_WEB_DATABASE_URL` (or
+`DATABASE_URL`), e.g. a free [Neon](https://neon.tech) database; without one they go in an
+SQLite file in `PAPERPUSH_WEB_DATA`, which a redeploy on a host like Render wipes.
+`PAPERPUSH_WEB_SHARED_TTL_DAYS` (default 90) deletes forms nobody has edited for that long,
+and `PAPERPUSH_WEB_SHARED=0` turns sharing off.
+
+### `--web`: the page for a `.sub` file on your computer
+
+`subfile`, `autofill`, and `validate` each take `--web`, and `paperpush web FILE.sub`
+opens an existing one. Each opens that `.sub` in the same page, served from your machine on 127.0.0.1, until you press Ctrl-C. Every edit
+in the form is saved straight back to the file. Paths stay real paths, relative to
+the directory you ran the command in, so the file works unchanged with the other
+commands.
+
+```bash
+paperpush subfile biorxiv --web                     # create biorxiv.sub, fill it in through the form
+paperpush autofill -d paper/ biorxiv.sub --web      # the page autofills from paper/, then you review
+paperpush validate biorxiv.sub --web [--ai]         # run the checks in the page, fix, re-validate
+```
+
+With `--web` and no `--values`/`--engine api`, `autofill` leaves the extraction to the
+page. The page uses an API key typed into it, or one set in your environment
+(`ANTHROPIC_API_KEY`, ...). Files you add in the page are saved next to the
+manuscript, and the page never deletes anything on disk.
 
 The included Dockerfile uses Python 3.12 and installs `paperpush[web,autofill,validate]`.
 Build and run it with `docker build -t paperpush-web .` and `docker run -p 8000:8000 paperpush-web`.

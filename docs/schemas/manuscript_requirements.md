@@ -80,6 +80,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `latex_class` | string or null | Required LaTeX document class or style file. |
 | `template_layout` | [TemplateLayout](#templatelayout) or null | Geometry of the compiled template, checked against the manuscript PDF to catch shrunken margins, font, or line spacing. |
 | `language` | string or null | Mandated language variant, if any. |
+| `initial_submission_any_format` | string or null | Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings. |
 | `notes` | list of string or null | Rules with no structured key, one per string. |
 
 ## title_page

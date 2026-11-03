@@ -306,8 +306,13 @@ def create_subfile(
     path: Optional[str] = None,
     fill_defaults: bool = True,
     overwrite: bool = False,
+    venue_order: bool = False,
 ) -> dict[str, Any]:
     """Create a blank `.sub` submission template for a venue.
+
+    Fields are grouped into the sections every venue shares (manuscript type,
+    files, details, authors, reviewers, declarations, additional). Set
+    `venue_order` to list them in the order the venue's portal asks instead.
 
     `path` is where to write it; pass an absolute path, since a relative one is
     resolved against the server's working directory rather than yours. Omit it
@@ -318,7 +323,7 @@ def create_subfile(
     resolved = _venue_or_error(venue)
     target = _resolve(path, None) if path else Path(default_filename(resolved)).resolve()
     try:
-        written = write_template(resolved, target, fill_defaults=fill_defaults, overwrite=overwrite)
+        written = write_template(resolved, target, fill_defaults=fill_defaults, overwrite=overwrite, venue_order=venue_order)
     except FileExistsError:
         raise ValueError(f"{target} already exists; pass overwrite=true to replace it") from None
     except OSError as exc:
@@ -330,6 +335,7 @@ def create_subfile(
         "field_count": len(resolved.fields),
         "required_field_count": sum(1 for f in resolved.fields if f.required),
         "filled_with_defaults": fill_defaults,
+        "venue_order": venue_order,
     }
 
 
@@ -364,6 +370,7 @@ def validate_subfile(
     ai_results: Optional[list[dict[str, Any]]] = None,
     output: Optional[str] = None,
     alt_color: bool = False,
+    initial_submission: bool = False,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file and report every check.
 
@@ -387,8 +394,10 @@ def validate_subfile(
     layout (page size, margins, body font and size, double spacing, line and
     page numbers, template, spelling variant), figures (resolution, lettering
     size and typeface, panel labels, placement, legends), the order figures and
-    tables are cited in, and whether the title, abstract, authors, keywords,
-    and statements in the `.sub` match the manuscript.
+    tables are cited in, whether the title, abstract, authors, keywords,
+    and statements in the `.sub` match the manuscript, and the prose (double
+    spaces, repeated words, punctuation spacing, unbalanced brackets and
+    quotes, common misspellings).
     `anonymous` checks a double-blind submission for information identifying
     its authors -- their names, emails, IDs and affiliations from the author
     list, author metadata, home-directory paths, acknowledgments -- in the
@@ -410,6 +419,11 @@ def validate_subfile(
     "unclear"|"not_applicable", "details", "evidence"}]` to merge your verdicts
     (or get the same list from `validation_ai_tasks`).
 
+    `initial_submission` validates the file as an initial submission: every
+    error comes back as a warning, so nothing blocks it. Use it when the venue
+    lets the initial submission be in any format; that rule, when the venue
+    has one, is returned as `initial_submission_rule` either way.
+
     `checks` lists every check with its status: passed, failed, warning,
     unchecked (could not run here), needs_ai, not_implemented, or
     not_applicable. `errors` block submission; `warnings` are advisory. `ok` is
@@ -422,11 +436,14 @@ def validate_subfile(
 
     path, text, venue = _load_subfile(subfile, manuscript_dir)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
-    result = _run_validate_report(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, ai=ai, subfile_path=str(path))
+    result = _run_validate_report(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, ai=ai, subfile_path=str(path))
     out: dict[str, Any] = {
         "path": str(path),
         "venue": venue.slug,
         "ok": result.ok,
+        "initial_submission_rule": result.initial_submission_rule,
+        "initial_submission": result.initial_submission,
+        "downgraded": result.downgraded,
         "errors": _issue_dicts(result.errors),
         "warnings": _issue_dicts(result.warnings),
         "counts": result.counts(),

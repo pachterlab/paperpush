@@ -156,7 +156,54 @@
     return `${text}${sep}${addition}\n`;
   }
 
-  const api = { parse, replaceScalar, replaceBlock, keyLine, setField, splitLines, MULTILINE_TYPES };
+  // A .sub packed into a URL: deflated, then base64url, so a share link
+  // carries the whole form with no server storage (it lives in the URL's
+  // #fragment, which browsers never send to the server).
+  async function pipeBytes(bytes, stream) {
+    const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+    return new Uint8Array(await out.arrayBuffer());
+  }
+
+  async function toShareCode(text) {
+    const bytes = await pipeBytes(new TextEncoder().encode(text), new CompressionStream("deflate-raw"));
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  async function fromShareCode(code) {
+    const b64 = code.replace(/-/g, "+").replace(/_/g, "/");
+    const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
+    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(await pipeBytes(bytes, new DecompressionStream("deflate-raw")));
+  }
+
+  // Three-way merge of a shared form, field by field. `base` is the text both
+  // sides started from, `mine` has this page's unsaved edits, and `theirs`
+  // is what someone else saved. A field only one side changed takes that
+  // side's value; a field both changed to different values is a conflict,
+  // which keeps `mine` in the returned text and is listed so the page can
+  // ask. `fields` maps a field id to its {id, type} (for setField).
+  function mergeFields(base, mine, theirs, fields) {
+    const b = parse(base).values;
+    const m = parse(mine).values;
+    const t = parse(theirs).values;
+    let text = theirs;
+    const conflicts = [];
+    const ids = new Set([...Object.keys(m), ...Object.keys(t)]);
+    for (const id of ids) {
+      const bv = b[id] ?? "";
+      const mv = m[id] ?? "";
+      const tv = t[id] ?? "";
+      if (mv === tv || mv === bv) continue; // theirs already holds the answer
+      if (tv !== bv) conflicts.push({ id, mine: mv, theirs: tv });
+      const field = (fields && (fields.get ? fields.get(id) : fields[id])) || { id, type: "text" };
+      text = setField(text, field, mv);
+    }
+    return { text, conflicts };
+  }
+
+  const api = { parse, replaceScalar, replaceBlock, keyLine, setField, splitLines, toShareCode, fromShareCode, mergeFields, MULTILINE_TYPES };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Subfile = api;
 })(typeof self !== "undefined" ? self : this);

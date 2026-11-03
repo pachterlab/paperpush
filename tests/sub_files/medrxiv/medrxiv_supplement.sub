@@ -3,29 +3,31 @@
 #
 # Edit the values below, then run:  paperpush submit medrxiv.sub
 # Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web medrxiv.sub   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
 
 @venue: medrxiv
 # submission guide: https://www.medrxiv.org/submit-a-manuscript
+# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
+# in the order the venue's submission form asks for them instead.
 
-# Subject category (choice, REQUIRED)
-#   Select the single medRxiv subject area that best describes the manuscript.
-#   options: Addiction Medicine | Allergy and Immunology | Anesthesia | Cardiovascular Medicine | Dentistry and Oral Medicine | Dermatology | Emergency Medicine | Endocrinology (including Diabetes Mellitus and Metabolic Disease) | Epidemiology | Forensic Medicine | Gastroenterology | Genetic and Genomic Medicine | Geriatric Medicine | Health Economics | Health Informatics | Health Policy | Health Systems and Quality Improvement | Hematology | HIV/AIDS | Infectious Diseases | Intensive Care and Critical Care Medicine | Medical Education | Medical Ethics | Nephrology | Neurology | Nursing | Nutrition | Obstetrics and Gynecology | Occupational and Environmental Health | Oncology | Ophthalmology | Orthopedics | Otolaryngology | Pain Medicine | Palliative Medicine | Pathology | Pediatrics | Pharmacology and Therapeutics | Primary Care Research | Psychiatry and Clinical Psychology | Public and Global Health | Radiology and Imaging | Rehabilitation Medicine and Physical Therapy | Respiratory Medicine | Rheumatology | Sexual and Reproductive Health | Sports Medicine | Surgery | Toxicology | Transplantation | Urology
-subject_category: Epidemiology
+# ----------------------------------------------------------------------
+# Manuscript type
+# ----------------------------------------------------------------------
 
-# Manuscript title (text, REQUIRED)
-#   The full title of the manuscript.
-title: Title goes here
+# Is this a revision of an existing medRxiv preprint? (boolean, optional)
+#   Set to yes if submitting a revised version of a preprint already on medRxiv.
+is_revision: no
 
-# Abstract (textarea, REQUIRED)
-#   Plain-text abstract as it should appear on the bioRxiv abstract page.
-abstract: |
-  Abstract goes here. It's a really good abstract.
+# DOI of the existing preprint (if a revision) (text, optional)
+#   Only needed when is_revision is yes.
+previous_doi: 
 
-# Authors (authorlist, REQUIRED)
-#   One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). Mark exactly one author as the corresponding author.
-authors: |
-  Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no
-  Joseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
 
 # Manuscript file (file, REQUIRED)
 #   Path to the manuscript. Accepted formats: PDF, Word (.docx), or a LaTeX source bundle.
@@ -42,20 +44,52 @@ figure_files: |
 supplementary_files: |
   tests/manuscript_files/medrxiv/supplement.pdf | pdf | Supplementary Text
 
-# License / reuse terms (choice, REQUIRED)
-#   Distribution license under which the preprint is posted.
-#   options: CC-BY | CC-BY-NC | CC-BY-ND | CC-BY-NC-ND | CC0 | No reuse without permission
-license: CC-BY-NC-ND
+# ----------------------------------------------------------------------
+# Manuscript details
+# ----------------------------------------------------------------------
+
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript.
+title: Title goes here
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract as it should appear on the bioRxiv abstract page.
+abstract: |
+  Abstract goes here. It's a really good abstract.
+
+# Subject category (choice, REQUIRED)
+#   Select the single medRxiv subject area that best describes the manuscript.
+#   options: Addiction Medicine | Allergy and Immunology | Anesthesia | Cardiovascular Medicine | Dentistry and Oral Medicine | Dermatology | Emergency Medicine | Endocrinology (including Diabetes Mellitus and Metabolic Disease) | Epidemiology | Forensic Medicine | Gastroenterology | Genetic and Genomic Medicine | Geriatric Medicine | Health Economics | Health Informatics | Health Policy | Health Systems and Quality Improvement | Hematology | HIV/AIDS | Infectious Diseases | Intensive Care and Critical Care Medicine | Medical Education | Medical Ethics | Nephrology | Neurology | Nursing | Nutrition | Obstetrics and Gynecology | Occupational and Environmental Health | Oncology | Ophthalmology | Orthopedics | Otolaryngology | Pain Medicine | Palliative Medicine | Pathology | Pediatrics | Pharmacology and Therapeutics | Primary Care Research | Psychiatry and Clinical Psychology | Public and Global Health | Radiology and Imaging | Rehabilitation Medicine and Physical Therapy | Respiratory Medicine | Rheumatology | Sexual and Reproductive Health | Sports Medicine | Surgery | Toxicology | Transplantation | Urology
+subject_category: Epidemiology
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). Mark exactly one author as the corresponding author.
+authors: |
+  Joseph Richie | jmrich@caltech.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA |  | no
+  Joseph Rich | jmrich@usc.edu | Division of Biology and Biological Engineering, California Institute of Technology, Pasadena, CA 91125, USA; Keck School of Medicine, University of Southern California, Los Angeles, CA 90033, USA |  | yes
+
+# ----------------------------------------------------------------------
+# Declarations
+# ----------------------------------------------------------------------
+
+# Funding statement (textarea, optional)
+#   Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match a FundRef funder, since bioRxiv requires picking an autocomplete suggestion.
+funding: |
+  
 
 # Competing interest statement (textarea, REQUIRED)
 #   Declare any competing interests. Enter 'The authors have declared no competing interest.' if none.
 competing_interest: |
   The authors have declared no competing interest.
 
-# Funding statement (textarea, optional)
-#   Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match a FundRef funder, since bioRxiv requires picking an autocomplete suggestion.
-funding: |
-  
+# Data availability statement (textarea, optional)
+#   Free-text description of data availability shown on the medRxiv declarations page.
+data_availability: |
+  All data produced in the present study are available upon reasonable request to the authors.
 
 # Data availability links (textarea, optional)
 #   Optional. One URL per line for external datasets or supplementary material at other repositories. On medRxiv the same links populate both the external-dataset and clinical-trial protocol link sections. They are shown to readers once the preprint posts (e.g. https://www.example.com). Each line must be a valid URL.
@@ -63,30 +97,9 @@ funding: |
 data_availability_links: |
   https://github.com/example/repo
 
-# Is this a revision of an existing medRxiv preprint? (boolean, optional)
-#   Set to yes if submitting a revised version of a preprint already on medRxiv.
-is_revision: no
-
-# DOI of the existing preprint (if a revision) (text, optional)
-#   Only needed when is_revision is yes.
-previous_doi: 
-
-# Forward to a journal via M2J on posting? (boolean, optional)
-#   medRxiv-to-Journal (M2J): offer to forward the manuscript to a participating journal.
-transfer_to_journal: no
-
-# Destination journal for B2J (text, optional)
-#   Only needed when transfer_to_journal is yes.
-journal_destination: 
-
 # All authors consent to deposit and to the chosen license (boolean, REQUIRED)
 #   Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.
 author_consent: yes
-
-# Data availability statement (textarea, optional)
-#   Free-text description of data availability shown on the medRxiv declarations page.
-data_availability: |
-  All data produced in the present study are available upon reasonable request to the authors.
 
 # Does the study use human data, samples, or involve human subjects? (choice, REQUIRED)
 #   medRxiv screening question. Answer 'Yes' if the work uses human data/samples or involves human subjects (including public datasets, surveys, patient records, or clinical protocols); otherwise 'No'.
@@ -112,5 +125,22 @@ ethics_statement: |
 #   medRxiv screening question. Select 'Yes' for a registered clinical trial, 'No' for a non-trial study, or 'Not applicable'.
 #   options: Yes | No | Not applicable
 clinical_trial: Not applicable
+
+# ----------------------------------------------------------------------
+# Additional information
+# ----------------------------------------------------------------------
+
+# License / reuse terms (choice, REQUIRED)
+#   Distribution license under which the preprint is posted.
+#   options: CC-BY | CC-BY-NC | CC-BY-ND | CC-BY-NC-ND | CC0 | No reuse without permission
+license: CC-BY-NC-ND
+
+# Forward to a journal via M2J on posting? (boolean, optional)
+#   medRxiv-to-Journal (M2J): offer to forward the manuscript to a participating journal.
+transfer_to_journal: no
+
+# Destination journal for B2J (text, optional)
+#   Only needed when transfer_to_journal is yes.
+journal_destination: 
 
 # vim: set filetype=yaml :

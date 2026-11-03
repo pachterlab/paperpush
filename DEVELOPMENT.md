@@ -19,6 +19,31 @@ For iterating on the script, the VS Code debugger is recommended:
 - Set breakpoints in the code (`breakpoint()` or IDE breakpoints)
 - Run the debugger
 
+### Recovering a run that gets stuck
+
+`paperpush/venues/recovery.py` lets a run continue after one browser action
+fails, instead of the whole run failing. A runner opts in by wrapping its page
+once sign-in is done, then labelling each part of the wizard as it goes (see
+`paperpush/venues/openrxiv/main.py`):
+
+```python
+from ..recovery import guard, step
+
+venue.ensure_signed_in(page, context, debug=debug)  # sign-in stays unguarded
+page = guard(page)
+step("Authors page")
+...
+```
+
+A failed action (`click`, `fill`, `check`, `select_option`, `wait_for`, ...) then
+goes to the handler that the caller set with `recovery.use_handler(...)`. That
+handler fixes the page and continues, retries the action, or aborts. With no
+handler set, every failure aborts, so the run behaves as it did before.
+`HumanHandler` asks in the terminal. When some actions only make sense together,
+such as the click that opens a file chooser plus handing it the file, run them as
+one unit with `page.attempt("attach ms.pdf", fn)`. Steps run through `_try` are
+optional and never go to the handler.
+
 
 ## Website
 
@@ -35,6 +60,14 @@ against the Python versions (when Node is installed), so change each pair togeth
 The page puts each check `validate` reports into one of four blocks (`app.check_group`):
 checked as you type, checked by Validate, checked only with AI, and not checked (rules
 recorded as `not_implemented`).
+
+`static/add-venue.html` / `add-venue.js` is the **Add venue** page (`/add-venue`). Its inputs are generated from `/api/venue-file/schema`, i.e. from the dataclasses through `paperpush/venuefile.py`, and the venue file it downloads is rendered and checked by the server (`/api/venue-file/render`), so the file format lives only in `venuefile.py`. It never writes the venue databases; `paperpush add-venue FILE` does.
+
+`static/viewer.js` holds the reading aids: the side menu of fields, the stat tiles, the
+filter and search bar, the description toggle, and the copy buttons. It reads only the DOM
+(each field card's `st-*` status class and `data-*` attributes, which `app.js:renderStatus`
+keeps current), because "Save this page" inlines it into the standalone HTML an author sends
+to a PI or collaborator, where `app.js` does not run.
 
 ```bash
 pip install -e .[dev]
@@ -107,7 +140,7 @@ section's `notes` list (one factual sentence each):
 
 | section         | what it holds                                                                   |
 |-----------------|---------------------------------------------------------------------------------|
-| `manuscript`    | `formats`, `max_file_size_mb`, `max_words[_before_refs]`, `max_pages[_before_refs]`, `count_excludes`, `max_display_items`, `line_numbers`, `double_spacing`, `single_file`, `figures_placement`, `anonymized`, `template_required`, `template_layout`, ... |
+| `manuscript`    | `formats`, `max_file_size_mb`, `max_words[_before_refs]`, `max_pages[_before_refs]`, `count_excludes`, `max_display_items`, `line_numbers`, `double_spacing`, `single_file`, `figures_placement`, `anonymized`, `template_required`, `template_layout`, `initial_submission_any_format`, ... |
 | `title_page`    | `required_items` (canonical ids: `title`, `authors`, `affiliations`, `corresponding_email`, `orcid`, `keywords`, `running_title`, `word_count`, ...), `title_max_characters`, `running_title_max_characters` |
 | `abstract`      | `max_words`, `min_words`, `max_characters`, `structured`, `structured_headings`, `no_references` |
 | `keywords`      | `min`, `max`                                                                    |
@@ -157,6 +190,13 @@ compiles it with `latexmk` (or `pdflatex` + `bibtex`) into a scratch directory,
 never writing next to the source, and caches the build for the process. With
 no TeX toolchain the limit is reported as unchecked. Tests that need a
 toolchain are skipped when none is installed.
+
+`manuscript.initial_submission_any_format` is set only when the guidelines let
+the initial submission be in any format (formatting rules apply from revision
+or acceptance); it holds that rule in one sentence. `validate` quotes it at the
+top of the report, enables the web page's "initial submission (any format)"
+checkbox, and `--initial-submission` then reports every error as a warning.
+Keep the full wording in `notes` too if it carries other requirements.
 
 `manuscript.template_layout` records the geometry of a mandatory template as
 it comes out of LaTeX -- text-block edges, body font size, baseline skip,
@@ -357,10 +397,55 @@ the manuscript, figure, table, supplementary and cover-letter files. So
 refuse it. `tests/test_internals.py` checks that every form and requirements
 entry names a listed venue.
 
+Some limits are recorded in both `submission_forms.json` (on a portal field)
+and `manuscript_requirements.json` (from the guidelines): the abstract and
+title lengths, keyword counts, per-file size caps, the total upload cap,
+accepted file formats, whether a cover letter is required, and per-article-type
+page and word limits. `python scripts/check_venue_consistency.py` lists every
+such pair that disagrees, giving both paths and values. It also checks that
+each `article_type_field` names a field in the venue's form and that each
+`article_types` key is one of that field's options. The pre-commit hook runs it
+whenever a venue database is part of the commit. A mismatch is only a warning,
+because a venue's portal and guidelines sometimes really do disagree (the
+guidelines say 1000 characters, the portal stops at 998). Reconcile the value
+when one file is wrong; when the venue itself disagrees, keep both, since
+`validate` enforces the portal value when both exist. `--strict` makes it exit
+1, and `--all-formats` also lists formats the portal accepts beyond the
+guidelines (normally expected, so hidden by default).
+
 To add a validate-only venue, add its entry to `venues.json` and its rules to
 `manuscript_requirements.json`. It needs no code, so it also reaches installed
 copies through the published venue data without a release.
 
 To deprecate a venue, add the field `deprecated:true` to its entry in `paperpush/venues.json`.
+
+### Field sections in `.sub` templates
+
+`paperpush subfile` groups every venue's fields into the same sections, in this
+order: `type`, `files`, `metadata`, `authors`, `reviewers`, `declarations`,
+`additional` (`SECTION_TITLES` in `paperpush/database.py`; layout code in
+`ordered_fields()` in `paperpush/subfile.py`). A field's section comes from, in
+order of precedence:
+
+1. its own `"section"` key in `submission_forms.json`;
+2. `paperpush/common_fields.json`, which gives a section to the field ids many
+   venues share (`title`, `abstract`, `manuscript_file`, `reviewers`, ...) and
+   ranks them within it;
+3. otherwise `additional`.
+
+Within a section, the fields `common_fields.json` ranks come first, in rank
+order, then the rest in the venue's own order. A field whose `required_if`
+target would come after it is moved to just after the target.
+`submission_forms.json` itself stays in portal order (the order you see when
+clicking through the form), and `paperpush subfile --venue-order` renders that
+order unchanged. Runners and validation read fields by id, so the layout never
+affects them.
+
+When you add a field, either reuse a common id (it is placed automatically) or
+give the field a `"section"`. A field id used by several venues belongs in
+`common_fields.json` instead. `tests/test_subfile.py` fails if a field is
+placed by neither. After editing either file, run
+`python scripts/gen_subfile_templates.py` to refresh
+`paperpush/subfile_templates/` (the pre-commit hook and CI check this).
 
 Every venue also declares `anonymous` (`true` for double-blind review, `false` otherwise; an entry without it counts as `false`). An anonymous venue gets the identifying-information check (`paperpush/anonymity.py`) on every `paperpush validate`: the attachments and any linked anonymous.4open.science repositories are searched for the authors' details. Set it for a new venue from its reviewing policy.

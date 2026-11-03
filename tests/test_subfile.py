@@ -23,13 +23,16 @@ fixture in ``conftest.py``.
 
 from __future__ import annotations
 
+import json
+from dataclasses import replace
+
 import pytest
 import sample_subfiles
 from sample_subfiles import REPO_ROOT, scenarios
 
 from paperpush import subfile, venues
 from paperpush.cli import main
-from paperpush.database import get_venue, list_venues
+from paperpush.database import SECTION_TITLES, Field, get_venue, list_venues
 
 VENUES = list_venues()
 SLUGS = [j.slug for j in VENUES]
@@ -125,6 +128,118 @@ def test_venues_lists_supported_venues(capsys):
     # Every configured venue slug shows up in the listing.
     for venue in list_venues():
         assert venue.slug in out.lower()
+
+
+# --- field order: shared sections vs. --venue-order -------------------------
+
+
+def _ids_in_text(text: str) -> list[str]:
+    """Field ids in the order their value slots appear in rendered .sub text."""
+    ids = []
+    for line in text.splitlines():
+        if line and not line.startswith((" ", "#", "@")) and ":" in line:
+            ids.append(line.split(":", 1)[0])
+    return ids
+
+
+@pytest.mark.parametrize("venue", VENUES, ids=SLUGS)
+def test_template_groups_fields_by_section_in_canonical_order(venue):
+    ordered = subfile.ordered_fields(venue)
+    assert sorted(f.id for _, f in ordered) == sorted(f.id for f in venue.fields)
+
+    # Sections appear in SECTION_TITLES order, each as one contiguous run.
+    runs = [s for i, (s, _) in enumerate(ordered) if i == 0 or ordered[i - 1][0] != s]
+    rank = list(SECTION_TITLES)
+    assert runs == sorted(runs, key=rank.index)
+    assert len(runs) == len(set(runs))
+
+    # The rendered text follows the same order, with one heading per section.
+    text = subfile.render_template(venue)
+    assert _ids_in_text(text) == [f.id for _, f in ordered]
+    for section in runs:
+        assert text.count(f"# {SECTION_TITLES[section]}\n") == 1
+
+
+@pytest.mark.parametrize("venue", VENUES, ids=SLUGS)
+def test_venue_order_keeps_the_portal_order(venue):
+    text = subfile.render_template(venue, venue_order=True)
+    assert _ids_in_text(text) == [f.id for f in venue.fields]
+    for title in SECTION_TITLES.values():
+        assert f"# {title}\n" not in text
+
+
+@pytest.mark.parametrize("venue", VENUES, ids=SLUGS)
+def test_conditional_field_never_precedes_its_trigger(venue):
+    position = {f.id: i for i, (_, f) in enumerate(subfile.ordered_fields(venue))}
+    for field in venue.fields:
+        if field.required_if in position:
+            assert position[field.required_if] < position[field.id], field.id
+
+
+def test_common_fields_rank_within_a_section():
+    # bioRxiv's portal asks for the result type first, but the shared layout
+    # leads with files after the type questions and puts the title before the
+    # abstract, ahead of the authors.
+    ids = [f.id for _, f in subfile.ordered_fields(get_venue("biorxiv"))]
+    assert ids.index("result_type") < ids.index("manuscript_file") < ids.index("title") < ids.index("abstract") < ids.index("authors")
+
+
+def test_explicit_section_overrides_common_fields():
+    field = Field(id="title", label="Title", type="text", section="additional")
+    assert subfile.field_section(field) == "additional"
+    assert subfile.field_section(Field(id="title", label="Title", type="text")) == "metadata"
+    assert subfile.field_section(Field(id="no_such_field", label="X", type="text")) == subfile.FALLBACK_SECTION
+
+
+def test_dependent_moves_after_its_trigger():
+    # A dependent ranked into an earlier section than its trigger follows it.
+    trigger = Field(id="has_extra", label="Extra?", type="boolean", section="additional")
+    dependent = Field(id="extra_detail", label="Detail", type="text", section="type", required_if="has_extra")
+    venue = replace(get_venue("biorxiv"), fields=[dependent, Field(id="title", label="Title", type="text"), trigger])
+    ordered = subfile.ordered_fields(venue)
+    assert [f.id for _, f in ordered] == ["title", "has_extra", "extra_detail"]
+    assert ordered[-1][0] == "additional"
+
+
+def test_common_fields_file_is_well_formed():
+    raw = json.loads(subfile.COMMON_FIELDS_PATH.read_text(encoding="utf-8"))
+    sections = [k for k in raw if not k.startswith("$")]
+    assert set(sections) <= set(SECTION_TITLES)
+    # Every ranked id is used by at least one venue, so a typo cannot hide.
+    used = {f.id for v in VENUES for f in v.fields}
+    assert set(subfile.common_fields()) <= used
+
+
+def test_every_venue_field_is_placed_deliberately():
+    # Fields neither tagged nor ranked silently land in "additional"; keep that
+    # deliberate by requiring every venue field to be placed one way or the other.
+    unplaced = sorted({f"{v.slug}.{f.id}" for v in VENUES for f in v.fields if f.section is None and f.id not in subfile.common_fields()})
+    assert not unplaced, "give these a 'section' in submission_forms.json or rank them in common_fields.json"
+
+
+def test_subfile_venue_order_flag(in_tmp):
+    venue = get_venue("biorxiv")
+    assert main(["subfile", "biorxiv"]) == 0
+    assert main(["subfile", "biorxiv", "-o", "portal.sub", "--venue-order"]) == 0
+    canonical = (in_tmp / "biorxiv.sub").read_text(encoding="utf-8")
+    portal = (in_tmp / "portal.sub").read_text(encoding="utf-8")
+    assert _ids_in_text(portal) == [f.id for f in venue.fields]
+    assert _ids_in_text(canonical) != _ids_in_text(portal)
+    # Both orders parse to the same values.
+    assert subfile.parse(canonical).values == subfile.parse(portal).values
+
+
+def test_check_venue_data_rejects_unknown_section(tmp_path):
+    from paperpush import database, venue_data
+
+    for name in (venue_data.VENUES_FILE, venue_data.FORMS_FILE, venue_data.REQUIREMENTS_FILE):
+        (tmp_path / name).write_text((database.DATABASE_PATH.parent / name).read_text(encoding="utf-8"), encoding="utf-8")
+    forms_path = tmp_path / venue_data.FORMS_FILE
+    forms = json.loads(forms_path.read_text(encoding="utf-8"))
+    forms["biorxiv"]["fields"][0]["section"] = "nonsense"
+    forms_path.write_text(json.dumps(forms), encoding="utf-8")
+    with pytest.raises(ValueError, match="unknown section"):
+        database.check_venue_data(tmp_path)
 
 
 # --- the options command ---------------------------------------------------

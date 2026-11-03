@@ -668,7 +668,7 @@ HANDLED_RULES = frozenset(
 # Rule keys that describe rather than constrain (what a count leaves out, a
 # template's download link, a preference), or free text handed to the AI
 # checks (``notes``).
-INFORMATIONAL_RULES = frozenset({"manuscript.count_excludes", "manuscript.count_includes", "manuscript.template_url", "figures.vector_formats", "figures.color_charge", "sections.optional", "statements.optional", "notes"})
+INFORMATIONAL_RULES = frozenset({"manuscript.count_excludes", "manuscript.initial_submission_any_format", "manuscript.count_includes", "manuscript.template_url", "figures.vector_formats", "figures.color_charge", "sections.optional", "statements.optional", "notes"})
 
 GUIDELINES = "Guidelines"
 

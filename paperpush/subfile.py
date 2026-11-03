@@ -15,15 +15,23 @@ deliberately simple so that ``submit`` can round-trip it:
 
 Block syntax (``key: |``) is used for any multi-line value (abstracts, author
 lists, file lists). Everything else is a single ``key: value`` line.
+
+Fields are grouped into the same sections, in the same order, for every venue
+(manuscript type, files, details, authors, reviewers, declarations, additional;
+see :func:`ordered_fields`), so ``.sub`` files for different venues line up.
+``venue_order=True`` lists them in the order the venue's portal asks instead.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 
-from .database import Field, Venue, options_command
+from .database import SECTION_TITLES, Field, Venue, options_command
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +45,100 @@ class SubFile:
 
     venue: str
     values: dict[str, str]
+
+
+# The hosted paperpush web page; a .sub dropped onto it opens filled in.
+WEB_URL = "https://paperpush.onrender.com"
+
+# Ranks the field ids many venues share and gives each its section; see the
+# file's own "$comment" and ordered_fields below.
+COMMON_FIELDS_PATH = Path(__file__).with_name("common_fields.json")
+
+# Section a field lands in when neither it nor common_fields.json names one.
+FALLBACK_SECTION = "additional"
+
+
+@lru_cache(maxsize=1)
+def common_fields() -> dict[str, tuple[str, int]]:
+    """Map each field id in ``common_fields.json`` to its (section, rank).
+
+    Raises ``ValueError`` when the file names an unknown section or lists an id
+    twice, since either would make the layout ambiguous.
+    """
+    data = json.loads(COMMON_FIELDS_PATH.read_text(encoding="utf-8"))
+    ranks: dict[str, tuple[str, int]] = {}
+    for section, ids in data.items():
+        if section.startswith("$"):
+            continue
+        if section not in SECTION_TITLES:
+            raise ValueError(f"{COMMON_FIELDS_PATH.name}: unknown section {section!r}")
+        for rank, field_id in enumerate(ids):
+            if field_id in ranks:
+                raise ValueError(f"{COMMON_FIELDS_PATH.name}: {field_id!r} is listed twice")
+            ranks[field_id] = (section, rank)
+    return ranks
+
+
+def field_section(field: Field) -> str:
+    """The section of a ``.sub`` template that ``field`` is listed under.
+
+    The field's own ``section`` wins; otherwise the section
+    ``common_fields.json`` gives its id; otherwise :data:`FALLBACK_SECTION`. An
+    unknown ``section`` value (e.g. from a newer published database) falls
+    through rather than failing.
+    """
+    if field.section in SECTION_TITLES:
+        return field.section
+    common = common_fields().get(field.id)
+    return common[0] if common else FALLBACK_SECTION
+
+
+def ordered_fields(venue: Venue, venue_order: bool = False) -> list[tuple[Optional[str], Field]]:
+    """Return ``venue``'s fields as (section, field) pairs in template order.
+
+    With ``venue_order`` the fields keep the order the venue defines (its
+    portal's order) and every section is None, so no headings are printed.
+
+    Otherwise fields are grouped by :func:`field_section`, sections in
+    :data:`~paperpush.database.SECTION_TITLES` order. Within a section, fields
+    ``common_fields.json`` ranks for that section come first, in rank order,
+    then the rest in venue order. Finally a field whose ``required_if`` target
+    would come after it is moved to just after that target (taking the target's
+    section), so a conditional question is never asked before the answer it
+    depends on.
+    """
+    if venue_order:
+        return [(None, f) for f in venue.fields]
+
+    section_rank = {name: i for i, name in enumerate(SECTION_TITLES)}
+    ranks = common_fields()
+
+    def key(item: tuple[int, Field]) -> tuple[int, int, int]:
+        index, field = item
+        section = field_section(field)
+        common = ranks.get(field.id)
+        if common and common[0] == section:
+            return (section_rank[section], 0, common[1])
+        return (section_rank[section], 1, index)
+
+    ordered = [(field_section(f), f) for _, f in sorted(enumerate(venue.fields), key=key)]
+
+    # Move each dependent after its target. A pass can only move a field later,
+    # and a chain of n dependents settles in at most n passes.
+    for _ in range(len(ordered)):
+        moved = False
+        position = {f.id: i for i, (_, f) in enumerate(ordered)}
+        for i, (_, field) in enumerate(ordered):
+            target = position.get(field.required_if or "")
+            if target is not None and target > i:
+                ordered.pop(i)
+                # The target shifted one place left when the dependent was popped.
+                ordered.insert(target, (ordered[target - 1][0], field))
+                moved = True
+                break
+        if not moved:
+            break
+    return ordered
 
 
 def default_filename(venue: Venue) -> str:
@@ -57,8 +159,13 @@ def render_template(
     venue: Venue,
     fill_defaults: bool = False,
     values: dict[str, str] | None = None,
+    venue_order: bool = False,
 ) -> str:
     """Build the text of a ``.sub`` template for ``venue``.
+
+    Fields are grouped into the shared sections of :func:`ordered_fields`, each
+    under a comment heading; ``venue_order=True`` lists them in the venue's own
+    (portal) order with no headings instead.
 
     When ``values`` is given, a field whose id appears there is pre-populated
     with that value (this is how ``autofill`` carries extracted values into the
@@ -77,14 +184,28 @@ def render_template(
         "#",
         "# Edit the values below, then run:  paperpush submit " f"{default_filename(venue)}",
         "# Lines starting with '#' are comments and are ignored.",
+        "#",
+        "# To fill this in through a form instead, open it in the paperpush web page:",
+        f"#   - run:  paperpush web {default_filename(venue)}   (use this file's path)",
+        f"#   - or visit {WEB_URL} and drag this file onto the page",
         "",
         f"@venue: {venue.slug}",
     ]
     if venue.submission_guide:
         lines.append(f"# submission guide: {venue.submission_guide}")
+    if venue_order:
+        lines.append("# Fields are listed in the order the venue's submission form asks for them.")
+    else:
+        lines.append("# Fields are grouped by section. 'paperpush subfile --venue-order' lists them")
+        lines.append("# in the order the venue's submission form asks for them instead.")
     lines.append("")
 
-    for field in venue.fields:
+    current_section: Optional[str] = None
+    for section, field in ordered_fields(venue, venue_order=venue_order):
+        if section is not None and section != current_section:
+            current_section = section
+            rule = "# " + "-" * 70
+            lines += [rule, f"# {SECTION_TITLES[section]}", rule, ""]
         flag = "REQUIRED" if field.required else "optional"
         lines.append(f"# {field.label} ({field.type}, {flag})")
         if field.help:
@@ -155,19 +276,24 @@ def write_template(
     path: str | Path | None = None,
     fill_defaults: bool = False,
     overwrite: bool = False,
+    venue_order: bool = False,
 ) -> Path:
-    """Write a ``.sub`` template for ``venue`` and return its path."""
+    """Write a ``.sub`` template for ``venue`` and return its path.
+
+    ``venue_order`` is passed to :func:`render_template`.
+    """
     target = Path(path) if path is not None else Path(default_filename(venue))
     if target.exists() and not overwrite:
         logger.debug("write_template: %s exists and overwrite=False", target)
         raise FileExistsError(target)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(render_template(venue, fill_defaults=fill_defaults), encoding="utf-8")
+    target.write_text(render_template(venue, fill_defaults=fill_defaults, venue_order=venue_order), encoding="utf-8")
     logger.debug(
-        "write_template: wrote %s template to %s (fill_defaults=%s)",
+        "write_template: wrote %s template to %s (fill_defaults=%s, venue_order=%s)",
         venue.slug,
         target,
         fill_defaults,
+        venue_order,
     )
     return target
 

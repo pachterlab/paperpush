@@ -33,6 +33,8 @@ dependency, imported lazily, so the deterministic core works without any of them
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import base64
 import json
 import logging
@@ -213,31 +215,33 @@ def parse_extraction(data: dict) -> Extraction:
     return Extraction(fields=proposals, unfilled=unfilled)
 
 
-def _resolve_one_path(path_str: str, manuscript_dir: Path | None) -> str:
+def _resolve_one_path(path_str: str, search_dirs: list[Path]) -> str:
     """Make a single file path resolvable from the current directory.
 
-    If the path as given does not exist but the same name does inside
-    ``manuscript_dir``, rewrite it to that location so the file checks in
-    :mod:`paperpush.validate` (which resolves paths against the working
-    directory) find it. Otherwise the value is left untouched for validation
-    to flag.
+    If the path as given does not exist but the same name does inside one of
+    ``search_dirs`` (tried in order), rewrite it to that location so the file
+    checks in :mod:`paperpush.validate` (which resolves paths against the
+    working directory) find it. Otherwise the value is left untouched for
+    validation to flag.
     """
     path_str = path_str.strip()
-    if not path_str or manuscript_dir is None:
+    if not path_str or not search_dirs:
         return path_str
     if Path(path_str).expanduser().exists():
         return path_str
-    candidate = manuscript_dir / path_str
-    if candidate.exists():
-        return str(candidate)
+    for base in search_dirs:
+        candidate = base / path_str
+        if candidate.exists():
+            return str(candidate)
     # Also try just the basename, in case the engine quoted a longer path.
-    candidate = manuscript_dir / Path(path_str).name
-    if candidate.exists():
-        return str(candidate)
+    for base in search_dirs:
+        candidate = base / Path(path_str).name
+        if candidate.exists():
+            return str(candidate)
     return path_str
 
 
-def _resolve_filemap(field: Field, value: str, manuscript_dir: Path | None) -> str:
+def _resolve_filemap(field: Field, value: str, search_dirs: list[Path]) -> str:
     """Resolve the file path(s) in a ``filemap`` field's value.
 
     For a ``file`` field the whole value is a path. For a ``filelist`` each
@@ -246,14 +250,14 @@ def _resolve_filemap(field: Field, value: str, manuscript_dir: Path | None) -> s
     preserved as written.
     """
     if field.type == "file":
-        return _resolve_one_path(value, manuscript_dir)
+        return _resolve_one_path(value, search_dirs)
 
     out_lines: list[str] = []
     for line in value.splitlines():
         if not line.strip():
             continue
         parts = [p.strip() for p in line.split("|")]
-        parts[0] = _resolve_one_path(parts[0], manuscript_dir)
+        parts[0] = _resolve_one_path(parts[0], search_dirs)
         out_lines.append(" | ".join(parts) if len(parts) > 1 else parts[0])
     return "\n".join(out_lines)
 
@@ -269,7 +273,7 @@ def autofill(
     text: str,
     venue: Venue,
     extraction: Extraction,
-    manuscript_dir: str | Path | None = None,
+    manuscript_dir: str | Path | Sequence[str | Path] | None = None,
     min_confidence: str = "low",
 ) -> AutofillResult:
     """Apply ``extraction`` to the ``.sub`` ``text`` for ``venue``.
@@ -282,11 +286,17 @@ def autofill(
     ``min_confidence`` is the floor below which a proposal is not written at all
     (``"low"`` writes everything proposed; ``"high"`` writes only sure things).
     ``manuscript_dir`` is used to resolve relative file paths in ``filemap``
-    fields against the directory the files actually live in.
+    fields against the directory the files actually live in. It may be a
+    single directory or a sequence of them, searched in order.
     """
     by_id = {f.id: f for f in venue.fields}
     floor = _CONFIDENCE_ORDER.get(min_confidence.lower(), 0)
-    mdir = Path(manuscript_dir).expanduser() if manuscript_dir is not None else None
+    if manuscript_dir is None:
+        search_dirs: list[Path] = []
+    elif isinstance(manuscript_dir, (str, Path)):
+        search_dirs = [Path(manuscript_dir).expanduser()]
+    else:
+        search_dirs = [Path(d).expanduser() for d in manuscript_dir]
 
     result = text
     outcomes: list[Outcome] = []
@@ -306,7 +316,7 @@ def autofill(
 
         value = prop.value
         if role == FILEMAP:
-            value = _resolve_filemap(field, value, mdir)
+            value = _resolve_filemap(field, value, search_dirs)
 
         if not value.strip():
             outcomes.append(Outcome(field.id, field.label, SKIPPED_EMPTY, confidence=confidence, source=prop.source, note="no value to write"))

@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from paperpush import credentials, mcp_server
-from paperpush.database import list_venues
+from paperpush.database import get_venue, list_venues
 
 VENUE = "biorxiv"
 LOGINLESS_VENUE = "combinatorica"
@@ -101,6 +101,15 @@ def test_create_subfile_writes_a_template(tmp_path):
     assert result["path"] == str(path)
     assert result["venue"] == VENUE
     assert "title:" in path.read_text(encoding="utf-8")
+
+
+def test_create_subfile_venue_order(tmp_path):
+    from paperpush.subfile import render_template
+
+    path = tmp_path / "out.sub"
+    result = mcp_server.create_subfile(VENUE, str(path), fill_defaults=False, venue_order=True)
+    assert result["venue_order"] is True
+    assert path.read_text(encoding="utf-8") == render_template(get_venue(VENUE), venue_order=True)
 
 
 def test_create_subfile_will_not_clobber_without_overwrite(tmp_path):
@@ -592,5 +601,5 @@ def test_build_server_exposes_typed_arguments():
     tool = by_name["validate_subfile"]
     # Renamed from inputSchema to input_schema in MCP SDK 2.0.
     schema = getattr(tool, "input_schema", None) or tool.inputSchema
-    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "alt_color"}
+    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "alt_color", "initial_submission"}
     assert schema["required"] == ["subfile"]

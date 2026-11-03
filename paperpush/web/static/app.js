@@ -14,15 +14,19 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+  // A tab opened from Settings > New (?new) keeps its workspace and drafts
+  // in sessionStorage, so it starts empty and never overwrites another tab's.
+  const FRESH = new URLSearchParams(location.search).has("new");
+  const areaFor = (key) => (FRESH && /^(workspace|draft:)/.test(key) ? sessionStorage : localStorage);
   const store = {
     get(key) {
-      try { return localStorage.getItem(`paperpush:${key}`); } catch { return null; }
+      try { return areaFor(key).getItem(`paperpush:${key}`); } catch { return null; }
     },
     set(key, value) {
-      try { localStorage.setItem(`paperpush:${key}`, value); } catch { /* storage unavailable */ }
+      try { areaFor(key).setItem(`paperpush:${key}`, value); } catch { /* storage unavailable */ }
     },
     del(key) {
-      try { localStorage.removeItem(`paperpush:${key}`); } catch { /* storage unavailable */ }
+      try { areaFor(key).removeItem(`paperpush:${key}`); } catch { /* storage unavailable */ }
     },
   };
 
@@ -76,10 +80,21 @@
     live: { checks: [], byField: {} },
     results: null, // /validate response
     resultsStale: false,
+    initialSubmission: false, // "initial submission (any format)" ticked: errors become warnings
     touched: false, // the author has changed something: colour the live checks
     showRequired: false, // flag empty required fields (after the first Validate)
     review: new Set(), // field ids autofill asked the author to confirm
+    pendingPaths: null, // zip paths waiting to be matched to the venue's upload fields
+    importSkipped: null, // zip members not unpacked, for the import summary
     busy: false,
+    // Set when the CLI opened this page with --web: {path, token, ...}. The
+    // page then edits that .sub file on the author's machine (saved back as
+    // they go) and file paths are real paths, not upload names.
+    local: null,
+    // Set while editing a shared form (#/f/<id>/<key>): {id, key, aes, token,
+    // version, base}. `base` is the text as last saved to (or read from) the
+    // server; the page's edits are state.text minus that.
+    shared: null,
   };
 
   // ------------------------------------------------------------------ utils
@@ -99,6 +114,7 @@
   }
 
   async function api(path, opts = {}) {
+    if (state.local) opts = { ...opts, headers: { ...(opts.headers || {}), "X-Paperpush-Token": state.local.token } };
     const res = await fetch(path, opts);
     if (!res.ok) {
       let detail = res.statusText;
@@ -125,6 +141,7 @@
   // Which LLM the visitor's key selects, or why AI cannot run.
   function aiAvailability() {
     if (!state.info || !state.info.ai) return { label: null, reason: "AI features are switched off on this server. Running paperpush yourself? Use `paperpush autofill` and `paperpush validate --ai`." };
+    if (!state.llm.key && envAi()) return { label: `the ${PROVIDER_LABELS[state.info.ai_provider] || state.info.ai_provider} key set in your environment`, reason: "" };
     if (!state.llm.key) return { label: null, reason: KEY_TOOLTIP };
     const provider = state.llm.provider || guessProvider(state.llm.key);
     if (!provider) return { label: null, reason: "Choose which provider your API key is for." };
@@ -135,8 +152,11 @@
     $("#key-panel").classList.toggle("has-key", Boolean(state.llm.key));
   }
 
+  // Run locally (--web), the server may use an API key from the environment.
+  const envAi = () => Boolean(state.local && state.info && state.info.ai_provider);
+
   function setAiTooltip(wrap, reason) {
-    const message = !state.llm.key ? KEY_TOOLTIP : reason;
+    const message = !state.llm.key && !envAi() ? KEY_TOOLTIP : reason;
     wrap.dataset.tooltip = message;
     wrap.setAttribute("aria-label", message || "AI feature");
   }
@@ -159,7 +179,6 @@
     input.addEventListener("input", update);
     provider.addEventListener("change", update);
     remember.addEventListener("change", update);
-    $("#key-clear").addEventListener("click", () => { input.value = ""; update(); input.focus(); });
     for (const wrap of [$("#autofill-wrap"), $("#validate-ai-wrap")]) {
       wrap.addEventListener("click", () => { if (wrap.dataset.tooltip) wrap.focus(); });
     }
@@ -186,7 +205,9 @@
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   }
 
-  const baseName = (path) => path.trim().replace(/\\/g, "/").split("/").pop();
+  // How a file is named in the pickers: its upload name, or (run locally with
+  // --web) the path exactly as the .sub gives it.
+  const baseName = (path) => (state.local ? path.trim() : path.trim().replace(/\\/g, "/").split("/").pop());
   const extOf = (name) => (name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
   const humanize = (key) => key.replace(/_/g, " ").replace(/\bmm\b/, "(mm)").replace(/\bpt\b/, "(pt)").replace(/\bmb\b/, "(MB)").replace(/\bdpi\b/, "dpi");
   const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -210,8 +231,16 @@
     document.documentElement.dataset.palette = alt ? "alt" : "default";
     $("#opt-colorblind").checked = alt;
     const showText = store.get("subtext") === "1";
-    $("#opt-subtext").checked = showText;
     $("#sub-text-panel").hidden = !showText;
+    $("#show-sub").textContent = showText ? "Hide .sub file" : "Show .sub file";
+    $("#show-sub").setAttribute("aria-expanded", String(showText));
+  }
+
+  function toggleSubText() {
+    const show = $("#sub-text-panel").hidden;
+    store.set("subtext", show ? "1" : "0");
+    applySettings();
+    if (show) $("#sub-text-panel").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function wireSettings() {
@@ -226,12 +255,15 @@
     document.addEventListener("click", (e) => { if (!menu.contains(e.target)) close(); });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
     $("#opt-colorblind").addEventListener("change", (e) => { store.set("palette", e.target.checked ? "alt" : "default"); applySettings(); });
-    $("#opt-subtext").addEventListener("change", (e) => { store.set("subtext", e.target.checked ? "1" : "0"); applySettings(); });
+    $("#new-btn").addEventListener("click", () => {
+      close();
+      window.open(`${location.pathname}?new=${Date.now().toString(36)}`, "_blank", "noopener");
+    });
     $("#open-sub").addEventListener("change", async (e) => {
-      const file = e.target.files[0];
+      const files = Array.from(e.target.files);
       e.target.value = "";
       close();
-      if (file) openSubFile(await file.text());
+      importFiles(files);
     });
     $("#reset-btn").addEventListener("click", async () => {
       close();
@@ -331,6 +363,7 @@
       location.hash = "";
       return;
     }
+    venue.fields.forEach(renameReviewerField);
     Object.assign(state, {
       venue,
       fields: new Map(venue.fields.map((f) => [f.id, f])),
@@ -339,18 +372,24 @@
       requirements: venue.manuscript_requirements,
       results: null,
       resultsStale: false,
+      initialSubmission: false,
       touched: false,
       showRequired: false,
       review: new Set(),
     });
+    renderReportButton();
     const draft = store.get(`draft:${slug}`);
     const restored = text == null && draft && draft !== venue.template;
     state.text = text ?? (draft || venue.template);
     state.touched = Boolean(restored || text);
 
+    hideNav(); // rebuilt with the form
+    window.PaperpushViewer?.setFilter("all");
+    $("#field-search").value = "";
     $("#venue-search").value = venue.name;
     $("#workspace").hidden = false;
     $("#restored").hidden = !restored;
+    $("#import-result").hidden = true;
     document.title = `${venue.name} · paperpush`;
     renderVenueHead();
 
@@ -363,7 +402,9 @@
     runLive();
     renderChecks();
     renderAiAvailability();
+    renderInitialSubmission();
     refreshPlan();
+    applyPendingMatches();
   }
 
   function renderVenueHead() {
@@ -387,6 +428,11 @@
   // -------------------------------------------------------------- workspace
 
   async function ensureWorkspace() {
+    if (state.local) {
+      state.ws = "local";
+      try { state.files = (await getJSON("/api/workspaces/local")).files; } catch { /* keep the list we have */ }
+      return;
+    }
     const saved = store.get("workspace");
     if (saved) {
       try {
@@ -410,7 +456,8 @@
     toast(`Uploading ${plural(files.length, "file")}…`);
     try {
       const res = await (await api(`/api/workspaces/${state.ws}/files`, { method: "POST", body })).json();
-      state.files = res.files;
+      const listed = new Set(res.files.map((f) => f.name));
+      state.files = [...res.files, ...state.files.filter((f) => !listed.has(f.name))];
       refreshFileWidgets();
       toast(`Uploaded ${res.saved.join(", ")}`);
       return res.saved;
@@ -424,6 +471,130 @@
     }
   }
 
+  // ---------------------------------------------- open a .sub or a .zip
+
+  // A .sub opens its venue's form. A zip (a folder of manuscript files, or a
+  // bundle downloaded here) is unpacked into the workspace; any .sub inside
+  // opens, and each file goes into the upload field its name points to
+  // (/match: keyword matching, no AI), for the fields still empty.
+  const isImportable = (name) => /\.(sub|zip|txt)$/i.test(name);
+
+  async function importFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    const bad = files.filter((f) => !isImportable(f.name));
+    if (bad.length) { toast(`${bad.map((f) => f.name).join(", ")}: open a .sub or a .zip here. Upload other files from the form.`, "error"); return; }
+    // A .txt is read here, as before: a .sub saved under another extension.
+    const txt = files.filter((f) => /\.txt$/i.test(f.name));
+    const rest = files.filter((f) => !/\.txt$/i.test(f.name));
+    let subs = await Promise.all(txt.map(async (f) => ({ name: f.name, text: await f.text() })));
+    let res = null;
+    if (rest.length) {
+      if (!state.ws) await ensureWorkspace();
+      const body = new FormData();
+      for (const f of rest) body.append("files", f, f.name);
+      const zips = rest.filter((f) => /\.zip$/i.test(f.name)).length;
+      if (zips) toast(`Unpacking ${plural(zips, "zip")}…`);
+      try {
+        res = await (await api(`/api/workspaces/${state.ws}/import`, { method: "POST", body })).json();
+      } catch (err) {
+        if (err.status === 404) {
+          store.del("workspace");
+          state.ws = null;
+          await ensureWorkspace();
+          toast("Your previous upload space expired. Please try again.", "error");
+        } else toast(err.message, "error");
+        return;
+      }
+      subs = subs.concat(res.subs);
+      state.files = res.files;
+      if (res.paths.length) state.pendingPaths = (state.pendingPaths || []).concat(res.paths);
+      state.importSkipped = res.skipped;
+    }
+    // Several .sub files: the one for the open venue, else the first.
+    const parsed = subs.map((s) => ({ ...s, venue: Subfile.parse(s.text).venue }));
+    const chosen = parsed.find((s) => state.venue && s.venue === state.venue.slug) || parsed.find((s) => s.venue) || null;
+    if (parsed.length && !chosen) toast(`${parsed.map((s) => s.name).join(", ")}: no '@venue:' line, so not a .sub file.`, "error");
+    else if (parsed.length > 1) toast(`Opened ${chosen.name}; ignored ${parsed.filter((s) => s !== chosen).map((s) => s.name).join(", ")}.`);
+    if (chosen) {
+      const sameVenue = state.venue && state.venue.slug === chosen.venue;
+      openSubFile(chosen.text);
+      // A new venue applies the matches once its form is built (openVenue).
+      if (sameVenue) { refreshFileWidgets(); applyPendingMatches(); }
+      return;
+    }
+    if (state.venue) { refreshFileWidgets(); applyPendingMatches(); }
+    else if (res) toast(`Uploaded ${plural(res.saved.length, "file")}. Choose a venue and they go into its form.`);
+  }
+
+  async function applyPendingMatches() {
+    const paths = state.pendingPaths;
+    if (!paths || !paths.length || !state.venue) return;
+    state.pendingPaths = null;
+    let res;
+    try {
+      res = await postJSON(`/api/venues/${encodeURIComponent(state.venue.slug)}/match`, { paths });
+    } catch (err) { toast(err.message, "error"); return; }
+    const vals = values();
+    let text = state.text;
+    const placed = [];
+    const kept = [];
+    for (const [fid, value] of Object.entries(res.assignments)) {
+      const field = state.fields.get(fid);
+      if (!field) continue;
+      if ((vals[fid] || "").trim()) { kept.push(field); continue; }
+      text = Subfile.setField(text, field, value);
+      placed.push(field);
+    }
+    setText(text);
+    syncWidgets();
+    refreshFileWidgets();
+    renderImportResult(res, new Set(placed.map((f) => f.id)), kept);
+    if (placed.length) toast(`Placed files in ${plural(placed.length, "field")}. Check them below.`);
+  }
+
+  function renderImportResult(res, placedIds, kept) {
+    const out = $("#import-result");
+    const byField = new Map();
+    for (const m of res.matched) {
+      if (!placedIds.has(m.field)) continue;
+      if (!byField.has(m.field)) byField.set(m.field, { label: m.label, names: [] });
+      byField.get(m.field).names.push(m.name);
+    }
+    const notPlaced = res.unmatched.concat(res.matched.filter((m) => !placedIds.has(m.field)).map((m) => ({ name: m.name, reason: `${m.label} was already filled in` })));
+    const skipped = state.importSkipped || [];
+    state.importSkipped = null;
+    out.replaceChildren(...[
+      el("strong", { text: byField.size ? "Your files, placed by their names:" : "No file could be placed by its name." }),
+      byField.size ? el("ul", {}, [...byField.entries()].map(([fid, g]) =>
+        el("li", {}, el("button", { type: "button", class: "link", onclick: () => focusField(fid), text: g.label }), ": ", el("span", { class: "mono", text: g.names.join(", ") })))) : null,
+      kept.length ? el("p", { class: "hint", text: `Left as they were (already filled in): ${kept.map((f) => f.label).join(", ")}.` }) : null,
+      notPlaced.length || skipped.length ? el("details", {},
+        el("summary", { text: `${plural(notPlaced.length + skipped.length, "file")} not placed` }),
+        el("ul", {},
+          notPlaced.map((m) => el("li", {}, el("span", { class: "mono", text: m.name }), ` — ${m.reason}`)),
+          skipped.map((m) => el("li", {}, el("span", { class: "mono", text: m.name }), ` — not unpacked: ${m.reason}`))),
+        el("p", { class: "hint", text: "They are uploaded; pick them in the right field below." })) : null,
+      el("button", { type: "button", class: "link small", onclick: () => (out.hidden = true), text: "Dismiss" }),
+    ].filter(Boolean));
+    out.hidden = false;
+  }
+
+  function wireImport() {
+    const input = $("#import-input");
+    input.addEventListener("change", () => { const files = Array.from(input.files); input.value = ""; importFiles(files); });
+    // Drop a .sub or .zip anywhere but on an upload box.
+    const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
+    window.addEventListener("dragover", (e) => { if (hasFiles(e) && !e.target.closest?.(".upload-box")) { e.preventDefault(); document.body.classList.add("drop-import"); } });
+    window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) document.body.classList.remove("drop-import"); });
+    window.addEventListener("drop", (e) => {
+      document.body.classList.remove("drop-import");
+      if (!hasFiles(e) || e.target.closest?.(".upload-box")) return;
+      e.preventDefault();
+      importFiles(e.dataTransfer.files);
+    });
+  }
+
   // ------------------------------------------------------------- the text
 
   // Every change goes through here.
@@ -433,7 +604,9 @@
     state.text = next;
     state.touched = true;
     if (state.results) state.resultsStale = true;
-    store.set(`draft:${state.venue.slug}`, next);
+    if (state.local) saveLocal();
+    else if (state.shared) schedulePush();
+    else store.set(`draft:${state.venue.slug}`, next);
     if (!fromEditor) $("#sub-text").value = next;
     else syncWidgets();
     const after = Subfile.parse(next).values;
@@ -443,6 +616,19 @@
     renderChecks();
     schedulePlan();
   }
+
+  // Write the text back to the local .sub file (--web), a moment after the last edit.
+  const saveLocal = debounce(async () => {
+    const text = state.text;
+    try {
+      await api("/api/local", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }), keepalive: true });
+      $("#local-status").textContent = `Saved ${new Date().toLocaleTimeString()}.`;
+      $("#local-status").className = "small muted";
+    } catch (err) {
+      $("#local-status").textContent = `Not saved: ${err.message}`;
+      $("#local-status").className = "small err";
+    }
+  }, 400);
 
   function onWidgetChange(field, value) {
     state.review.delete(field.id);
@@ -467,34 +653,12 @@
 
   // ------------------------------------------------------------ manuscript
 
+  // The autofill button under the upload boxes: it needs the manuscript.
   function renderManuscript() {
-    const v = state.venue;
-    const fid = v.manuscript_field;
-    const zone = $("#dropzone");
-    const input = $("#ms-input");
-    const formats = v.manuscript_formats || [];
-    input.accept = formats.join(",");
-    $("#ms-formats").textContent = formats.length
-      ? `Accepted formats: ${formats.map((f) => f.replace(/^\./, "").toUpperCase()).join(", ")}${state.fields.get(fid)?.max_file_size_mb ? ` · up to ${state.fields.get(fid).max_file_size_mb} MB` : ""}`
-      : "Any format the venue accepts.";
-    const current = fid ? baseName(values()[fid] || "") : "";
-    const file = state.files.find((f) => f.name === current);
-    zone.classList.toggle("has-file", Boolean(current));
-    $("#ms-empty").hidden = Boolean(current);
-    const box = $("#ms-file");
-    box.hidden = !current;
-    if (current) {
-      const wrong = formats.length && !formats.includes(extOf(current));
-      box.replaceChildren(
-        el("div", { class: "ms-file" },
-          el("strong", { class: "mono", text: current }),
-          file ? el("span", { class: "muted small", text: formatSize(file.size) }) : el("span", { class: "chip warn", text: "not uploaded" }),
-          wrong ? el("span", { class: "chip warn", text: `${extOf(current) || "no extension"} is not accepted` }) : null,
-          el("button", { type: "button", class: "btn btn-small", onclick: (e) => { e.stopPropagation(); input.click(); }, text: "Replace" }),
-          el("button", { type: "button", class: "btn btn-small", onclick: (e) => { e.stopPropagation(); setManuscript(""); }, text: "Remove" }),
-        ),
-      );
-    }
+    const fid = state.venue.manuscript_field;
+    const current = fid ? (values()[fid] || "").trim() : "";
+    const file = current ? fileInfo(current) : null;
+    renderStatus();
     const af = $("#autofill-btn");
     const hint = $("#autofill-hint");
     const { label: ai, reason } = aiAvailability();
@@ -502,34 +666,14 @@
     setAiTooltip($("#autofill-wrap"), reason);
     hint.textContent = !ai
       ? reason
-      : !current || !file
-        ? "Upload the manuscript first."
-        : `Reads the manuscript (${ai}) and fills the title, abstract, authors, keywords, statements, and the rest. You review every value.`;
-  }
-
-  async function setManuscript(name) {
-    const field = state.fields.get(state.venue.manuscript_field);
-    if (field) onWidgetChange(field, name);
-    renderManuscript();
+      : !current
+        ? "Choose the manuscript first."
+        : !file
+          ? "The manuscript file was not found. Choose it again."
+          : `Reads your uploads (${ai}) and fills the title, abstract, authors, keywords, statements, and the rest. You review every value.`;
   }
 
   function wireManuscript() {
-    const zone = $("#dropzone");
-    const input = $("#ms-input");
-    const pick = async (files) => {
-      const file = files && files[0];
-      if (!file) return;
-      const formats = state.venue.manuscript_formats || [];
-      if (formats.length && !formats.includes(extOf(file.name))) toast(`${file.name}: ${state.venue.name} accepts ${formats.join(", ")} for the manuscript.`, "error");
-      const saved = await uploadFiles([file]);
-      if (saved.length) setManuscript(saved[0]);
-    };
-    zone.addEventListener("click", () => { if (!zone.classList.contains("has-file")) input.click(); });
-    zone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } });
-    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drag"); });
-    zone.addEventListener("dragleave", () => zone.classList.remove("drag"));
-    zone.addEventListener("drop", (e) => { e.preventDefault(); zone.classList.remove("drag"); pick(e.dataTransfer.files); });
-    input.addEventListener("change", () => { pick(input.files); input.value = ""; });
     $("#autofill-btn").addEventListener("click", runAutofill);
   }
 
@@ -538,13 +682,14 @@
     const out = $("#autofill-result");
     state.busy = true;
     btn.disabled = true;
-    btn.replaceChildren(el("span", { class: "spinner" }), " Reading your manuscript…");
+    btn.replaceChildren(el("span", { class: "spinner" }), " Reading your files…");
     try {
       const res = await postJSON(`/api/workspaces/${state.ws}/autofill`, { text: state.text }, llmHeaders());
       setText(res.text);
       syncWidgets();
       state.review = new Set(res.needs_review.map((o) => o.id));
       for (const [id, w] of state.widgets) w.card?.classList.toggle("review", state.review.has(id));
+      renderStatus();
       out.hidden = false;
       const reviewList = res.needs_review.length
         ? el("ul", {}, res.needs_review.map((o) => el("li", {}, el("button", { type: "button", class: "link", onclick: () => focusField(o.id), text: o.label }), o.note ? ` — ${o.note}` : "")))
@@ -562,7 +707,7 @@
       toast(`Autofill failed: ${err.message}`, "error");
     } finally {
       state.busy = false;
-      btn.replaceChildren(el("span", { "aria-hidden": "true", text: "✨" }), " Fill in the rest from my manuscript");
+      btn.replaceChildren(el("span", { "aria-hidden": "true", text: "✨" }), " Fill in the rest from my file uploads");
       renderManuscript();
     }
   }
@@ -628,29 +773,92 @@
   // ------------------------------------------------------------------ form
 
   const GROUPS = [
-    ["paper", "About the paper", "Copied from the manuscript."],
+    ["paper", "Paper Metadata", "Copied from the manuscript."],
     ["authors", "Authors", ""],
-    ["files", "Other files", "Figures, supplements, cover letter. Upload them here."],
-    ["decisions", "Your decisions", "Policies and confirmations only you can answer. paperpush never fills these in for you."],
+    ["reviewers", "Reviewers", "People you suggest as reviewers and people you ask the editor to exclude. paperpush never fills these in for you."],
+    ["decisions", "Disclosures", "Policies and confirmations only you can answer. paperpush never fills these in for you."],
   ];
+
+  // Reviewer fields go in their own group. A venue that takes suggested and
+  // excluded reviewers in one field (a stance column) shows it as two tables.
+  const isReviewerField = (f) => /reviewer|referee/i.test(f.id);
+  const stanceIndex = (f) => (f.fields || []).findIndex((c) => c.replace(/\?$/, "") === "stance");
+  // The page says "reviewers", never "referees" (the portal's own "Add
+  // Referee" button keeps its name), and names a combined field for both tables.
+  function renameReviewerField(f) {
+    if (!isReviewerField(f)) return;
+    if (stanceIndex(f) >= 0) f.label = "Suggested and excluded reviewers";
+    const swap = (t) => t.replace(/(?<!Add )\b(r)eferee/gi, (_, r) => (r === "R" ? "R" : "r") + "eviewer");
+    f.label = swap(f.label);
+    if (f.help) f.help = swap(f.help);
+  }
 
   function groupOf(f) {
     if (f.type === "authorlist") return "authors";
     if (f.type === "file" || f.type === "filelist") return "files";
+    if (isReviewerField(f)) return "reviewers";
     if (f.role === "never") return "decisions";
     return "paper";
+  }
+
+  // The upload fields, the manuscript first, in the File uploads panel.
+  function uploadFields() {
+    const mf = state.venue.manuscript_field;
+    const files = state.venue.fields.filter((f) => f.type === "file" || f.type === "filelist");
+    return [...files.filter((f) => f.id === mf), ...files.filter((f) => f.id !== mf)];
   }
 
   function buildForm() {
     const root = $("#field-groups");
     root.replaceChildren();
     state.widgets.clear();
-    const fields = state.venue.fields.filter((f) => f.id !== state.venue.manuscript_field);
+    const uploads = uploadFields();
+    $("#upload-fields").replaceChildren(...uploads.map(fieldCard));
+    const fields = state.venue.fields.filter((f) => !uploads.includes(f));
     for (const [key, title, hint] of GROUPS) {
       const group = fields.filter((f) => groupOf(f) === key);
       if (!group.length) continue;
-      root.append(el("fieldset", { class: "panel" }, el("legend", { text: title }), hint ? el("p", { class: "hint", style: "margin:0 0 12px", text: hint }) : null, group.map(fieldCard)));
+      root.append(el("section", { class: "field-group", id: `group-${key}`, "data-group": key },
+        el("div", { class: "group-head" }, el("h2", { text: title }), el("span", { class: "count muted small", "data-count": key })),
+        hint ? el("p", { class: "hint group-hint", text: hint }) : null,
+        group.map(fieldCard)));
     }
+    buildNav(fields, uploads);
+  }
+
+  // The side menu: the manuscript, the guidelines, every field by group
+  // (each with a status dot), then the checks. viewer.js highlights the
+  // entry on screen and scrolls to the one clicked.
+  function buildNav(fields, uploads = []) {
+    const v = state.venue;
+    $("#nav-venue").textContent = v.name;
+    $("#nav-file").textContent = v.subfile_name;
+    const item = (target, label, { required = false, key = "", cls = "" } = {}) =>
+      el("a", { class: `toc-item ${cls}`, href: `#${target}`, "data-target": target, "data-key": key || null },
+        el("span", { class: "dot", "aria-hidden": "true" }),
+        el("span", { class: "toc-label", text: label }),
+        required ? el("span", { class: "req", title: "Required", text: "*" }) : null);
+    const top = [
+      ...(uploads.length ? [el("div", { class: "toc-group", "data-group": "uploads", text: "File uploads" })] : []),
+      ...uploads.map((f) => item(`card-${f.id}`, f.label, { required: f.required, key: f.id, cls: "st-empty" })),
+      item("req-panel", "Author guidelines", { key: "guidelines", cls: "st-info" }),
+    ];
+    const groups = [];
+    for (const [key, title] of GROUPS) {
+      const group = fields.filter((f) => groupOf(f) === key);
+      if (!group.length) continue;
+      groups.push(el("div", { class: "toc-group", "data-group": key, text: title }));
+      for (const f of group) groups.push(item(`card-${f.id}`, f.label, { required: f.required, key: f.id, cls: "st-empty" }));
+    }
+    $("#toc").replaceChildren(
+      ...top,
+      ...groups,
+      el("div", { class: "toc-group", text: "Before you submit" }),
+      item("checks-panel", "Checks", { key: "checks", cls: "st-pending" }),
+    );
+    $("#sidenav").hidden = false;
+    $("#layout").classList.add("with-nav");
+    window.PaperpushViewer?.refresh();
   }
 
   function limitsText(f) {
@@ -676,21 +884,30 @@
     return bits.join(" · ");
   }
 
+  const TYPE_BADGES = { text: "text", textarea: "long text", choice: "choice", multichoice: "multiple choice", boolean: "yes / no", file: "file", filelist: "files", authorlist: "authors", int: "number" };
+
   function fieldCard(f) {
     const id = `fld-${f.id}`;
     const widget = makeWidget(f, id);
     const card = el(
-      "div",
-      { class: "field", id: `card-${f.id}`, "data-field": f.id },
-      el("div", { class: "field-head" },
-        el("label", { class: "field-label", for: id }, f.label, f.required ? el("span", { class: "req", title: "Required", text: "*" }) : null),
-        f.required_if ? el("span", { class: "chip plain", text: `required if ${state.fields.get(f.required_if)?.label || f.required_if}` }) : null,
+      "section",
+      { class: "field card st-empty", id: `card-${f.id}`, "data-field": f.id },
+      el("header", { class: "card-head" },
+        el("div", { class: "titles" },
+          el("label", { class: "field-label", for: id, text: f.label }),
+          el("code", { class: "key", text: f.id })),
+        el("div", { class: "badges" },
+          el("span", { class: "badge type", text: TYPE_BADGES[f.type] || f.type }),
+          f.required ? el("span", { class: "badge req", text: "required" })
+            : f.required_if ? el("span", { class: "badge cond", text: `required if ${state.fields.get(f.required_if)?.label || f.required_if}` })
+              : el("span", { class: "badge opt", text: "optional" }),
+          el("span", { class: "badge review-badge", text: "check this", title: "Autofill filled this in; please read it over" }),
+          el("button", { type: "button", class: "copy", title: "Copy the value", text: "Copy" })),
       ),
       f.help ? helpBlock(f.help) : null,
-      el("p", { class: "limits" }),
       widget.node,
-      el("div", { class: "field-foot" }, widget.counter ? widget.counter.node : null),
       el("ul", { class: "field-issues", "aria-live": "polite" }),
+      el("footer", { class: "card-foot" }, widget.counter ? widget.counter.node : null, el("span", { class: "limits" })),
     );
     widget.card = card;
     widget.field = f;
@@ -703,30 +920,30 @@
     const w = state.widgets.get(fid);
     if (!w) return;
     const text = limitsText(w.field);
-    const p = $(".limits", w.card);
-    p.textContent = text;
-    p.hidden = !text;
+    $(".limits", w.card).replaceChildren(...(text ? text.split(" · ") : []).map((t) => el("span", { class: "fnote lim", text: t })));
   }
 
   function helpBlock(text) {
-    if (text.length <= 220) return el("p", { class: "hint", style: "margin:0 0 6px", text });
-    const short = el("p", { class: "hint", style: "margin:0 0 6px" }, text.slice(0, 200).replace(/\s+\S*$/, "") + "… ");
+    if (text.length <= 220) return el("p", { class: "hint desc", text });
+    const short = el("p", { class: "hint desc" }, text.slice(0, 200).replace(/\s+\S*$/, "") + "… ");
     const more = el("button", { type: "button", class: "link small", text: "more" });
-    more.addEventListener("click", () => short.replaceWith(el("p", { class: "hint", style: "margin:0 0 6px", text })));
+    more.addEventListener("click", () => short.replaceWith(el("p", { class: "hint desc", text })));
     short.append(more);
     return short;
   }
 
   function makeWidget(f, id) {
     if (f.hierarchical) return hierarchicalWidget(f, id);
+    if (isReviewerField(f) && stanceIndex(f) >= 0) return stanceWidget(f, id);
     if (f.fields && f.fields.length > 1 && (f.type === "authorlist" || f.type === "textarea")) return tableWidget(f, id);
     switch (f.type) {
       case "boolean": return booleanWidget(f, id);
       case "choice": return f.options && f.options.length ? choiceWidget(f, id) : textWidget(f, id);
-      case "multichoice": return f.options && f.options.length ? multiWidget(f, id) : textWidget(f, id);
+      case "multichoice": return f.options && f.options.length ? multiWidget(f, id) : tagWidget(f, id);
       case "file": return fileWidget(f, id);
       case "filelist": return fileListWidget(f, id);
       case "int": return textWidget(f, id, "number");
+      case "text": return /keyword/i.test(f.id) ? tagWidget(f, id) : textWidget(f, id);
       case "textarea":
       case "authorlist": return textareaWidget(f, id);
       default: return textWidget(f, id);
@@ -735,7 +952,7 @@
 
   // A running count against the field's own limit, or the guidelines'.
   function counterFor(f) {
-    const node = el("span", { class: "counter" });
+    const node = el("span", { class: "counter fnote" });
     const update = (value) => {
       const g = state.liveRules[f.id] || {};
       const maxWords = f.word_count || g.max_words;
@@ -747,6 +964,7 @@
       if (maxChars) { const c = value.trim().length; parts.push(`${c}/${maxChars} characters`); over ||= c > maxChars; }
       if (maxKeywords) { const k = value.split(/[,;\n]/).filter((s) => s.trim()).length; parts.push(`${k}/${maxKeywords} keywords`); over ||= k > maxKeywords; }
       node.textContent = parts.join(" · ");
+      node.hidden = !parts.length;
       node.classList.toggle("over", over);
     };
     return { node, update };
@@ -856,8 +1074,8 @@
       custom.addEventListener("keydown", (e) => {
         if (e.key !== "Enter") return;
         e.preventDefault();
-        const v = custom.value.trim().replace(/,/g, " ");
-        if (v && !selected.includes(v)) { selected = [...selected, v]; renderChips(); renderList(); emit(); }
+        const added = splitItems(custom.value).filter((v) => !selected.includes(v));
+        if (added.length) { selected = [...selected, ...new Set(added)]; renderChips(); renderList(); emit(); }
         custom.value = "";
       });
       extras.push(custom);
@@ -869,37 +1087,143 @@
     };
   }
 
-  // File pickers choose among the uploaded files, or upload one on the spot.
-  function fileSelect(current, accept) {
-    const select = el("select", { class: "input" });
-    select.append(el("option", { value: "", text: state.files.length ? "Choose an uploaded file…" : "Upload a file →" }));
-    const names = state.files.map((f) => f.name);
-    const cur = current ? baseName(current) : "";
-    if (cur && !names.includes(cur)) select.append(el("option", { value: cur, text: `${cur} (not uploaded)` }));
-    const ok = (n) => !accept || accept.some((ext) => n.toLowerCase().endsWith(ext.toLowerCase()));
-    for (const n of [...names.filter(ok), ...names.filter((n) => !ok(n))]) select.append(el("option", { value: n, text: ok(n) ? n : `${n} (wrong type)` }));
-    select.value = cur;
-    return select;
+  // Typed-in entries split on commas and semicolons, so a pasted list
+  // ("a, b; c") becomes one entry each.
+  function splitItems(text) {
+    return text.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
   }
 
-  function uploadButton(accept, multiple, onDone) {
-    const input = el("input", { type: "file", hidden: true, multiple, accept: accept ? accept.join(",") : null });
-    input.addEventListener("change", async () => {
-      const saved = await uploadFiles(input.files);
+  // A free list (keywords, categories): each entry is its own chip. Type and
+  // press Enter (or leave the box) to add; several at once with commas or
+  // semicolons. Backspace in the empty box takes the last one back to edit,
+  // double-clicking a chip edits it. The .sub keeps the list joined with the
+  // separator the venue's help asks for.
+  function tagWidget(f, id) {
+    const sep = /semicolon/i.test(f.help || "") ? ";" : ", ";
+    let items = [];
+    const input = el("input", { id, class: "tag-input", type: "text", autocomplete: "off", placeholder: "Type and press Enter" });
+    const box = el("div", { class: "tags input" });
+    const counter = counterFor(f);
+    const emit = () => { const v = items.join(sep); counter.update(v); onWidgetChange(f, v); };
+    const render = () => {
+      box.replaceChildren(
+        ...items.map((t, i) => {
+          const chip = el("span", { class: "chip tag", title: "Double-click to edit" }, el("span", { text: t }),
+            el("button", { type: "button", "aria-label": `Remove ${t}`, onclick: (e) => { e.stopPropagation(); items.splice(i, 1); render(); emit(); input.focus(); } }, "×"));
+          chip.addEventListener("dblclick", () => { commit(); items.splice(i, 1); input.value = t; render(); emit(); input.focus(); });
+          return chip;
+        }),
+        input,
+      );
+      input.placeholder = items.length ? "" : "Type and press Enter";
+      input.size = Math.max(input.value.length + 1, items.length ? 4 : 20);
+    };
+    const commit = () => {
+      const added = splitItems(input.value).filter((t) => !items.includes(t));
       input.value = "";
-      if (saved.length) onDone(saved);
+      if (!added.length) { render(); return false; }
+      items = [...items, ...new Set(added)];
+      render();
+      emit();
+      return true;
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); commit(); }
+      else if (e.key === "Backspace" && !input.value && items.length) {
+        e.preventDefault();
+        input.value = items.pop();
+        render();
+        emit();
+      }
     });
-    return el("label", { class: "btn btn-small" }, "Upload…", input);
+    input.addEventListener("input", () => { input.size = Math.max(input.value.length + 1, items.length ? 4 : 20); });
+    input.addEventListener("blur", () => { commit(); markTouched(f.id); });
+    box.addEventListener("click", (e) => { if (e.target === box) input.focus(); });
+    render();
+    return {
+      node: box,
+      counter,
+      set(v) { items = splitItems(v); counter.update(v); render(); },
+    };
+  }
+
+  // Upload boxes. Click one to choose files (in a local session, paperpush
+  // opens the Finder itself so the .sub gets the file's real path; on the
+  // website the browser's picker uploads a copy), or drop files onto it.
+  const acceptOf = (f) => f.accept || (f.id === state.venue.manuscript_field && state.venue.manuscript_formats?.length ? state.venue.manuscript_formats : null);
+  const acceptOk = (f, name) => { const acc = acceptOf(f); return !acc || acc.some((ext) => name.toLowerCase().endsWith(ext.toLowerCase())); };
+  // The listed file a path names. A local session lists files relative to
+  // where paperpush runs, so an absolute path in the .sub matches by its tail.
+  const fileInfo = (path) => {
+    const p = path.trim();
+    return state.files.find((x) => x.name === p || baseName(x.name) === baseName(p))
+      || (state.local && p.startsWith("/") ? state.files.find((x) => !x.name.startsWith("/") && p.endsWith(`/${x.name}`)) : null)
+      || null;
+  };
+
+  async function pickNative(f, multiple) {
+    try {
+      const res = await postJSON("/api/local/pick", { multiple, prompt: `Choose ${multiple ? "files" : "a file"} for “${f.label}”` });
+      for (const file of res.files) if (!state.files.some((x) => x.name === file.name)) state.files.push(file);
+      return res.files.map((x) => x.name);
+    } catch (err) {
+      toast(`Could not open the file picker: ${err.message}`, "error");
+      return [];
+    }
+  }
+
+  // A chosen file: its path, size, and anything wrong with it.
+  function chosenFile(f, path, onRemove) {
+    const info = fileInfo(path);
+    return el("span", { class: "chosen" },
+      el("span", { class: "mono path", text: path }),
+      info ? el("span", { class: "muted small", text: formatSize(info.size) }) : el("span", { class: "chip warn", text: state.local ? "not found" : "not uploaded" }),
+      acceptOk(f, path) ? null : el("span", { class: "chip warn", text: `${extOf(path) || "no extension"} is not accepted` }),
+      onRemove ? el("button", { type: "button", class: "icon-btn", "aria-label": `Remove ${path}`, title: "Remove", onclick: (e) => { e.stopPropagation(); onRemove(); } }, "×") : null);
+  }
+
+  // `shown` is the chosen file's path (a single-file box shows it inside).
+  function uploadBox(f, id, { multiple, shown, onPicked, onRemove }) {
+    const acc = acceptOf(f);
+    const input = el("input", { type: "file", hidden: true, multiple, accept: acc ? acc.join(",") : null });
+    input.addEventListener("change", async () => {
+      const files = Array.from(input.files);
+      input.value = "";
+      const saved = await uploadFiles(files);
+      if (saved.length) onPicked(saved);
+    });
+    const prompt = el("span", { class: "prompt" },
+      el("strong", { text: shown ? "Change" : multiple ? "Choose files" : "Choose a file" }), ` or drop ${multiple ? "them" : "it"} here`);
+    const box = el("div", { class: `upload-box${shown ? " has-file" : ""}`, id, tabindex: "0", role: "button", "aria-label": `${shown ? "Change" : "Choose"} ${f.label}` },
+      shown ? chosenFile(f, shown, onRemove) : null, prompt);
+    const open = async () => {
+      if (state.info?.native_picker && state.local) { const names = await pickNative(f, multiple); if (names.length) onPicked(names); }
+      else input.click();
+    };
+    box.addEventListener("click", open);
+    box.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+    box.addEventListener("dragover", (e) => { e.preventDefault(); box.classList.add("drag"); });
+    box.addEventListener("dragleave", () => box.classList.remove("drag"));
+    box.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      box.classList.remove("drag");
+      const files = Array.from(e.dataTransfer.files).slice(0, multiple ? undefined : 1);
+      const saved = await uploadFiles(files);
+      if (saved.length) onPicked(saved);
+    });
+    return el("div", { class: "upload-wrap" }, box, input);
   }
 
   function fileWidget(f, id) {
     const wrap = el("div", { class: "file-pick" });
     let value = "";
     const render = () => {
-      const select = fileSelect(value, f.accept);
-      select.id = id;
-      select.addEventListener("change", () => { value = select.value; onWidgetChange(f, value); });
-      wrap.replaceChildren(select, uploadButton(f.accept, false, (saved) => { value = saved[0]; render(); onWidgetChange(f, value); }));
+      wrap.replaceChildren(uploadBox(f, id, {
+        multiple: false,
+        shown: value,
+        onPicked: (names) => { value = names[0]; render(); onWidgetChange(f, value); },
+        onRemove: () => { value = ""; render(); onWidgetChange(f, ""); },
+      }));
     };
     render();
     return { node: wrap, set(v) { value = v.trim(); render(); }, refresh: render };
@@ -927,8 +1251,6 @@
     const render = () => {
       wrap.replaceChildren();
       rows.forEach((r, ri) => {
-        const select = fileSelect(r[0], f.accept);
-        select.addEventListener("change", () => { r[0] = select.value; emit(); });
         const cells = cols.map((c, ci) => {
           let input;
           if (c === "type" && f.type_options) {
@@ -941,13 +1263,13 @@
           }
           return input;
         });
-        const del = el("button", { type: "button", class: "icon-btn", "aria-label": "Remove row", title: "Remove", onclick: () => { rows.splice(ri, 1); render(); emit(); } }, "×");
-        wrap.append(el("div", { class: "row" }, select, ...cells, del));
+        wrap.append(el("div", { class: "row file-row" }, chosenFile(f, r[0], () => { rows.splice(ri, 1); render(); emit(); }), ...cells));
       });
-      wrap.append(el("div", { class: "row-actions" },
-        uploadButton(f.accept, true, (saved) => { saved.forEach((n) => rows.push([n])); render(); emit(); }),
-        state.files.length ? el("button", { type: "button", class: "btn btn-small", onclick: () => { rows.push([""]); render(); } }, "+ Pick an uploaded file") : null,
-      ));
+      wrap.append(uploadBox(f, `${id}-add`, {
+        multiple: true,
+        shown: "",
+        onPicked: (names) => { names.forEach((n) => { if (!rows.some((r) => r[0] === n)) rows.push([n]); }); render(); emit(); },
+      }));
     };
     render();
     return {
@@ -965,38 +1287,87 @@
 
   const BOOL_COLUMNS = new Set(["corresponding", "first_author", "contributed_equally", "submitter"]);
 
-  function tableWidget(f, id) {
-    const cols = f.fields.map((c) => ({ name: c.replace(/\?$/, ""), optional: c.endsWith("?") }));
+  // Authors, reviewers, funders: a table that reads like the saved report
+  // (columns as wide as their longest word, long values wrapping). Click into
+  // it and every cell turns into a text box that wraps the same way; click
+  // away and it is a table again. Each cell is a textarea laid over an
+  // invisible copy of its text, so the copy sets the column widths and row
+  // heights and the box always matches them.
+  // `opts.fields` overrides the columns, `opts.onChange` replaces saving the
+  // value (the caller reads `rows()` instead), `opts.addLabel` names the button.
+  function tableWidget(f, id, opts = {}) {
+    const cols = (opts.fields || f.fields).map((c) => ({ name: c.replace(/\?$/, ""), optional: c.endsWith("?") }));
     let rows = [];
-    const wrap = el("div", { class: "table-edit", id });
-    const serialize = () =>
-      rows.filter((r) => r.some((c, i) => c && !(BOOL_COLUMNS.has(cols[i]?.name) && c === "no")))
-        .map((r) => cols.map((_, i) => r[i] || "").join(" | ")).join("\n");
-    const emit = () => onWidgetChange(f, serialize());
-    const render = () => {
-      const head = el("div", { class: "trow thead", style: `--cols:${cols.length}` },
-        cols.map((c) => el("span", { text: c.name.replace(/_/g, " ") + (c.optional ? "" : " *") })), el("span"));
-      const body = rows.map((r, ri) =>
-        el("div", { class: "trow", style: `--cols:${cols.length}` },
-          cols.map((c, ci) => {
-            if (BOOL_COLUMNS.has(c.name)) {
-              const box = el("input", { type: "checkbox", "aria-label": c.name, checked: /^yes$/i.test(r[ci] || "") });
-              box.addEventListener("change", () => { r[ci] = box.checked ? "yes" : c.optional ? "" : "no"; emit(); });
-              return el("label", { class: "tcheck" }, box);
-            }
-            const input = el("input", { class: "input", "aria-label": c.name, placeholder: c.name.replace(/_/g, " "), value: r[ci] || "" });
-            input.addEventListener("input", () => { r[ci] = input.value.replace(/\|/g, "/").replace(/\n/g, " "); emit(); });
-            return input;
-          }),
-          el("button", { type: "button", class: "icon-btn", title: "Remove", "aria-label": "Remove row", onclick: () => { rows.splice(ri, 1); render(); emit(); } }, "×"),
-        ));
-      const add = el("button", { type: "button", class: "btn btn-small", onclick: () => { rows.push(cols.map((c) => (BOOL_COLUMNS.has(c.name) && !c.optional ? "no" : ""))); render(); } },
-        f.type === "authorlist" ? "+ Add author" : "+ Add row");
-      wrap.replaceChildren(el("div", { class: "tscroll" }, head, ...body), add);
+    const wrap = el("div", { class: "tedit", id });
+    const filled = () => rows.filter((r) => r.some((c, i) => c && !(BOOL_COLUMNS.has(cols[i]?.name) && c === "no")))
+      .map((r) => cols.map((_, i) => r[i] || ""));
+    const serialize = () => filled().map((r) => r.join(" | ")).join("\n");
+    const emit = () => (opts.onChange ? opts.onChange() : onWidgetChange(f, serialize()));
+    const label = (c) => c.name.replace(/_/g, " ");
+    const cell = (r, ri, c, ci) => {
+      if (BOOL_COLUMNS.has(c.name)) {
+        const on = /^yes$/i.test(r[ci] || "");
+        const pill = el("span", { class: `pill ${on ? "yes" : "no"}`, text: on ? "yes" : "no" });
+        const box = el("input", { type: "checkbox", "aria-label": `${label(c)}, row ${ri + 1}`, checked: on });
+        box.addEventListener("change", () => {
+          r[ci] = box.checked ? "yes" : c.optional ? "" : "no";
+          pill.className = `pill ${box.checked ? "yes" : "no"}`;
+          pill.textContent = box.checked ? "yes" : "no";
+          emit();
+        });
+        return el("td", { class: "tbool" }, pill, box);
+      }
+      const value = r[ci] || "";
+      const sizer = el("span", { class: "sizer", "aria-hidden": "true", text: value || label(c) });
+      const ta = el("textarea", { rows: 1, spellcheck: c.name !== "email", "aria-label": `${label(c)}, row ${ri + 1}`, placeholder: label(c) });
+      ta.value = value;
+      ta.addEventListener("input", () => {
+        const v = ta.value.replace(/\|/g, "/").replace(/\n/g, " ");
+        if (v !== ta.value) ta.value = v;
+        r[ci] = v;
+        sizer.textContent = v || label(c);
+        emit();
+      });
+      // A cell holds one line of the .sub; Enter moves down a row instead.
+      ta.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const next = wrap.querySelectorAll("tbody tr")[ri + (e.shiftKey ? -1 : 1)];
+        next?.children[ci + 1]?.querySelector("textarea")?.focus();
+      });
+      return el("td", {}, el("div", { class: "tcell" }, sizer, ta));
     };
+    const render = () => {
+      const head = el("thead", {}, el("tr", {},
+        el("th", { class: "num", text: "#" }),
+        cols.map((c) => el("th", { text: label(c) + (c.optional ? "" : " *") })),
+        el("th", { class: "tdel" })));
+      const body = el("tbody", {}, rows.map((r, ri) =>
+        el("tr", {},
+          el("td", { class: "num", text: String(ri + 1) }),
+          cols.map((c, ci) => cell(r, ri, c, ci)),
+          el("td", { class: "tdel" },
+            el("button", { type: "button", class: "icon-btn", title: "Remove", "aria-label": `Remove row ${ri + 1}`, onclick: () => { rows.splice(ri, 1); render(); emit(); } }, "×")))));
+      const add = el("button", { type: "button", class: "btn btn-small", onclick: () => {
+        rows.push(cols.map((c) => (BOOL_COLUMNS.has(c.name) && !c.optional ? "no" : "")));
+        render();
+        wrap.classList.add("editing");
+        wrap.querySelector("tbody tr:last-child textarea")?.focus();
+      } }, opts.addLabel || (f.type === "authorlist" ? "+ Add author" : "+ Add row"));
+      wrap.replaceChildren(el("div", { class: "tscroll" }, el("table", {}, head, body)), add);
+    };
+    // Editing while focus (or the pointer's last press) is inside the table.
+    wrap.addEventListener("pointerdown", () => wrap.classList.add("editing"));
+    wrap.addEventListener("focusin", () => wrap.classList.add("editing"));
+    wrap.addEventListener("focusout", (e) => {
+      if (e.relatedTarget && wrap.contains(e.relatedTarget)) return;
+      setTimeout(() => { if (!wrap.contains(document.activeElement)) { wrap.classList.remove("editing"); markTouched(f.id); } }, 0);
+    });
+    document.addEventListener("pointerdown", (e) => { if (!wrap.contains(e.target) && !wrap.contains(document.activeElement)) wrap.classList.remove("editing"); });
     render();
     return {
       node: wrap,
+      rows: filled,
       set(v) {
         rows = v.split("\n").filter((l) => l.trim()).map((l) => {
           const parts = l.split("|").map((s) => s.trim());
@@ -1005,6 +1376,38 @@
           return parts;
         });
         render();
+      },
+    };
+  }
+
+  // One reviewers field with a stance column, shown as a "Suggested reviewers"
+  // table and an "Excluded reviewers" table. Saved back as one field, each
+  // line carrying the stance the venue expects ("opposed" for excluded).
+  function stanceWidget(f, id) {
+    const si = stanceIndex(f);
+    const fields = f.fields.filter((_, i) => i !== si);
+    const suggested = /\brecommended\b/i.test(f.help || "") ? "recommended" : "suggested";
+    const withStance = (r, stance) => [...r.slice(0, si), stance, ...r.slice(si)];
+    const emit = () => onWidgetChange(f, [
+      ...sug.rows().map((r) => withStance(r, suggested)),
+      ...exc.rows().map((r) => withStance(r, "opposed")),
+    ].map((r) => r.join(" | ").replace(/(\s*\|\s*)+$/, "")).join("\n"));
+    const sug = tableWidget(f, id, { fields, onChange: emit, addLabel: "+ Add suggested reviewer" });
+    const exc = tableWidget(f, `${id}-excluded`, { fields, onChange: emit, addLabel: "+ Add excluded reviewer" });
+    return {
+      node: el("div", { class: "stance-tables" },
+        el("h3", { class: "subhead", text: "Suggested reviewers" }), sug.node,
+        el("h3", { class: "subhead", text: "Excluded reviewers" }), exc.node),
+      set(v) {
+        const lines = { sug: [], exc: [] };
+        for (const l of v.split("\n").filter((x) => x.trim())) {
+          const parts = l.split("|").map((x) => x.trim());
+          const stance = parts[si] || "";
+          const rest = [...parts.slice(0, si), ...parts.slice(si + 1)].join(" | ");
+          (/^(opposed|excluded?)$/i.test(stance) ? lines.exc : lines.sug).push(rest);
+        }
+        sug.set(lines.sug.join("\n"));
+        exc.set(lines.exc.join("\n"));
       },
     };
   }
@@ -1054,8 +1457,51 @@
   }
 
   function runLive() {
-    state.live = LiveChecks.run(state.venue.fields, values(), state.liveRules);
+    const live = LiveChecks.run(state.venue.fields, values(), state.liveRules);
+    state.live = state.initialSubmission ? asInitialSubmission(live) : live;
     renderFieldIssues();
+  }
+
+  // ------------------------------------------- initial submission (any format)
+
+  // The venue's rule that the initial submission may be in any format, for the
+  // selected article type ("" when it has none).
+  function initialRule() {
+    if (!state.venue) return "";
+    return (state.plan ? state.plan.initial_submission_rule : state.venue.initial_submission_rule) || "";
+  }
+
+  // The live checks with every error turned into a warning, as
+  // `paperpush validate --initial-submission` does on the server.
+  function asInitialSubmission(live) {
+    const soften = (i) => (i.level === "error" ? { ...i, level: "warning" } : i);
+    const byField = {};
+    for (const [fid, issues] of Object.entries(live.byField)) byField[fid] = issues.map(soften);
+    const checks = live.checks.map((c) => ({ ...c, status: c.status === "failed" ? "warning" : c.status, issues: (c.issues || []).map(soften) }));
+    return { ...live, checks, byField };
+  }
+
+  function renderInitialSubmission() {
+    const box = $("#initial-submission");
+    const wrap = $("#initial-wrap");
+    const rule = initialRule();
+    if (!rule && state.initialSubmission) setInitialSubmission(false);
+    box.disabled = !rule;
+    box.checked = state.initialSubmission;
+    const message = rule
+      ? `Show every error as a warning. ${rule}`
+      : `${state.venue ? state.venue.name : "This venue"}'s guidelines do not let the initial submission be in any format.`;
+    wrap.dataset.tooltip = message;
+    wrap.setAttribute("aria-label", message);
+  }
+
+  function setInitialSubmission(on) {
+    if (state.initialSubmission === on) return;
+    state.initialSubmission = on;
+    // Results from the server were validated the other way: ask for a re-run.
+    if (state.results) state.resultsStale = true;
+    runLive();
+    renderChecks();
   }
 
   // Issues under each field: the live ones as they happen (an empty required
@@ -1075,7 +1521,97 @@
       const list = $(".field-issues", w.card);
       list.replaceChildren(...all.map((i) => el("li", { class: i.level === "error" ? "error" : "warning", text: i.message })));
       w.card.querySelectorAll(".input").forEach((n) => n.classList.toggle("invalid", live.some((i) => i.level === "error")));
+      w.issues = all;
     }
+    renderStatus();
+  }
+
+  // One status per field, shown as the card's coloured edge and the menu
+  // dot: red for an error, orange for a warning, yellow for a value autofill
+  // wants read over, green for filled, hollow grey for empty.
+  const STATUS_CLASSES = ["st-ok", "st-warn", "st-issue", "st-review", "st-empty", "st-pending"];
+  function fieldStatus(value, issues, review) {
+    if (issues.some((i) => i.level === "error")) return "st-issue";
+    if (issues.length) return "st-warn";
+    if (!String(value || "").trim()) return "st-empty";
+    return review ? "st-review" : "st-ok";
+  }
+  function setStatus(node, status) {
+    if (!node) return;
+    node.classList.remove(...STATUS_CLASSES);
+    node.classList.add(status);
+  }
+
+  function renderStatus() {
+    if (!state.venue || !$("#toc").children.length) return;
+    const vals = values();
+    let withIssues = 0;
+    for (const [fid, w] of state.widgets) {
+      const value = vals[fid] ?? "";
+      const status = fieldStatus(value, w.issues || [], state.review.has(fid));
+      if (status === "st-issue" || status === "st-warn") withIssues++;
+      setStatus(w.card, status);
+      setStatus($(`.toc-item[data-key="${CSS.escape(fid)}"]`), status);
+      w.card.toggleAttribute("data-filled", Boolean(String(value).trim()));
+      w.card.dataset.value = value;
+      w.card.dataset.search = `${w.field.label} ${fid} ${value}`.toLowerCase();
+      $(".copy", w.card).hidden = !String(value).trim();
+    }
+    // The totals.
+    const all = state.venue.fields;
+    const req = all.filter((f) => f.required);
+    const reqFilled = req.filter((f) => String(vals[f.id] ?? "").trim()).length;
+    $("#stat-fields").textContent = all.length;
+    $("#stat-req").textContent = `${reqFilled}/${req.length}`;
+    $("#stat-req-tile").className = `stat ${reqFilled === req.length ? "good" : "partial"}`;
+    $("#stat-issues").textContent = withIssues;
+    $("#stat-issues-tile").className = `stat ${withIssues ? "bad" : "good"}`;
+    const pct = req.length ? Math.round((100 * reqFilled) / req.length) : 100;
+    $("#nav-progress span").style.width = `${pct}%`;
+    $("#nav-progress").classList.toggle("done", reqFilled === req.length);
+    $("#nav-progress-label").textContent = `${reqFilled} of ${req.length} required fields filled`;
+    for (const [key] of GROUPS) {
+      const count = $(`[data-count="${key}"]`);
+      if (!count) continue;
+      const cards = $$(`#group-${key} .card[data-field]`);
+      const filled = cards.filter((c) => c.hasAttribute("data-filled")).length;
+      count.textContent = `${filled} of ${cards.length} filled`;
+    }
+    renderCheckStatus();
+    window.PaperpushViewer?.apply();
+  }
+
+  // The checks' tally: the last stat tile, the menu entry, and the row of
+  // tiles above the check groups.
+  function renderCheckStatus() {
+    const tile = $("#stat-checks-tile");
+    const item = $(".toc-item[data-key=checks]");
+    const r = state.results;
+    const statsRow = $("#check-stats");
+    if (!r) {
+      $("#stat-checks").textContent = "–";
+      $("#stat-checks-label").textContent = "checks passed (not run yet)";
+      tile.className = "stat jump";
+      setStatus(item, "st-pending");
+      statsRow.hidden = true;
+      return;
+    }
+    const c = r.counts;
+    const ran = c.passed + c.failed + c.warning;
+    $("#stat-checks").textContent = `${c.passed}/${ran}`;
+    $("#stat-checks-label").textContent = state.resultsStale ? "checks passed (out of date)" : "checks passed";
+    const cls = state.resultsStale ? "stale" : c.failed ? "bad" : c.warning ? "partial" : "good";
+    tile.className = `stat jump ${cls}`;
+    setStatus(item, state.resultsStale ? "st-pending" : c.failed ? "st-issue" : c.warning ? "st-warn" : "st-ok");
+    const tiles = [
+      ["good", c.passed, "passed"],
+      [c.failed ? "bad" : "", c.failed, "failed"],
+      [c.warning ? "partial" : "", c.warning, "warnings"],
+      ["", c.needs_ai || 0, "need AI"],
+    ];
+    statsRow.replaceChildren(...tiles.map(([k, n, label]) => el("div", { class: `stat ${k}` }, el("b", { text: String(n) }), el("span", { text: label }))));
+    statsRow.hidden = false;
+    statsRow.classList.toggle("stale", state.resultsStale);
   }
 
   const BLOCKS = [
@@ -1133,12 +1669,20 @@
   function renderChecks() {
     const root = $("#check-groups");
     root.replaceChildren();
+    const rule = initialRule();
+    if (rule) {
+      root.append(el("p", { class: "initial-notice" }, el("b", { text: "Format for initial submission: " }), rule,
+        state.initialSubmission ? " Errors are shown as warnings (initial submission is ticked)." : " Tick “initial submission (any format)” to show errors as warnings."));
+    }
+    if ($("#toc").children.length) renderCheckStatus();
     if (state.results && state.resultsStale) {
       root.append(el("p", { class: "hint", text: "You have changed the form since the last validation. Validate again to refresh these results." }));
     } else if (state.results) {
       const ok = state.results.ok;
       const errors = state.results.checks.filter((c) => c.status === "failed").length;
-      root.append(el("p", { class: `verdict ${ok ? "ok" : "bad"}`, text: ok ? "✔ No blocking errors. Read any warnings, then submit." : `✖ Not ready: ${plural(errors, "check")} failed. Fix them before submitting.` }));
+      const downgraded = state.results.downgraded || 0;
+      if (downgraded) root.append(el("p", { class: "verdict partial", text: `▲ Ready as an initial submission: ${plural(downgraded, "error")} shown as warnings. Fix them before the revision.` }));
+      else root.append(el("p", { class: `verdict ${ok ? "ok" : "bad"}`, text: ok ? "✔ No blocking errors. Read any warnings, then submit." : `✖ Not ready: ${plural(errors, "check")} failed. Fix them before submitting.` }));
     }
     for (const [group, title, hint] of BLOCKS) {
       const checks = blockChecks(group);
@@ -1150,7 +1694,10 @@
       const na = checks.filter((c) => c.status === "not_applicable");
       const done = shown.filter((c) => ["passed", "failed", "warning"].includes(c.status));
       const counts = done.length ? `${done.filter((c) => c.status === "passed").length} of ${shown.length} passed` : plural(shown.length, "check");
-      root.append(el("div", { class: "check-group", "data-group": group },
+      const worst = shown.some((c) => c.status === "failed") ? "st-failed"
+        : shown.some((c) => c.status === "warning") ? "st-warning"
+          : shown.length && done.length === shown.length ? "st-passed" : "st-pending";
+      root.append(el("div", { class: `check-group ${worst}`, "data-group": group },
         el("h3", {}, title, el("span", { class: "count", text: counts })),
         el("p", { class: "hint", text: hint }),
         el("div", { class: "check-list" }, shown.map(checkItem)),
@@ -1180,6 +1727,7 @@
       state.plan = plan;
       state.liveRules = plan.live_rules || {};
       if (plan.requirements) state.requirements = plan.requirements;
+      renderInitialSubmission();
       if (rulesChanged) {
         for (const fid of state.widgets.keys()) updateLimits(fid);
         syncWidgets(); // redraws the counters against the new limits
@@ -1201,7 +1749,7 @@
     status.replaceChildren(el("span", { class: "spinner" }), withAi ? " Validating, with the AI checks (this can take a minute)…" : " Validating…");
     state.showRequired = true;
     try {
-      const res = await postJSON(`/api/workspaces/${state.ws}/validate`, { text: state.text, ai: withAi }, withAi ? llmHeaders() : {});
+      const res = await postJSON(`/api/workspaces/${state.ws}/validate`, { text: state.text, ai: withAi, initial_submission: state.initialSubmission }, withAi ? llmHeaders() : {});
       state.results = res;
       state.resultsStale = false;
       state.touched = true;
@@ -1216,6 +1764,7 @@
       status.textContent = err.message;
     } finally {
       buttons[0].disabled = false;
+      renderReportButton();
       renderAiAvailability();
       runLive();
       renderChecks();
@@ -1225,7 +1774,6 @@
 
   function focusField(fid) {
     const w = state.widgets.get(fid);
-    if (fid === state.venue.manuscript_field) { $("#manuscript-panel").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     if (!w) return;
     w.card.scrollIntoView({ behavior: "smooth", block: "center" });
     const target = w.card.querySelector("input, textarea, select");
@@ -1238,6 +1786,19 @@
     download(new Blob([state.text], { type: "text/plain" }), state.venue.subfile_name);
   }
 
+  // The last validation as a text report, like `paperpush validate -o report.txt`.
+  function downloadReport() {
+    if (!state.results?.report_text) { toast("Validate first.", "error"); return; }
+    download(new Blob([state.results.report_text], { type: "text/plain" }), `${state.venue.subfile_name.replace(/\.sub$/, "")}_validation.txt`);
+    if (state.resultsStale) toast("The form changed since this validation. Validate again for an up-to-date report.");
+  }
+
+  function renderReportButton() {
+    const btn = $("#download-report");
+    btn.disabled = !state.results?.report_text;
+    btn.title = btn.disabled ? "Validate first" : "The last validation's report, as a text file";
+  }
+
   async function downloadBundle() {
     try {
       const res = await api(`/api/workspaces/${state.ws}/bundle`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: state.text }) });
@@ -1247,12 +1808,22 @@
     }
   }
 
-  // A standalone copy of the page as it is now: the form's values, the
-  // requirements, and the check results, with the styles inlined and the
-  // scripts left out.
+  // A standalone copy of the page as it is now, to send to a PI or
+  // collaborator: the form's values, the requirements, and the check
+  // results, with the styles inlined. Of the scripts only viewer.js comes
+  // along, so the side menu, filters, search, and copy buttons still work.
+  // Save as PDF goes through the browser's print dialog, which every browser
+  // can save as a PDF; viewer.js lays the page out for paper first.
+  function savePdf() {
+    toast("In the print dialog, choose “Save as PDF” as the destination.");
+    setTimeout(() => window.PaperpushViewer.print(), 50);
+  }
+
   async function savePage() {
     let css = "";
+    let viewer = "";
     try { css = await (await api("/static/style.css")).text(); } catch { /* unstyled copy */ }
+    try { viewer = await (await api("/static/viewer.js")).text(); } catch { /* a static copy */ }
     const doc = document.documentElement.cloneNode(true);
     const live = $$("input, textarea, select");
     const copies = $$("input, textarea, select", doc);
@@ -1263,16 +1834,309 @@
       else if (node.tagName === "TEXTAREA") copy.textContent = node.value;
       else if (node.tagName === "SELECT") $$("option", copy).forEach((o, j) => (j === node.selectedIndex ? o.setAttribute("selected", "") : o.removeAttribute("selected")));
       else copy.setAttribute("value", node.value);
-      copy.setAttribute("disabled", "");
+      if (!node.hasAttribute("data-keep")) copy.setAttribute("disabled", "");
     });
-    $$("script, dialog, #toast, .settings, .topbar-key, .final-actions, .check-actions, .autofill, #restored, #venue-options", doc).forEach((n) => n.remove());
+    $$("script, dialog, #toast, .settings, #add-venue-link, .topbar-key, .final-actions, .check-actions, .autofill, #restored, #shared-note, #venue-options", doc).forEach((n) => n.remove());
     $$("details", doc).forEach((d) => d.setAttribute("open", ""));
     const link = $("link[rel=stylesheet]", doc);
     if (link) link.replaceWith(Object.assign(document.createElement("style"), { textContent: css }));
-    const stamp = el("p", { class: "hint", text: `Saved from paperpush ${state.info?.version || ""} on ${new Date().toLocaleString()}. To keep working on it, open ${state.venue.subfile_name} in paperpush.` });
+    let editLink = null;
+    try { editLink = await shareLink(); } catch { /* no CompressionStream: no link */ }
+    const stamp = el("p", { class: "hint", text: `Saved from paperpush ${state.info?.version || ""} on ${new Date().toLocaleString()}. ` });
+    if (editLink) stamp.append(el("a", { href: editLink, target: "_blank", rel: "noopener", text: "Open an editable copy on the paperpush website" }), ".");
+    else stamp.append(`To keep working on it, open ${state.venue.subfile_name} in paperpush.`);
     $("main", doc)?.prepend(stamp);
+    if (viewer) $("body", doc).append(Object.assign(document.createElement("script"), { textContent: viewer }));
     const html = `<!doctype html>\n${doc.outerHTML}`;
     download(new Blob([html], { type: "text/html" }), `${state.venue.slug}-paperpush.html`);
+  }
+
+  // ----------------------------------------------------------- share link
+
+  // Where a share link points. A page served by `paperpush ... --web` is on
+  // this computer only, so its links go to the public website instead.
+  const PUBLIC_SITE = "https://paperpush.onrender.com/";
+
+  // A link that opens this form, filled in and editable, on the website:
+  // the .sub rides in the URL's #fragment, so nothing is stored on a server
+  // and the recipient needs no install. Uploaded files are not in it.
+  async function shareLink() {
+    const base = state.local ? PUBLIC_SITE : `${location.origin}${location.pathname}`;
+    return `${base}#/v/${encodeURIComponent(state.venue.slug)}/s/${await Subfile.toShareCode(state.text)}`;
+  }
+
+  async function copyShareLink() {
+    let link;
+    try {
+      link = await shareLink();
+    } catch (err) {
+      toast(`Could not make a link: ${err.message}`, "error");
+      return;
+    }
+    const note = (state.files || []).length ? " Your uploaded files are not in it: send them separately, or the bundle (.zip)." : "";
+    try {
+      await navigator.clipboard.writeText(link);
+      toast(`Link copied. Whoever opens it gets this form, filled in and editable.${note}`);
+    } catch {
+      window.prompt("Copy this link:", link); // clipboard blocked (http, or permissions)
+    }
+  }
+
+  // ---------------------------------------------------------- shared forms
+
+  // "Share for editing": one copy of the form on the server that everyone
+  // with the link edits (web/shared.py). The page encrypts it with the key
+  // in the link (shared.js), saves each edit a moment after it is made,
+  // checks for others' edits every few seconds, and merges field by field
+  // (Subfile.mergeFields). When two people change the same field, the one
+  // who saves second chooses which value to keep.
+
+  const POLL_MS = 4000;
+  const sharedPath = (id) => `/api/shared/${encodeURIComponent(id)}`;
+  const sharedLink = () => `${location.origin}${location.pathname}#/f/${state.shared.id}/${state.shared.key}`;
+  let pushTimer = null;
+  let pollTimer = null;
+  let pushing = false;
+  let resolving = false;
+
+  function setSharedStatus(text, kind = "muted") {
+    const node = $("#shared-status");
+    node.textContent = text;
+    node.className = `small ${kind}`;
+  }
+
+  function renderSharedNote() {
+    const sh = state.shared;
+    $("#shared-note").hidden = !sh;
+    $("#share-edit").hidden = Boolean(sh) || !state.info?.shared || Boolean(state.local);
+    $("#venue-search").disabled = Boolean(sh || state.local);
+    $("#venue-toggle").hidden = Boolean(sh || state.local);
+    for (const sel of ["#reset-btn", "#discard-draft"]) { const n = $(sel); if (n) n.hidden = Boolean(sh || state.local); }
+    if (!sh) return;
+    const info = state.info.shared || {};
+    const days = Math.round(info.ttl_days || 90);
+    $("#shared-expiry").textContent = info.durable
+      ? ` It is deleted after ${days} days without edits.`
+      : " This server keeps shared forms only until it restarts, so do not rely on the link for long.";
+  }
+
+  async function startSharing() {
+    if (!state.venue || state.shared) return;
+    const btn = $("#share-edit");
+    btn.disabled = true;
+    try {
+      const key = SharedCrypto.newKey();
+      const { aes, token } = await SharedCrypto.derive(key);
+      const text = state.text;
+      const res = await postJSON("/api/shared", { ciphertext: await SharedCrypto.encrypt(text, aes), token });
+      state.shared = { id: res.id, key, aes, token, version: res.version, base: text };
+      history.replaceState(null, "", `${location.pathname}${location.search}#/f/${res.id}/${key}`);
+      renderSharedNote();
+      startPolling();
+      setSharedStatus(`Saved ${new Date().toLocaleTimeString()}.`);
+      await copySharedLink();
+    } catch (err) {
+      toast(`Could not share the form: ${err.message}`, "error");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function copySharedLink() {
+    if (!state.shared) return;
+    const link = sharedLink();
+    const files = (state.files || []).length ? " Uploaded files are not shared: each person uploads their own to validate." : "";
+    try {
+      await navigator.clipboard.writeText(link);
+      toast(`Link copied. Everyone who opens it edits this same form.${files}`);
+    } catch {
+      window.prompt("Copy this link:", link);
+    }
+  }
+
+  // Open #/f/<id>/<key>: fetch, decrypt, and show the shared form.
+  async function openShared(id, key) {
+    let keys, res, text;
+    try {
+      keys = await SharedCrypto.derive(key);
+      res = await getJSON(sharedPath(id));
+    } catch (err) {
+      toast(err.status === 404 ? "This shared form no longer exists: it was deleted, or expired after going unedited." : `Could not open the shared form: ${err.message}`, "error");
+      location.hash = "";
+      return;
+    }
+    try {
+      text = await SharedCrypto.decrypt(res.ciphertext, keys.aes);
+    } catch {
+      toast("This link's key does not open the shared form. It may have been cut off: ask for the link again.", "error");
+      location.hash = "";
+      return;
+    }
+    const { venue } = Subfile.parse(text);
+    stopSharing();
+    state.shared = { id, key, aes: keys.aes, token: keys.token, version: res.version, base: text };
+    state.venue = null; // open it afresh, even if this venue is already showing
+    await openVenue(venue, text);
+    if (state.venue?.slug !== venue) { stopSharing(); return; }
+    renderSharedNote();
+    setSharedStatus(`Up to date as of ${new Date().toLocaleTimeString()}.`);
+    startPolling();
+  }
+
+  // Leave the shared form (the page moves to another venue, or it was deleted).
+  function stopSharing() {
+    clearTimeout(pushTimer);
+    clearInterval(pollTimer);
+    pushTimer = pollTimer = null;
+    state.shared = null;
+    if (state.info) renderSharedNote();
+  }
+
+  function schedulePush() {
+    clearTimeout(pushTimer);
+    if (state.shared && state.text === state.shared.base && !pushing) return; // nothing new to save
+    setSharedStatus("Saving…");
+    pushTimer = setTimeout(push, 700);
+  }
+
+  async function push() {
+    const sh = state.shared;
+    if (!sh || resolving) return;
+    if (pushing) { schedulePush(); return; }
+    const text = state.text;
+    if (text === sh.base) { setSharedStatus(`Saved ${new Date().toLocaleTimeString()}.`); return; }
+    pushing = true;
+    try {
+      const ciphertext = await SharedCrypto.encrypt(text, sh.aes);
+      const res = await fetch(sharedPath(sh.id), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-Paperpush-Share-Token": sh.token },
+        body: JSON.stringify({ ciphertext, base_version: sh.version }),
+        keepalive: ciphertext.length < 60000,
+      });
+      if (state.shared !== sh) return;
+      if (res.ok) {
+        const body = await res.json();
+        sh.version = body.version;
+        sh.base = text;
+        setSharedStatus(`Saved ${new Date().toLocaleTimeString()}.`);
+      } else if (res.status === 409) {
+        const { current } = await res.json();
+        await receive(current.version, await SharedCrypto.decrypt(current.ciphertext, sh.aes));
+      } else if (res.status === 404) {
+        sharedGone();
+        return;
+      } else {
+        let detail = res.statusText;
+        try { detail = (await res.json()).detail || detail; } catch { /* not JSON */ }
+        setSharedStatus(`Not saved: ${detail}`, "err");
+        return;
+      }
+    } catch (err) {
+      setSharedStatus(`Not saved (${err.message}). Retrying…`, "err");
+      pushTimer = setTimeout(push, POLL_MS);
+      return;
+    } finally {
+      pushing = false;
+    }
+    if (state.shared === sh && state.text !== sh.base) schedulePush();
+  }
+
+  function startPolling() {
+    clearInterval(pollTimer);
+    pollTimer = setInterval(poll, POLL_MS);
+  }
+
+  async function poll() {
+    const sh = state.shared;
+    if (!sh || pushing || resolving || document.visibilityState !== "visible") return;
+    let res;
+    try {
+      res = await getJSON(`${sharedPath(sh.id)}?known=${sh.version}`);
+    } catch (err) {
+      if (err.status === 404) sharedGone();
+      return;
+    }
+    if (state.shared !== sh || res.version === sh.version || !res.ciphertext || pushing) return;
+    let theirs;
+    try { theirs = await SharedCrypto.decrypt(res.ciphertext, sh.aes); } catch { return; }
+    await receive(res.version, theirs);
+  }
+
+  // Someone else saved `theirs` as `version`: take it in, keeping this
+  // page's unsaved edits, and ask about any field both sides changed.
+  async function receive(version, theirs) {
+    const sh = state.shared;
+    const mine = state.text;
+    const { text, conflicts } = Subfile.mergeFields(sh.base, mine, theirs, state.fields);
+    sh.base = theirs;
+    sh.version = version;
+    if (conflicts.length) {
+      resolving = true;
+      let chosen;
+      try { chosen = await askConflicts(conflicts); } finally { resolving = false; }
+      let resolved = text;
+      for (const c of conflicts) if (chosen[c.id] === "theirs") resolved = Subfile.setField(resolved, state.fields.get(c.id) || { id: c.id, type: "text" }, c.theirs);
+      applyRemote(resolved);
+    } else {
+      applyRemote(text);
+      if (text === theirs) setSharedStatus(`Updated with a collaborator's changes at ${new Date().toLocaleTimeString()}.`);
+    }
+    if (state.text !== sh.base) schedulePush();
+  }
+
+  function applyRemote(text) {
+    if (text === state.text) return;
+    setText(text);
+    syncWidgets();
+  }
+
+  function sharedGone() {
+    const slug = state.venue?.slug;
+    stopSharing();
+    if (slug) {
+      store.set(`draft:${slug}`, state.text);
+      history.replaceState(null, "", `${location.pathname}${location.search}#/v/${encodeURIComponent(slug)}`);
+    }
+    toast("This shared form was deleted. What you see is now your own copy, saved in this browser.", "error");
+  }
+
+  async function stopSharingForAll() {
+    const sh = state.shared;
+    if (!sh) return;
+    if (!window.confirm("Delete the shared form for everyone? Each person keeps the copy they have open, but the link stops working.")) return;
+    try {
+      await api(sharedPath(sh.id), { method: "DELETE", headers: { "X-Paperpush-Share-Token": sh.token } });
+    } catch (err) {
+      if (err.status !== 404) { toast(`Could not delete it: ${err.message}`, "error"); return; }
+    }
+    sharedGone();
+    toast("Deleted the shared form. Your copy is saved in this browser.");
+  }
+
+  // One question per field both sides changed; resolves to {fieldId: "mine"|"theirs"}.
+  function askConflicts(conflicts) {
+    const dialog = $("#conflict-dialog");
+    const preview = (v) => el("pre", { class: "conflict-value", text: v === "" ? "(empty)" : v.length > 600 ? `${v.slice(0, 600)}…` : v });
+    const rows = conflicts.map((c) => {
+      const label = state.fields.get(c.id)?.label || c.id;
+      const name = `conflict-${c.id}`;
+      return el("fieldset", { class: "conflict" },
+        el("legend", { text: label }),
+        el("label", { class: "conflict-choice" }, el("input", { type: "radio", name, value: "theirs" }), el("span", { text: "Theirs (just saved by someone else)" }), preview(c.theirs)),
+        el("label", { class: "conflict-choice" }, el("input", { type: "radio", name, value: "mine", checked: true }), el("span", { text: "Mine" }), preview(c.mine)));
+    });
+    $("#conflict-body").replaceChildren(...rows);
+    return new Promise((resolve) => {
+      const done = () => {
+        const out = {};
+        for (const c of conflicts) out[c.id] = $(`input[name="conflict-${CSS.escape(c.id)}"]:checked`, dialog)?.value || "mine";
+        dialog.removeEventListener("close", done);
+        resolve(out);
+      };
+      dialog.addEventListener("close", done);
+      dialog.showModal();
+    });
   }
 
   function command(text) {
@@ -1306,6 +2170,14 @@
       $("#portal-dialog").showModal();
       return;
     }
+    if (state.local) {
+      if (v.login_required) steps.push(el("li", {}, el("strong", { text: `Log in to ${v.name}` }), " once. paperpush keeps the login in your system keychain:", command(`paperpush login ${v.slug}`)));
+      steps.push(el("li", {}, el("strong", { text: "Submit" }), " from the same directory:", command(`paperpush submit ${state.local.path}`),
+        el("p", { class: "hint", text: "paperpush validates again, opens a browser, and fills in the portal. It stops before the final submit button, so you can look everything over and press it yourself." })));
+      body.replaceChildren(el("ol", {}, steps));
+      $("#portal-dialog").showModal();
+      return;
+    }
     steps.push(el("li", {},
       el("strong", { text: "Download your submission." }), ` The bundle holds ${sub} and the files you uploaded; unzip it into a folder. (Already have the files? The .sub alone is enough if it sits next to them.)`,
       el("div", { class: "cmd" },
@@ -1325,17 +2197,52 @@
   // ------------------------------------------------------------- routing
 
   async function route() {
-    const m = location.hash.match(/^#\/v\/([^/]+)/);
+    const f = location.hash.match(/^#\/f\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)/);
+    if (f && !state.local) {
+      if (state.shared?.id !== f[1]) await openShared(f[1], f[2]);
+      return;
+    }
+    if (state.shared) stopSharing();
+    const m = location.hash.match(/^#\/v\/([^/]+)(?:\/s\/([A-Za-z0-9_-]+))?/);
     if (m) {
       const slug = decodeURIComponent(m[1]);
+      if (m[2] && !state.local) {
+        // A share link: open its form, then drop the code from the URL so a
+        // reload keeps the recipient's edits (saved as this venue's draft).
+        history.replaceState(null, "", `${location.pathname}${location.search}#/v/${encodeURIComponent(slug)}`);
+        let shared;
+        try {
+          shared = await Subfile.fromShareCode(m[2]);
+        } catch {
+          toast("That share link is damaged or cut off, so it could not be opened. Ask for it again.", "error");
+        }
+        if (shared != null) {
+          const hadDraft = (store.get(`draft:${slug}`) || "") !== "" && store.get(`draft:${slug}`) !== shared;
+          if (state.venue && state.venue.slug === slug) { setText(shared); syncWidgets(); }
+          else await openVenue(slug, shared);
+          if (state.venue?.slug === slug) {
+            store.set(`draft:${slug}`, shared);
+            toast(hadDraft ? "Opened the shared form. It replaced the form you had saved for this venue in this browser." : "Opened the shared form. Your edits are saved in this browser.");
+          }
+          pendingText = null;
+          return;
+        }
+      }
       if (!state.venue || state.venue.slug !== slug) await openVenue(slug, pendingText);
       pendingText = null;
     } else {
       state.venue = null;
       $("#workspace").hidden = true;
+      hideNav();
       $("#venue-search").value = "";
       document.title = "paperpush";
     }
+  }
+
+  function hideNav() {
+    $("#toc").replaceChildren();
+    $("#sidenav").hidden = true;
+    $("#layout").classList.remove("with-nav");
   }
 
   let pendingText = null;
@@ -1355,6 +2262,7 @@
     wireSettings();
     wireCombo();
     wireManuscript();
+    wireImport();
     $("#sub-text").addEventListener("input", debounce((e) => setText(e.target.value, { fromEditor: true }), 300));
     $("#discard-draft").addEventListener("click", () => {
       store.del(`draft:${state.venue.slug}`);
@@ -1366,8 +2274,17 @@
     });
     $("#validate-btn").addEventListener("click", () => runValidate(false));
     $("#validate-ai-btn").addEventListener("click", () => runValidate(true));
+    $("#initial-submission").addEventListener("change", (e) => setInitialSubmission(e.target.checked));
     $("#download-sub").addEventListener("click", downloadSub);
+    $("#download-report").addEventListener("click", downloadReport);
+    $("#show-sub").addEventListener("click", toggleSubText);
     $("#save-page").addEventListener("click", savePage);
+    $("#share-link").addEventListener("click", copyShareLink);
+    $("#share-edit").addEventListener("click", startSharing);
+    $("#shared-copy").addEventListener("click", copySharedLink);
+    $("#shared-stop").addEventListener("click", stopSharingForAll);
+    document.addEventListener("visibilitychange", () => { if (state.shared && document.visibilityState === "visible") poll(); });
+    $("#save-pdf").addEventListener("click", savePdf);
     $("#portal-btn").addEventListener("click", openPortalDialog);
     $("#form").addEventListener("submit", (e) => e.preventDefault());
     window.addEventListener("hashchange", route);
@@ -1386,11 +2303,60 @@
     $("#version").textContent = `v${state.info.version}`;
     $("#key-panel").hidden = !state.info.ai;
     renderKeyPanel();
+    renderSharedNote();
     const input = $("#venue-search");
     input.disabled = false;
     $("#venue-hint").textContent = `${state.venues.length} venues. Search by name, or open the list.`;
+    if (await openLocal()) return;
     await route();
     if (!state.venue) input.focus();
+  }
+
+  // Opened by `paperpush subfile|autofill|validate --web`: load the .sub file
+  // from disk, lock the page to it, then run the step the command asked for.
+  async function openLocal() {
+    const token = new URLSearchParams(location.search).get("local");
+    if (!token || !state.info.local) return false;
+    state.local = { token };
+    let local;
+    try {
+      local = await getJSON("/api/local");
+    } catch (err) {
+      state.local = null;
+      toast(`Could not open the local .sub file: ${err.message}`, "error");
+      return false;
+    }
+    Object.assign(state.local, local);
+    state.ws = "local";
+    state.files = local.files;
+    $("#venue-search").disabled = true;
+    $("#venue-toggle").hidden = true;
+    $("#venue-hint").textContent = "";
+    $("#local-path").textContent = local.path;
+    $("#local-note").hidden = false;
+    for (const sel of ["#reset-btn", "#discard-draft"]) { const n = $(sel); if (n) n.hidden = true; }
+    const openRow = $("#open-sub")?.closest(".menu-row");
+    if (openRow) openRow.hidden = true;
+    pendingText = local.text;
+    if (location.hash !== `#/v/${encodeURIComponent(local.venue)}`) history.replaceState(null, "", `${location.pathname}${location.search}#/v/${encodeURIComponent(local.venue)}`);
+    await route();
+    document.title = `${local.path} · paperpush`;
+    if (local.action === "autofill") {
+      if ($("#autofill-btn").disabled) toast(`Cannot autofill yet: ${$("#autofill-hint").textContent}`, "error");
+      else { $("#manuscript-panel").scrollIntoView({ block: "start" }); await runAutofill(); }
+    } else if (/^validate(-ai)?(\+initial)?$/.test(local.action || "")) {
+      const [action, initial] = local.action.split("+");
+      if (initial) {
+        await refreshPlan(); // the article type can change the rule
+        if (initialRule()) setInitialSubmission(true);
+        else toast(`Validating normally: ${state.venue.name}'s guidelines do not let the initial submission be in any format.`, "error");
+        renderInitialSubmission();
+      }
+      const withAi = action === "validate-ai" && Boolean(aiAvailability().label);
+      if (action === "validate-ai" && !withAi) toast(`Validating without the AI checks: ${aiAvailability().reason}`, "error");
+      await runValidate(withAi);
+    }
+    return true;
   }
 
   init();

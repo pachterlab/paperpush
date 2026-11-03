@@ -950,6 +950,7 @@ def validate(
     check_anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
     check_openreview: bool = True,
+    initial_submission: bool = False,
 ) -> list[Issue]:
     """Return all issues found in ``subfile`` against ``venue``.
 
@@ -970,6 +971,7 @@ def validate(
         check_anonymous=check_anonymous,
         check_hidden_text=check_hidden_text,
         check_openreview=check_openreview,
+        initial_submission=initial_submission,
     ).issues()
 
 
@@ -984,6 +986,7 @@ def validate_report(
     check_anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
     check_openreview: bool = True,
+    initial_submission: bool = False,
     ai=None,
     subfile_path: str = "",
 ):
@@ -1014,7 +1017,9 @@ def validate_report(
     lettering, and type (:mod:`paperpush.figure_check`), the order figures and
     tables are cited in (:mod:`paperpush.citation_check`), and whether the
     title, abstract, authors, keywords, and statements in the ``.sub`` match
-    the manuscript (:mod:`paperpush.consistency`).
+    the manuscript (:mod:`paperpush.consistency`), and the manuscript's prose
+    for double spaces, repeated words, punctuation spacing, unbalanced
+    brackets and quotes, and common misspellings (:mod:`paperpush.prose_check`).
 
     ``check_anonymous`` scans the submission for information identifying its
     authors, including every linked anonymous.4open.science repository (see
@@ -1027,6 +1032,12 @@ def validate_report(
     reviewers as errors (see :func:`_hidden_text_issues`). ``check_openreview``
     (default on; network) looks up each author's OpenReview profile for venues
     submitted through OpenReview (see :func:`_openreview_profile_issues`).
+
+    ``initial_submission`` validates the file as an initial submission: every
+    error is reported as a warning instead, so nothing blocks it. It is meant
+    for venues whose guidelines let the initial submission be in any format
+    (``manuscript.initial_submission_any_format``); that rule is put on the
+    report (``initial_submission_rule``) whether or not the flag is set.
 
     ``ai`` (an :class:`~paperpush.ai_validate.AiOptions`) decides what happens
     to the checks only an LLM can judge: run them through a provider's API,
@@ -1091,13 +1102,14 @@ def validate_report(
         checks.record("integrity.openreview", "Authors' OpenReview profiles", integrity, report.UNCHECKED, detail="switched off (--dont-check-openreview-profiles)")
 
     if check_manuscript:
-        from . import citation_check, consistency, figure_check, layout_check, requirements_check
+        from . import citation_check, consistency, figure_check, layout_check, prose_check, requirements_check
 
         requirements_check.run_checks(checks, venue, values)
         layout_check.run_checks(checks, venue, values)
         figure_check.run_checks(checks, venue, values)
         citation_check.run_checks(checks, venue, values)
         consistency.run_checks(checks, venue, values)
+        prose_check.run_checks(checks, venue, values)
         requirements_check.not_implemented(checks, venue, values)
     else:
         checks.record("guidelines", "Manuscript checked against the author guidelines", "Guidelines", report.UNCHECKED, detail="switched off (--dont-check-manuscript)")
@@ -1106,7 +1118,13 @@ def validate_report(
 
     tasks = ai_validate.resolve(checks, venue, values, ai) if check_manuscript else []
 
+    from .requirements import any_format_initial_rule
+
     result = report.ValidationReport(venue=venue.slug, subfile=subfile_path, results=checks.results, ai_tasks=tasks)
+    result.initial_submission_rule = any_format_initial_rule(venue.slug, values)
+    if initial_submission:
+        result.initial_submission = True
+        result.downgraded = downgrade_errors(result.results)
     if ai is not None:
         result.ai = ai.description
         result.ai_error = ai.error
@@ -1119,6 +1137,25 @@ def validate_report(
         len(result.issues()) - errors,
     )
     return result
+
+
+def downgrade_errors(results: list) -> int:
+    """Turn every error in ``results`` into a warning, in place; return how many.
+
+    A failed check becomes a warning check. Used by ``--initial-submission``.
+    """
+    from dataclasses import replace
+
+    from . import report
+
+    count = 0
+    for result in results:
+        if any(i.is_error for i in result.issues):
+            count += sum(1 for i in result.issues if i.is_error)
+            result.issues = [replace(i, level=WARNING) if i.is_error else i for i in result.issues]
+        if result.status == report.FAILED:
+            result.status = report.WARNING
+    return count
 
 
 def replace_unchecked(issue: Issue) -> Issue:

@@ -3,43 +3,69 @@
 #
 # Edit the values below, then run:  paperpush submit combinatorica.sub
 # Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web combinatorica.sub   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
 
 @venue: combinatorica
 # submission guide: https://combinatorica.hu/
+# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
+# in the order the venue's submission form asks for them instead.
 
-# EditFlow author agreement accepted (boolean, REQUIRED)
-#   Author-only attestation on EditFlow Step 0. Set to yes only after every coauthor has authorized the submission and you personally confirm the article is a genuinely new Combinatorica submission, is not under consideration or published elsewhere, is not an uninvited resubmission of a rejected article, and every author has their own valid email address. Paperpush never autofills this consent.
-author_agreement: 
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
 
-# Authors (authorlist, REQUIRED)
-#   One author per line, in order. Format: given name | middle name (optional) | family name | email | MR author ID (optional) | institution | country. EditFlow first uses the email to recognize a returning author, then fills or confirms the remaining details. Each coauthor must have a distinct personal email address.
-authors: |
-  
+# Article PDF (file, REQUIRED)
+#   PDF manuscript uploaded to EditFlow's required Article field.
+manuscript_file: 
+
+# ----------------------------------------------------------------------
+# Manuscript details
+# ----------------------------------------------------------------------
 
 # Article title (text, REQUIRED)
 #   The manuscript's full title, entered in EditFlow's Article Title field.
 title: 
-
-# Mathematics Subject Classification (text, REQUIRED)
-#   One five-character Mathematics Subject Classification code, such as 05C05. EditFlow validates the code before advancing.
-msc_classification: 
-
-# Handling editor (text, REQUIRED)
-#   Author-only choice from EditFlow's editor menu. Prefer the editor's visible menu label exactly as shown. A portal option value may be used in a test fixture. Paperpush never chooses an editor on the author's behalf.
-handling_editor: 
-
-# arXiv reference (text, REQUIRED)
-#   Full http(s) URL of the manuscript on arXiv, entered in EditFlow's arXiv-reference field. This runner implements the verified arXiv-reference submission path. Combinatorica ordinarily limits the submitted version to 30 pages; for a longer work, its author instructions advise a 30-page version with a link to the full arXiv version.
-#   each non-blank line must be a valid http/https URL
-arxiv_reference: 
 
 # Abstract (textarea, REQUIRED)
 #   The manuscript abstract, entered in EditFlow's required Abstract field.
 abstract: |
   
 
-# Article PDF (file, REQUIRED)
-#   PDF manuscript uploaded to EditFlow's required Article field.
-manuscript_file: 
+# Mathematics Subject Classification (text, REQUIRED)
+#   One five-character Mathematics Subject Classification code, such as 05C05. EditFlow validates the code before advancing.
+msc_classification: 
+
+# arXiv reference (text, REQUIRED)
+#   Full http(s) URL of the manuscript on arXiv, entered in EditFlow's arXiv-reference field. This runner implements the verified arXiv-reference submission path. Combinatorica ordinarily limits the submitted version to 30 pages; for a longer work, its author instructions advise a 30-page version with a link to the full arXiv version.
+#   each non-blank line must be a valid http/https URL
+arxiv_reference: 
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: given name | middle name (optional) | family name | email | MR author ID (optional) | institution | country. EditFlow first uses the email to recognize a returning author, then fills or confirms the remaining details. Each coauthor must have a distinct personal email address.
+authors: |
+  
+
+# ----------------------------------------------------------------------
+# Reviewers and editors
+# ----------------------------------------------------------------------
+
+# Handling editor (text, REQUIRED)
+#   Author-only choice from EditFlow's editor menu. Prefer the editor's visible menu label exactly as shown. A portal option value may be used in a test fixture. Paperpush never chooses an editor on the author's behalf.
+handling_editor: 
+
+# ----------------------------------------------------------------------
+# Declarations
+# ----------------------------------------------------------------------
+
+# EditFlow author agreement accepted (boolean, REQUIRED)
+#   Author-only attestation on EditFlow Step 0. Set to yes only after every coauthor has authorized the submission and you personally confirm the article is a genuinely new Combinatorica submission, is not under consideration or published elsewhere, is not an uninvited resubmission of a rejected article, and every author has their own valid email address. Paperpush never autofills this consent.
+author_agreement: 
 
 # vim: set filetype=yaml :

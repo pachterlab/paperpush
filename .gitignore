@@ -193,3 +193,6 @@ tests/portal_snapshots/_failures/
 /paper/
 # Page texts and run state of scripts/check_guidelines.py
 .guideline_cache/
+.neon
+node_modules/
+.env.local

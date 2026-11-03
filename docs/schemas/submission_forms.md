@@ -73,6 +73,7 @@ required, every other key is optional, and `null` deletes the inherited key.
 | `autofill` | `extract` \| `classify` \| `filemap` \| `never` \| `` | How an autofill engine may populate the field: extract \| classify \| filemap \| never. Empty string means infer from `type`. |
 | `confirm` | boolean | For a required `boolean`, whether it is a consent checkbox that must be affirmative (vs. an informational yes/no question). |
 | `required_if` | string or null | Id of another field in the same venue; when that field has a non-empty value, this field becomes required. A `boolean` target triggers only on an affirmative answer, since "no" means the dependent fields do not apply. Combined with `required` (unconditional). |
+| `section` | `type` \| `files` \| `metadata` \| `authors` \| `reviewers` \| `declarations` \| `additional` or null | Section of the .sub template this field is listed under (type, files, metadata, authors, reviewers, declarations, additional). Omit to use the section paperpush/common_fields.json gives this field id, or "additional" when it names none. Layout only: ignored by `paperpush subfile --venue-order`, submission and validation. |
 
 ## ConditionalLimit
 

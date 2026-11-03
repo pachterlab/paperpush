@@ -37,13 +37,19 @@ to it:
 - **Not applicable** -- the venue sets no such rule, or the submission has
   nothing for the check to look at. Listed in one line at the end.
 
-In the terminal the sections are coloured: green for passed, red for failed
-and warnings, yellow for anything not checked. ``--alt-color`` switches to a
-colour-blind-friendly palette (blue, vermillion, grey), and every line also
+In the terminal the sections are coloured: green for passed, red for failed,
+amber for warnings, yellow for anything not checked. ``--alt-color`` switches
+to a colour-blind-friendly palette (blue, vermillion, dark yellow, grey), and every line also
 carries a marker (``✔``, ``✖``, ``▲``, ``?``, ``–``), so the status never
 depends on colour alone. ``-o`` saves the same report as a PDF (colours kept),
 or as HTML, Markdown, or plain text when the path ends in ``.html``, ``.md``,
 or ``.txt``.
+
+When the venue lets the initial submission be in any format, the report opens
+with a "Format for initial submission" note quoting the rule.
+``--initial-submission`` (the "initial submission (any format)" checkbox on
+the web page) then reports every error as a warning, so the formatting rules
+that apply only from revision do not block the first submission.
 
 Each problem reads ``error: [field_id] message`` or ``warning: [field_id]
 message``. The field id in brackets tells you which line of the ``.sub`` to
@@ -118,6 +124,10 @@ The passes at a glance
      - ``--dont-check-manuscript``
      - no
    * - :ref:`.sub matches the manuscript <vc-consistency>`
+     - yes
+     - ``--dont-check-manuscript``
+     - no
+   * - :ref:`Prose <vc-prose>`
      - yes
      - ``--dont-check-manuscript``
      - no
@@ -475,6 +485,40 @@ compared word for word, ignoring case, punctuation, and line breaks:
 An identical value passes. A near match is a warning that lists the first
 differing words ("'twelve' in the .sub vs 'ten' in the manuscript"); a value
 the manuscript does not contain is a warning too.
+
+.. _vc-prose:
+
+Prose
+-----
+
+A mechanical proofread of the manuscript, not a grammar check. Each check
+looks for one kind of slip that a pattern finds with few false alarms:
+
+- **Double spaces** between words. Two spaces after a sentence (after ``.``,
+  ``?``, ``!``, or ``:``) are allowed.
+- **Repeated words** ("the the"). "that that" and "had had" are allowed.
+- **Spacing around punctuation**: a space before ``,`` ``;`` ``:`` ``.`` ``?``
+  or ``!`` ("word ,"), and no space after a comma, semicolon, or full stop
+  between words ("word,word", "end.Next"). URLs, e-mail addresses, DOIs, and
+  numbers such as 1,000 and 0.5 are skipped.
+- **Brackets and quotes** that do not pair up within a paragraph. Enumerations
+  such as "a) ... b) ..." are allowed.
+- **Common misspellings**, from `codespell <https://github.com/codespell-project/codespell>`_'s
+  list of known typos ("teh", "recieve", "seperate"). Because it lists typos
+  instead of checking every word against a dictionary, gene names, acronyms,
+  and jargon are not flagged. Capitalized words and words of three letters or
+  fewer are skipped, since in a paper they are mostly names and abbreviations.
+  Needs ``codespell``, part of the ``validate`` extra.
+
+What is checked depends on the file. Word, Markdown, and plain-text files are
+read as written, so every check runs. LaTeX source is read with its math,
+commands, citations, and URLs masked; double spaces are not checked there,
+because LaTeX does not print them. Text extracted from a PDF has spacing
+artefacts of its own (justified lines, rejoined line breaks), so a PDF gets
+only the repeated-word and spelling checks. The reference list is skipped.
+Every finding is a warning, quoting the first five examples in context with
+the problem marked (``␣␣`` for a double space, ``»,«`` around a mark).
+For a full proofread, use an editor or the ``/proofreading`` agent skill.
 
 .. _vc-ai:
 

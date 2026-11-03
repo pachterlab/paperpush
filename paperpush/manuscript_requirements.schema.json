@@ -669,6 +669,17 @@
           ],
           "description": "Mandated language variant, if any."
         },
+        "initial_submission_any_format": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings."
+        },
         "notes": {
           "anyOf": [
             {

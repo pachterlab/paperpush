@@ -21,6 +21,11 @@ API key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`). You alread
 the manuscript in front of you; extract from it directly. Use `--engine api`
 only if the user has explicitly set an API key and asked for it.
 
+**Don't run `--web` or `paperpush web` yourself.** They serve a page in the
+user's browser and keep running until Ctrl-C, so your command never returns.
+Suggest them to a user who wants to fill in or review a `.sub` in a form, and
+let the user run them in their own terminal.
+
 ## Before anything else: check the user is logged in
 
 The pipeline ends in a real browser sign-in, and that sign-in is the one step you
@@ -174,7 +179,10 @@ autofill step alone is:
 paperpush autofill <venue>.sub -d <manuscript-dir> --engine manual --values values.json
 ```
 
-(Add `--dry-run` to preview without writing.)
+(Add `--dry-run` to preview without writing. `-d` accepts several directories
+and/or documents -- `.tex`, `.doc`, `.docx`, `.odt`, `.rtf`, `.txt`, `.md`, `.rst`,
+`.pdf` -- e.g. `-d ms/ figures/ cover_letter.docx`; it stops at the next flag or
+the first `.sub` file, and may be repeated.)
 
 ## The manuscript itself is checked too
 
@@ -191,7 +199,9 @@ layout (template, margins, font, spacing, line/page numbers, spelling variant),
 the figures (resolution, lettering size and typeface, panel labels -- attached
 files, or the figures embedded in the manuscript when none are attached), that
 figures, tables, and figure panels are cited in order, and that the title, abstract, authors,
-keywords, and statements in the `.sub` match the manuscript. Warnings from this
+keywords, and statements in the `.sub` match the manuscript, and proofreads the
+prose mechanically (double spaces, repeated words, punctuation spacing,
+unbalanced brackets and quotes, common misspellings). Warnings from this
 pass are heuristics over extracted text and images: relay them to the user as
 things to confirm, not as blockers. `--dont-check-manuscript` skips the pass.
 
@@ -201,6 +211,11 @@ things to confirm, not as blockers. `--dont-check-manuscript` skips the pass.
 AI, not implemented, or not applicable (MCP: `checks` in the `validate_subfile`
 result). `-o` saves the report (PDF by default; `.html`/`.md`/`.txt` by
 extension); `--alt-color` is the colour-blind-friendly palette.
+When the venue lets the initial submission be in any format
+(`manuscript.initial_submission_any_format`), the report opens with that rule
+(MCP: `initial_submission_rule`); `--initial-submission` (MCP:
+`initial_submission=true`) reports every error as a warning for a first
+submission. Use it only when the author says this is an initial submission.
 
 Checks that need a reader's judgement -- lettering in raster figures, a postal
 address on the title page, tables pasted as images, the venue's free-text

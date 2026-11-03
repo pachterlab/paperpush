@@ -27,6 +27,7 @@ from ..common import parse_pipe_funders as _parse_funders
 from ..common import session_path as _session_path
 from ..common import split_name_first_middle_last as _split_name
 from ..login import VenueLoginError, login_orcid
+from ..recovery import GuardedPage, guard, step
 
 logger = logging.getLogger(__name__)
 
@@ -260,9 +261,18 @@ def _attach_file(page, dropzone_sel: str, path: str) -> None:
     "Select Files" is a link opening a native file chooser (not a file input),
     so we intercept the chooser the click opens and hand it the file.
     """
-    with page.expect_file_chooser() as fc_info:
-        page.locator(dropzone_sel).get_by_role("link", name=LINK_SELECT_FILES).click()
-    fc_info.value.set_files(path)
+
+    def attach(page) -> None:
+        with page.expect_file_chooser() as fc_info:
+            page.locator(dropzone_sel).get_by_role("link", name=LINK_SELECT_FILES).click()
+        fc_info.value.set_files(path)
+
+    # The click and the file chooser it opens only make sense together, so they
+    # are one recoverable unit when the page is guarded.
+    if isinstance(page, GuardedPage):
+        page.attempt(f"attach {path!r} to {dropzone_sel}", attach)
+    else:
+        attach(page)
 
 
 def _select_funder_suggestion(page, timeout_ms: int = 8000) -> None:
@@ -441,6 +451,10 @@ def submit_biorxiv(values: dict, headless: bool = False, debug: bool = False, ne
         page = context.new_page()
 
         venue.ensure_signed_in(page, context, debug=debug)
+        # Sign-in stays unguarded (it is the author's to complete). From here on,
+        # a failing action goes to the recovery handler set by the caller (by
+        # default it aborts, as an unguarded run would).
+        page = guard(page)
 
         if debug:
             # Open the Inspector at the first action so you can step through the
@@ -448,9 +462,11 @@ def submit_biorxiv(values: dict, headless: bool = False, debug: bool = False, ne
             page.pause()
 
         logger.debug("Signed in; starting a new manuscript submission")
+        step("Opening screens")
         _open_submission(page, server, article_scope, cfg)
         # Selects are chosen by visible label so the .sub value maps directly.
         # bioRxiv has a result-type drop-down before the subject; medRxiv does not.
+        step("Title page")
         if cfg.has_result_type and result_type:
             page.locator(SEL_RESULT_TYPE).select_option(label=result_type)
         if subject_category:
@@ -467,6 +483,7 @@ def submit_biorxiv(values: dict, headless: bool = False, debug: bool = False, ne
             _fill_url_list(page, SEL_EXTERNAL_LINKS_PREFIX, SEL_EXTERNAL_LINKS_ADD, data_availability_links)
         page.get_by_role("button", name=BTN_SAVE_CONTINUE).click()
 
+        step("Declarations page")
         # Declarations page: the abstract, the mandatory affirmation checkboxes,
         # the competing-interest answer, and (medRxiv only) the health-research
         # screening block.
@@ -485,6 +502,7 @@ def submit_biorxiv(values: dict, headless: bool = False, debug: bool = False, ne
             _answer_health_declarations(page, human_subjects, public_data_only, public_data_source, ethics_statement, clinical_trial, data_availability, data_availability_links)
         page.get_by_role("button", name=BTN_SAVE_CONTINUE).click()
 
+        step("Authors page")
         # Repeat the author step for every author in the .sub list. Pause
         # between authors so a fast next "Add Author" click does not race the
         # save and drop the entry (the portal glitches and skips the author).
@@ -493,9 +511,11 @@ def submit_biorxiv(values: dict, headless: bool = False, debug: bool = False, ne
             if i > 0:
                 page.wait_for_timeout(AUTHOR_SAVE_PAUSE_MS)
             logger.debug("Adding author %d/%d", i + 1, len(authors))
+            step(f"Authors page: author {i + 1} of {len(authors)} ({author['name']})")
             _add_author(page, author)
         page.get_by_role("button", name=BTN_SAVE_CONTINUE).click()
 
+        step("Funding page")
         # No funders -> the "No funding" radio; otherwise declare each funder.
         if funders:
             page.get_by_role("radio", name="Yes, I have funding").check()
@@ -509,10 +529,13 @@ def submit_biorxiv(values: dict, headless: bool = False, debug: bool = False, ne
         else:
             page.get_by_role("radio", name=NO_FUNDING_LABEL).check()
         page.get_by_role("button", name=BTN_SAVE_CONTINUE).click()
+        step("License page")
         license_id = _LICENSE_IDS.get(license_name, DEFAULT_LICENSE_ID)
         page.locator(license_id).check()
         page.get_by_role("button", name=BTN_SAVE_CONTINUE).click()
+        step("Page after License")
         page.get_by_role("button", name=BTN_SAVE_CONTINUE).click()
+        step("Files page")
         # Attach the manuscript, then any figures/supplementary material. Each
         # goes through a native file chooser (see _attach_file).
         logger.info("Attaching manuscript file %s", manuscript_file)

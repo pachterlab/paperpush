@@ -20,3 +20,8 @@ services:
         value: "24"
       - key: PAPERPUSH_WEB_MAX_WORKSPACE_MB
         value: "200"
+      # "Share for editing" stores encrypted forms in Postgres, since this
+      # plan's disk is wiped on every deploy. Paste a Neon connection string
+      # (postgresql://...?sslmode=require) in the dashboard; it is a secret.
+      - key: PAPERPUSH_WEB_DATABASE_URL
+        sync: false

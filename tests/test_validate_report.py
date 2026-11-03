@@ -747,3 +747,77 @@ def test_section_order_and_abstract_abbreviations(_use, tmp_path):
     assert "'Methods' comes before 'Results'" in _result(rep, "guidelines.section_order").issues[0].message
     abbreviations = _result(rep, "guidelines.abstract_abbreviations").issues[0].message
     assert "scRNA-seq" in abbreviations and "MLP" in abbreviations and "HCA" not in abbreviations and "DNA" not in abbreviations
+
+
+# ===========================================================================
+# initial submission in any format (--initial-submission)
+# ===========================================================================
+
+_ANY_FORMAT = {"testj": {"manuscript": {"initial_submission_any_format": "Initial submissions need no special formatting."}}}
+
+
+def test_any_format_rule_is_on_the_report_without_the_flag(_use):
+    _use(_ANY_FORMAT)
+    rep = _report(_venue(TITLE), {})
+    assert rep.initial_submission_rule == "Initial submissions need no special formatting."
+    assert not rep.initial_submission and not rep.ok
+    assert _result(rep, "form.required").status == report.FAILED
+    text = report.to_text(rep)
+    assert "Format for initial submission: Initial submissions need no special formatting." in text
+    assert "--initial-submission" in text
+    # The note sits at the top, before the verdict.
+    assert text.index("Format for initial submission") < text.index("Not ready")
+
+
+def test_initial_submission_turns_errors_into_warnings(_use):
+    _use(_ANY_FORMAT)
+    rep = _report(_venue(TITLE), {}, initial_submission=True)
+    required = _result(rep, "form.required")
+    assert required.status == report.WARNING
+    assert required.issues and all(i.level == WARNING for i in required.issues)
+    assert rep.ok and not rep.errors and rep.downgraded == 1
+    assert not rep.by_status(report.FAILED)
+    text = report.to_text(rep)
+    assert "Ready to submit as an initial submission: 1 error(s) shown as warnings" in text
+    for render in (report.to_markdown, report.to_html):
+        assert "Format for initial submission" in render(rep)
+
+
+def test_initial_submission_without_a_rule_says_the_venue_has_none(_use):
+    _use({})
+    rep = _report(_venue(TITLE), {}, initial_submission=True)
+    assert rep.ok and rep.initial_submission_rule == ""
+    assert "do not say that an initial submission may be in any format" in report.to_text(rep)
+    assert "Format for initial submission" not in report.to_text(rep)
+
+
+def test_any_format_rule_follows_the_article_type(_use):
+    _use({"testj": {"article_type_field": "kind", "article_types": {"Letter": {"manuscript": {"initial_submission_any_format": "Letters may be in any format."}}}}})
+    assert r.any_format_initial_rule("testj") == ""
+    assert r.any_format_initial_rule("testj", {"kind": "Letter"}) == "Letters may be in any format."
+    # Informational: never listed as a guideline rule with no check.
+    venue = _venue(Field(id="kind", label="Kind", type="text"))
+    rep = _report(venue, {"kind": "Letter"})
+    assert rep.initial_submission_rule == "Letters may be in any format."
+    assert not any("initial_submission_any_format" in res.id for res in rep.results)
+
+
+def test_cli_initial_submission_flag_passes_with_warnings(_use, tmp_path, monkeypatch, capsys):
+    _use(_ANY_FORMAT)
+    _cli_venue(monkeypatch, TITLE)
+    sub = _sub(tmp_path, "")
+    args = ["validate", str(sub), "--dont-check-links", "--dont-check-references"]
+    assert main(args) == 1
+    out = capsys.readouterr().out
+    assert "Format for initial submission" in out
+    assert main(args + ["--initial-submission", "-o", str(tmp_path / "r.pdf")]) == 0
+    out = capsys.readouterr().out
+    assert "as an initial submission (1 error(s) shown as warnings)" in out
+    assert (tmp_path / "r.pdf").read_bytes().startswith(b"%PDF-")
+
+
+def test_real_any_format_venues_carry_the_rule():
+    for slug in ("nature", "cell", "plos_compbio", "pnas", "bioinformatics"):
+        assert r.any_format_initial_rule(slug), slug
+    for slug in ("biorxiv", "arxiv", "science"):
+        assert not r.any_format_initial_rule(slug), slug

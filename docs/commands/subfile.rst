@@ -7,7 +7,7 @@ submission.
 .. code-block:: text
 
    usage: paperpush subfile [-h] [-v] [-q] [-o OUTPUT] [--fill-defaults]
-                            [--dont-fill-defaults] [--force]
+                            [--dont-fill-defaults] [--force] [--venue-order]
                             venue
 
 Synopsis
@@ -25,6 +25,30 @@ allowed options. Fill in the values, then move on to :doc:`autofill` or
 :doc:`validate`.
 
 Lines beginning with ``#`` are comments and are ignored when the file is read.
+
+Field order
+-----------
+
+Every venue's template lists its fields under the same section headings, in the
+same order, so ``.sub`` files for different venues line up and can be compared
+side by side:
+
+1. Manuscript type (article type, target journal, revision status)
+2. Files (manuscript, figures, tables, supplements, cover letter)
+3. Manuscript details (title, short title, abstract, keywords, subject areas)
+4. Authors
+5. Reviewers and editors
+6. Declarations (funding, competing interests, data and code availability,
+   consent checkboxes)
+7. Additional information
+
+Within a section, fields that many venues share come first, in a fixed order
+(e.g. title, then short title, then abstract), followed by the venue's own
+fields in the order its portal asks for them. A follow-up question (such as a
+previous DOI when the manuscript is a revision) always comes after the question
+it depends on. Pass ``--venue-order`` to list the fields in the order the
+venue's portal asks for them instead, with no section headings. The order never
+changes what ``validate`` or ``submit`` do: fields are read by id.
 
 Arguments
 ---------
@@ -52,6 +76,17 @@ Options
    Overwrite an existing ``.sub`` file. Without this flag, ``subfile`` refuses
    to clobber a file that already exists.
 
+``--web``
+   After writing the template, open it in the paperpush web page on this
+   computer (served on 127.0.0.1 until Ctrl-C) to fill it in through a form.
+   Every edit is saved to the ``.sub`` file. If the file already exists, it is
+   opened instead of refused. Needs ``pip install 'paperpush[web]'``.
+
+``--venue-order``
+   List the fields in the order the venue's submission form asks for them,
+   instead of grouped into the sections every venue shares (see `Field order`_).
+   Handy when filling the template while looking at the portal.
+
 Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags.
 
 Examples
@@ -74,6 +109,12 @@ Create a bare template with no defaults pre-filled:
 .. code-block:: bash
 
    paperpush subfile biorxiv --dont-fill-defaults
+
+List the fields in the portal's own order:
+
+.. code-block:: bash
+
+   paperpush subfile nature --venue-order
 
 See also
 --------

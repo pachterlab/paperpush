@@ -161,6 +161,7 @@ class ManuscriptRules:
     latex_class: Annotated[Optional[str], PField(description="Required LaTeX document class or style file.")] = None
     template_layout: Annotated[Optional[TemplateLayout], PField(description="Geometry of the compiled template, checked against the manuscript PDF to catch shrunken margins, font, or line spacing.")] = None
     language: Annotated[Optional[str], PField(description="Mandated language variant, if any.")] = None
+    initial_submission_any_format: Annotated[Optional[str], PField(description="Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key, one per string.")] = _notes()
 
 
@@ -703,6 +704,20 @@ def resolve(reqs: ManuscriptRequirements, values: dict[str, str]) -> ManuscriptR
     merged = merge_entries(base, override)
     merged.pop("article_types", None)
     return ManuscriptRequirements.from_dict(reqs.slug, merged)
+
+
+def any_format_initial_rule(slug: str, values: Optional[dict[str, str]] = None) -> str:
+    """The venue's "any format at initial submission" rule, or "" if it has none.
+
+    Reads ``manuscript.initial_submission_any_format`` for the article type
+    ``values`` selects (the top-level rules when ``values`` is None).
+    """
+    reqs = get_requirements(slug)
+    if reqs is None:
+        return ""
+    if values is not None:
+        reqs = resolve(reqs, values)
+    return (reqs.manuscript.initial_submission_any_format or "").strip()
 
 
 def heading_aliases(kind: str) -> dict[str, list[str]]:

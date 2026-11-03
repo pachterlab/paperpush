@@ -141,6 +141,10 @@ named the venue, use it; otherwise infer or ask per the inputs below.
    paperpush autofill <venue>.sub -d <manuscript-dir> --engine manual --values values.json
    ```
 
+   `-d` takes several directories and/or documents if the files are spread
+   out (e.g. `-d <ms-dir> <figures-dir> <cover-letter.docx>`); it stops at the
+   next flag or the first `.sub` file.
+
    Add `--dry-run` first if you want to preview without writing. The command
    prints a summary of what was filled, what needs review, and what was left for
    the user, and re-validates the result.

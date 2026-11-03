@@ -3,13 +3,45 @@
 #
 # Edit the values below, then run:  paperpush submit iclr_2027.sub
 # Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web iclr_2027.sub   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
 
 @venue: iclr_2027
 # submission guide: https://iclr.cc/Conferences/2027/AuthorGuidelines
+# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
+# in the order the venue's submission form asks for them instead.
+
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
+
+# Supplementary material (file, optional)
+#   Optional. All supplementary material must be self-contained and zipped into a single file. It is visible to reviewers and the public throughout and after the review period, so it must be anonymized. Maximum 100 MB.
+#   each file at most 100 MB
+supplementary_material: 
+
+# ----------------------------------------------------------------------
+# Manuscript details
+# ----------------------------------------------------------------------
 
 # Title (text, REQUIRED)
 #   The full title of the paper. TeX formulas are supported with $In-line Formula$ or $$Block Formula$$.
 title: Title goes here
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract of the paper. Must be one paragraph. TeX formulas are supported with $In-line Formula$ or $$Block Formula$$.
+abstract: |
+  Abstract goes here. It's a really good abstract.
+
+# Keywords (text, REQUIRED)
+#   Comma-separated list of keywords describing the paper.
+keywords: representation learning, benchmarks, reproducibility
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
 
 # Authors (authorlist, REQUIRED)
 #   One author per line, in order. Format: Open Review ID | Name | Email suffixes | Reciprocal Reviewer(yes/no). Every author must already have an OpenReview profile. If Open Review ID is added, then name and email suffixes are optional. Each author is added to the OpenReview author page by a profile search on the Name column, so the name must match the author's OpenReview profile. Email suffixes should be comma-separated, in decreasing order of likelihood of association with the author. Mark the author(s) who agree to register as a reviewer to satisfy ICLR's reciprocal reviewing requirement with 'yes' in the Reciprocal Reviewer column; they are selected from the form's Reciprocal Reviewing Author dropdown, which lists authors by name, so a reciprocal reviewer must carry a Name even when an Open Review ID is given. Check eligibility at https://openreview.net/group?id=ICLR.cc/2027/Conference/Reciprocal_Reviewing_Check. At least one author is required.
@@ -17,30 +49,25 @@ authors: |
    | Joseph Rich | caltech.edu, usc.edu | yes
    | Lior Pachter | caltech.edu | no
 
-# Keywords (text, REQUIRED)
-#   Comma-separated list of keywords describing the paper.
-keywords: representation learning, benchmarks, reproducibility
+# ----------------------------------------------------------------------
+# Additional information
+# ----------------------------------------------------------------------
+
+# License (choice, REQUIRED)
+#   Distribution license for the submission. ICLR 2027 offers only CC BY 4.0.
+#   options: CC BY 4.0
+license: CC BY 4.0
 
 # TL;DR (text, optional)
 #   Optional. A one-sentence summary of the paper ("too long; didn't read").
 #   at most 250 characters
 tldr: A one-sentence summary of the paper.
 
-# Abstract (textarea, REQUIRED)
-#   Plain-text abstract of the paper. Must be one paragraph. TeX formulas are supported with $In-line Formula$ or $$Block Formula$$.
-abstract: |
-  Abstract goes here. It's a really good abstract.
-
 # PDF (file, optional)
 #   The paper PDF, at most 50 MB. The main text must fit in 9 pages; page counting stops at the first heading ICLR excludes from that limit -- the references, the reproducibility / ethics / AI-use statements, the acknowledgements, or the appendix -- so everything from there on is unlimited. The headings are matched by name (see main_text_end_headings), so an unusually worded one is counted as main text; check the page count yourself if validation flags a paper you believe is within the limit.
 #   at most 9 pages in the main text
 #   each file at most 50 MB
 pdf_file: tests/manuscript_files/iclr_2027/manuscript.pdf
-
-# Supplementary material (file, optional)
-#   Optional. All supplementary material must be self-contained and zipped into a single file. It is visible to reviewers and the public throughout and after the review period, so it must be anonymized. Maximum 100 MB.
-#   each file at most 100 MB
-supplementary_material: 
 
 # Primary area (choice, REQUIRED)
 #   The closest area the submission falls into, chosen from the ICLR 2027 primary-area list (_assets/iclr_2027_primary_areas.txt). Use the full label as it appears in the dropdown.
@@ -68,10 +95,5 @@ reciprocal_reviewing_exemption_reason: |
 ai_assistance: |
   Yes, to aid or polish writing. Details are described in the paper.
   Yes, for retrieval and discovery (e.g., finding related work). Details are described in the paper.
-
-# License (choice, REQUIRED)
-#   Distribution license for the submission. ICLR 2027 offers only CC BY 4.0.
-#   options: CC BY 4.0
-license: CC BY 4.0
 
 # vim: set filetype=yaml :

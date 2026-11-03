@@ -3,9 +3,41 @@
 #
 # Edit the values below, then run:  paperpush submit arxiv.sub
 # Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web arxiv.sub   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
 
 @venue: arxiv
 # submission guide: https://info.arxiv.org/help/submit/index.html
+# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
+# in the order the venue's submission form asks for them instead.
+
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
+
+# Manuscript file (file, REQUIRED)
+#   Path to the submission. arXiv prefers a LaTeX source bundle (a .zip or .tar.gz of the .tex, figures, and .bbl); a single PDF is accepted for PDF-only submissions. The file is uploaded, processed, and confirmed on the Files step.
+manuscript_file: 
+
+# Keep all uploaded files (boolean, optional)
+#   Only applies to LaTeX source submissions (.tex/.zip). Set to yes to keep every file in the uploaded bundle, including any arXiv's processor flags as removable (e.g. a bundled .pdf or auxiliary files); set to no to let arXiv delete the files it auto-selects for removal.
+keep_all_files: 
+
+# ----------------------------------------------------------------------
+# Manuscript details
+# ----------------------------------------------------------------------
+
+# Title (text, REQUIRED)
+#   The full title of the article.
+title: 
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract as it should appear on the arXiv abstract page.
+#   at least 20 characters
+abstract: |
+  
 
 # Primary archive (choice, REQUIRED)
 #   The top-level arXiv archive your work belongs to. This is the value of the submission form's archive drop-down (#select_arch), so use the archive code (e.g. 'cs' for Computer Science, 'q-bio' for Quantitative Biology, 'stat' for Statistics).
@@ -28,34 +60,6 @@ crosslist_archives:
 #   select 0-any, comma-separated
 #   options: run 'paperpush options arxiv.crosslist_categories' to list the choices
 crosslist_categories: 
-
-# License (choice, REQUIRED)
-#   Distribution license for the submission. The arXiv perpetual, non-exclusive license is the minimum arXiv requires; the Creative Commons options grant broader reuse. The runner selects the matching radio on the license step; it is shown again on the review page, so you can confirm it before the final submit.
-#   options: arXiv.org perpetual, non-exclusive license 1.0 | CC BY 4.0 | CC BY-SA 4.0 | CC BY-NC-SA 4.0 | CC BY-NC-ND 4.0 | CC0 1.0
-license: 
-
-# Title (text, REQUIRED)
-#   The full title of the article.
-title: 
-
-# Authors (authorlist, REQUIRED)
-#   One author per line, in order. Format: Name. The arXiv metadata form has a single *Author(s) box that takes a comma-separated list of names, so a name is all that is recorded -- no emails, affiliations, ORCIDs, or corresponding-author marker. Use the form 'Firstname Lastname' for each name (first names first, no 'et al.').
-authors: |
-  
-
-# Abstract (textarea, REQUIRED)
-#   Plain-text abstract as it should appear on the arXiv abstract page.
-#   at least 20 characters
-abstract: |
-  
-
-# Manuscript file (file, REQUIRED)
-#   Path to the submission. arXiv prefers a LaTeX source bundle (a .zip or .tar.gz of the .tex, figures, and .bbl); a single PDF is accepted for PDF-only submissions. The file is uploaded, processed, and confirmed on the Files step.
-manuscript_file: 
-
-# Keep all uploaded files (boolean, optional)
-#   Only applies to LaTeX source submissions (.tex/.zip). Set to yes to keep every file in the uploaded bundle, including any arXiv's processor flags as removable (e.g. a bundled .pdf or auxiliary files); set to no to let arXiv delete the files it auto-selects for removal.
-keep_all_files: 
 
 # Comments (textarea, optional)
 #   Optional. Free-text comments shown on the abstract page, conventionally the page/figure count and notes (e.g. '10 pages, 4 figures; submitted to JOSS').
@@ -81,5 +85,23 @@ msc_class:
 # DOI (text, optional)
 #   Optional. DOI of a published version of this article, if one exists.
 doi: 
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name. The arXiv metadata form has a single *Author(s) box that takes a comma-separated list of names, so a name is all that is recorded -- no emails, affiliations, ORCIDs, or corresponding-author marker. Use the form 'Firstname Lastname' for each name (first names first, no 'et al.').
+authors: |
+  
+
+# ----------------------------------------------------------------------
+# Additional information
+# ----------------------------------------------------------------------
+
+# License (choice, REQUIRED)
+#   Distribution license for the submission. The arXiv perpetual, non-exclusive license is the minimum arXiv requires; the Creative Commons options grant broader reuse. The runner selects the matching radio on the license step; it is shown again on the review page, so you can confirm it before the final submit.
+#   options: arXiv.org perpetual, non-exclusive license 1.0 | CC BY 4.0 | CC BY-SA 4.0 | CC BY-NC-SA 4.0 | CC BY-NC-ND 4.0 | CC0 1.0
+license: 
 
 # vim: set filetype=yaml :

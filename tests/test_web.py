@@ -56,7 +56,7 @@ def _filled_template(**values: str) -> str:
 
 def test_index_and_static_assets_are_served(client):
     assert "paperpush" in client.get("/").text
-    for asset in ("app.js", "subfile.js", "checks.js", "style.css"):
+    for asset in ("app.js", "subfile.js", "checks.js", "viewer.js", "style.css"):
         assert client.get(f"/static/{asset}").status_code == 200
 
 
@@ -207,6 +207,10 @@ def test_validate_resolves_uploads_and_hides_workspace_paths(client, ws):
     assert not res["ok"]
     # Network checks are off in these tests, and the note says so in the page's words.
     assert by_id["integrity.links"]["detail"] == "switched off on this server"
+    # The text report behind "Download validate file", with workspace paths hidden too.
+    assert "file not found" not in res["report_text"]
+    assert "title" in res["report_text"]
+    assert ws not in res["report_text"]
 
 
 def test_ai_checks_and_autofill_refuse_without_an_api_key(tmp_path, monkeypatch):
@@ -485,6 +489,40 @@ def _live_cases():
     return cases
 
 
+_SHARE_HARNESS = """
+const sub = require(process.argv[1]);
+const texts = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+(async () => {
+  const out = [];
+  for (const t of texts) {
+    const code = await sub.toShareCode(t);
+    out.push({ code, back: await sub.fromShareCode(code) });
+  }
+  process.stdout.write(JSON.stringify(out));
+})();
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs Node.js")
+def test_subfile_js_share_code_round_trips():
+    """A share link's code must give back the exact .sub, and stay URL-safe."""
+    texts = [
+        _filled_template(title="Ünïcødé — title", abstract="line 1\n\nline 2 with + / = signs"),
+        "",
+        "@venue: biorxiv\n" + "x" * 100_000,  # larger than one String.fromCharCode chunk
+    ]
+    proc = subprocess.run(
+        ["node", "-e", _SHARE_HARNESS, str(SUBFILE_JS)],
+        input=json.dumps(texts),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    for text, out in zip(texts, json.loads(proc.stdout)):
+        assert out["back"] == text
+        assert all(c.isalnum() or c in "-_" for c in out["code"])
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="needs Node.js")
 def test_checks_js_matches_validate_py():
     import dataclasses
@@ -541,3 +579,376 @@ def test_checks_js_matches_validate_py():
             # The page leaves a guideline check it has no limits for as not applicable; validate calls it passed.
             if not (check_id == "guidelines.text_fields" and have["status"] == "not_applicable"):
                 assert have["status"] == want["status"], f"{venue.slug} {check_id}"
+
+
+# --- opening a .sub or a .zip ---------------------------------------------
+
+
+def _zip(members: dict[str, bytes]) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in members.items():
+            zf.writestr(name, data)
+    return buf.getvalue()
+
+
+def test_import_a_sub_returns_its_text_without_storing_it(client, ws):
+    text = _filled_template()
+    res = client.post(f"/api/workspaces/{ws}/import", files=[("files", ("biorxiv.sub", text.encode(), "text/plain"))]).json()
+    assert res["subs"] == [{"name": "biorxiv.sub", "text": text}]
+    assert res["files"] == []
+
+
+def test_import_a_zip_unpacks_it_flat_and_returns_its_sub(client, ws, tmp_path):
+    text = _filled_template(manuscript_file="paper/manuscript.pdf")
+    data = _zip(
+        {
+            "paper/biorxiv.sub": text.encode(),
+            "paper/manuscript.pdf": b"%PDF-1.4",
+            "paper/figures/fig1.png": b"png",
+            "paper/supp/fig1.png": b"other",  # same name: skipped
+            "__MACOSX/paper/._manuscript.pdf": b"junk",
+            "paper/.DS_Store": b"junk",
+            "../../escape.pdf": b"x",  # '..' parts: dropped
+        }
+    )
+    res = client.post(f"/api/workspaces/{ws}/import", files=[("files", ("paper.zip", data, "application/zip"))]).json()
+    assert [s["text"] for s in res["subs"]] == [text]
+    assert sorted(res["saved"]) == ["fig1.png", "manuscript.pdf"]
+    assert "paper/figures/fig1.png" in res["paths"]
+    assert [s["name"] for s in res["skipped"]] == ["paper/supp/fig1.png"]
+    assert sorted(f["name"] for f in res["files"]) == ["fig1.png", "manuscript.pdf"]
+    assert not list(tmp_path.rglob("escape.pdf"))
+    # The .sub's folder paths resolve to the unpacked files.
+    v = client.post(f"/api/workspaces/{ws}/validate", json={"text": text}).json()
+    assert "manuscript.pdf" not in json.dumps([c for c in v["checks"] if c.get("status") == "failed" and "not found" in c.get("detail", "")])
+
+
+def test_import_a_bundle_downloaded_here_round_trips(client, ws):
+    client.post(f"/api/workspaces/{ws}/files", files=[("files", ("manuscript.pdf", b"%PDF-1.4", "application/pdf"))])
+    text = _filled_template(manuscript_file="manuscript.pdf")
+    bundle = client.post(f"/api/workspaces/{ws}/bundle", json={"text": text}).content
+    other = client.post("/api/workspaces").json()["id"]
+    res = client.post(f"/api/workspaces/{other}/import", files=[("files", ("b.zip", bundle, "application/zip"))]).json()
+    assert res["subs"][0]["text"] == text
+    assert res["saved"] == ["manuscript.pdf"]
+
+
+def test_import_refuses_other_files_bad_zips_and_zips_over_the_cap(tmp_path):
+    settings = Settings(data_dir=tmp_path / "web", max_workspace_mb=0.001, network_checks=False)
+    with TestClient(create_app(settings)) as c:
+        ws_id = c.post("/api/workspaces").json()["id"]
+        url = f"/api/workspaces/{ws_id}/import"
+        assert c.post(url, files=[("files", ("paper.pdf", b"x", "application/pdf"))]).status_code == 400
+        assert c.post(url, files=[("files", ("bad.zip", b"not a zip", "application/zip"))]).status_code == 400
+        # Small compressed, large unpacked: refused on the bytes actually unpacked.
+        bomb = _zip({"big.bin": b"0" * 50_000})
+        assert len(bomb) < 1024
+        assert c.post(url, files=[("files", ("bomb.zip", bomb, "application/zip"))]).status_code == 413
+        assert c.get(f"/api/workspaces/{ws_id}").json()["files"] == []
+
+
+def test_match_places_files_by_name(client):
+    res = client.post(
+        "/api/venues/nature/match",
+        json={"paths": ["x/manuscript.docx", "x/figures/Fig1.pdf", "x/cover_letter.pdf", "x/notes.md"]},
+    ).json()
+    assert res["assignments"] == {
+        "manuscript_file": "manuscript.docx",
+        "figure_files": "Fig1.pdf",
+        "cover_letter": "cover_letter.pdf",
+    }
+    assert [m["name"] for m in res["unmatched"]] == ["notes.md"]
+    assert client.post("/api/venues/nope/match", json={"paths": []}).status_code == 404
+
+
+# --- local sessions (paperpush <command> --web) ------------------------------
+
+
+@pytest.fixture
+def local_client(tmp_path, monkeypatch):
+    from paperpush.web.app import LocalSession
+
+    monkeypatch.chdir(tmp_path)
+    paper = tmp_path / "paper"
+    paper.mkdir()
+    shutil.copy(MANUSCRIPT, paper / "manuscript.pdf")
+    sub_path = tmp_path / "biorxiv.sub"
+    sub_path.write_text(_filled_template(manuscript_file="paper/manuscript.pdf"), encoding="utf-8")
+    local = LocalSession(sub_path=sub_path, root=tmp_path, manuscript_dirs=(paper,), action="validate")
+    settings = Settings(data_dir=tmp_path / "web", network_checks=False, local=local)
+    with TestClient(create_app(settings)) as c:
+        c.headers["X-Paperpush-Token"] = local.token
+        yield c, local
+
+
+def test_local_endpoints_need_the_session_token(local_client, client):
+    c, local = local_client
+    assert c.get("/api/local", headers={"X-Paperpush-Token": "wrong"}).status_code == 403
+    assert c.post("/api/workspaces/local/plan", json={"text": local.sub_path.read_text()}, headers={"X-Paperpush-Token": ""}).status_code == 403
+    # The hosted site has no local session at all.
+    assert client.get("/api/local", headers={"X-Paperpush-Token": "x"}).status_code == 404
+    assert client.get("/api/workspaces/local").status_code == 404
+
+
+def test_local_session_reads_and_saves_the_sub_file(local_client):
+    c, local = local_client
+    data = c.get("/api/local").json()
+    assert data["path"] == "biorxiv.sub"
+    assert data["venue"] == VENUE and data["action"] == "validate"
+    assert data["text"] == local.sub_path.read_text()
+    assert "paper/manuscript.pdf" in {f["name"] for f in data["files"]}
+    assert c.get("/api/info").json()["local"] is True
+
+    edited = replace_scalar(data["text"], "title", "A local title")
+    assert c.put("/api/local", json={"text": edited}).json()["saved"]
+    assert local.sub_path.read_text() == edited
+    # Text that is not a .sub never overwrites the file.
+    assert c.put("/api/local", json={"text": "nonsense"}).status_code == 400
+    assert local.sub_path.read_text() == edited
+
+
+def test_local_validate_resolves_paths_against_the_working_directory(local_client):
+    c, local = local_client
+    res = c.post("/api/workspaces/local/validate", json={"text": local.sub_path.read_text()}).json()
+    blob = json.dumps(res)
+    assert str(local.root) not in blob
+    # paper/manuscript.pdf is relative to the working directory, as on the CLI, and found there.
+    manuscript_issues = [i for chk in res["checks"] for i in chk.get("issues", []) if i.get("field") == "manuscript_file" and i.get("level") == "error"]
+    assert not manuscript_issues, manuscript_issues
+
+
+def test_local_uploads_land_beside_the_manuscript_and_nothing_is_deleted(local_client):
+    c, local = local_client
+    res = c.post("/api/workspaces/local/files", files=[("files", ("cover.pdf", b"%PDF-1.4", "application/pdf"))]).json()
+    assert res["saved"] == ["paper/cover.pdf"]
+    assert (local.root / "paper" / "cover.pdf").is_file()
+    assert c.delete("/api/workspaces/local/files/cover.pdf").status_code == 403
+    assert c.delete("/api/workspaces/local").json() == {"deleted": False}
+    assert (local.root / "paper" / "cover.pdf").is_file()
+    assert c.post("/api/workspaces/local/bundle", json={"text": local.sub_path.read_text()}).status_code == 400
+
+
+def test_local_ai_falls_back_to_the_environment_key(local_client, monkeypatch):
+    from paperpush.web.app import visitor_llm
+
+    for var in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    settings = Settings(data_dir=Path("."))
+    with pytest.raises(Exception):
+        visitor_llm(settings, None, None, "autofill", local=True)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    assert visitor_llm(settings, None, None, "autofill", local=True) == ("anthropic", None)
+    # The hosted site still insists on the visitor's own key.
+    with pytest.raises(Exception):
+        visitor_llm(settings, None, None, "autofill")
+
+
+@pytest.fixture
+def served(monkeypatch):
+    """Record what ``--web`` would serve instead of starting a server."""
+    calls = []
+    import paperpush.web.app as web_app
+
+    monkeypatch.setattr(web_app, "serve_local", lambda sub_path, **kw: calls.append((Path(sub_path), kw)) or 0)
+    return calls
+
+
+def test_subfile_web_writes_the_template_then_opens_it(tmp_path, monkeypatch, served):
+    from paperpush.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    assert main(["subfile", VENUE, "--web"]) == 0
+    assert (tmp_path / "biorxiv.sub").is_file()
+    assert served == [(Path("biorxiv.sub"), {"manuscript_dirs": (), "action": None})]
+    # Run again, the existing file is opened rather than refused.
+    (tmp_path / "biorxiv.sub").write_text("@venue: biorxiv\nmine\n")
+    assert main(["subfile", VENUE, "--web"]) == 0
+    assert (tmp_path / "biorxiv.sub").read_text() == "@venue: biorxiv\nmine\n"
+    assert len(served) == 2
+
+
+def test_validate_web_opens_the_page_to_validate(tmp_path, monkeypatch, served):
+    from paperpush.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "biorxiv.sub").write_text(_filled_template())
+    assert main(["validate", "biorxiv.sub", "--web"]) == 0
+    assert main(["validate", "biorxiv.sub", "--web", "--ai"]) == 0
+    assert [kw["action"] for _, kw in served] == ["validate", "validate-ai"]
+
+
+def test_autofill_web_without_values_lets_the_page_autofill(tmp_path, monkeypatch, served):
+    from paperpush.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    paper = tmp_path / "paper"
+    paper.mkdir()
+    shutil.copy(MANUSCRIPT, paper / "manuscript.pdf")
+    assert main(["autofill", "-d", "paper", "biorxiv.sub", "--web"]) == 0
+    sub = parse((tmp_path / "biorxiv.sub").read_text())
+    assert sub.venue == VENUE
+    assert sub.values["manuscript_file"] == "paper/manuscript.pdf"
+    (path, kw), = served
+    assert path == Path("biorxiv.sub") and kw["action"] == "autofill"
+    assert kw["manuscript_dirs"] == (Path("paper"),)
+
+
+def test_venue_detail_says_whether_the_initial_submission_may_be_in_any_format(client):
+    assert client.get("/api/venues/nature").json()["initial_submission_rule"]
+    assert client.get(f"/api/venues/{VENUE}").json()["initial_submission_rule"] == ""
+
+
+def test_validate_as_initial_submission_turns_errors_into_warnings(client, ws):
+    text = _filled_template(manuscript_file="manuscript.pdf")
+    res = client.post(f"/api/workspaces/{ws}/validate", json={"text": text}).json()
+    assert _checks(res)["files.uploads"]["status"] == "failed" and not res["ok"]
+    assert res["initial_submission"] is False and res["downgraded"] == 0
+    res = client.post(f"/api/workspaces/{ws}/validate", json={"text": text, "initial_submission": True}).json()
+    uploads = _checks(res)["files.uploads"]
+    assert uploads["status"] == "warning"
+    assert {i["level"] for i in uploads["issues"]} == {"warning"}
+    assert res["ok"] and res["counts"]["failed"] == 0 and res["downgraded"] >= 1
+
+
+def test_validate_web_initial_submission_ticks_the_box(tmp_path, monkeypatch, served):
+    from paperpush.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "biorxiv.sub").write_text(_filled_template())
+    assert main(["validate", "biorxiv.sub", "--web", "--initial-submission"]) == 0
+    assert main(["validate", "biorxiv.sub", "--web", "--ai", "--initial-submission"]) == 0
+    assert [kw["action"] for _, kw in served] == ["validate+initial", "validate-ai+initial"]
+
+
+# --- shared forms ------------------------------------------------------------
+
+SHARED_JS = STATIC / "shared.js"
+_TOKEN = "t" * 43
+_HDR = {"X-Paperpush-Share-Token": _TOKEN}
+
+
+def test_shared_form_create_get_update(client):
+    assert client.get("/api/info").json()["shared"] == {"durable": False, "ttl_days": 90.0}
+    made = client.post("/api/shared", json={"ciphertext": "AAAA", "token": _TOKEN}).json()
+    assert made["version"] == 1
+    path = f"/api/shared/{made['id']}"
+    assert client.get(path).json()["ciphertext"] == "AAAA"
+    # Asking with the version you already have returns no ciphertext.
+    assert "ciphertext" not in client.get(path, params={"known": 1}).json()
+
+    res = client.put(path, json={"ciphertext": "BBBB", "base_version": 1}, headers=_HDR)
+    assert res.status_code == 200 and res.json()["version"] == 2
+    assert client.get(path).json()["ciphertext"] == "BBBB"
+
+
+def test_shared_form_stale_update_gets_409_with_current(client):
+    made = client.post("/api/shared", json={"ciphertext": "AAAA", "token": _TOKEN}).json()
+    path = f"/api/shared/{made['id']}"
+    client.put(path, json={"ciphertext": "BBBB", "base_version": 1}, headers=_HDR)
+    res = client.put(path, json={"ciphertext": "CCCC", "base_version": 1}, headers=_HDR)
+    assert res.status_code == 409
+    assert res.json()["current"]["version"] == 2
+    assert res.json()["current"]["ciphertext"] == "BBBB"
+
+
+def test_shared_form_needs_its_token_to_change_or_delete(client):
+    made = client.post("/api/shared", json={"ciphertext": "AAAA", "token": _TOKEN}).json()
+    path = f"/api/shared/{made['id']}"
+    wrong = {"X-Paperpush-Share-Token": "w" * 43}
+    assert client.put(path, json={"ciphertext": "BBBB", "base_version": 1}, headers=wrong).status_code == 403
+    assert client.put(path, json={"ciphertext": "BBBB", "base_version": 1}).status_code == 403
+    assert client.delete(path, headers=wrong).status_code == 403
+    assert client.delete(path, headers=_HDR).status_code == 200
+    assert client.get(path).status_code == 404
+
+
+def test_shared_form_rejects_bad_input(client):
+    assert client.post("/api/shared", json={"ciphertext": "not base64url!", "token": _TOKEN}).status_code == 400
+    assert client.post("/api/shared", json={"ciphertext": "AAAA", "token": "short"}).status_code == 403
+    assert client.get("/api/shared/../../etc").status_code == 404
+    assert client.get("/api/shared/" + "x" * 24).status_code == 404
+
+
+def test_shared_forms_expire(tmp_path):
+    from paperpush.web.shared import SharedForms
+
+    store = SharedForms(sqlite_path=tmp_path / "s.sqlite3", ttl_days=1)
+    form = store.create("AAAA", _TOKEN)
+    assert store.sweep() == 0
+    with store._connect() as conn:
+        conn.execute("UPDATE shared_forms SET updated_at = 0 WHERE id = ?", (form["id"],))
+    assert store.sweep() == 1
+
+
+def test_shared_forms_are_off_for_local_sessions_and_when_disabled(tmp_path):
+    settings = Settings(data_dir=tmp_path / "web", network_checks=False, shared=False)
+    with TestClient(create_app(settings)) as c:
+        assert c.get("/api/info").json()["shared"] is None
+        assert c.post("/api/shared", json={"ciphertext": "AAAA", "token": _TOKEN}).status_code == 404
+
+
+_MERGE_HARNESS = """
+const sub = require(process.argv[1]);
+const cases = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+const fields = new Map([["title", {id: "title", type: "text"}], ["abstract", {id: "abstract", type: "textarea"}]]);
+process.stdout.write(JSON.stringify(cases.map(c => sub.mergeFields(c.base, c.mine, c.theirs, fields))));
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs Node.js")
+def test_subfile_js_merge_fields():
+    base = _filled_template(title="T0", abstract="A0")
+    mine_title = replace_scalar(base, "title", "T-mine")
+    theirs_abs = replace_block(base, "abstract", "A-theirs\n\nsecond paragraph")
+    theirs_title = replace_scalar(base, "title", "T-theirs")
+    cases = [
+        # Different fields: both kept.
+        {"base": base, "mine": mine_title, "theirs": theirs_abs},
+        # Same field, different values: a conflict, mine kept for now.
+        {"base": base, "mine": mine_title, "theirs": theirs_title},
+        # Nothing of mine: theirs as-is.
+        {"base": base, "mine": base, "theirs": theirs_abs},
+    ]
+    proc = subprocess.run(["node", "-e", _MERGE_HARNESS, str(SUBFILE_JS)], input=json.dumps(cases), capture_output=True, text=True, check=True)
+    both, clash, plain = json.loads(proc.stdout)
+
+    assert parse(both["text"]).values["title"] == "T-mine"
+    assert parse(both["text"]).values["abstract"] == "A-theirs\n\nsecond paragraph"
+    assert both["conflicts"] == []
+
+    assert parse(clash["text"]).values["title"] == "T-mine"
+    assert clash["conflicts"] == [{"id": "title", "mine": "T-mine", "theirs": "T-theirs"}]
+
+    assert plain["text"] == theirs_abs and plain["conflicts"] == []
+
+
+_CRYPTO_HARNESS = """
+const sc = require(process.argv[1]);
+(async () => {
+  const key = sc.newKey();
+  const a = await sc.derive(key), b = await sc.derive(key), other = await sc.derive(sc.newKey());
+  const text = "@venue: biorxiv\\ntitle: Ünïcødé " + "x".repeat(50000) + "\\n";
+  const ct = await sc.encrypt(text, a.aes);
+  let wrongKeyFails = false;
+  try { await sc.decrypt(ct, other.aes); } catch { wrongKeyFails = true; }
+  process.stdout.write(JSON.stringify({
+    key, ct, back: (await sc.decrypt(ct, b.aes)) === text,
+    sameToken: a.token === b.token, otherToken: a.token !== other.token, token: a.token,
+    fresh: ct !== await sc.encrypt(text, a.aes), wrongKeyFails,
+    leaks: ct.includes("biorxiv"),
+  }));
+})();
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs Node.js")
+def test_shared_js_encrypts_and_derives_tokens():
+    out = json.loads(subprocess.run(["node", "-e", _CRYPTO_HARNESS, str(SHARED_JS)], capture_output=True, text=True, check=True).stdout)
+    assert out["back"] and out["sameToken"] and out["otherToken"] and out["fresh"] and out["wrongKeyFails"]
+    assert not out["leaks"]
+    # What the page sends must pass the server's format checks.
+    from paperpush.web.shared import check_ciphertext, check_token
+
+    check_ciphertext(out["ct"])
+    check_token(out["token"])

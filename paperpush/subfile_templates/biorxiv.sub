@@ -3,9 +3,27 @@
 #
 # Edit the values below, then run:  paperpush submit biorxiv.sub
 # Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web biorxiv.sub   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
 
 @venue: biorxiv
 # submission guide: https://www.biorxiv.org/submit-a-manuscript
+# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
+# in the order the venue's submission form asks for them instead.
+
+# ----------------------------------------------------------------------
+# Manuscript type
+# ----------------------------------------------------------------------
+
+# Is this a revision of an existing bioRxiv preprint? (boolean, optional)
+#   Set to yes if submitting a revised version of a preprint already on bioRxiv.
+is_revision: 
+
+# DOI of the existing preprint (if a revision) (text, optional)
+#   Only needed when is_revision is yes.
+previous_doi: 
 
 # Type of result (choice, REQUIRED)
 #   bioRxiv categorizes manuscripts by how the results relate to prior work.
@@ -22,24 +40,9 @@ server_suitability:
 #   options: Announcements/Application notes without analyses/data | Perspectives article | Proposal/Guidelines | Narrative review | Research article with data
 article_scope: 
 
-# Subject category / collection (choice, REQUIRED)
-#   Select the single category that best describes your findings.
-#   options: Animal Behavior and Cognition | Biochemistry | Bioengineering | Bioinformatics | Biophysics | Cancer Biology | Cell Biology | Clinical Trials | Developmental Biology | Ecology | Epidemiology | Evolutionary Biology | Genetics | Genomics | Immunology | Microbiology | Molecular Biology | Neuroscience | Paleontology | Pathology | Pharmacology and Toxicology | Physiology | Plant Biology | Scientific Communication and Education | Synthetic Biology | Systems Biology | Zoology
-subject_category: 
-
-# Manuscript title (text, REQUIRED)
-#   The full title of the manuscript.
-title: 
-
-# Abstract (textarea, REQUIRED)
-#   Plain-text abstract as it should appear on the bioRxiv abstract page.
-abstract: |
-  
-
-# Authors (authorlist, REQUIRED)
-#   One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). Mark exactly one author as the corresponding author.
-authors: |
-  
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
 
 # Manuscript file (file, REQUIRED)
 #   Path to the manuscript. Accepted formats: PDF, Word (.docx), or a LaTeX source bundle.
@@ -56,19 +59,45 @@ figure_files: |
 supplementary_files: |
   
 
-# License / reuse terms (choice, REQUIRED)
-#   Distribution license under which the preprint is posted.
-#   options: CC-BY | CC-BY-NC | CC-BY-ND | CC-BY-NC-ND | CC0 | No reuse without permission
-license: 
+# ----------------------------------------------------------------------
+# Manuscript details
+# ----------------------------------------------------------------------
 
-# Competing interest statement (textarea, REQUIRED)
-#   Declare any competing interests. Enter 'The authors have declared no competing interest.' if none.
-competing_interest: |
+# Manuscript title (text, REQUIRED)
+#   The full title of the manuscript.
+title: 
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract as it should appear on the bioRxiv abstract page.
+abstract: |
   
+
+# Subject category / collection (choice, REQUIRED)
+#   Select the single category that best describes your findings.
+#   options: Animal Behavior and Cognition | Biochemistry | Bioengineering | Bioinformatics | Biophysics | Cancer Biology | Cell Biology | Clinical Trials | Developmental Biology | Ecology | Epidemiology | Evolutionary Biology | Genetics | Genomics | Immunology | Microbiology | Molecular Biology | Neuroscience | Paleontology | Pathology | Pharmacology and Toxicology | Physiology | Plant Biology | Scientific Communication and Education | Synthetic Biology | Systems Biology | Zoology
+subject_category: 
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order. Format: Name | email | affiliation | ORCID | corresponding(yes/no). Mark exactly one author as the corresponding author.
+authors: |
+  
+
+# ----------------------------------------------------------------------
+# Declarations
+# ----------------------------------------------------------------------
 
 # Funding statement (textarea, optional)
 #   Optional. One funder per line as 'Funder name | award1, award2' (awards optional). The funder name must match a FundRef funder, since bioRxiv requires picking an autocomplete suggestion.
 funding: |
+  
+
+# Competing interest statement (textarea, REQUIRED)
+#   Declare any competing interests. Enter 'The authors have declared no competing interest.' if none.
+competing_interest: |
   
 
 # Data availability links (textarea, optional)
@@ -77,13 +106,18 @@ funding: |
 data_availability_links: |
   
 
-# Is this a revision of an existing bioRxiv preprint? (boolean, optional)
-#   Set to yes if submitting a revised version of a preprint already on bioRxiv.
-is_revision: 
+# All authors consent to deposit and to the chosen license (boolean, REQUIRED)
+#   Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.
+author_consent: 
 
-# DOI of the existing preprint (if a revision) (text, optional)
-#   Only needed when is_revision is yes.
-previous_doi: 
+# ----------------------------------------------------------------------
+# Additional information
+# ----------------------------------------------------------------------
+
+# License / reuse terms (choice, REQUIRED)
+#   Distribution license under which the preprint is posted.
+#   options: CC-BY | CC-BY-NC | CC-BY-ND | CC-BY-NC-ND | CC0 | No reuse without permission
+license: 
 
 # Forward to a journal via B2J on posting? (boolean, optional)
 #   bioRxiv-to-Journal (B2J): offer to forward the manuscript to a participating journal.
@@ -92,9 +126,5 @@ transfer_to_journal:
 # Destination journal for B2J (text, optional)
 #   Only needed when transfer_to_journal is yes.
 journal_destination: 
-
-# All authors consent to deposit and to the chosen license (boolean, REQUIRED)
-#   Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.
-author_consent: 
 
 # vim: set filetype=yaml :
