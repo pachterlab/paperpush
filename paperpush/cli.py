@@ -4,6 +4,7 @@ Implemented so far:
 
     paperpush --venues          list supported venues
     paperpush --venues submit   list only the venues paperpush can submit to
+    paperpush pick-venue <terms> find a venue slug from a loose query
     paperpush subfile <venue>   create a <venue>.sub template
     paperpush options <venue>.<field>
                                       list the allowed values for a field
@@ -489,6 +490,47 @@ def _cmd_web(args: argparse.Namespace) -> int:
         token=os.environ.get("PAPERPUSH_WEB_TOKEN") or None,
         idle_timeout=args.idle_timeout,
     )
+
+
+@_validate
+def _cmd_pick_venue(args: argparse.Namespace) -> int:
+    from .venue_select import format_hits, pick_venues
+
+    query = " ".join(args.query).strip()
+    if not query and not args.types and not args.portal:
+        print("error: pick-venue needs a query, --type, or --portal", file=sys.stderr)
+        print("Run 'paperpush pick-venue --help' for usage.", file=sys.stderr)
+        return 2
+
+    hits = pick_venues(query, venue_types=tuple(args.types or ()), portals=tuple(args.portal or ()))
+
+    if not hits:
+        # A query with no tokens is rejected above, so reaching here with no
+        # hits means the input matched nothing -- an unusable answer for both
+        # humans and agents, hence a failing exit code rather than an empty
+        # list.
+        what = f" {query!r}" if query else " the given filters"
+        print(f"error: no venues matched{what}", file=sys.stderr)
+        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        return 1
+
+    if args.json:
+        json.dump(
+            [{"slug": hit.venue.slug, "name": hit.venue.name, "venue_type": hit.venue.venue_type, "portal": hit.portal, "score": hit.score} for hit in hits],
+            sys.stdout,
+            indent=2,
+        )
+        print()
+        return 0
+
+    shown = hits if args.all else hits[: max(args.limit, 0)]
+    for line in format_hits(shown):
+        print(line)
+
+    # The subfile hint always names the top-ranked hit, even when --limit
+    # hides it, so a scripted run stays actionable with a single glance.
+    print(f"\nUse 'paperpush subfile {hits[0].venue.slug}' to create its submission template.")
+    return 0
 
 
 def _cmd_subfile(args: argparse.Namespace) -> int:
@@ -2098,7 +2140,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # metavar lists only the public commands; the internal 'schema' command is
     # registered below but deliberately left out so it does not appear in --help.
-    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,requirements,login,submit,codegen,web,add-venue,update-venues,install-skills}")
+    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,requirements,login,submit,codegen,web,pick-venue,add-venue,update-venues,install-skills}")
 
     p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub submission template")
     p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv")
@@ -2368,6 +2410,15 @@ def build_parser() -> argparse.ArgumentParser:
     # Used by the background preview 'subfile' and 'autofill' start: stop after this many idle seconds.
     p_web.add_argument("--idle-timeout", type=float, default=None, help=argparse.SUPPRESS)
     p_web.set_defaults(func=_cmd_web)
+
+    p_pick = sub.add_parser("pick-venue", parents=[verbosity], help="find a venue slug from a loose query")
+    p_pick.add_argument("query", nargs="*", metavar="QUERY", help="free-text terms: slug, name, topic, or portal (e.g. 'bio', 'nature', 'scholarone')")
+    p_pick.add_argument("-t", "--type", dest="types", action="append", choices=["preprint", "journal", "conference"], metavar="TYPE", help="only venues of this kind (repeatable)")
+    p_pick.add_argument("--portal", dest="portal", action="append", metavar="PORTAL", help="only venues submitting through this portal (repeatable), e.g. scholarone")
+    p_pick.add_argument("-n", "--limit", type=int, default=5, metavar="N", help="show at most N matches (default: 5)")
+    p_pick.add_argument("--all", action="store_true", help="show every match instead of limiting")
+    p_pick.add_argument("--json", action="store_true", help="print matches as JSON (slug, name, venue_type, portal, score) for agents")
+    p_pick.set_defaults(func=_cmd_pick_venue)
 
     p_add = sub.add_parser(
         "add-venue",
