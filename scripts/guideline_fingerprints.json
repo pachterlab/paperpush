@@ -15,9 +15,9 @@
     "sha256": "7315ed5334995867cb9374096d5a2f4fa0ecf3c2e1f3613316c40daebb2943a6"
   },
   "https://bmcbioinformatics.biomedcentral.com/submission-guidelines": {
-    "chars": 28048,
-    "recorded": "2026-09-21",
-    "sha256": "6281626b9f4bd68e4222d1d90b57935df0ead3fd8c743bbbf94921005a63a892"
+    "chars": 28168,
+    "recorded": "2026-11-01",
+    "sha256": "e017866bde55a66eaae9a4938b305b4b6db8d23f59ee12a429dd2c734a720c08"
   },
   "https://cis.ieee.org/publications/t-neural-networks-and-learning-systems": {
     "chars": 1103,
@@ -35,9 +35,9 @@
     "sha256": "68360354a949a95a22e304c4ba3387bc670b43ffbc0e5e77901c4088a1f05ddf"
   },
   "https://cvpr.thecvf.com/Conferences/2027/CallForPapers": {
-    "chars": 5401,
-    "recorded": "2026-10-23",
-    "sha256": "1f8019ed17c04fb6094a00e6be6d630d68c737d2ed9c7ef2d0420f5d7a185ae1"
+    "chars": 5425,
+    "recorded": "2026-11-01",
+    "sha256": "af22fc8fdd3103591700a3b07a9a6f673e7acfff81db61b5cf732102cf0a1d0c"
   },
   "https://elife-rp.msubmit.net/html/elife-rp_author_instructions.html": {
     "chars": 3578,
@@ -60,9 +60,9 @@
     "sha256": "46bf983e628bbc63bb676bb646b5fb22de8f2ceddf88544cbaf15589c39c9f9d"
   },
   "https://genomebiology.biomedcentral.com/submission-guidelines": {
-    "chars": 27235,
-    "recorded": "2026-09-21",
-    "sha256": "c100d5570bf4657a2c31aaa023dc045b81d5fcfa44dd7ca2d2b79c20b4703a06"
+    "chars": 27355,
+    "recorded": "2026-11-01",
+    "sha256": "543c568552015fbf29ee8399eee9c6c93837ab85d9bd55f34f6bb1d1c0222f5f"
   },
   "https://genomemedicine.biomedcentral.com/submission-guidelines": {
     "chars": 27376,
@@ -70,14 +70,14 @@
     "sha256": "d8b34ea95813c9bbacc434f519e586e935d97cee40957993260640c1f28e993a"
   },
   "https://genomemedicine.biomedcentral.com/submission-guidelines/preparing-your-manuscript/method": {
-    "chars": 3483,
-    "recorded": "2026-10-23",
-    "sha256": "907142b299daf88489e7234556f19fe13d091a4cdb053f2caf2cef44f607c035"
+    "chars": 3736,
+    "recorded": "2026-11-01",
+    "sha256": "93ab2889cd504019db11e40eb5aaa1923ab939b5d89b34621f2ca41aab53d311"
   },
   "https://genomemedicine.biomedcentral.com/submission-guidelines/preparing-your-manuscript/research": {
-    "chars": 3483,
-    "recorded": "2026-10-23",
-    "sha256": "907142b299daf88489e7234556f19fe13d091a4cdb053f2caf2cef44f607c035"
+    "chars": 3736,
+    "recorded": "2026-11-01",
+    "sha256": "93ab2889cd504019db11e40eb5aaa1923ab939b5d89b34621f2ca41aab53d311"
   },
   "https://iclr.cc/Conferences/2027/AuthorGuidelines": {
     "chars": 25463,
@@ -110,9 +110,9 @@
     "sha256": "43904bfb55c0026f6e1404616f0ff018b8e6ff16870cecedf892654d794644d3"
   },
   "https://info.arxiv.org/help/submit/index.html": {
-    "chars": 8223,
-    "recorded": "2026-09-21",
-    "sha256": "4689e3303dacdc6590cfa553aa1e2ab65fe0e16d4ecf2ab29ff1119008b54e12"
+    "chars": 8097,
+    "recorded": "2026-11-01",
+    "sha256": "2b1bad3825d6377d1d473e3e7be7bea0c4d594dac9ba98659f592e6558857446"
   },
   "https://info.arxiv.org/help/submit_pdf.html": {
     "chars": 7986,
@@ -136,8 +136,8 @@
   },
   "https://jnm.snmjournals.org/authors": {
     "chars": 49201,
-    "recorded": "2026-10-23",
-    "sha256": "3299f3c0d5af70d8581e29e3c78bc056844fcf9c10f23b1ab96a2d5038c0f2d5"
+    "recorded": "2026-11-01",
+    "sha256": "03f1bc4687d4b1af745fa8721aac3ee6c85b63c5a3f06a902f323b2f5708bf67"
   },
   "https://journals.myesr.org/eur-radiol/for-authors/": {
     "chars": 1530,
@@ -266,8 +266,8 @@
   },
   "https://link.springer.com/journal/493/submission-guidelines": {
     "chars": 278,
-    "recorded": "2026-09-21",
-    "sha256": "eca0a1b995c7aeef68f689ca5de88d5e4a4ed6ed719322958269b569a6ee096b"
+    "recorded": "2026-11-01",
+    "sha256": "c456645a0dbae88a2e0b6f6e75bf213d949234357106d2a5c52ea0ee9d9b68bf"
   },
   "https://media.springer.com/full/springer-instructions-for-authors-assets/pdf/95445_1085900_493_CCA_Instructions_to_authors_20240627.pdf": {
     "chars": 2166,
@@ -300,19 +300,19 @@
     "sha256": "44dc2dde8cf032652a18076724ece80dda7c981f7559b160a0753fcc368418d8"
   },
   "https://www.biorxiv.org/about-biorxiv": {
-    "chars": 15171,
-    "recorded": "2026-09-23",
-    "sha256": "201bc4fcd9bbfbef6819df18fede3caa7fe9536cdf4aa0e4627ada1c4258905a"
+    "chars": 15135,
+    "recorded": "2026-11-01",
+    "sha256": "c76a01ad6c1b4fcd2a05d17dbe5a28d74e9369e7b20a873fa03a4fd6e8c31d82"
   },
   "https://www.biorxiv.org/about/FAQ": {
-    "chars": 28493,
-    "recorded": "2026-10-01",
-    "sha256": "a605f7d4dfd0dbe5089dc29448b34536a9a74b597bc88fb4dd00de8f3ee2c23b"
+    "chars": 29157,
+    "recorded": "2026-11-01",
+    "sha256": "afcce5901a2f213530317ed5286e466958b5bb3e594b031aeb929c821a6216a3"
   },
   "https://www.biorxiv.org/submit-a-manuscript": {
-    "chars": 11473,
-    "recorded": "2026-09-23",
-    "sha256": "75765b17a39e2ae77b1991827aeea7a53da3dd4149e971ec1aa5038c39eb3118"
+    "chars": 11437,
+    "recorded": "2026-11-01",
+    "sha256": "84d35b34aa76aa0574228574d8860439825cd27e225e09de5e7fb1f6bb98d34f"
   },
   "https://www.bmj.com/about-bmj/resources-authors/article-submission": {
     "chars": 2375,
@@ -370,9 +370,9 @@
     "sha256": "9a5f3d8d0f8e73db007ffbfd4ac1a9f5cf9daa31117f887682bb30cb5c9f4455"
   },
   "https://www.cell.com/cell-systems/information-for-authors/final-submission": {
-    "chars": 4805,
-    "recorded": "2026-09-21",
-    "sha256": "464788a9c5e27cb7a0c379ed06aab91f85402056d17343d85bd0cb2e37945881"
+    "chars": 4782,
+    "recorded": "2026-11-01",
+    "sha256": "e8348892450cb3963d955e15db40c6e4fcc51fa629d370141386dfe2e704c44e"
   },
   "https://www.cell.com/cell-systems/information-for-authors/revise-manuscript": {
     "chars": 21776,
@@ -485,19 +485,19 @@
     "sha256": "fbd0c4a5f16ab3b8f432ee3e3adae3205c3bb3b76984cc9bd18b82f157245ad8"
   },
   "https://www.medrxiv.org/about/FAQ": {
-    "chars": 33119,
-    "recorded": "2026-09-21",
-    "sha256": "56d300cebdbec73a82440b5918a84bee187e7869bd38e4041b26ff782e1d8fc9"
+    "chars": 34169,
+    "recorded": "2026-11-01",
+    "sha256": "3e4c0d768eb942399808a314a642cb26a5c0fc2db32202383be0ddf7c9d60dce"
   },
   "https://www.medrxiv.org/content/about-medrxiv": {
-    "chars": 9853,
-    "recorded": "2026-09-21",
-    "sha256": "a509572790b5d852fe73c0500586ca3c65a5e043016b71a87deed6073c506fc8"
+    "chars": 9840,
+    "recorded": "2026-11-01",
+    "sha256": "9391d7bb1c7414607fec535bb81121d2f690600d5ba61a67f69d6aa33890dc14"
   },
   "https://www.medrxiv.org/submit-a-manuscript": {
-    "chars": 12189,
-    "recorded": "2026-09-21",
-    "sha256": "7324a25844037da63cf5adea15dc0234ae62ed33137cb9dd073062ea0c8319b1"
+    "chars": 12176,
+    "recorded": "2026-11-01",
+    "sha256": "c0478b0a186081dd1a70411a9372585153035062ea5cb8b3d3ca0f81896d030d"
   },
   "https://www.nature.com/documents/NRJs-guide-to-preparing-final-artwork.pdf": {
     "chars": 6507,
@@ -580,9 +580,9 @@
     "sha256": "45600cc82e2aa108ee915c90a2121dc5d72ecd2cb1b029dc96358165b42d369b"
   },
   "https://www.nature.com/nature/for-authors/matters-arising": {
-    "chars": 5346,
-    "recorded": "2026-09-21",
-    "sha256": "0b58b808abdd4e038feb4a7bb8a3e763561ed19503e18c5888d3ae0286592111"
+    "chars": 5398,
+    "recorded": "2026-11-01",
+    "sha256": "c5cb91569cbadfa3a92302ba24af714ccc757e91be47b0126dbb2efb31f16ec3"
   },
   "https://www.nature.com/nature/for-authors/other-subs": {
     "chars": 12400,
@@ -835,14 +835,14 @@
     "sha256": "fa8d0a783cf19512f30667297700542366527b5efa02fef290989316004b5929"
   },
   "https://www.sciencedirect.com/journal/discrete-mathematics/publish/guide-for-authors": {
-    "chars": 48100,
-    "recorded": "2026-10-23",
-    "sha256": "2cd7b0a28c598f6e82374004a28e6fffdbab4f463e03380840d39b75bcd6ebe6"
+    "chars": 48080,
+    "recorded": "2026-11-01",
+    "sha256": "8011b456de36c9455359b955241f7f48aed16a49f5e0babb3d63399ebaef6365"
   },
   "https://www.sciencedirect.com/journal/medical-image-analysis/publish/guide-for-authors": {
-    "chars": 60813,
-    "recorded": "2026-10-23",
-    "sha256": "760afa537c86c8a08aea6bae384990d4065966160c2183c3eba52ae3262e0338"
+    "chars": 60793,
+    "recorded": "2026-11-01",
+    "sha256": "2f7cd74c1de858e77443f150d1e2155b5eb2ff4d8388f217d094ca6bd7579269"
   },
   "https://www.thelancet.com/pb-assets/Lancet/authors/tl-info-for-authors-1740380189507.pdf": {
     "chars": 74214,
