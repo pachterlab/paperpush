@@ -256,7 +256,7 @@
       "https://www.biorxiv.org/about/FAQ",
       "https://www.biorxiv.org/about-biorxiv"
     ],
-    "retrieved": "2026-10-01",
+    "retrieved": "2026-11-01",
     "manuscript": {
       "formats": [
         ".docx",
@@ -307,7 +307,7 @@
       "https://www.medrxiv.org/about/FAQ",
       "https://www.medrxiv.org/content/about-medrxiv"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-11-01",
     "manuscript": {
       "formats": [
         ".pdf",
@@ -387,7 +387,7 @@
       ]
     },
     "notes": [
-      "medRxiv covers preprints 'in the medical, clinical, and related health sciences'; content types out of scope include case reports, narrative/scoping reviews without meta-analysis, editorials, letters, opinion pieces without data, laboratory protocols, theses, and manuscript components.",
+      "medRxiv covers preprints 'in the medical, clinical, and related health sciences'; content types out of scope include case reports, narrative/scoping reviews without meta-analysis, editorials, letters, opinion pieces without data, laboratory protocols, theses, manuscript components, and teaching/instructive materials.",
       "All submissions undergo basic screening for offensive/non-scientific content and plagiarism; content posing health risks or dual-use research of concern is flagged.",
       "Authors choose a reuse license at submission: CC0, CC-BY, CC-BY-NC, CC-BY-ND, CC-BY-NC-ND, or 'no reuse without permission'.",
       "No submission fee.",
@@ -403,7 +403,7 @@
       "https://info.arxiv.org/help/submit_pdf.html",
       "https://info.arxiv.org/help/prep.html"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-11-01",
     "manuscript": {
       "formats": [
         ".tex",
@@ -1036,7 +1036,7 @@
       "https://www.nature.com/nature-portfolio/editorial-policies/image-integrity",
       "https://www.nature.com/documents/nature_3a_initial_revised_submissions.pdf"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-11-01",
     "article_type_field": "manuscript_type",
     "article_types": {
       "Submit - Review": {
@@ -1082,7 +1082,7 @@
             "A simple message ideally requiring only one or two small figures/tables; complex figures/tables may be presented as Extended Data (ideally no more than three such items).",
             "At submission, figures should be of sufficient quality for referees, ideally as JPEGs.",
             "Only comments/clarifications on original research or peer-reviewed material published within the previous 18 months are eligible.",
-            "Correspondents must first contact the authors of the original paper directly; a record of that correspondence must accompany the submission.",
+            "Correspondents must first send a detailed summary of the issues they wish to raise directly to the authors of the original paper; full details of that correspondence must accompany the submission.",
             "Replies (author responses to a Matters Arising) are formatted the same way as the Matters Arising itself.",
             "Extended Methods may be reported as Supplementary Information."
           ]
@@ -2066,7 +2066,7 @@
       "https://www.cell.com/pb-assets/journals/EM/MasterFFCs/CELSFFC-1766175470697.pdf",
       "https://www.cell.com/pb-assets/journals/research/cell-systems/do-not-delete/CSformatting-1666007786657.pdf"
     ],
-    "retrieved": "2026-10-01",
+    "retrieved": "2026-11-01",
     "article_type_field": "article_type",
     "article_types": {
       "Report": {
@@ -2837,7 +2837,7 @@
       "https://link.springer.com/journal/13059/submission-guidelines/brief-report",
       "https://link.springer.com/journal/13059/submission-guidelines/matters-arising"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-11-01",
     "article_type_field": "article_type",
     "article_types": {
       "methodology": {
@@ -3215,7 +3215,7 @@
       "https://link.springer.com/journal/12859/submission-guidelines/review-article",
       "https://link.springer.com/journal/12859/submission-guidelines/matters-arising"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-11-01",
     "article_type_field": "article_type",
     "article_types": {
       "database": {
@@ -5029,7 +5029,7 @@
       "https://www.elsevier.com/about/policies-and-standards/author/artwork-and-media-instructions/artwork-faq",
       "https://www.elsevier.com/about/policies-and-standards/author/artwork-and-media-instructions/artwork-sizing"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-11-01",
     "article_type_field": "article_type",
     "article_types": {
       "Contribution": {
@@ -5177,7 +5177,7 @@
       "https://media.springer.com/full/springer-instructions-for-authors-assets/pdf/95445_1085900_493_CCA_Instructions_to_authors_20240627.pdf",
       "https://link.springer.com/journal/493/ethics-and-disclosures"
     ],
-    "retrieved": "2026-09-10",
+    "retrieved": "2026-11-01",
     "manuscript": {
       "formats": [
         ".tex",
@@ -6189,7 +6189,7 @@
       "https://cvpr.thecvf.com/Conferences/2027/AuthorGuidelines",
       "https://cvpr.thecvf.com/Conferences/2027/CallForPapers"
     ],
-    "retrieved": "2026-10-23",
+    "retrieved": "2026-11-01",
     "manuscript": {
       "formats": [
         ".pdf"
@@ -6747,7 +6747,7 @@
       "https://genomemedicine.biomedcentral.com/submission-guidelines/preparing-your-manuscript/research",
       "https://genomemedicine.biomedcentral.com/submission-guidelines/preparing-your-manuscript/method"
     ],
-    "retrieved": "2026-10-23",
+    "retrieved": "2026-11-01",
     "article_type_field": "article_type",
     "article_types": {
       "Research": {},
@@ -7752,7 +7752,7 @@
     "source_urls": [
       "https://jnm.snmjournals.org/authors"
     ],
-    "retrieved": "2026-10-23",
+    "retrieved": "2026-11-01",
     "article_type_field": "article_type",
     "article_types": {
       "Original research": {
@@ -8719,7 +8719,7 @@
     "source_urls": [
       "https://www.sciencedirect.com/journal/medical-image-analysis/publish/guide-for-authors"
     ],
-    "retrieved": "2026-10-23",
+    "retrieved": "2026-11-01",
     "manuscript": {
       "formats": [
         ".docx",
@@ -8851,7 +8851,7 @@
       "https://www.nature.com/natbiomedeng/content"
     ],
     "retrieved": "2026-10-23",
-    "article_type_field": "article_type",
+    "article_type_field": "manuscript_type",
     "article_types": {
       "Article": {},
       "Review Article": {
@@ -9445,7 +9445,7 @@
       "https://www.nature.com/natmachintell/content"
     ],
     "retrieved": "2026-10-23",
-    "article_type_field": "article_type",
+    "article_type_field": "manuscript_type",
     "article_types": {
       "Article": {},
       "Analysis": {

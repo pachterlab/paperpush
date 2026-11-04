@@ -1748,6 +1748,42 @@
       }
     ]
   },
+  "nature_biomedical_engineering": {
+    "submission_url": "https://mts-natbiomedeng.nature.com/cgi-bin/main.plex",
+    "inherits": "nature",
+    "fields": [
+      {
+        "id": "manuscript_type",
+        "default": "Article",
+        "help": "The submission category on the opening eJournalPress manuscript-type page. Choose one of the listed options exactly.",
+        "options": [
+          "Article",
+          "Review Article",
+          "Perspective",
+          "Comment",
+          "Correspondence",
+          "Matters Arising",
+          "Down to Business"
+        ]
+      }
+    ]
+  },
+  "nature_machine_intelligence": {
+    "submission_url": "https://mts-natmachintell.nature.com/cgi-bin/main.plex",
+    "inherits": "nature",
+    "fields": [
+      {
+        "id": "manuscript_type",
+        "default": "Article",
+        "help": "The submission category on the opening eJournalPress manuscript-type page. Choose the article type that matches your manuscript.",
+        "options": [
+          "Article",
+          "Analysis",
+          "Reusability Report"
+        ]
+      }
+    ]
+  },
   "nature_methods": {
     "submission_url": "https://mts-nmeth.nature.com/cgi-bin/main.plex",
     "inherits": "nature",
@@ -3249,6 +3285,19 @@
           "email",
           "institution",
           "corresponding"
+        ]
+      },
+      {
+        "id": "funding",
+        "autofill": "extract",
+        "label": "Funding",
+        "type": "textarea",
+        "required": false,
+        "help": "Optional. One funder per line, in order of importance, as 'Funder name | award1, award2 | grant recipient' (awards and recipient optional). Drives the portal's 'Add your funder details' step: the funder name is typed into the institution-or-organisation autocomplete and the suggestion with exactly that name is picked (else the first, with a warning), the awards are entered as the grant/contract numbers, and the recipient (an author's name exactly as in the authors field) is picked from the grant-recipient drop-down. Leave empty to answer 'No' to 'Did you receive any funding?'.",
+        "fields": [
+          "funder_name",
+          "awards?",
+          "recipient?"
         ]
       },
       {
