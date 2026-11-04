@@ -34,11 +34,11 @@ Issues = "https://github.com/pachterlab/paperpush/issues"
 ai-anthropic = ["anthropic>=0.40"]
 ai-openai = ["openai>=2.0"]
 ai-google = ["google-genai>=2.3.0"]
-ai = ["paperpush[ai-anthropic,ai-openai,ai-google]"]
 mcp = ["mcp>=1.2"]
+ai = ["paperpush[ai-anthropic,ai-openai,ai-google,mcp]"]
 web = ["fastapi>=0.115", "uvicorn>=0.30", "python-multipart>=0.0.9", "psycopg[binary]>=3.1"]
 validate = ["pdfminer.six>=20240706", "arxiv_latex_cleaner>=0.1.0", "codespell>=2.2", "tqdm>=4.60"]
-all = ["paperpush[ai,mcp,web,validate]"]
+all = ["paperpush[ai,web,validate]"]
 dev = ["paperpush[mcp,web,validate]", "pytest>=7.0", "bandit", "black", "jsonschema>=4.18", "sphinx", "isort"]
 
 [project.scripts]

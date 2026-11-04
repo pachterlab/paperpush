@@ -31,7 +31,7 @@ Workflow to create the manuscript metadata (.sub) file, validate against author 
 ### CLI: 
 - `paperpush subfile VENUE`  # create a .sub file
 - Fill out VENUE.sub
-- `paperpush validate VENUE.sub`  # validate the files and date in VENUE.sub
+- `paperpush validate VENUE.sub`  # validate the files and data in VENUE.sub
 - Share VENUE.sub with co-authors (it can be viewed in a text editor, with `paperpush web VENUE.sub`, or via upload onto [paperpush.onrender.com](https://paperpush.onrender.com))
 - (If available) `paperpush login VENUE`  # log in to the VENUE submission portal
 - (If available) `paperpush submit VENUE.sub`  # fill out the VENUE submission portal with information in VENUE.sub
@@ -43,8 +43,8 @@ Workflow to create the manuscript metadata (.sub) file, validate against author 
 ## Install
 
 ```bash
+pip install paperpush["all"]  # Recommended — for AI API usage, MCP server, and additional manuscript validation checks
 pip install paperpush  # basic CLI usage
-pip install paperpush["all"]  # for AI API usage, MCP server, and additional manuscript validation checks
 ```
 
 (Required for `submit`): To install the playwright dependency and the required chromium browser, run:
@@ -91,8 +91,8 @@ See [`docs/example-session.md`](docs/example-session.md) for a full worked examp
 
 ## Quickstart
 1. `paperpush subfile VENUE`: creates a file VENUE.sub that is a template for the VENUE submission. Fields are grouped into the same sections for every venue (manuscript type, files, details, authors, reviewers, declarations, additional); add `--venue-order` to list them in the order the venue's portal asks for them instead.
-2. **fill out VENUE.sub:** Open VENUE.sub in a text editor to edit manually, or run `paperpush web VENUE.sub` to edit in a web browser. Use the agent skill `/paperpush-autofill My manuscript files are in /PATH/TO/MANUSCRIPT/DIRECTORY. Fill out VENUE.sub` or the command `paperpush autofill --engine api -p /PATH/TO/MANUSCRIPT/DIRECTORY ... VENUE.sub` (API) to automatically fill from the manuscript directory with AI. `paperpush autofill` requires the provider's API key and `pip install "paperpush[ai]"`. The AI agent may not be able to fill out all fields if some information is not in the manuscript directory.
-3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`. Use the agent skill `/paperpush-validate` or the CLI flag `--ai` (API) to run checks with AI. The AI checks require the provider's API key and `pip install "paperpush[validate]"`.
+2. **fill out VENUE.sub:** Open VENUE.sub in a text editor to edit manually, or run `paperpush web VENUE.sub` to edit in a web browser. Use the agent skill `/paperpush-autofill My manuscript files are in /PATH/TO/MANUSCRIPT/DIRECTORY. Fill out VENUE.sub` or the command `paperpush autofill --engine api -p /PATH/TO/MANUSCRIPT/DIRECTORY ... VENUE.sub` (API) to automatically fill from the manuscript directory with AI. `paperpush autofill` requires the provider's API key. The AI agent may not be able to fill out all fields if some information is not in the manuscript directory.
+3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`. Use the agent skill `/paperpush-validate` or the CLI flag `--ai` (API) to run checks with AI. The AI checks require the provider's API key.
 4. `paperpush login VENUE`: log in to the VENUE submission portal.
 5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. Use the agent skill `/paperpush-portal-debug` or the CLI flag `--ai` (API) to have AI fix any issues that may arise. Ignore validation checks with the `--skip-validate` flag.
 
@@ -263,21 +263,21 @@ to use it.
 
 *How does PaperPush work?*
 
-Supported venues are listed in `paperpush/venues.json`, their submission forms are in `paperpush/submission_forms.json`, and their author guidelines are in `paperpush/manuscript_requirements.json`. `paperpush subfile` generates a file from the form for the specified venue. The file can be filled out manually, or with the help of an LLM via `paperpush autofill`. The submission portal for a selected venue is filled out with the information from this file with a `paperpush submit`. This runs a Playwright script that is written specifically for each supported venue.
+Supported venues are listed in `paperpush/venues.json`, their submission form data are in `paperpush/submission_forms.json`, and their author guidelines are in `paperpush/manuscript_requirements.json`. `paperpush subfile` generates a file from the form for the specified venue. The file can be filled out manually, or with the help of an LLM via `paperpush autofill`. The manuscript documents are validated with `paperpush validate`. The submission portal for a selected venue is filled out with the information from this file with a `paperpush submit`. This runs a Playwright script that is written specifically for each supported venue.
 
 
-*The repository says that is supports a given venue, but it fails when I try. Why is that?*
+*The repository says that it supports a given venue, but it fails when I try. Why is that?*
 
 Here are a few possibilities, in order of decreasing ease of resolution:
-- Sometimes, submission portals can be a bit funny, and the solution can be as simply as retrying the command 1-2 more times.
+- Sometimes, submission portals can be a bit funny, and the solution can be as simple as retrying the command 1-2 more times.
 - The submission portal is having server issues. You can try logging in to the portal manually to see if it is working, as well as on a different browser and at a different time.
 - The sub file has an option that we did not anticipate. You can try running the unit test for the venue with `pytest tests/test_submit.py --run-portal -s --venue VENUE`. If this passes, then it indicates an option in the sub file is not being handled correctly. If this fails, then it indicates that the submission portal has changed since the last time the venue was tested. In either case, please open an issue with the error message.
-- The submission portal has changed since the last time the venue was tested (monthly jobs scheduled every 2 months). You can run the unit test listed above to see if this is the case. If so, please open an issue with the error message.
+- The submission portal has changed since the last time the venue was tested. You can run the unit test listed above to see if this is the case. If so, please open an issue with the error message.
 
 
 *I do not see my venue in the supported list. Is it possible to add a venue?*
 
-Yes! See [`CONTRIBUTING.md`](CONTRIBUTING.md) if you would like to add a journal yourself, and feel free to ask any questions in the Discussion forum. The recommended process involves running `Playwright codegen`, walking through all options for your journal of interest, replacing values with variables, encoding these variables in venues.json, and creating sample files for unit testing in `sample_subfiles.json`.
+Yes! See [`CONTRIBUTING.md`](CONTRIBUTING.md) if you would like to add a journal yourself, and feel free to ask any questions in the Discussion forum. 
 
 
 *Does PaperPush press submit for me?*
@@ -287,25 +287,21 @@ No. PaperPush will bring you to one of the final steps on your venue of interest
 
 *Does every venue have a unique submission portal?*
 
-No - in fact, many share the same type of platform. PaperPush has a unique Playwright script for each supported venue, but many venues share the same submission platform. The big ones are Editorial Manager (including the Cell family and PLOS family), ScholarOne Manuscripts, eJournalPress, Snapp, and OpenReview (for many computer science conferences). The submission script may be highly similar for venues that share the same platform, so check the folders within `paperpush/venues` to see which venues share the same submission platform. See screenshots of each of the major supported venues in [`docs/portal_screenshots`](docs/portal_screenshots) to see what each submission portal looks like.
+No — in fact, many share the same type of platform. PaperPush has a unique Playwright script for each supported venue, but many venues share the same submission platform. The big ones are Editorial Manager (including the Cell family and PLOS family), ScholarOne Manuscripts, eJournalPress, Snapp, and OpenReview (for many computer science conferences). The submission script may be highly similar for venues that share the same platform, so check the folders within `paperpush/venues` to see which venues share the same submission platform. See screenshots of each of the major supported venues in [`docs/portal_screenshots`](docs/portal_screenshots) to see what each submission portal looks like.
 
 
 *How long does it take to add a new journal?*
 
-It depends on the complexity of the submission portal and your comfort with coding, but I would say roughly 1-3 hours.
+It depends on the complexity of the submission portal and your comfort with coding, but I would say roughly 1-3 hours manually. AI tools with the paperpush skills can potentially do this in under 20 minutes.
 
 
 *Can I vibe code a new journal?*
 
-As of now, LLMs cannot reliably observe the state of a submission portal, which means adding a new journal requires some human oversight. However, when provided with the Playwright script outlining the steps to fill out a submission portal, LLMs can be pretty good at generating the Venue class for login and submit. In my experience, LLMs can make the code a bit verbose and abstract away some of the action names, which may be harder to read/maintain in my opinion, but this is just stylistic. My favorite code style is in arxiv.py.
-
-
-*I want to add another journal from the Nature family, but Playwright codegen is not working. What do I do?*
-
-This is an issue with the Nature submission portal. My solution was to use the Chrome DevTools to inspect the elements and write the Playwright script manually from the HTML. If you find a solution to this issue, please let me know in the Discussion forum.
+Yes, with `/paperpush-add-venue` (see [`CONTRIBUTING.md`](CONTRIBUTING.md)). AI agents can navigate submission portals and write the Venue class for login and submit, but it can take a lot of tokens and may stall at times, so some human oversight helps. In my experience, LLMs can make the code a bit verbose and abstract away some of the action names, which may be harder to read/maintain in my opinion, but this is just stylistic. My favorite code style is in `arxiv.py`.
 
 
 ## License
+
 This project is licensed under the BSD-2 License - see the [LICENSE](LICENSE) file for details.
 
 Developed by Joe Rich

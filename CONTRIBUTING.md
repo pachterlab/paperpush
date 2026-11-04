@@ -15,7 +15,7 @@ As of the time of writing this (November 2026), AI agents are capable of autonom
   
 See the YouTube tutorial [PaperPush Contributor Tutorial](https://youtu.be/hn1RNcvHuYw)
 
-A venue has the following ocmponents:
+A venue has the following components:
 1. Venue listing: an entry in `paperpush/venues.json`, the master list, with the venue's general metadata (name, type, homepage, `anonymous`, etc.).
 2. Submission form (for `subfile`, `autofill`, basic `validate`, `submit`): an entry in `paperpush/submission_forms.json` with the submission fields and constraints, in the order the portal asks for them. This is what becomes the .sub file. See [Field sections](DEVELOPMENT.md#field-sections-in-sub-templates).
 3. Manuscript requirements (for `validate`): an entry in `paperpush/manuscript_requirements.json` with what the venue's author guidelines require of the manuscript itself (formats, length limits, required sections and statements, title-page items, figure rules, references, etc.).
@@ -28,7 +28,7 @@ A venue has the following ocmponents:
 
 All new venues need 1-2. 3 (extensive `validate` support) is highly recommended, and 4-5 (`submit` support) are recommended if feasible.
 
-To implement 4, I recommend `paperpush codegen`. See [DEVELOPMEND.md](DEVELOPMENT.md#recording-a-runner-with-paperpush-codegen).
+To implement 4, I recommend `paperpush codegen`. See [DEVELOPMENT.md](DEVELOPMENT.md#recording-a-runner-with-paperpush-codegen).
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for tips on using playwright, debugging, and running unit tests.
 

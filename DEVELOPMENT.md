@@ -156,7 +156,7 @@ the recovery tools, then report it.
 The skills live in `skills/<name>/SKILL.md`, and that copy is the one to edit.
 Three things read it:
 
-- **The plugins.** `.claude-plugin/` and `.codex-plugin/` make the repo a
+- **The plugins.** `.claude-plugin/`, `.codex-plugin/` and `.agents/plugins/` make the repo a
   Claude Code and a Codex plugin marketplace (`/plugin marketplace add
   pachterlab/paperpush`), so both install the skills straight from `skills/` on
   GitHub. Bump `version` in both `plugin.json` files with each release.
@@ -491,13 +491,13 @@ black . -l 99999
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/`). `ci.yml` and `docs.yml` run on every
-push and pull request, and all three allow manual runs from the Actions tab.
+GitHub Actions (`.github/workflows/`). `ci.yml` runs on every push and pull
+request, `docs.yml` on pushes to `main` and every pull request, and all three allow manual runs from the Actions tab.
 None touches a live portal, so no session secret is needed.
 
 - `ci.yml` — runs `pytest` (real-portal tests are skipped) and checks that
-  `venues.md` / `README.md` and `venues.schema.json` are in sync with their
-  generators.
+  `venues.md` / `README.md`, the three schemas, `docs/schemas/` and
+  `paperpush/subfile_templates/` are in sync with their generators.
 - `docs.yml` — builds the Sphinx docs with warnings as errors. Check only; it
   does not publish. The docs are hosted by Read the Docs
   (<https://paperpush.readthedocs.io>), which builds them from `.readthedocs.yaml`
