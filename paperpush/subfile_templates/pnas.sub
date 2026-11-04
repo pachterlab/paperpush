@@ -10,8 +10,6 @@
 
 @venue: pnas
 # submission guide: https://www.pnas.org/author-center/submitting-your-manuscript
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

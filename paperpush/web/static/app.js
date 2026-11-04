@@ -259,6 +259,14 @@
 
   // --------------------------------------------------------------- settings
 
+  // ?palette=alt (from `paperpush validate --web --colorblind`) turns the
+  // colour-blind-friendly colours on and remembers the choice; read once at
+  // load, so the settings checkbox can still turn them off.
+  function paletteFromUrl() {
+    const asked = new URLSearchParams(location.search).get("palette");
+    if (asked === "alt" || asked === "default") store.set("palette", asked);
+  }
+
   function applySettings() {
     const alt = store.get("palette") === "alt";
     document.documentElement.dataset.palette = alt ? "alt" : "default";
@@ -441,6 +449,13 @@
     if (!v.supports_submit) chips.push(el("span", { class: "chip plain", title: "paperpush checks the manuscript against the guidelines but cannot fill this portal yet", text: "Validate only" }));
     if (v.login_required) chips.push(el("span", { class: "chip plain", text: "Portal login needed to submit" }));
     $("#venue-chips").replaceChildren(...chips);
+    // Validate-only venues have no runner to fill the portal: gray the button out.
+    const portalWrap = $("#portal-wrap");
+    $("#portal-btn").disabled = !v.supports_submit;
+    portalWrap.dataset.tooltip = v.supports_submit ? "" : "Not supported for this venue";
+    portalWrap.tabIndex = v.supports_submit ? -1 : 0;
+    if (v.supports_submit) portalWrap.removeAttribute("aria-label");
+    else portalWrap.setAttribute("aria-label", "Not supported for this venue");
     const links = [];
     if (v.submission_guide) links.push(el("a", { href: v.submission_guide, target: "_blank", rel: "noopener", text: "Author guidelines ↗" }));
     if (v.submission_url) links.push(el("a", { href: v.submission_url, target: "_blank", rel: "noopener", text: "Submission portal ↗" }));
@@ -1746,7 +1761,7 @@
       ["good", c.passed, "passed"],
       [c.failed ? "bad" : "", c.failed, "failed"],
       [c.warning ? "partial" : "", c.warning, "warnings"],
-      ["", c.needs_ai || 0, "need AI"],
+      [c.needs_ai ? "ai" : "", c.needs_ai || 0, "need AI"],
     ];
     statsRow.replaceChildren(...tiles.map(([k, n, label]) => el("div", { class: `stat ${k}` }, el("b", { text: String(n) }), el("span", { text: label }))));
     statsRow.hidden = false;
@@ -1759,7 +1774,7 @@
     ["ai", "Checked only with AI", "Judgements that need someone to read the files: lettering in raster figures, free-text guideline rules, whether every field says what the manuscript says. Run them with “Validate, extended with AI”."],
     ["manual", "Not checked by paperpush", "Rules in the guidelines paperpush has no check for yet. Check these yourself."],
   ];
-  const MARKS = { passed: "✔", failed: "✖", warning: "▲", unchecked: "?", needs_ai: "○", not_implemented: "–", not_applicable: "·", pending: "○" };
+  const MARKS = { passed: "✔", failed: "✖", warning: "▲", unchecked: "?", needs_ai: "?", not_implemented: "–", not_applicable: "·", pending: "○" };
   const STATUS_WORDS = { unchecked: "could not run", needs_ai: "needs AI", not_implemented: "check by hand" };
 
   // The checks of one block, each with the status to show (grey "pending"
@@ -1788,7 +1803,7 @@
 
   function checkItem(c) {
     const status = c.status;
-    const cls = { passed: "st-passed", failed: "st-failed", warning: "st-warning", unchecked: "st-unchecked", not_applicable: "st-na" }[status] || "";
+    const cls = { passed: "st-passed", failed: "st-failed", warning: "st-warning", unchecked: "st-unchecked", needs_ai: "st-needs-ai", not_applicable: "st-na" }[status] || "";
     const tag = c.source === "ai" ? el("span", { class: "tag", text: "AI" }) : null;
     const word = STATUS_WORDS[status] ? el("span", { class: "cat", text: STATUS_WORDS[status] }) : null;
     const head = [el("span", { class: "mk", "aria-hidden": "true", text: MARKS[status] || "○" }), el("span", { class: "ttl", text: c.title }), tag, word, el("span", { class: "cat", text: c.category })];
@@ -2314,23 +2329,6 @@
     const sub = v.subfile_name;
     const body = $("#portal-body");
     const steps = [];
-    if (!v.supports_submit) {
-      body.replaceChildren(
-        el("p", { text: `paperpush can check a manuscript for ${v.name}, but cannot fill its submission portal yet.` }),
-        el("ol", {},
-          el("li", {}, "Download your submission files. The bundle contains your .sub file and uploaded files; download the .sub alone if you already have the manuscript files.",
-            el("div", { class: "cmd" },
-              el("button", { type: "button", class: "btn primary btn-small", onclick: downloadBundle, text: "Download bundle (.zip)" }),
-              el("button", { type: "button", class: "btn btn-small", onclick: downloadSub, text: `Download ${sub} only` }))),
-          el("li", {}, "Visit ", v.site_url
-            ? el("a", { href: v.site_url, target: "_blank", rel: "noopener", text: `${v.name}'s website ↗` })
-            : `${v.name}'s website`, ", then complete the submission there using your files and the values in the .sub file.")),
-        el("p", {}, "Want paperpush to fill this portal in the future? ",
-          el("a", { href: "https://github.com/pachterlab/paperpush/discussions", target: "_blank", rel: "noopener", text: "Suggest this venue on GitHub Discussions ↗" }), "."),
-      );
-      $("#portal-dialog").showModal();
-      return;
-    }
     const submitHint = () => el("p", { class: "hint", text: "paperpush validates again, opens a browser, and fills in the portal. It stops before the final submit button, so you can look everything over and press it yourself." });
     const loginStep = () => el("li", {}, el("strong", { text: `Log in to ${v.name}` }), " once. paperpush keeps the login in your system keychain:", command(`paperpush login ${v.slug}`));
     // The two routes are alternatives, so show them as tabs: one visible at a time.
@@ -2462,11 +2460,13 @@
     $("#shared-stop").addEventListener("click", stopSharingForAll);
     document.addEventListener("visibilitychange", () => { if (state.shared && document.visibilityState === "visible") poll(); });
     $("#portal-btn").addEventListener("click", openPortalDialog);
+    $("#portal-wrap").addEventListener("click", (e) => { if (e.currentTarget.dataset.tooltip) e.currentTarget.focus(); });
     $("#form").addEventListener("submit", (e) => e.preventDefault());
     window.addEventListener("hashchange", route);
   }
 
   async function init() {
+    paletteFromUrl();
     applySettings();
     wire();
     wireKeyPanel();

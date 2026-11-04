@@ -9,7 +9,7 @@ in the ``.sub`` file.
 
    usage: paperpush login [-h] [-v] [-q] [--list] [-u USERNAME]
                           [--password PASSWORD] [--confirm-password] [--orcid]
-                          [--orcid-id ID] [--into SUBFILE] [--status]
+                          [--orcid-id ID] [--into SUBFILE] [--status] [--check]
                           [--logout] [--no-verify] [--verify-headless]
                           [--timeout SECONDS]
                           [venue]
@@ -111,6 +111,15 @@ Manage stored credentials
 ``--status``
    Show whether credentials are stored for the venue, then exit.
 
+``--check``
+   Sign in with the stored credentials, in a headless browser, to confirm they
+   still work, then exit. Unlike ``--status``, this catches a password changed
+   since you logged in. Exits ``1`` if nothing is stored or the sign-in fails;
+   re-run ``paperpush login <venue>`` to fix it. A headless browser cannot
+   complete a CAPTCHA or two-factor prompt, so a venue that always asks for one
+   fails this check. A venue paperpush cannot sign in to automatically prints a
+   note and exits ``0``.
+
 ``--logout``
    Remove the stored credentials for the venue.
 
@@ -151,6 +160,12 @@ Check status for one venue:
 .. code-block:: bash
 
    paperpush login biorxiv --status
+
+Confirm the stored login still works before submitting:
+
+.. code-block:: bash
+
+   paperpush login biorxiv --check
 
 Sign in with ORCID (you are prompted for your ORCID password):
 

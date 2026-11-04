@@ -10,8 +10,6 @@
 
 @venue: plos_compbio
 # submission guide: https://journal.plos.org/ploscompbiol/s/submission-guidelines
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

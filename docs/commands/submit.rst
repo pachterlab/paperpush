@@ -100,7 +100,7 @@ Options
    is handed to you, as with ``by-hand``. Uses the same API keys as
    ``autofill --engine api`` (``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``,
    ``GEMINI_API_KEY``/``GOOGLE_API_KEY``) and needs that provider's SDK
-   (``pip install "paperpush[autofill]"``).
+   (``pip install "paperpush[ai]"``).
 
 ``--provider {anthropic,openai,google}`` / ``--model MODEL``
    With ``--ai``: which provider and model to use. They default to the first

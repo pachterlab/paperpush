@@ -10,8 +10,6 @@
 
 @venue: npj_digital_medicine
 # submission guide: https://www.nature.com/npjdigitalmed/for-authors-and-referees/submission-guidelines
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

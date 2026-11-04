@@ -10,8 +10,6 @@
 
 @venue: radiology_ai
 # submission guide: https://pubs.rsna.org/page/ai/author-instructions
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

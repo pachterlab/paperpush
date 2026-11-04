@@ -155,22 +155,23 @@ if git diff --cached --name-only --diff-filter=ACM -z \
 fi
 
 # ---------------------------------------------------------------------------
-# Keep the packaged copy of AGENTS.md in sync with the root file. The root copy
-# is canonical (agent tooling looks for it there); the copy under
-# paperpush/_docs/ is what ships in the wheel and backs `paperpush
-# --agent-guide`, so a pip-installed agent reads the same contract.
+# Keep the packaged copies of AGENTS.md and skills/ in sync with the root files.
+# The root copies are canonical (agent tooling looks for them there); the copies
+# under paperpush/_docs/ and paperpush/_skills/ are what ship in the wheel and
+# back `paperpush --agent-guide` and `paperpush install-skills`, so a
+# pip-installed agent reads the same contract and skills.
 # ---------------------------------------------------------------------------
-if git diff --cached --name-only --diff-filter=ACM -z \
-    | tr '\0' '\n' | grep -qx 'AGENTS.md'; then
+if git diff --cached --name-only --diff-filter=ACMDR -z \
+    | tr '\0' '\n' | grep -qE '^(AGENTS\.md|skills/.*)$'; then
     if python scripts/sync_agent_docs.py; then
         # --porcelain (not `git diff`) so a brand-new, still-untracked copy is
         # staged too; `git diff` reports no change for an untracked file.
-        if [ -n "$(git status --porcelain --untracked-files=all -- paperpush/_docs)" ]; then
-            git add paperpush/_docs
-            echo "pre-commit: re-synced paperpush/_docs from AGENTS.md and re-staged it."
+        if [ -n "$(git status --porcelain --untracked-files=all -- paperpush/_docs paperpush/_skills)" ]; then
+            git add -A paperpush/_docs paperpush/_skills
+            echo "pre-commit: re-synced paperpush/_docs and paperpush/_skills and re-staged them."
         fi
     else
-        echo "pre-commit: failed to sync paperpush/_docs from AGENTS.md." >&2
+        echo "pre-commit: failed to sync paperpush/_docs / paperpush/_skills." >&2
         status=1
     fi
 fi
@@ -178,13 +179,14 @@ fi
 # ---------------------------------------------------------------------------
 # Keep the generated test fixtures in sync with sample_subfiles.json. Only
 # runs when the JSON is part of this commit; re-stages the regenerated sample
-# .sub files and their input assets so the committed tree never drifts.
+# .sub files so the committed tree never drifts. (Their input assets under
+# tests/manuscript_files are gitignored and built on demand by the tests.)
 # ---------------------------------------------------------------------------
 if git diff --cached --name-only --diff-filter=ACM -z \
     | tr '\0' '\n' | grep -qx 'tests/sample_subfiles.json'; then
     if python tests/sample_subfiles.py; then
-        if ! git diff --quiet -- tests/sub_files tests/manuscript_files; then
-            git add tests/sub_files tests/manuscript_files
+        if ! git diff --quiet -- tests/sub_files; then
+            git add tests/sub_files
             echo "pre-commit: regenerated sample .sub fixtures and re-staged them."
         fi
     else

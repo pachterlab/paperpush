@@ -150,6 +150,23 @@ def test_validate_subfile_flags_an_unfilled_template(tmp_path):
     assert any(issue["field"] == "title" for issue in result["errors"])
 
 
+def test_validate_subfile_resolves_relative_paths_against_the_sub_folder(tmp_path, monkeypatch, manuscript_pdf):
+    import shutil
+
+    ms = tmp_path / "ms"
+    ms.mkdir()
+    shutil.copy(manuscript_pdf, ms / "main.pdf")
+    path = ms / f"{VENUE}.sub"
+    mcp_server.create_subfile(VENUE, str(path))
+    text = path.read_text(encoding="utf-8").replace("manuscript_file:", "manuscript_file: main.pdf", 1)
+    path.write_text(text, encoding="utf-8")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    result = mcp_server.validate_subfile(str(path), check_links=False, check_sensitive=False)
+    assert not [i for i in result["errors"] if i["field"] == "manuscript_file" and "not found" in i["message"]]
+
+
 # --- autofill --------------------------------------------------------------
 
 
@@ -269,6 +286,78 @@ def test_login_status_for_one_venue_when_signed_in():
     status = mcp_server.login_status(VENUE)
     assert status["logged_in"] is True
     assert status["identity"] == "ada@example.com"
+
+
+class _CheckRun:
+    """A stand-in for subprocess.run that records the argv and fakes `login --check`."""
+
+    def __init__(self, returncode=0, stdout="", stderr=""):
+        self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
+        self.calls = []
+
+    def __call__(self, command, **kwargs):
+        self.calls.append((command, kwargs))
+        return self
+
+
+def test_login_status_check_needs_a_venue():
+    with pytest.raises(ValueError, match="needs a venue"):
+        mcp_server.login_status(check=True)
+
+
+def test_login_status_does_not_sign_in_without_check(monkeypatch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    monkeypatch.setattr(mcp_server.subprocess, "run", lambda *a, **k: pytest.fail("status must not shell out"))
+    assert "check" not in mcp_server.login_status(VENUE)
+
+
+def test_login_status_check_runs_login_check(monkeypatch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    run = _CheckRun(stdout="Sign-in confirmed: the stored login works.")
+    monkeypatch.setattr(mcp_server.subprocess, "run", run)
+    status = mcp_server.login_status(VENUE, check=True)
+    assert status["check"]["status"] == "ok"
+    assert status["logged_in"] is True
+    command, kwargs = run.calls[0]
+    assert command[-3:] == ["login", VENUE, "--check"]
+    assert kwargs["stdin"] is mcp_server.subprocess.DEVNULL
+
+
+def test_login_status_check_reports_a_failed_sign_in(monkeypatch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    monkeypatch.setattr(mcp_server.subprocess, "run", _CheckRun(returncode=1, stderr="error: the stored login did not work"))
+    status = mcp_server.login_status(VENUE, check=True)
+    assert status["check"]["status"] == "failed"
+    assert status["logged_in"] is False
+    assert status["login_command"] == f"paperpush login {VENUE}"
+    assert "hunter2" not in repr(status)
+
+
+def test_login_status_check_venue_that_cannot_be_checked(monkeypatch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    monkeypatch.setattr(mcp_server.subprocess, "run", _CheckRun(stdout="Credentials are stored, but they could not be checked: no automated sign-in"))
+    status = mcp_server.login_status(VENUE, check=True)
+    assert status["check"]["status"] == "unchecked"
+    assert status["logged_in"] is True
+
+
+def test_login_status_check_timeout(monkeypatch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+
+    def _timeout(command, **kwargs):
+        raise mcp_server.subprocess.TimeoutExpired(command, 1)
+
+    monkeypatch.setattr(mcp_server.subprocess, "run", _timeout)
+    status = mcp_server.login_status(VENUE, check=True)
+    assert status["check"]["status"] == "timed_out"
+    assert status["logged_in"] is False
+
+
+def test_login_status_check_skips_sign_in_when_not_logged_in(monkeypatch):
+    monkeypatch.setattr(mcp_server.subprocess, "run", lambda *a, **k: pytest.fail("nothing stored: must not shell out"))
+    status = mcp_server.login_status(VENUE, check=True)
+    assert status["logged_in"] is False
+    assert "check" not in status
 
 
 def test_login_status_reports_when_login_is_not_required():
@@ -602,7 +691,7 @@ def test_build_server_exposes_typed_arguments():
     tool = by_name["validate_subfile"]
     # Renamed from inputSchema to input_schema in MCP SDK 2.0.
     schema = getattr(tool, "input_schema", None) or tool.inputSchema
-    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "alt_color", "initial_submission", "ai_only", "cover_letter_max_age_days"}
+    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "colorblind", "initial_submission", "ai_only", "cover_letter_max_age_days"}
     assert schema["required"] == ["subfile"]
 
 

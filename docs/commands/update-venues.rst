@@ -10,15 +10,17 @@ Fetch the latest published venue data now.
 Venue details (field options, help text, limits, and the author-guideline
 rules in ``manuscript_requirements.json``) are published separately from
 PaperPush releases, so a fix reaches you without upgrading. PaperPush checks for
-new data on its own at most once a day and falls back to the data bundled with
+new data on its own at most once a day, whether it was installed with ``pip``
+or cloned with ``git``, and falls back to the data bundled with
 the installed version when it is offline. Run this command to pick up a fix
 right away, or to see which copy is in use.
 
 Only changes that the installed version can use are applied. A new venue, a
 new or changed field on an existing one, or a kind of manuscript rule the
 installed version does not know yet needs a newer release
-(``pip install -U paperpush``). Until then, that venue keeps its bundled
-definition or rules. ``paperpush requirements VENUE`` shows which copy of the
+(``pip install -U paperpush``, or ``git pull`` in a clone). Until then, that
+venue keeps its bundled definition or rules. A new validate-only venue needs no
+release and is added. ``paperpush requirements VENUE`` shows which copy of the
 rules it read.
 
 Options
@@ -33,8 +35,9 @@ Environment
 -----------
 
 ``PAPERPUSH_VENUE_DATA``
-   ``auto`` (default) uses the published data. ``bundled`` uses only the
-   data shipped with the installed version. A directory path reads
+   ``auto`` (default) uses the published data, in a ``git`` clone too.
+   ``bundled`` uses only the local files (the installed package's, or the
+   clone's): set it when editing the venue data yourself. A directory path reads
    ``venues.json``, ``submission_forms.json`` and
    ``manuscript_requirements.json`` from that directory; a file it lacks comes
    from the bundled copy.

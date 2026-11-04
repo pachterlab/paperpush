@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import zipfile
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 
@@ -50,6 +51,22 @@ from paperpush.database import list_venues  # noqa: E402
 #
 # Mark a test with @pytest.mark.portal ONLY if it talks to a real portal.
 # Offline submit tests should stay unmarked so they run automatically.
+
+
+@pytest.fixture(autouse=True)
+def _fresh_form_models():
+    """Start and end every test with an empty cache of per-venue form models.
+
+    ``validate`` caches the pydantic model it builds for a venue by slug, so a
+    test that validates a cut-down venue under a real slug ("arxiv") would
+    otherwise leave that model behind for whichever test runs next.
+    """
+    import importlib
+
+    models = importlib.import_module("paperpush.validate")._MODELS
+    models.clear()
+    yield
+    models.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -523,6 +540,9 @@ def _figure_payload(ext: str, *, size: tuple[int, int], dpi: int, label: str) ->
         kwargs["quality"] = 95
     if fmt == "PDF":
         kwargs["resolution"] = float(dpi)
+        # Pin the info-dict dates Pillow would otherwise stamp with "now".
+        fixed = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        kwargs["create_date"] = kwargs["modification_date"] = fixed
     buf = BytesIO()
     img.save(buf, format=fmt, **kwargs)
     return buf.getvalue()
@@ -698,6 +718,20 @@ class SampleFiles:
 
 
 # --- fixtures --------------------------------------------------------------
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _sample_manuscript_files():
+    """Build any missing input assets under ``tests/manuscript_files/``.
+
+    The sample manuscripts, supplements, cover letters, and figures that the
+    ``tests/sub_files`` samples point at are generated, not committed. They are
+    deterministic, so building only the missing ones is equivalent to a full
+    rebuild (``python tests/sample_subfiles.py``).
+    """
+    from tests.sample_subfiles import ensure_assets
+
+    ensure_assets(missing_only=True)
 
 
 @pytest.fixture(autouse=True)

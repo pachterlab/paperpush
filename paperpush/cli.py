@@ -7,7 +7,7 @@ Implemented so far:
     paperpush subfile <venue>   create a <venue>.sub template
     paperpush options <venue>.<field>
                                       list the allowed values for a field
-    paperpush autofill -d <dir|file> [<dir|file> ...] <subfile>
+    paperpush autofill -p <dir|file> [<dir|file> ...] <subfile>
                                       fill a .sub from a manuscript directory
     paperpush validate <subfile>  run the pre-submission checks on a .sub
     paperpush requirements <venue>  show what the venue's author guidelines require of the manuscript
@@ -24,6 +24,7 @@ Implemented so far:
     paperpush add-venue --template [<slug>]  write a venue file to fill in
     paperpush add-venue <file>    add a venue from a filled venue file
     paperpush update-venues       fetch the latest published venue data now
+    paperpush install-skills      install the agent skills (Claude Code, Codex)
     paperpush --agent-guide       print the guide for AI agents (AGENTS.md)
 
 ``submit`` drives the bioRxiv wizard, typing in the field values read from the
@@ -41,6 +42,7 @@ import json
 import logging
 import os
 import sys
+import textwrap
 from pathlib import Path
 
 from pydantic import ConfigDict, validate_call
@@ -190,6 +192,58 @@ def _cmd_recovery_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_install_skills(args: argparse.Namespace) -> int:
+    """Install, list, or remove the agent skills that ship with paperpush."""
+    from . import skills as skills_mod
+
+    shipped = skills_mod.available()
+    if not shipped:
+        print("error: this installation has no packaged skills; get them from " "https://github.com/pachterlab/paperpush/tree/main/skills", file=sys.stderr)
+        return 1
+    try:
+        chosen = skills_mod.select(shipped, args.names, include_contributor=args.all or args.uninstall or args.list)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    directory = skills_mod.target_dir(args.agent, project=args.project, dest=args.dest)
+
+    if args.list:
+        for skill in chosen:
+            state = "installed" if (directory / skill.name / "SKILL.md").is_file() else "not installed"
+            kind = " (contributor; needs a source checkout)" if skill.contributor else ""
+            print(f"{skill.name}{kind} [{state}]")
+            if skill.description:
+                print(textwrap.fill(skill.description, width=88, initial_indent="    ", subsequent_indent="    ", break_on_hyphens=False))
+        print(f"\nSkills directory: {directory}")
+        return 0
+
+    if args.uninstall:
+        results = skills_mod.uninstall(chosen, directory)
+        for skill, outcome in results:
+            if outcome == "removed":
+                print(f"removed {skill.name}")
+            elif outcome == "kept":
+                print(f"kept {skill.name}: {directory / skill.name} was not installed by this command")
+        if not any(o == "removed" for _, o in results):
+            print(f"No paperpush skills to remove in {directory}.")
+        return 0
+
+    results = skills_mod.install(chosen, directory, overwrite=args.overwrite)
+    for skill, outcome in results:
+        if outcome == "skipped":
+            print(f"skipped {skill.name}: {directory / skill.name} already exists and was not installed by this command (--overwrite replaces it)")
+        else:
+            print(f"{outcome} {skill.name}")
+    print(f"Skills directory: {directory}")
+    if not args.all and not args.names:
+        left_out = [s.name for s in shipped if s.contributor]
+        if left_out:
+            print(f"Contributor skills not installed ({', '.join(left_out)}); add --all if you work on paperpush itself.")
+    if any(o in ("installed", "updated") for _, o in results):
+        print("Start a new agent session to load them.")
+    return 1 if any(o == "skipped" for _, o in results) else 0
+
+
 def _cmd_update_venues(args: argparse.Namespace) -> int:
     """Fetch the published venue data now, or clear the cached copy.
 
@@ -204,7 +258,7 @@ def _cmd_update_venues(args: argparse.Namespace) -> int:
         return 0
 
     if not venue_data.uses_published():
-        print("note: published venue data is not used here (PAPERPUSH_VENUE_DATA, or a source " "checkout); fetching it into the cache anyway.", file=sys.stderr)
+        print("note: published venue data is not used here (PAPERPUSH_VENUE_DATA is set); fetching it into the cache anyway.", file=sys.stderr)
     try:
         result = venue_data.refresh(force=True)
     except Exception as exc:
@@ -243,14 +297,14 @@ def _cmd_add_venue(args: argparse.Namespace) -> int:
             sys.stdout.write(text)
             return 0
         path = Path(out)
-        if path.exists() and not args.force:
-            print(f"error: {path} already exists (use --force to overwrite)", file=sys.stderr)
+        if path.exists() and not args.overwrite:
+            print(f"error: {path} already exists (use --overwrite to replace it)", file=sys.stderr)
             return 1
         path.write_text(text, encoding="utf-8")
         what = f"{args.from_slug}'s current entries" if args.from_slug else "the fields most portals share"
         print(f"Wrote {path}, starting from {what}.")
         print("Fill it in from the venue's submission portal and author guidelines (by hand, or ask an AI agent),")
-        print(f"then run:  paperpush add-venue {path}" + (" --force" if args.from_slug and (not slug or slug == args.from_slug) else ""))
+        print(f"then run:  paperpush add-venue {path}" + (" --overwrite" if args.from_slug and (not slug or slug == args.from_slug) else ""))
         return 0
 
     if not args.file:
@@ -269,7 +323,7 @@ def _cmd_add_venue(args: argparse.Namespace) -> int:
         return 1
 
     data_dir = Path(args.data_dir) if args.data_dir else None
-    result = venuefile.check(doc, force=args.force, data_dir=data_dir)
+    result = venuefile.check(doc, force=args.overwrite, data_dir=data_dir)
     for warning in result.warnings:
         print(f"warning: {warning}", file=sys.stderr)
     if result.errors:
@@ -283,7 +337,7 @@ def _cmd_add_venue(args: argparse.Namespace) -> int:
         print(f"\n(dry run) {path} is valid; nothing written.", file=sys.stderr)
         return 0
 
-    merged = venuefile.merge(doc, data_dir=data_dir, force=args.force)
+    merged = venuefile.merge(doc, data_dir=data_dir, force=args.overwrite)
     where = venuefile.database_paths(data_dir)["venues"].parent
     for name in merged.written:
         print(f"Added {doc.slug} to {where / name}")
@@ -304,6 +358,8 @@ def _cmd_add_venue(args: argparse.Namespace) -> int:
             print(f"  python scripts/check_venue_consistency.py {doc.slug}")
         if doc.form is not None:
             print(f"  To submit: add a runner at paperpush/venues/<portal>/{doc.slug}.py (see CONTRIBUTING.md)")
+        if venue_data.uses_published():
+            print("  Set PAPERPUSH_VENUE_DATA=bundled while you work on it, so the published venue data does not override your entries.")
     else:
         print(f"  The entries are in the installed package ({where}); upgrading paperpush replaces them.")
         print(f"  To share the venue, open a pull request or issue with {path.name} at {__url__}")
@@ -313,14 +369,14 @@ def _cmd_add_venue(args: argparse.Namespace) -> int:
 
 
 @_validate
-def _open_web(sub_path: Path, *, manuscript_dirs=(), action: str | None = None) -> int:
+def _open_web(sub_path: Path, *, manuscript_dirs=(), action: str | None = None, colorblind: bool = False) -> int:
     """Open ``sub_path`` in the paperpush web page on this machine (``--web``) and serve it until Ctrl-C."""
     try:
         from .web.app import serve_local
     except ImportError:
         print("error: --web needs the web extra: pip install 'paperpush[web]'", file=sys.stderr)
         return 1
-    return serve_local(Path(sub_path), manuscript_dirs=tuple(manuscript_dirs), action=action)
+    return serve_local(Path(sub_path), manuscript_dirs=tuple(manuscript_dirs), action=action, **({"colorblind": True} if colorblind else {}))
 
 
 # How long a preview server started by 'subfile'/'autofill' waits for a request
@@ -367,7 +423,7 @@ def _print_web_link(sub_path: Path, *, manuscript_dirs=(), blank_line: bool = Fa
     token = secrets.token_urlsafe(24)
     cmd = [sys.executable, "-m", "paperpush", "web", str(sub_path.resolve()), "--no-browser", "--port", str(port), "--idle-timeout", str(_PREVIEW_IDLE_SECONDS)]
     for d in manuscript_dirs:
-        cmd += ["-d", str(Path(d).resolve())]
+        cmd += ["-p", str(Path(d).resolve())]
     try:
         subprocess.Popen(  # nosec B603
             cmd,
@@ -400,8 +456,8 @@ def _cmd_web(args: argparse.Namespace) -> int:
         return 1
     open_browser = not args.no_browser
     if not args.subfile:
-        if args.directory:
-            print("error: --directory needs a .sub file to go with it", file=sys.stderr)
+        if args.paths:
+            print("error: --path needs a .sub file to go with it", file=sys.stderr)
             return 2
         return serve_app(port=args.port, open_browser=open_browser)
     path = Path(args.subfile)
@@ -418,11 +474,13 @@ def _cmd_web(args: argparse.Namespace) -> int:
     if not venue:
         print(f"error: {path} has no '@venue:' line, so it is not a .sub file", file=sys.stderr)
         return 1
-    dirs = tuple(Path(d) for d in args.directory or ())
-    missing = [d for d in dirs if not d.is_dir()]
+    given = [Path(p).expanduser() for p in args.paths or ()]
+    missing = [p for p in given if not p.exists()]
     if missing:
-        print(f"error: not a directory: {', '.join(map(str, missing))}", file=sys.stderr)
+        print(f"error: no such file or directory: {', '.join(map(str, missing))}", file=sys.stderr)
         return 1
+    # A file stands for the directory holding it: the pickers list directories.
+    dirs = tuple(dict.fromkeys(p if p.is_dir() else p.parent for p in given))
     return serve_local(
         path,
         manuscript_dirs=dirs,
@@ -434,7 +492,7 @@ def _cmd_web(args: argparse.Namespace) -> int:
 
 
 def _cmd_subfile(args: argparse.Namespace) -> int:
-    logger.debug("subfile: requested venue %r, output=%r, fill_defaults=%s, " "force=%s, venue_order=%s", args.venue, args.output, args.fill_defaults, args.force, getattr(args, "venue_order", False))
+    logger.debug("subfile: requested venue %r, output=%r, fill_defaults=%s, " "overwrite=%s, venue_order=%s", args.venue, args.output, args.fill_defaults, args.overwrite, getattr(args, "venue_order", False))
     try:
         venue = get_venue(args.venue)
     except KeyError:
@@ -454,16 +512,16 @@ def _cmd_subfile(args: argparse.Namespace) -> int:
             venue,
             path=target,
             fill_defaults=args.fill_defaults,
-            overwrite=args.force,
+            overwrite=args.overwrite,
             venue_order=getattr(args, "venue_order", False),
         )
     except FileExistsError:
         if getattr(args, "web", False):
             # Nothing to create: open the existing file instead.
-            print(f"{target} already exists; opening it (use --force to start from a fresh template).")
+            print(f"{target} already exists; opening it (use --overwrite to start from a fresh template).")
             return _open_web(target)
         logger.info("subfile: refusing to overwrite existing %s", target)
-        print(f"error: {target} already exists (use --force to overwrite)", file=sys.stderr)
+        print(f"error: {target} already exists (use --overwrite to replace it)", file=sys.stderr)
         return 1
 
     required = sum(1 for f in venue.fields if f.required)
@@ -538,6 +596,56 @@ def _list_logins() -> int:
     return 0
 
 
+def _check_login(venue, args: argparse.Namespace) -> int:
+    """Re-verify the stored credential for ``venue`` against its real sign-in.
+
+    ``--status`` only says a credential is stored; this signs in with it, so a
+    password changed since ``paperpush login`` is caught before ``submit``. Runs
+    headless (no window, no prompt) so an agent can call it unattended -- which
+    means a CAPTCHA or two-factor step cannot be completed and reads as a failure.
+
+    Exit codes: 0 sign-in works (or the venue cannot be checked automatically --
+    a note says so), 1 nothing stored or the sign-in failed.
+    """
+    from .venues.login import LoginVerificationError, verify_login
+
+    cred = credentials.get_credential(venue.slug)
+    if cred is None:
+        print(f"Not logged in to {venue.slug}. Run 'paperpush login {venue.slug}' first.")
+        return 1
+
+    who = _describe_identity(cred)
+    print(f"Checking the stored {venue.slug} login ({who}) by signing in…")
+    try:
+        verify_login(
+            venue.slug,
+            cred.username,
+            cred.password,
+            method=cred.method,
+            headless=True,
+            timeout=getattr(args, "timeout", DEFAULT_TIMEOUT_SECONDS),
+        )
+    except NotImplementedError as exc:
+        logger.warning("login --check: cannot drive %s sign-in for %s: %s", cred.method, venue.slug, exc)
+        print(f"Credentials are stored for {venue.slug}, but they could not be checked: {exc}")
+        return 0
+    except LoginVerificationError as exc:
+        reason = str(exc)
+        if "no automated sign-in" in reason:
+            logger.info("login --check: %s cannot be checked automatically: %s", venue.slug, reason)
+            print(f"Credentials are stored for {venue.slug}, but they could not be checked: {reason}")
+            return 0
+        logger.warning("login --check: stored credentials for %s failed: %s", venue.slug, reason)
+        print(f"error: the stored {venue.slug} login did not work: {reason}", file=sys.stderr)
+        print(
+            f"Run 'paperpush login {venue.slug}' to sign in again (it opens a browser, " "so a CAPTCHA or two-factor prompt can be completed by hand).",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"Sign-in confirmed: the stored {venue.slug} login works.")
+    return 0
+
+
 @_validate
 def _cmd_login(args: argparse.Namespace) -> int:
     if getattr(args, "list", False):
@@ -598,6 +706,9 @@ def _cmd_login(args: argparse.Namespace) -> int:
         else:
             print(f"Logged in to {venue.slug} as {who} (stored in {store}).")
         return 0
+
+    if getattr(args, "check", False):
+        return _check_login(venue, args)
 
     if args.orcid or args.orcid_id:
         # ORCID sign-in is a journal thing: the preprint servers and conference
@@ -1012,7 +1123,14 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         action = "validate-ai" if getattr(args, "ai", False) else "validate"
         if getattr(args, "initial_submission", False):
             action += "+initial"
-        return _open_web(Path(args.subfile), action=action)
+        return _open_web(Path(args.subfile), action=action, colorblind=getattr(args, "alt_color", False))
+
+    report_out = None
+    if getattr(args, "output", None) is not None:
+        report_out = report_mod.output_path(args.output, args.subfile)
+        if report_out.exists() and not getattr(args, "overwrite", False):
+            print(f"error: {report_out} already exists (use --overwrite to replace it)", file=sys.stderr)
+            return 1
 
     if getattr(args, "arxiv_latex_cleaner", False):
         subfile = _clean_latex_sources(subfile, venue_def)
@@ -1062,8 +1180,8 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         tasks_path.write_text(json.dumps(tasks_payload(result.ai_tasks, venue_def, args.subfile), indent=2) + "\n", encoding="utf-8")
         again = " --ai-only" if ai_only else ""
         print(f"\nWrote {len(result.ai_tasks)} AI check(s) to {tasks_path}; have an agent answer them, then run 'paperpush validate {args.subfile}{again} --ai-results <results.json>'.")
-    if getattr(args, "output", None) is not None:
-        out = report_mod.output_path(args.output, args.subfile)
+    if report_out is not None:
+        out = report_out
         try:
             report_mod.save(result, out, alt_color=alt)
         except OSError as exc:
@@ -1342,7 +1460,7 @@ def _ai_recovery_handler(args: argparse.Namespace, venue: str, impl, values: dic
     except ModuleNotFoundError:
         found = False
     if not found:
-        raise ValueError(f"--ai with {provider} needs the {_SDK_PACKAGES[provider]} package; install it with 'pip install paperpush[autofill-{provider}]'")
+        raise ValueError(f"--ai with {provider} needs the {_SDK_PACKAGES[provider]} package; install it with 'pip install paperpush[ai-{provider}]'")
     model = getattr(args, "model", None) or DEFAULT_MODELS[provider]
 
     directory = Path(args.recover_dir) if args.recover_dir else _default_recover_dir(venue)
@@ -1371,13 +1489,13 @@ AUTOFILL_INPUT_SUFFIXES = frozenset({".tex", ".ltx", ".doc", ".docx", ".odt", ".
 
 
 class _AutofillInputsAction(argparse.Action):
-    """Collect ``-d`` inputs, stopping at the first ``.sub`` file.
+    """Collect ``-p`` inputs, stopping at the first ``.sub`` file.
 
     argparse hands an ``nargs="+"`` option every string up to the next flag, so
-    ``-d ms/ notes.md biorxiv.sub`` would swallow the .sub file. This action
+    ``-p ms/ notes.md biorxiv.sub`` would swallow the .sub file. This action
     keeps the inputs before the first ``.sub`` and records that file as the
     subfile (reconciled with the positional in :func:`_cmd_autofill`). Repeated
-    ``-d`` flags accumulate.
+    ``-p`` flags accumulate.
     """
 
     def __call__(self, parser, namespace, values, option_string=None):
@@ -1397,7 +1515,7 @@ class _AutofillInputsAction(argparse.Action):
 
 
 def _check_autofill_inputs(raw: list[str]) -> tuple[list[Path], list[Path]] | None:
-    """Split ``-d`` inputs into ``(directories, files)``, or print why not.
+    """Split ``-p`` inputs into ``(directories, files)``, or print why not.
 
     Every input must exist and be either a directory or a document in one of
     :data:`AUTOFILL_INPUT_SUFFIXES`. Returns None after printing an error.
@@ -1435,13 +1553,20 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
     from .autofill import autofill, parse_extraction
     from .subfile import parse, render_template
 
+    if not args.inputs:
+        # Not required=True in argparse, so that the hidden old name -d also satisfies it.
+        parser = getattr(args, "_autofill_parser", None)
+        if parser is not None:
+            parser.error("the following arguments are required: -p/--path")
+        print("error: the following arguments are required: -p/--path", file=sys.stderr)
+        return 2
     trailing_sub = getattr(args, "_subfile_from_inputs", None)
     if trailing_sub and args.subfile:
         print(f"error: two .sub files given ({args.subfile}, {trailing_sub})", file=sys.stderr)
         return 2
     args.subfile = args.subfile or trailing_sub
     if not args.subfile:
-        print("error: no .sub file given, e.g. 'paperpush autofill -d MANUSCRIPT_DIR biorxiv.sub'", file=sys.stderr)
+        print("error: no .sub file given, e.g. 'paperpush autofill -p MANUSCRIPT_DIR biorxiv.sub'", file=sys.stderr)
         return 2
 
     logger.debug(
@@ -1521,8 +1646,8 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
     if args.dry_run:
         print(f"(dry run -- {out_path} not written)\n")
     else:
-        if args.output and out_path.exists() and not args.force and out_path.resolve() != sub_path.resolve():
-            print(f"error: {out_path} already exists (use --force to overwrite)", file=sys.stderr)
+        if args.output and out_path.exists() and not args.overwrite and out_path.resolve() != sub_path.resolve():
+            print(f"error: {out_path} already exists (use --overwrite to replace it)", file=sys.stderr)
             return 1
         out_path.write_text(result.text, encoding="utf-8")
 
@@ -1571,8 +1696,8 @@ def _autofill_in_browser(args: argparse.Namespace, input_dirs: list[Path], input
         return 2
     if text is None:
         text = render_template(venue, fill_defaults=True)
-    if args.output and out_path.exists() and not args.force and out_path.resolve() != sub_path.resolve():
-        print(f"error: {out_path} already exists (use --force to overwrite)", file=sys.stderr)
+    if args.output and out_path.exists() and not args.overwrite and out_path.resolve() != sub_path.resolve():
+        print(f"error: {out_path} already exists (use --overwrite to replace it)", file=sys.stderr)
         return 1
 
     field = manuscript_field(venue)
@@ -1683,7 +1808,7 @@ def _list_inputs(dirs: list[Path], files: list[Path]) -> list[str]:
 def _extract_with_api(venue, dirs: list[Path], files: list[Path], args: argparse.Namespace):
     """Build the document set and run the API extraction engine.
 
-    Documents passed directly with ``-d`` are always sent; the manuscript,
+    Documents passed directly with ``-p`` are always sent; the manuscript,
     title page, and supplement are otherwise picked by name from those files
     and the top level of each directory. Returns an Extraction, or None after
     printing an error (so the caller can exit nonzero).
@@ -1723,6 +1848,69 @@ def _extract_with_api(venue, dirs: list[Path], files: list[Path], args: argparse
     except AutofillApiError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return None
+
+
+@_validate
+def _cmd_codegen(args: argparse.Namespace) -> int:
+    """Record a venue's submission wizard as runner code (Playwright's codegen, for paperpush).
+
+    Opens a browser with the paperpush recorder toolbar: record, play, pause,
+    undo/redo, branches, step labels, .sub variables, copy the code, copy the
+    page's HTML. Given a .sub (or --venue), it reuses the venue's saved sign-in,
+    offers the venue's fields as variables, and binds typed values that match
+    the .sub to their field automatically.
+    """
+    from .codegen.session import CodegenSession
+    from .venues.common import session_path
+
+    sub_values: dict[str, str] = {}
+    slug = args.venue
+    if args.sub:
+        from .subfile import load
+
+        try:
+            subfile = load(args.sub)
+        except OSError as exc:
+            print(f"error: cannot read {args.sub}: {exc}", file=sys.stderr)
+            return 1
+        sub_values = {k: v for k, v in subfile.values.items() if v and v.strip()}
+        slug = slug or subfile.venue or None
+
+    fields: list[str] = list(sub_values)
+    file_fields: list[str] = []
+    field_options: dict[str, list[str]] = {}
+    url = args.url or ""
+    storage_state = None
+    if slug:
+        try:
+            venue_def = get_venue(slug)
+        except KeyError:
+            print(f"error: unknown venue {slug!r} (see 'paperpush --venues')", file=sys.stderr)
+            return 1
+        fields = [f.id for f in venue_def.fields]
+        file_fields = [f.id for f in venue_def.fields if f.type in ("file", "filelist")]
+        field_options = {f.id: [str(o) for o in f.options] for f in venue_def.fields if f.options}
+        impl = None
+        with contextlib.suppress(Exception):
+            from .venues import get_venue_impl
+
+            impl = get_venue_impl(slug)
+        if not url:
+            url = (impl.portal_url if impl is not None else "") or venue_def.submission_url
+        session = impl.session_path() if impl is not None else session_path(slug)
+        if not args.new_session and session.exists():
+            storage_state = session
+            print(f"Reusing the saved {slug} sign-in ({session}).")
+
+    header = "Recorded with `paperpush codegen`" + (f" for {slug}" if slug else "") + "."
+    rec = CodegenSession(url=url or "about:blank", target=args.target, output=args.output, sub_values=sub_values, fields=fields, file_fields=file_fields, field_options=field_options, storage_state=storage_state, header=header)
+    print("Recording. Use the paperpush toolbar in the page; close the browser when you are done.")
+    rendered = rec.run()
+    if args.output:
+        print(f"Wrote {args.output}")
+    else:
+        print(rendered.code)
+    return 0
 
 
 @_validate
@@ -1910,14 +2098,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     # metavar lists only the public commands; the internal 'schema' command is
     # registered below but deliberately left out so it does not appear in --help.
-    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,requirements,login,submit,web,add-venue,update-venues}")
+    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,requirements,login,submit,codegen,web,add-venue,update-venues,install-skills}")
 
     p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub submission template")
     p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv")
-    p_subfile.add_argument("-o", "--output", help="output path for the .sub file")
-    p_subfile.add_argument("--fill-defaults", dest="fill_defaults", action="store_true", help="pre-populate fields with their default values (this is the default)")
+    p_subfile.add_argument("-o", "--output", metavar="OUT", help="output path for the .sub file (default: VENUE.sub in the current directory, e.g. biorxiv.sub; .sub is added if missing)")
     p_subfile.add_argument("--dont-fill-defaults", dest="fill_defaults", action="store_false", help="leave fields with default values empty instead of pre-populating them")
-    p_subfile.add_argument("--force", action="store_true", help="overwrite an existing .sub file")
+    p_subfile.add_argument("--overwrite", action="store_true", help="overwrite an existing .sub file")
+    p_subfile.add_argument("--force", dest="overwrite", action="store_true", help=argparse.SUPPRESS)
     p_subfile.add_argument("--web", action="store_true", help="then open the .sub in the paperpush web page on this computer, to fill it in through a form; edits are saved to the file (needs pip install 'paperpush[web]')")
     p_subfile.add_argument("--venue-order", dest="venue_order", action="store_true", help="list fields in the order the venue's submission form asks for them, instead of grouped into the sections every venue shares")
     p_subfile.set_defaults(func=_cmd_subfile, fill_defaults=True)
@@ -1930,15 +2118,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_autofill = sub.add_parser("autofill", parents=[verbosity], help="fill a .sub file from a directory of manuscript files")
     p_autofill.add_argument("subfile", nargs="?", help="the .sub file to fill (created from the filename's venue slug " "if it does not exist yet), e.g. biorxiv.sub")
     p_autofill.add_argument(
-        "-d",
-        "--directory",
+        "-p",
+        "--path",
         dest="inputs",
         nargs="+",
         action=_AutofillInputsAction,
-        required=True,
-        metavar="INPUT",
-        help="one or more manuscript directories and/or document files (" + ", ".join(sorted(AUTOFILL_INPUT_SUFFIXES)) + "). " "Takes everything up to the next flag or the first .sub file, and may be repeated",
+        metavar="PATH",
+        help="(required) one or more manuscript directories and/or document files (" + ", ".join(sorted(AUTOFILL_INPUT_SUFFIXES)) + "). " "Takes everything up to the next flag or the first .sub file, and may be repeated",
     )
+    # Old names for -p/--path, kept working but left out of --help.
+    p_autofill.add_argument("-d", "--directory", dest="inputs", nargs="+", action=_AutofillInputsAction, help=argparse.SUPPRESS)
     p_autofill.add_argument(
         "--engine",
         choices=["manual", "api"],
@@ -1952,17 +2141,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_autofill.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(api) LLM provider; defaults to the first of anthropic, openai, google " "whose API key is set (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY)")
     p_autofill.add_argument("--model", help="(api) model to use (default: claude-opus-5-5, gpt-6-astra, or " "gemini-3.8-flash, by provider)")
     p_autofill.add_argument("--min-confidence", choices=["low", "medium", "high"], default="low", help="do not write any value below this confidence (default: low)")
-    p_autofill.add_argument("-o", "--output", help="write the filled file here instead of overwriting the .sub")
-    p_autofill.add_argument("--force", action="store_true", help="overwrite --output if it already exists")
+    p_autofill.add_argument("-o", "--output", metavar="OUT", help="write the filled file here instead of overwriting the .sub")
+    p_autofill.add_argument("--overwrite", action="store_true", help="overwrite --output if it already exists")
+    p_autofill.add_argument("--force", dest="overwrite", action="store_true", help=argparse.SUPPRESS)
     p_autofill.add_argument("--dry-run", action="store_true", help="show what would be filled without writing the file")
     p_autofill.add_argument("--web", action="store_true", help="open the .sub in the paperpush web page on this computer to review the values; edits are saved to the file. Without --values or --engine api the page runs the autofill itself, with the API key from the page or the environment (needs pip install 'paperpush[web]')")
-    p_autofill.set_defaults(func=_cmd_autofill)
+    p_autofill.set_defaults(func=_cmd_autofill, inputs=None, _autofill_parser=p_autofill)
 
     p_validate = sub.add_parser(
         "validate",
         parents=[verbosity],
         help="run the pre-submission checks on a .sub file",
-        description="Run the pre-submission checks on a .sub file and print a report of every check:\npassed (green), failed (red), and not checked -- could not run, needs AI, or not\nimplemented -- (yellow).",
+        description="Run the pre-submission checks on a .sub file and print a report of every check:\npassed (green), failed (red), warnings (amber), needs AI (purple), and could not run\nor not implemented (grey; a check that could not run says why). --colorblind\nswitches to a colour-blind-friendly palette.",
         epilog=_VALIDATE_CHECKS,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -2022,9 +2212,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         nargs="?",
         const="",
-        metavar="PATH",
-        help="also save the report. PDF by default (keeps the colours); give a path ending in .html, .md, or .txt for those formats. With no PATH, writes <subfile>_validation.pdf next to the .sub.",
+        metavar="OUT",
+        help="also save the report. PDF by default (keeps the colours); give a path ending in .html, .md, or .txt for those formats. With no OUT, writes <subfile>_validation.pdf next to the .sub.",
     )
+    p_validate.add_argument("--overwrite", action="store_true", help="replace the report saved with -o if the file already exists")
+    p_validate.add_argument("--force", dest="overwrite", action="store_true", help=argparse.SUPPRESS)
     p_validate.add_argument(
         "--initial-submission",
         dest="initial_submission",
@@ -2039,11 +2231,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="DAYS",
         help="warn when the date at the top of the cover letter is more than DAYS days old (default: 7). The cover letter is also checked for the name of a different venue, as left over from an earlier submission.",
     )
-    p_validate.add_argument("--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours (blue for passed, vermillion for failed, dark yellow for warnings, grey for not checked) in the terminal and saved report")
+    p_validate.add_argument("--colorblind", "--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours in the terminal and saved report: blue for passed, vermillion for failed, dark yellow for warnings, reddish purple for needs AI, grey for could not run / not implemented (the same palette as the web app's \"Colorblind-friendly colors\" setting). --alt-color is an older name for it")
     p_validate.add_argument(
         "--ai",
         action="store_true",
-        help="also run the checks only an LLM can judge (lettering in raster figures, the guidelines' free-text rules, whether the .sub's fields say the same as the manuscript, ...) through an LLM API. Needs ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY and the provider's SDK (pip install 'paperpush[autofill]'). Without it those checks are listed as needing AI.",
+        help="also run the checks only an LLM can judge (lettering in raster figures, the guidelines' free-text rules, whether the .sub's fields say the same as the manuscript, ...) through an LLM API. Needs ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY and the provider's SDK (pip install 'paperpush[ai]'). Without it those checks are listed as needing AI.",
     )
     p_validate.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(--ai) LLM provider; defaults to the first whose API key is set")
     p_validate.add_argument("--model", help="(--ai) model to use (default: the provider's default, as for autofill)")
@@ -2085,6 +2277,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_login.add_argument("--orcid-id", metavar="ID", dest="orcid_id", help="your ORCID iD (e.g. 0000-0002-1825-0097) or the email " "registered with ORCID; implies --orcid and skips that " "prompt (you are still asked for the ORCID password)")
     p_login.add_argument("--into", metavar="SUBFILE", help="after an ORCID login, fill the matching author's " "ORCID/name/affiliation in this .sub file, read from " "their public ORCID record")
     p_login.add_argument("--status", action="store_true", help="show whether credentials are stored, then exit")
+    p_login.add_argument(
+        "--check",
+        action="store_true",
+        help="sign in with the stored credentials (headless) to confirm " "they still work, then exit; unlike --status this catches a " "changed password. Exits 1 if nothing is stored or the sign-in fails",
+    )
     p_login.add_argument("--logout", action="store_true", help="remove stored credentials for the venue")
     p_login.add_argument("--no-verify", dest="no_verify", action="store_true", help="store the credentials without checking them against " "the venue's sign-in (the default opens a browser and " "verifies first)")
     p_login.add_argument("--verify-headless", dest="verify_headless", action="store_true", help="run the verification browser headless (no window; " "cannot complete a CAPTCHA or two-factor prompt)")
@@ -2146,6 +2343,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_submit.set_defaults(func=_cmd_submit)
 
+    p_codegen = sub.add_parser("codegen", parents=[verbosity], help="record a venue's submission wizard as runner code")
+    p_codegen.add_argument("url", nargs="?", help="page to start on (default: the venue's portal, else a blank page)")
+    p_codegen.add_argument("--venue", help="venue slug: its fields become the variables and its saved sign-in is reused")
+    p_codegen.add_argument("--sub", metavar="SUBFILE", help="a filled .sub: typed values and files matching it are bound to its fields, and Play replays its values")
+    p_codegen.add_argument("--target", choices=["paperpush", "python"], default="paperpush", help="paperpush: the body of a venue runner's submit() (default); python: a standalone Playwright script")
+    p_codegen.add_argument("-o", "--output", metavar="OUT", help="write the code here, updated as you record (default: print it at the end)")
+    p_codegen.add_argument("--new-session", dest="new_session", action="store_true", help="start signed out instead of reusing the venue's saved sign-in")
+    p_codegen.set_defaults(func=_cmd_codegen)
+
     p_web = sub.add_parser(
         "web",
         parents=[verbosity],
@@ -2155,7 +2361,8 @@ def build_parser() -> argparse.ArgumentParser:
         "Needs pip install 'paperpush[web]'.",
     )
     p_web.add_argument("subfile", nargs="?", help="a .sub file to open, e.g. biorxiv.sub")
-    p_web.add_argument("-d", "--directory", action="append", metavar="DIR", help="a manuscript directory whose files the page offers in its file pickers (with a .sub file; may be repeated)")
+    p_web.add_argument("-p", "--path", dest="paths", action="append", metavar="PATH", help="a manuscript directory (or a file in it) whose files the page offers in its file pickers (with a .sub file; may be repeated)")
+    p_web.add_argument("-d", "--directory", dest="paths", action="append", help=argparse.SUPPRESS)  # old name for -p/--path
     p_web.add_argument("--port", type=int, default=0, help="port to listen on (default: any free port)")
     p_web.add_argument("--no-browser", action="store_true", help="print the address instead of opening a browser")
     # Used by the background preview 'subfile' and 'autofill' start: stop after this many idle seconds.
@@ -2178,8 +2385,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_add.add_argument("file", nargs="?", metavar="FILE", help="the venue file to add; with --template, the new venue's slug (optional)")
     p_add.add_argument("--template", action="store_true", help="write a venue file to fill in instead of adding one")
     p_add.add_argument("--from", dest="from_slug", metavar="SLUG", help="(--template) start from an existing venue's entries, e.g. to fix them or to add a sister journal")
-    p_add.add_argument("-o", "--output", metavar="PATH", help="(--template) where to write the file (default: SLUG.txt; '-' prints it)")
-    p_add.add_argument("--force", action="store_true", help="overwrite an existing file (--template), or replace an existing venue's entries")
+    p_add.add_argument("-o", "--output", metavar="OUT", help="(--template) where to write the file (default: SLUG.txt; '-' prints it)")
+    p_add.add_argument("--overwrite", action="store_true", help="overwrite an existing file (--template), or replace an existing venue's entries")
+    p_add.add_argument("--force", dest="overwrite", action="store_true", help=argparse.SUPPRESS)  # old name for --overwrite
     p_add.add_argument("--dry-run", action="store_true", help="check the file and print the entries it would add, without writing them")
     p_add.add_argument("--data-dir", dest="data_dir", metavar="DIR", help="write the databases in DIR instead of the installed package (copied there first if missing); use them with PAPERPUSH_VENUE_DATA=DIR")
     p_add.set_defaults(func=_cmd_add_venue)
@@ -2187,6 +2395,32 @@ def build_parser() -> argparse.ArgumentParser:
     p_update = sub.add_parser("update-venues", parents=[verbosity], help="fetch the latest published venue data (otherwise refreshed daily)")
     p_update.add_argument("--clear", action="store_true", help="delete the cached copy and use the data bundled with this version")
     p_update.set_defaults(func=_cmd_update_venues)
+
+    p_skills = sub.add_parser(
+        "install-skills",
+        parents=[verbosity],
+        help="install paperpush's agent skills (autofill, validate, submit, portal debugging) for Claude Code or Codex",
+        description="Install the agent skills that ship with paperpush, so an AI agent knows how to autofill, validate, and submit with it.\n\n"
+        "  paperpush install-skills                  the author skills, for Claude Code in every project\n"
+        "  paperpush install-skills --all           also the contributor skills (adding and fixing venues)\n"
+        "  paperpush install-skills --agent codex   for Codex instead\n"
+        "  paperpush install-skills --project .     into this project only\n"
+        "  paperpush install-skills --list          show the skills and whether each is installed\n"
+        "  paperpush install-skills --uninstall     remove them again\n\n"
+        "Run it again after upgrading paperpush to update the installed copies.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_skills.add_argument("names", nargs="*", metavar="SKILL", help="install only these skills, e.g. paperpush-autofill (or just 'autofill'); default: every author skill")
+    p_skills.add_argument("--agent", choices=sorted(("claude", "codex")), default="claude", help="the agent to install for (default: claude, into ~/.claude/skills; codex: ~/.codex/skills)")
+    where = p_skills.add_mutually_exclusive_group()
+    where.add_argument("--project", nargs="?", const=".", metavar="DIR", help="install into the project at DIR (default: the current directory) instead of your user skills directory")
+    where.add_argument("--dest", metavar="DIR", help="install into this skills directory instead, for another agent")
+    p_skills.add_argument("--all", action="store_true", help="also install the contributor skills (paperpush-add-venue, paperpush-add-venue-validate), which need a source checkout")
+    p_skills.add_argument("--overwrite", action="store_true", help="replace a skill directory of the same name that this command did not install")
+    action = p_skills.add_mutually_exclusive_group()
+    action.add_argument("--list", action="store_true", help="list the skills and whether each is installed, then exit")
+    action.add_argument("--uninstall", action="store_true", help="remove the skills this command installed")
+    p_skills.set_defaults(func=_cmd_install_skills)
 
     p_report = sub.add_parser("recovery-report", parents=[verbosity], help="draft a redacted bug report from a submit run whose steps needed recovery")
     p_report.add_argument("directory", nargs="?", help="the run's recovery directory (default: the latest run with recoveries)")

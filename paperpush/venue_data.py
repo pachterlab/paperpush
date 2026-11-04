@@ -13,11 +13,14 @@ Resolution, controlled by ``PAPERPUSH_VENUE_DATA``:
 
 * ``auto`` (default) -- use the cached remote copy, refreshing it at most once
   per :data:`REFRESH_INTERVAL_SECONDS`; fall back to the bundled copy when there
-  is no usable cache. In a source checkout (the package sits next to ``.git``)
-  ``auto`` means ``bundled``, so a contributor's edits to ``venues.json`` are
-  what they see and what the tests and generators read.
-* ``remote`` -- as ``auto``, but also in a source checkout.
-* ``bundled`` -- only the files shipped with the installed package.
+  is no usable cache. This holds for a pip install and a source checkout alike:
+  either way the published data is merged onto the local files, so data fixes
+  arrive daily while new runners (and venues that need them) arrive with
+  ``pip install -U`` or ``git pull``.
+* ``remote`` -- the same as ``auto``.
+* ``bundled`` -- only the local files: the installed package's, or in a source
+  checkout the checkout's. A contributor editing the venue data opts in to
+  this so their edits are what they see; the tests and generators set it.
 * a directory path -- read the files from that directory (same layout as the
   published data; a ``manifest.json`` is optional). For testing data changes.
 
@@ -161,8 +164,7 @@ def _mode() -> str:
 
 def uses_published() -> bool:
     """Whether this process reads the published copy (rather than bundled or override data)."""
-    mode = _mode()
-    return mode == "remote" or (mode == "auto" and not _in_source_checkout())
+    return _mode() in {"auto", "remote"}
 
 
 # ---------------------------------------------------------------------------

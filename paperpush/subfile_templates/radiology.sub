@@ -10,8 +10,6 @@
 
 @venue: radiology
 # submission guide: https://pubs.rsna.org/page/radiology/author-instructions
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

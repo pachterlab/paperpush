@@ -39,7 +39,7 @@ def test_web_opens_by_default_on_any_free_port(served):
 def test_web_with_a_sub_file_opens_it_filled_in(served, tmp_path):
     sub = tmp_path / "nar.sub"
     sub.write_text(SUB.read_text(encoding="utf-8"), encoding="utf-8")
-    assert main(["web", str(sub), "-d", str(tmp_path), "--no-browser"]) == 0
+    assert main(["web", str(sub), "-p", str(tmp_path), "--no-browser"]) == 0
     [(kind, args, kwargs)] = served
     assert kind == "local"
     assert args == (sub,)
@@ -61,7 +61,7 @@ def test_web_refuses_a_file_without_a_venue(served, tmp_path, capsys):
 
 
 def test_web_directory_needs_a_sub_file(served, tmp_path, capsys):
-    assert main(["web", "-d", str(tmp_path)]) == 2
+    assert main(["web", "-p", str(tmp_path)]) == 2
     assert "needs a .sub file" in capsys.readouterr().err
     assert served == []
 
@@ -69,9 +69,20 @@ def test_web_directory_needs_a_sub_file(served, tmp_path, capsys):
 def test_web_refuses_a_missing_directory(served, tmp_path, capsys):
     sub = tmp_path / "nar.sub"
     sub.write_text(SUB.read_text(encoding="utf-8"), encoding="utf-8")
-    assert main(["web", str(sub), "-d", str(tmp_path / "missing")]) == 1
-    assert "not a directory" in capsys.readouterr().err
+    assert main(["web", str(sub), "-p", str(tmp_path / "missing")]) == 1
+    assert "no such file or directory" in capsys.readouterr().err
     assert served == []
+
+
+def test_web_path_accepts_a_file_and_the_old_directory_flag(served, tmp_path):
+    sub = tmp_path / "nar.sub"
+    sub.write_text(SUB.read_text(encoding="utf-8"), encoding="utf-8")
+    doc = tmp_path / "paper.pdf"
+    doc.write_bytes(b"%PDF-")
+    # A file stands for its directory; -d/--directory are old names for -p/--path.
+    assert main(["web", str(sub), "--path", str(doc), "-d", str(tmp_path), "--no-browser"]) == 0
+    [(_, _, kwargs)] = served
+    assert kwargs["manuscript_dirs"] == (tmp_path,)
 
 
 # -- the localhost link 'subfile' and 'autofill' print -----------------------

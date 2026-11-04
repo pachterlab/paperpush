@@ -23,16 +23,17 @@ Optional extras
 
 Some features need extra dependencies, declared as optional extras:
 
-``autofill``
-   Adds the Anthropic, OpenAI, and Google (``google-genai``) SDKs, used by
-   ``paperpush autofill --engine api`` to extract submission fields with an
-   LLM. To install only the provider you use, pick ``autofill-anthropic``,
-   ``autofill-openai``, or ``autofill-google`` instead.
+``ai``
+   Adds the Anthropic, OpenAI, and Google (``google-genai``) SDKs, used
+   wherever paperpush calls an LLM API: ``paperpush autofill --engine api``,
+   ``paperpush validate --ai``, and AI recovery during ``paperpush submit``.
+   To install only the provider you use, pick ``ai-anthropic``,
+   ``ai-openai``, or ``ai-google`` instead.
 
    .. code-block:: bash
 
-      pip install "paperpush[autofill]"            # all three providers
-      pip install "paperpush[autofill-openai]"     # just OpenAI
+      pip install "paperpush[ai]"                  # all three providers
+      pip install "paperpush[ai-openai]"           # just OpenAI
 
 ``validate``
    Optional extras for ``validate``:

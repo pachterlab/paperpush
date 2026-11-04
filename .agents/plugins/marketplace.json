@@ -1,0 +1,21 @@
+{
+  "name": "paperpush",
+  "interface": {
+    "displayName": "paperpush"
+  },
+  "plugins": [
+    {
+      "name": "paperpush",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/pachterlab/paperpush.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

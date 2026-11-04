@@ -10,8 +10,6 @@
 
 @venue: ieee_tnnls
 # submission guide: https://cis.ieee.org/publications/t-neural-networks-and-learning-systems/tnnls
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

@@ -792,7 +792,7 @@ def check(doc: VenueDoc, *, force: bool = False, data_dir: Optional[Path] = None
     if not SLUG_RE.match(slug):
         res.errors.append(f"[venue] slug {slug!r}: use lowercase letters, digits and underscores, starting with a letter.")
     if slug in info and not force:
-        res.errors.append(f"{slug!r} is already a venue. Use --force to replace its entries (`paperpush add-venue --template --from {slug}` writes its current file).")
+        res.errors.append(f"{slug!r} is already a venue. Use --overwrite to replace its entries (`paperpush add-venue --template --from {slug}` writes its current file).")
     if not doc.venue.get("name"):
         res.warnings.append("[venue] name is empty; the slug is shown instead.")
     problem = _info_problem(slug, doc.venue)

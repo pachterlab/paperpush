@@ -61,7 +61,7 @@ from ._logging import configure_logging
 from .autofill import autofill as _apply_autofill
 from .autofill import field_schema, parse_extraction
 from .database import Venue, get_venue, list_venues
-from .subfile import default_filename, parse as parse_subfile, render_template, write_template
+from .subfile import default_filename, parse as parse_subfile, render_template, resolve_paths, write_template
 from .validate import Issue
 from .validate import validate_report as _run_validate_report
 
@@ -71,6 +71,9 @@ logger = logging.getLogger(__name__)
 # default sign-in check opens a real browser, so this has to leave room for a
 # page load and a CAPTCHA, but not hang the client forever.
 LOGIN_TIMEOUT_SECONDS = 300.0
+# The headless `login --check` never waits on a human, so it needs only the page
+# loads of one sign-in.
+LOGIN_CHECK_TIMEOUT_SECONDS = 120.0
 
 # How many lines of a submission's output to hand back per status check. Enough
 # to see the step it reached or the traceback that stopped it, without pasting a
@@ -371,7 +374,7 @@ def validate_subfile(
     check_openreview: bool = True,
     ai_results: Optional[list[dict[str, Any]]] = None,
     output: Optional[str] = None,
-    alt_color: bool = False,
+    colorblind: bool = False,
     initial_submission: bool = False,
     ai_only: bool = False,
     cover_letter_max_age_days: int = 7,
@@ -444,14 +447,15 @@ def validate_subfile(
     not_applicable. `errors` block submission; `warnings` are advisory. `ok` is
     true when there are no errors. `output`, an absolute path ending in .pdf,
     .html, .md, or .txt, also saves the colour-coded report there
-    (`alt_color` for a colour-blind-friendly palette).
+    (`colorblind` for a colour-blind-friendly palette, the same as
+    `paperpush validate --colorblind`).
     """
     from . import report as report_mod
     from .ai_validate import AiOptions, tasks_payload
 
     path, text, venue = _load_subfile(subfile, manuscript_dir)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
-    result = _run_validate_report(parse_subfile(text), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path), ai_only=ai_only)
+    result = _run_validate_report(resolve_paths(parse_subfile(text), path.parent), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path), ai_only=ai_only)
     out: dict[str, Any] = {
         "path": str(path),
         "venue": venue.slug,
@@ -467,7 +471,7 @@ def validate_subfile(
         "ai_tasks": tasks_payload([t for t in result.ai_tasks if t.id in {r.id for r in result.by_status(report_mod.NEEDS_AI)}], venue, str(path))["tasks"],
     }
     if output:
-        saved = report_mod.save(result, report_mod.output_path(str(_resolve(output, manuscript_dir)), str(path)), alt_color=alt_color)
+        saved = report_mod.save(result, report_mod.output_path(str(_resolve(output, manuscript_dir)), str(path)), alt_color=colorblind)
         out["report"] = str(saved)
     return out
 
@@ -487,7 +491,7 @@ def validation_ai_tasks(subfile: str, manuscript_dir: Optional[str] = None) -> d
     from .ai_validate import tasks_payload
 
     path, text, venue = _load_subfile(subfile, manuscript_dir)
-    result = _run_validate_report(parse_subfile(text), venue, check_links=False, check_references=False, check_openreview=False, subfile_path=str(path))
+    result = _run_validate_report(resolve_paths(parse_subfile(text), path.parent), venue, check_links=False, check_references=False, check_openreview=False, subfile_path=str(path))
     return tasks_payload(result.ai_tasks, venue, str(path))
 
 
@@ -587,21 +591,65 @@ def autofill_subfile(
 # ---------------------------------------------------------------------------
 
 
-def login_status(venue: Optional[str] = None) -> dict[str, Any]:
+def _check_stored_login(base: str, timeout_seconds: float = LOGIN_CHECK_TIMEOUT_SECONDS) -> dict[str, Any]:
+    """Run `paperpush login <base> --check` and classify the outcome.
+
+    A subprocess, like `login`: the check drives Playwright's sync API, which
+    cannot run inside the server's event loop. The CLI prints only the venue and
+    the login's identity, never the password.
+    """
+    command = _paperpush_command("login", base) + ["--check"]
+    display_command = f"paperpush login {base} --check"
+    logger.info("login_status: running %s", display_command)
+    try:
+        # Audited for B603: fixed argv list; the only interpolated element is a
+        # venue slug already checked against the database by _venue_or_error.
+        completed = subprocess.run(  # nosec B603
+            command,
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            timeout=timeout_seconds if timeout_seconds > 0 else None,
+        )
+    except subprocess.TimeoutExpired:
+        return {"status": "timed_out", "command": display_command, "reason": f"the sign-in check did not finish within {timeout_seconds:g}s"}
+    except OSError as exc:
+        raise ValueError(f"could not run {display_command}: {exc}") from exc
+
+    output = "\n".join(part.strip() for part in (completed.stdout, completed.stderr) if part.strip())
+    if completed.returncode == 0:
+        status = "unchecked" if "could not be checked" in completed.stdout else "ok"
+    else:
+        status = "failed"
+    return {"status": status, "command": display_command, "output": output}
+
+
+def login_status(venue: Optional[str] = None, check: bool = False) -> dict[str, Any]:
     """Report which venues have stored submission credentials.
 
     Call this before `login` (or before telling the user to run
     `paperpush login`) -- it is the cheap, offline check for whether a sign-in
-    is needed at all. Never touches the network and never returns a secret.
+    is needed at all. By default it never touches the network, and it never
+    returns a secret.
 
     With no argument, lists every stored login. With `venue` (a slug or a `.sub`
     path), reports just that one, including the `login_command` to run if it is
     not signed in.
 
+    `check=true` (needs `venue`) also signs in with the stored credentials in a
+    headless browser -- `paperpush login <venue> --check` -- and adds a `check`
+    entry: `status` is `ok`, `failed` (e.g. the password changed since login, or
+    the portal showed a CAPTCHA / two-factor prompt), `unchecked` (paperpush
+    cannot sign in to this venue automatically; treat as a pass) or `timed_out`.
+    On `failed` or `timed_out`, `logged_in` is false and `login_command` is set:
+    ask the user to run it in their own terminal. Use this right before `submit`.
+
     Venues that submit through a shared portal (the AAAS and Nature families)
     share one credential, stored under the base venue; each sibling is listed
     separately here, since that is how an author thinks about it.
     """
+    if check and venue is None:
+        raise ValueError("check=true needs a venue: it signs in to that one venue's portal")
     if venue is not None:
         slug = _slug_from_reference(venue)
         resolved = _venue_or_error(slug)
@@ -631,6 +679,11 @@ def login_status(venue: Optional[str] = None) -> dict[str, Any]:
         if credential.display_name:
             entry["display_name"] = credential.display_name
         entry["stored_in"] = "OS keyring" if credentials.credential_location(base) == "keyring" else "config file"
+        if check:
+            entry["check"] = _check_stored_login(base)
+            if entry["check"]["status"] in ("failed", "timed_out"):
+                entry["logged_in"] = False
+                entry["login_command"] = " ".join(["paperpush", "login", base])
         return entry
 
     logins: list[dict[str, Any]] = []

@@ -10,8 +10,6 @@
 
 @venue: arxiv
 # submission guide: https://info.arxiv.org/help/submit/index.html
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Files

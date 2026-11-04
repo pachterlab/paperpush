@@ -7,14 +7,14 @@ hand.
 
 .. code-block:: text
 
-   usage: paperpush autofill [-h] [-v] [-q] -d MANUSCRIPTDIR
+   usage: paperpush autofill [-h] [-v] [-q] [-p PATH [PATH ...]]
                              [--engine {manual,api}] [--values FILE]
                              [--manuscript FILE] [--title-page FILE]
                              [--supplement FILE]
                              [--provider {anthropic,openai,google}]
                              [--model MODEL]
-                             [--min-confidence {low,medium,high}] [-o OUTPUT]
-                             [--force] [--dry-run]
+                             [--min-confidence {low,medium,high}] [-o OUT]
+                             [--overwrite] [--dry-run] [--web]
                              subfile
 
 Synopsis
@@ -22,7 +22,7 @@ Synopsis
 
 .. code-block:: bash
 
-   paperpush autofill -d MANUSCRIPT_DIR biorxiv.sub
+   paperpush autofill -p MANUSCRIPT_DIR biorxiv.sub
 
 If the ``.sub`` file does not exist yet, ``autofill`` creates it first from the
 venue slug in the filename (so ``biorxiv.sub`` is templated as if you had run
@@ -42,9 +42,9 @@ Engines
 
 ``api``
    Extracts fields directly with an LLM API: Anthropic, OpenAI, or Google.
-   Requires that provider's SDK (``pip install "paperpush[autofill]"`` for all
-   three, or ``paperpush[autofill-anthropic]`` / ``[autofill-openai]`` /
-   ``[autofill-google]`` for one) and its API key:
+   Requires that provider's SDK (``pip install "paperpush[ai]"`` for all
+   three, or ``paperpush[ai-anthropic]`` / ``[ai-openai]`` /
+   ``[ai-google]`` for one) and its API key:
 
    =============  ==========================================  ====================
    Provider       API key variable                            Default model
@@ -67,8 +67,12 @@ Arguments
 Options
 -------
 
-``-d MANUSCRIPTDIR``, ``--directory MANUSCRIPTDIR`` (required)
-   Directory holding the manuscript, figures, and other files.
+``-p PATH [PATH ...]``, ``--path PATH [PATH ...]`` (required)
+   One or more manuscript directories and/or document files (``.tex``,
+   ``.doc``, ``.docx``, ``.odt``, ``.rtf``, ``.txt``, ``.md``, ``.rst``,
+   ``.pdf``) holding the manuscript, figures, and other files. Takes everything
+   up to the next flag or the first ``.sub`` file, and may be repeated.
+   (``-d``/``--directory`` are accepted as older names.)
 
 ``--engine {manual,api}``
    Which extraction engine to use. ``manual`` (default) reads values from
@@ -78,7 +82,7 @@ Options
    JSON file of proposed field values. **Required for** ``--engine manual``.
 
 ``--manuscript FILE``
-   *(api)* The manuscript file. Inferred from ``--directory`` if omitted.
+   *(api)* The manuscript file. Inferred from ``--path`` if omitted.
 
 ``--title-page FILE``
    *(api)* A standalone title page with author details, if it is separate from
@@ -99,11 +103,12 @@ Options
    Do not write any value whose extraction confidence is below this threshold.
    Defaults to ``low`` (write everything).
 
-``-o OUTPUT``, ``--output OUTPUT``
+``-o OUT``, ``--output OUT``
    Write the filled file here instead of overwriting the input ``.sub``.
 
-``--force``
-   Overwrite ``--output`` if it already exists.
+``--overwrite``
+   Overwrite ``--output`` if it already exists. (``--force`` is accepted as an
+   older name.)
 
 ``--dry-run``
    Show what would be filled without writing anything.
@@ -131,25 +136,25 @@ Preview an API-based autofill without writing the file:
 
 .. code-block:: bash
 
-   paperpush autofill -d ./my_manuscript --engine api --dry-run biorxiv.sub
+   paperpush autofill -p ./my_manuscript --engine api --dry-run biorxiv.sub
 
 Fill from an agent-produced ``values.json`` (the default manual engine):
 
 .. code-block:: bash
 
-   paperpush autofill -d ./my_manuscript --values values.json biorxiv.sub
+   paperpush autofill -p ./my_manuscript --values values.json biorxiv.sub
 
 Use OpenAI even though an Anthropic key is also set:
 
 .. code-block:: bash
 
-   paperpush autofill -d ./my_manuscript --engine api --provider openai biorxiv.sub
+   paperpush autofill -p ./my_manuscript --engine api --provider openai biorxiv.sub
 
 Write the result to a new file and only accept high-confidence values:
 
 .. code-block:: bash
 
-   paperpush autofill -d ./my_manuscript --engine api \
+   paperpush autofill -p ./my_manuscript --engine api \
        --min-confidence high -o biorxiv.filled.sub biorxiv.sub
 
 .. note::

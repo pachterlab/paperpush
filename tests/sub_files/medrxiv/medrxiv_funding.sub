@@ -10,8 +10,6 @@
 
 @venue: medrxiv
 # submission guide: https://www.medrxiv.org/submit-a-manuscript
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

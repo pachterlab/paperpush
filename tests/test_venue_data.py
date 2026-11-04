@@ -512,11 +512,11 @@ def test_bundled_mode_ignores_the_cache(server, monkeypatch):
     assert venue_data.active_source().kind == "bundled"
 
 
-def test_source_checkout_defaults_to_bundled(server, monkeypatch):
+def test_source_checkout_uses_published_data(server, monkeypatch):
     monkeypatch.setenv("PAPERPUSH_VENUE_DATA", "auto")
     monkeypatch.setattr(venue_data, "_in_source_checkout", lambda: True)
-    assert venue_data.active_source().kind == "bundled"
-    assert server.requests == []
+    assert venue_data.active_source().kind == "remote"
+    assert server.requests
 
 
 def test_override_directory(tmp_path, monkeypatch, bundled):

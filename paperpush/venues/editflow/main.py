@@ -133,10 +133,9 @@ class EditFlowVenue(Venue):
             _next(page)
 
             step("Step 1: author count")
-            # Step 1: declare the author count. EditFlow then shows an intermediate
-            # author-list page before the individual author-details form.
+            # Step 1: declare the author count. EditFlow goes straight on to the
+            # author-details form (it no longer shows an intermediate page here).
             page.get_by_role("textbox", name="How many authors does your").fill(str(len(authors)))
-            _next(page)
             _next(page)
 
             step("Step 2: author details")
@@ -174,7 +173,13 @@ class EditFlowVenue(Venue):
             # Step 3: the MSC control validates on navigation; a venue-specific
             # field validator catches malformed codes before the browser opens.
             page.get_by_role("textbox", name="Article Title").fill(title)
-            page.locator("#mscp0").fill(msc_classification)
+            msc_input = page.locator("#mscp0")
+            msc_input.fill(msc_classification)
+            # EditFlow looks the code up when the box loses focus and lists it
+            # ("05C05: \"Trees\" (MSC2020)") below. Clicking Next Step before that
+            # lookup finishes only runs the validation, so the page stays on Step 3.
+            msc_input.press("Tab")
+            page.get_by_text(f"{msc_classification.upper()}:").wait_for(state="visible")
             _next(page)
 
             step("Step 4: editor, arXiv reference, abstract, and PDF")

@@ -24,7 +24,7 @@ COPY paperpush ./paperpush
 # web: the server; autofill: the LLM SDKs for autofill and the AI checks;
 # validate: PDF layout and LaTeX checks. Playwright's browsers are not
 # installed -- the website never drives a submission portal.
-RUN pip install ".[web,autofill,validate]"
+RUN pip install ".[web,ai,validate]"
 
 RUN useradd --create-home --uid 1000 paperpush \
     && mkdir -p /data \

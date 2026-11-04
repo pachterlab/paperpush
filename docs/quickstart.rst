@@ -32,7 +32,7 @@ The five-step workflow
 
       .. code-block:: bash
 
-         paperpush autofill -d MANUSCRIPT_DIR --engine api biorxiv.sub
+         paperpush autofill -p MANUSCRIPT_DIR --engine api biorxiv.sub
 
    See :doc:`commands/autofill`.
 

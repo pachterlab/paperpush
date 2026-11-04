@@ -472,7 +472,7 @@
   // ---- the venue file: rendered and checked by the server
   function syncFilename() {
     if (!state.filename) $("filename").value = `${state.slug || "venue"}.txt`;
-    const force = state.replacing && state.slug === state.replacing ? " --force" : "";
+    const force = state.replacing && state.slug === state.replacing ? " --overwrite" : "";
     $("cmd").textContent = `paperpush add-venue ${$("filename").value || "venue.txt"}${force}`;
   }
 

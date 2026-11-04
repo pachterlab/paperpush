@@ -216,13 +216,13 @@ def parse_extraction(data: dict) -> Extraction:
 
 
 def _resolve_one_path(path_str: str, search_dirs: list[Path]) -> str:
-    """Make a single file path resolvable from the current directory.
+    """Point a single file path at the file the engine meant.
 
     If the path as given does not exist but the same name does inside one of
-    ``search_dirs`` (tried in order), rewrite it to that location so the file
-    checks in :mod:`paperpush.validate` (which resolves paths against the
-    working directory) find it. Otherwise the value is left untouched for
-    validation to flag.
+    ``search_dirs`` (tried in order), rewrite it to that location. Otherwise
+    the value is left untouched for validation to flag. Relative paths left
+    in the ``.sub`` are later resolved by :func:`paperpush.subfile.load`
+    against the ``.sub`` file's folder first, then the working directory.
     """
     path_str = path_str.strip()
     if not path_str or not search_dirs:
@@ -351,7 +351,7 @@ def autofill(
 # produces so both flow through the deterministic gates above. Every provider
 # gets the same prompt and the same JSON schema; only the request/response
 # plumbing differs. Each SDK is an optional dependency
-# (``pip install paperpush[autofill-<provider>]``, or ``paperpush[autofill]``
+# (``pip install paperpush[ai-<provider>]``, or ``paperpush[ai]``
 # for all three), imported lazily below.
 # ---------------------------------------------------------------------------
 
@@ -649,7 +649,7 @@ def resolve_provider(provider: str | None, alternative: str = "use '--engine man
 
 
 def _missing_sdk(provider: str) -> AutofillApiError:
-    return AutofillApiError(f"the 'api' engine with --provider {provider} needs the {_SDK_PACKAGES[provider]} package; " f"install it with 'pip install paperpush[autofill-{provider}]'.")
+    return AutofillApiError(f"the 'api' engine with --provider {provider} needs the {_SDK_PACKAGES[provider]} package; " f"install it with 'pip install paperpush[ai-{provider}]'.")
 
 
 def _client_kwargs(api_key: str | None) -> dict[str, str]:

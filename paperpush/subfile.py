@@ -195,9 +195,6 @@ def render_template(
         lines.append(f"# submission guide: {venue.submission_guide}")
     if venue_order:
         lines.append("# Fields are listed in the order the venue's submission form asks for them.")
-    else:
-        lines.append("# Fields are grouped by section. 'paperpush subfile --venue-order' lists them")
-        lines.append("# in the order the venue's submission form asks for them instead.")
     lines.append("")
 
     current_section: Optional[str] = None
@@ -347,7 +344,7 @@ def parse(text: str) -> SubFile:
     return SubFile(venue=venue, values=values)
 
 
-def _resolve_one(raw: str, base: Path) -> str:
+def resolve_relative_path(raw: str, base: Path) -> str:
     """Resolve one relative upload path against ``base`` (the .sub's folder).
 
     An absolute path is kept. A relative one that exists beside the .sub wins;
@@ -386,7 +383,7 @@ def resolve_paths(sub: SubFile, base: str | Path) -> SubFile:
         if not raw or not raw.strip():
             continue
         if field.type == "file":
-            values[field.id] = _resolve_one(raw, base)
+            values[field.id] = resolve_relative_path(raw, base)
         elif field.type == "filelist":
             lines = []
             for line in raw.splitlines():
@@ -394,7 +391,7 @@ def resolve_paths(sub: SubFile, base: str | Path) -> SubFile:
                     lines.append(line)
                     continue
                 head, sep, rest = line.partition("|")
-                lines.append(_resolve_one(head, base) + (" " + sep + rest if sep else ""))
+                lines.append(resolve_relative_path(head, base) + (" " + sep + rest if sep else ""))
             values[field.id] = "\n".join(lines)
     return SubFile(venue=sub.venue, values=values)
 

@@ -76,7 +76,7 @@ from ..requirements import resolve as resolve_requirements
 from ..requirements_check import upload_role_ids
 from ..subfile import default_filename
 from ..subfile import parse as parse_subfile
-from ..subfile import replace_block, replace_scalar
+from ..subfile import replace_block, replace_scalar, resolve_relative_path
 from ..subfile import render_template
 from ..validate import validate_report
 from .shared import DEFAULT_TTL_DAYS, SharedFormError, SharedForms
@@ -145,9 +145,10 @@ _LOCAL_LIST_LIMIT = 2000
 class LocalSession:
     """One ``.sub`` file on this machine, opened in the page by ``--web``.
 
-    ``root`` is the directory relative paths in the ``.sub`` resolve against
-    (where paperpush was run, as for the CLI). ``manuscript_dirs`` are the
-    ``autofill -d`` inputs: their files are offered in the page's file pickers
+    ``root`` is the directory relative paths in the ``.sub`` resolve against:
+    the ``.sub`` file's own folder, as for the CLI. A relative path found only
+    in the current working directory is still used from there. ``manuscript_dirs`` are the
+    ``autofill -p`` inputs: their files are offered in the page's file pickers
     and to autofill. ``action`` is what the page starts with once it opens:
     ``"autofill"``, ``"validate"``, ``"validate-ai"``, or nothing; a validate
     action ending in ``"+initial"`` ticks "initial submission (any format)"
@@ -174,8 +175,7 @@ class LocalSession:
             return str(resolved)
 
     def resolve(self, path_text: str) -> Path:
-        path = Path(path_text.strip()).expanduser()
-        return path if path.is_absolute() else self.root / path
+        return Path(resolve_relative_path(path_text, self.root))
 
     def scrub(self, message: str) -> str:
         """``message`` with absolute paths under ``root`` made relative again."""
@@ -1383,6 +1383,7 @@ def serve_local(
     open_browser: bool = True,
     token: Optional[str] = None,
     idle_timeout: Optional[float] = None,
+    colorblind: bool = False,
 ) -> int:
     """Open ``sub_path`` in the page on this machine and serve it until Ctrl-C (``--web``).
 
@@ -1392,6 +1393,8 @@ def serve_local(
     process can print the link before this one is up); with ``idle_timeout``
     the server stops by itself once that many seconds pass without a request
     (an open page pings it every minute, so it stays up while one is open).
+    ``colorblind`` opens the page with its colour-blind-friendly colours
+    switched on (``paperpush validate --web --colorblind``).
     """
     import uvicorn
 
@@ -1401,13 +1404,13 @@ def serve_local(
     venue = parse_subfile(sub_path.read_text(encoding="utf-8")).venue or sub_path.stem
     local = LocalSession(
         sub_path=sub_path,
-        root=Path.cwd(),
+        root=sub_path.parent,
         manuscript_dirs=tuple(Path(d).resolve() for d in manuscript_dirs),
         action=action,
         **({"token": token} if token else {}),
     )
     settings = dataclasses.replace(Settings.from_env(), local=local)
-    url = local_url(host, port, local.token, venue)
+    url = local_url(host, port, local.token, venue, colorblind=colorblind)
     print(f"{'Opening' if open_browser else 'Open'} {local.display(sub_path)} in your browser: {url}")
     print("Edits in the page are saved to the file as you make them. Press Ctrl-C to stop.")
     if open_browser:
@@ -1423,9 +1426,10 @@ def serve_local(
     return 0
 
 
-def local_url(host: str, port: int, token: str, venue: str) -> str:
-    """The address of the page with a local ``.sub`` open in it."""
-    return f"http://{host}:{port}/?local={token}#/v/{venue}"
+def local_url(host: str, port: int, token: str, venue: str, *, colorblind: bool = False) -> str:
+    """The address of the page with a local ``.sub`` open in it (``colorblind`` adds ``palette=alt``)."""
+    palette = "&palette=alt" if colorblind else ""
+    return f"http://{host}:{port}/?local={token}{palette}#/v/{venue}"
 
 
 def _stop_when_idle(app: FastAPI, server, idle_timeout: float) -> None:

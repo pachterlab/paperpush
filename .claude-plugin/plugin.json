@@ -1,0 +1,14 @@
+{
+  "name": "paperpush",
+  "version": "0.3.1",
+  "description": "Skills for paperpush: autofill a submission from the manuscript, validate it against the venue's guidelines, submit it, debug a stalled portal run, and add venues.",
+  "author": {
+    "name": "Pachter Lab",
+    "url": "https://github.com/pachterlab"
+  },
+  "homepage": "https://paperpush.readthedocs.io",
+  "repository": "https://github.com/pachterlab/paperpush",
+  "license": "BSD-2-Clause",
+  "keywords": ["manuscript", "journal", "submission", "preprint", "academic"],
+  "skills": "./skills/"
+}

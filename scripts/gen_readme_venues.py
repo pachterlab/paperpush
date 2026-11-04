@@ -8,7 +8,7 @@ Two artifacts are kept in sync with the database:
       <!-- BEGIN SUPPORTED VENUES -->
       <!-- END SUPPORTED VENUES -->
 
-* the short "Supported venues" summary in ``README.md``, grouped by
+* the "Supported venues" tables in ``README.md``, one per
   ``venue_type`` (preprint servers / journals / conferences), between
 
       <!-- BEGIN SUPPORTED VENUES -->
@@ -27,6 +27,7 @@ The ``--check`` form is suitable for CI or a pre-commit hook.
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import sys
 from pathlib import Path
@@ -34,6 +35,8 @@ from pathlib import Path
 # Import the package directly from the repo without requiring an install.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+# Generate from the checkout's own venue data, never the published copy.
+os.environ["PAPERPUSH_VENUE_DATA"] = "bundled"
 
 from paperpush.database import list_venues  # noqa: E402
 from tests.submit_walkthrough_status import STATUS_PATH  # noqa: E402
@@ -77,6 +80,8 @@ PLATFORMS = {
     "nature": "eJournalPress",
     "nature_biotech": "eJournalPress",
     "nature_methods": "eJournalPress",
+    "nature_machine_intelligence": "eJournalPress",
+    "nature_biomedical_engineering": "eJournalPress",
     "cell": "Editorial Manager",
     "cell_systems": "Editorial Manager",
     "cell_genomics": "Editorial Manager",
@@ -158,8 +163,11 @@ def build_table() -> str:
 def build_venue_groups() -> str:
     """Render the README "Supported venues" summary, grouped by ``venue_type``.
 
-    Each configured group (see :data:`VENUE_GROUPS`) becomes a line listing its
-    venues as links, in the database's display order; an empty group renders as
+    Each configured group (see :data:`VENUE_GROUPS`) becomes a heading plus a
+    Markdown table with the venue (linked), its slug, a check for validate +
+    basic .sub support (every listed venue), and a check for submit + full .sub
+    support (venues with a submit runner, i.e. ``paperpush --venues submit``).
+    Venues keep the database's display order; an empty group renders as
     "none yet" so every supported kind of venue stays visible.
     """
     venues = list_venues()
@@ -167,12 +175,23 @@ def build_venue_groups() -> str:
     for j in venues:
         by_type.setdefault(j.venue_type, []).append(j)
 
-    paragraphs = []
+    sections = []
     for venue_type, heading in VENUE_GROUPS:
         members = by_type.get(venue_type, [])
-        listing = ", ".join(_linked_name(j) for j in members) if members else "_none yet_"
-        paragraphs.append(f"**{heading}:** {listing}")
-    return "\n\n".join(paragraphs)
+        lines = [f"**{heading}**", ""]
+        if not members:
+            lines.append("_none yet_")
+        else:
+            lines += [
+                "| Venue | Slug | Validate + basic .sub | Submit + full .sub |",
+                "| --- | --- | :---: | :---: |",
+            ]
+            for j in members:
+                validate = "✅" if j.supports_validate else ""
+                submit = "✅" if j.supports_submit else ""
+                lines.append(f"| {_linked_name(j)} | `{j.slug}` | {validate} | {submit} |")
+        sections.append("\n".join(lines))
+    return "\n\n".join(sections)
 
 
 def _replace_section(text: str, begin: str, end: str, body: str, where: str) -> str:

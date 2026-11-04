@@ -196,3 +196,22 @@ tests/portal_snapshots/_failures/
 .neon
 node_modules/
 .env.local
+
+# Claude Code runtime lock files
+.claude/*.lock
+
+# Neon CLI scaffolding (local tooling; the app only reads DATABASE_URL)
+neon.ts
+package.json
+package-lock.json
+
+# Generated test inputs: built on demand by tests/conftest.py, or in full by
+# `python tests/sample_subfiles.py`
+tests/manuscript_files/
+
+# playwright-cli session logs and page snapshots
+.playwright-cli/
+
+# paperpush codegen output (paste into the venue runner, don't commit)
+steps.py
+*_steps.py

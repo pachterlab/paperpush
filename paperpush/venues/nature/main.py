@@ -15,6 +15,7 @@ import json
 import logging
 import re
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -56,6 +57,8 @@ class Variant:
     has_external_consultation: bool = True
     # Dashboard link that starts a submission; Nature Biotech labels it "Submit Manuscript".
     submit_new_link: str = "Submit a new manuscript"
+    # NMI has two validation tabs before its final, author-only submission button.
+    validate_before_review: bool = False
 
     @property
     def venue(self):
@@ -75,6 +78,25 @@ class Variant:
 
 VARIANTS = {
     "nature": Variant("nature", "Nature"),
+    "nature_machine_intelligence": Variant(
+        "nature_machine_intelligence",
+        "Nature Machine Intelligence",
+        validate_before_review=True,
+        has_open_access=False,
+        has_external_consultation=False,
+        submit_new_link="Submit Manuscript",
+    ),
+    "nature_biomedical_engineering": Variant(
+        "nature_biomedical_engineering",
+        "Nature Biomedical Engineering",
+        # Four default author panes plus "More Authors", and NMI's two
+        # validation tabs before the author-only "Approve" button.
+        author_count_mode="additional",
+        validate_before_review=True,
+        has_open_access=False,
+        has_external_consultation=False,
+        submit_new_link="Submit Manuscript",
+    ),
     "nature_methods": Variant(
         "nature_methods",
         "Nature Methods",
@@ -116,6 +138,17 @@ LOGOUT_LINK_NAMES = ("Log Out", "Logout", "Log out", "Sign Out", "Sign out")
 # their visible value text. Re-capture with ``playwright codegen`` on drift.
 BTN_CONTINUE = "Continue"
 BTN_SAVE_CONTINUE = "Save and Continue"
+
+# Validation tab (NMI, NBE): eJP converts each upload to PDF in the background.
+# A row still converting reads "PDF Not Yet Converted" (anchored, so the
+# instruction bullet that quotes the phrase is not counted); the refresh link
+# reloads the tab. The final, author-only button is "Approve Submission" on both
+# (NBE's instructions still call it "Approve Manuscript").
+LINK_CHECK_CONVERSION = "Check for completion of file conversion."
+PDF_PENDING_TEXT = re.compile(r"^\s*PDF Not Yet Converted")
+BTN_FINAL_APPROVE = "Approve Submission"
+CONVERSION_TIMEOUT_S = 300
+CONVERSION_POLL_MS = 5000
 
 # Manuscript-type splash: a group of ``ms_type_cde`` radios whose type name is
 # free text beside each radio (no <label>). _select_manuscript_type reads that
@@ -215,14 +248,14 @@ SEL_SUBJECT_ADD = "#subject_terms_add"
 # Author declarations after the authors/subjects tabs. Radios by id (distinct
 # yes/no ids), free-text boxes by name; a couple targeted by name+value where the
 # id is ambiguous or unstable.
-SEL_CONFLICT_NO = "#conflict_ind_1"  # none declared
-SEL_CONFLICT_YES = "#conflict_ind_2"  # interests declared
+SEL_CONFLICT_NO = "#conflict_ind_1"
+SEL_CONFLICT_YES = "#conflict_ind_2"
 SEL_CONFLICT_TXT = "textarea[name='conflict_of_interest_txt']"
-SEL_DUAL_PUB_NO = "#dual_pub_ind_no"  # pre-checked
+SEL_DUAL_PUB_NO = "#dual_pub_ind_no"
 SEL_DUAL_PUB_YES = "#dual_pub_ind_yes"
 SEL_DUAL_PUB_TXT = "textarea[name='dual_pub_txt']"
-SEL_DOUBLE_BLIND_YES = "#double_blind_ind_yes"  # hide author info
-SEL_DOUBLE_BLIND_NO = "#double_blind_ind_no"  # show it
+SEL_DOUBLE_BLIND_YES = "#double_blind_ind_yes"
+SEL_DOUBLE_BLIND_NO = "#double_blind_ind_no"
 SEL_MS_COMMENT = "textarea[name='ms_comment']"
 SEL_OPEN_ACCESS = "#open_access_ind"
 SEL_RESEARCH_SQUARE_DFA = "#research_square_dfa_ind"
@@ -440,6 +473,43 @@ def _dismiss_cookie_banner(page, timeout_ms: int = 4000) -> bool:
     return True
 
 
+def _on_account_interstitial(page) -> bool:
+    """Whether ``page`` is Springer Nature's shared "check your account details" page."""
+    url = page.url or ""
+    return "spd.plex" in url and "form_type=account" in url
+
+
+def _leave_account_interstitial(page, cfg: Variant = _DEFAULT, timeout_ms: int = 15000) -> bool:
+    """Get past Springer Nature's account-details check to the journal dashboard.
+
+    After sign-in, eJP sometimes redirects to a shared Springer Nature profile
+    page (``mts-spd.nature.com/apps/spd.plex?form_type=account``) asking the author
+    to confirm their contact details, with a link back to each journal's tracking
+    system. Those links open a new tab (``target="new"``), so follow the matching
+    link's ``href`` in the same page. Returns True if the page was on the
+    interstitial and was moved on; False if it was not there (not an error).
+    """
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+    except Exception:  # noqa: BLE001 -- best effort; the URL check below decides
+        pass
+    if not _on_account_interstitial(page):
+        return False
+    logger.info(
+        "%s showed the account-details check; continuing to the journal dashboard",
+        cfg.name,
+    )
+    link = page.locator(f'a[alt="{cfg.name}"]').first
+    try:
+        link.wait_for(state="attached", timeout=timeout_ms)
+        href = link.get_attribute("href")
+    except Exception:  # noqa: BLE001 -- fall back to the portal entry point below
+        href = None
+    page.goto(href or cfg.portal_url)
+    page.wait_for_load_state("domcontentloaded")
+    return True
+
+
 def _venue(cfg: Variant):
     """The :class:`Venue` instance for a variant, so the module-level entry points
     can reuse the base class's shared sign-in orchestration and login-state check.
@@ -603,7 +673,7 @@ def _is_described(type_label: str) -> bool:
     return label == "Figure" or label.startswith("Supplement") or label in ("Extended Data", "Source Data")
 
 
-def _upload_files(page, files: list[tuple]) -> None:
+def _upload_files(page, files: list[tuple]) -> dict[str, tuple]:
     """Upload every file on the eJP upload step, then set each file's type.
 
     ``files`` is ``(path, type_label, ...)`` in upload order. Each file is handed
@@ -611,8 +681,10 @@ def _upload_files(page, files: list[tuple]) -> None:
     only once they all exist are the ``object_file_type_`` selects assigned in a
     second pass, the Nth select to the Nth file. A blank ``type_label`` leaves the
     default; type assignment is best-effort. Blank-path entries are skipped.
+    Returns upload object IDs mapped to the original entries for the metadata tab.
     """
-    files = [(entry[0], entry[1]) for entry in files if entry[0]]
+    entries = [entry for entry in files if entry[0]]
+    files = [(entry[0], entry[1]) for entry in entries]
 
     for i, (path, type_label) in enumerate(files):
         step(f"Upload step: file {i + 1} of {len(files)} ({Path(path).name})")
@@ -641,6 +713,33 @@ def _upload_files(page, files: list[tuple]) -> None:
             lambda n=name, label=type_label: page.locator(f"select[name='{n}']").select_option(label=label),
             f"file type {type_label!r} for {path}",
         )
+
+    if len(names) != len(entries):
+        raise ValueError(f"Expected {len(entries)} uploaded files, found {len(names)} file-type controls")
+    return {name.rsplit("_", 1)[-1]: entry for name, entry in zip(names, entries)}
+
+
+def _enter_file_metadata(page, files_by_id: dict[str, tuple]) -> None:
+    """Match metadata to upload IDs, including figures without colour radios.
+
+    NMI asks for Figure Number but has no colour controls. Inferring file types
+    from those radios drops the figures and shifts the supplementary titles.
+    The upload and metadata tabs use the same object IDs, so preserve that map.
+    """
+    for obj_id, (path, type_label, title, extra) in files_by_id.items():
+        if not _is_described(type_label):
+            continue
+        step(f"Per-object metadata step: {Path(path).name}")
+        page.locator(f"input[name='object_title_{obj_id}']").fill(title or Path(path).stem)
+        if type_label == "Figure":
+            color = page.locator(f"input[name='color_{obj_id}']")
+            if color.count():
+                choice = extra.strip().lower()
+                if choice not in ("color", "bw"):
+                    choice = "color"
+                page.locator(f"input[name='color_{obj_id}'][value='{choice}']").check()
+        elif extra:
+            page.locator(f"textarea[name='object_desc_{obj_id}']").fill(extra)
 
 
 def _fill_author_fields(page, author: dict, prefix: str) -> None:
@@ -1020,7 +1119,7 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     if cover_letter:
         files.append((cover_letter, FILE_TYPE_COVER_LETTER, "", ""))
     files.extend(extra_files)
-    _upload_files(page, files)
+    files_by_id = _upload_files(page, files)
     _click_button(page, BTN_SAVE_CONTINUE)
 
     # Per-object metadata step (only when files beyond the manuscript exist): a
@@ -1028,51 +1127,8 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     # optional description per supplementary file. Titles fall back to the file
     # name; the id increments with upload order.
     step("Per-object metadata step")
-    title_names = page.locator(SEL_OBJECT_TITLE).evaluate_all("els => els.map(e => e.name)")
-    if title_names:
-        # eJP renders a title box for every uploaded object (Article File and
-        # cover letter included, which we don't describe), so classify each by the
-        # controls beside it: a figure has ``color_<id>``, a supp file has
-        # ``object_desc_<id>``, the manuscript/letter have neither (dropped). Kept
-        # boxes, sorted by id, line up with the described entries of ``files``.
-        objects = []
-        for name in title_names:
-            obj_id = name.rsplit("_", 1)[-1]
-            is_figure = bool(page.locator(f"input[name='color_{obj_id}']").count())
-            is_supp = bool(page.locator(f"textarea[name='object_desc_{obj_id}']").count())
-            if is_figure or is_supp:
-                objects.append((int(obj_id), name, obj_id, is_figure))
-        objects.sort(key=lambda obj: obj[0])
-
-        described = [(path, type_label, title, extra) for path, type_label, title, extra in files if path and _is_described(type_label)]
-        if len(objects) != len(described):
-            logger.warning(
-                "Nature: %d figure/supplementary boxes on the page but %d such files in the .sub; matching by upload order",
-                len(objects),
-                len(described),
-            )
-        for i, ((_, name, obj_id, is_figure), (path, _type, title, extra)) in enumerate(zip(objects, described)):
-            step(f"Per-object metadata step: object {i + 1} of {min(len(objects), len(described))} ({Path(path).name})")
-            title = title or Path(path).stem
-            _try(
-                lambda n=name, t=title: page.locator(f"input[name='{n}']").fill(t),
-                f"object title {title!r}",
-            )
-            if is_figure:
-                # Fourth column is the color choice, defaulting to color.
-                choice = extra.strip().lower()
-                if choice not in ("color", "bw"):
-                    choice = "color"
-                _try(
-                    lambda i=obj_id, c=choice: page.locator(f"input[name='color_{i}'][value='{c}']").check(),
-                    f"figure color {choice!r} for object {obj_id}",
-                )
-            elif extra:
-                # Fourth column is the optional supplementary-file description.
-                _try(
-                    lambda i=obj_id, d=extra: page.locator(f"textarea[name='object_desc_{i}']").fill(d),
-                    f"object description for object {obj_id}",
-                )
+    if page.locator(SEL_OBJECT_TITLE).count():
+        _enter_file_metadata(page, files_by_id)
         _click_button(page, BTN_SAVE_CONTINUE)
 
     step("File-confirmation step")
@@ -1093,8 +1149,14 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     code_availability = values.get("code_availability", "").strip()
     if code_availability:
         _try(lambda: page.locator(SEL_CODE_OCEAN_YES).check(), "code-ocean = Yes")
-        _try(lambda: page.locator(SEL_CODE_OCEAN_TXT).fill(code_availability), "code-ocean statement")
-        _try(lambda: page.locator(SEL_CODE_OCEAN_ENABLED_NO).check(), "code-ocean enabled = No")
+        _try(
+            lambda: page.locator(SEL_CODE_OCEAN_TXT).fill(code_availability),
+            "code-ocean statement",
+        )
+        _try(
+            lambda: page.locator(SEL_CODE_OCEAN_ENABLED_NO).check(),
+            "code-ocean enabled = No",
+        )
     else:
         _try(lambda: page.locator(SEL_CODE_OCEAN_NO).check(), "code-ocean = No")
     _try(lambda: page.locator(SEL_FIGSHARE_NO).check(), "figshare = No")
@@ -1121,8 +1183,14 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
         # four or fewer authors the default panes suffice, so skip the control.
         num_additional = max(0, len(authors) - DEFAULT_AUTHOR_PANES)
         if num_additional:
-            _try(lambda: page.locator(SEL_MORE_CONTRIB_CNT).fill(str(num_additional)), "number of additional authors")
-            _try(lambda: page.locator(SEL_MORE_CONTRIB_BUTTON).click(), "add additional authors")
+            _try(
+                lambda: page.locator(SEL_MORE_CONTRIB_CNT).fill(str(num_additional)),
+                "number of additional authors",
+            )
+            _try(
+                lambda: page.locator(SEL_MORE_CONTRIB_BUTTON).click(),
+                "add additional authors",
+            )
             page.wait_for_timeout(1500)
     else:
         num_authors = str(len(authors) or 1)
@@ -1138,13 +1206,77 @@ def _advance_to_subjects(page, values: dict, cfg: Variant = _DEFAULT) -> None:
     else:
         gender = values.get("corresponding_gender", "").strip()
         if gender:
-            _try(lambda: page.locator(SEL_AUTHOR_GENDER).select_option(label=gender), f"corresponding-author gender {gender!r}")
+            _try(
+                lambda: page.locator(SEL_AUTHOR_GENDER).select_option(label=gender),
+                f"corresponding-author gender {gender!r}",
+            )
 
     _enter_authors(page, authors)
     _click_button(page, BTN_SAVE_CONTINUE)
 
 
-def submit_nature(values: dict, headless: bool = False, debug: bool = False, new_session: bool = False, timeout: float = DEFAULT_TIMEOUT_SECONDS, keep_open_on_failure: bool = True, *, venue) -> None:
+def _wait_for_pdf_conversion(page, cfg: Variant = _DEFAULT) -> None:
+    """Refresh the validation tab until no uploaded file is still converting.
+
+    The refresh link navigates only after its click returns, so each click is
+    wrapped in ``expect_navigation``; reading the page straight after the click
+    saw the old (or a half-torn-down) page and ended the wait early. Bounded by
+    :data:`CONVERSION_TIMEOUT_S`; every retry is logged.
+    """
+    pending = page.get_by_text(PDF_PENDING_TEXT)
+    refresh = page.get_by_role("link", name=LINK_CHECK_CONVERSION, exact=True)
+    deadline = time.monotonic() + CONVERSION_TIMEOUT_S
+    while (count := pending.count()):
+        if time.monotonic() >= deadline:
+            raise PWTimeout(
+                f"{cfg.name} had not converted {count} uploaded file(s) to PDF after "
+                f"{CONVERSION_TIMEOUT_S // 60} minutes; the draft is saved, so check "
+                "back later or use 'Upload PDF' on the Validate tab"
+            )
+        logger.info("Waiting for %s to convert %d uploaded file(s) to PDF", cfg.name, count)
+        page.wait_for_timeout(CONVERSION_POLL_MS)
+        with page.expect_navigation(wait_until="load"):
+            refresh.click()
+
+
+def _advance_to_submission_review(page, cfg: Variant = _DEFAULT) -> None:
+    """Walk the file/details validation tabs (NMI, NBE); never approve the submission.
+
+    Open each converted PDF before marking that file checked, as required by
+    eJP. The author can still review/change the files from the final page.
+    Missing metadata or an unfinished conversion must not be silently skipped.
+    """
+    step("Validation: converted files")
+    _wait_for_pdf_conversion(page, cfg)
+    links = page.get_by_role("link", name="Validate PDF", exact=True)
+    links.first.wait_for(state="visible", timeout=30000)
+    for i in range(links.count()):
+        with page.expect_popup() as opened:
+            links.nth(i).click()
+        popup = opened.value
+        popup.wait_for_load_state("domcontentloaded")
+        popup.close()
+    boxes = page.locator("input[name^='approve_file_']")
+    for i in range(boxes.count()):
+        boxes.nth(i).check()
+    _click_button(page, BTN_SAVE_CONTINUE)
+    step("Validation: manuscript details")
+    page.get_by_text("No errors found.", exact=True).wait_for(state="visible")
+    _click_button(page, BTN_SAVE_CONTINUE)
+    step("Ready for author review — final submission is manual")
+    page.get_by_role("button", name=BTN_FINAL_APPROVE, exact=True).wait_for(state="visible")
+
+
+def submit_nature(
+    values: dict,
+    headless: bool = False,
+    debug: bool = False,
+    new_session: bool = False,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    keep_open_on_failure: bool = True,
+    *,
+    venue,
+) -> None:
     """Open Nature, sign in, then drive the eJP submission wizard from a ``.sub``.
 
     Signs in via ``ensure_signed_in``, then clicks through the captured eJP steps
@@ -1152,8 +1284,8 @@ def submit_nature(values: dict, headless: bool = False, debug: bool = False, new
     declarations). ``new_session=True`` discards any saved session first;
     ``debug=True`` forces a headed browser and pauses in the Inspector.
 
-    The run stops after the declarations step and leaves the browser open via
-    :func:`hold_open`; it never clicks a final submit, so the rest is done by hand.
+    The run stops after declarations, or after the validation tabs for NMI, and
+    leaves the browser open via :func:`hold_open`. Final submission is manual.
     """
     # The Inspector needs a visible browser; debugging headless makes no sense.
     if debug:
@@ -1162,9 +1294,18 @@ def submit_nature(values: dict, headless: bool = False, debug: bool = False, new
     cfg = venue.variant
 
     manuscript_file = values.get("manuscript_file", "").strip()
-    logger.info("Starting %s submission run (headless=%s, debug=%s): " "manuscript=%s", cfg.name, headless, debug, manuscript_file)
+    logger.info(
+        "Starting %s submission run (headless=%s, debug=%s): " "manuscript=%s",
+        cfg.name,
+        headless,
+        debug,
+        manuscript_file,
+    )
 
-    with sync_playwright() as playwright, hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure):
+    with (
+        sync_playwright() as playwright,
+        hold_open_on_failure(headless=headless, keep_open=keep_open_on_failure),
+    ):
         # browser_launch_args() is empty unless `submit --cdp-port` asked for a
         # CDP endpoint that another client (playwright-cli) can attach to.
         browser = playwright.chromium.launch(headless=headless, args=browser_launch_args())
@@ -1173,6 +1314,9 @@ def submit_nature(values: dict, headless: bool = False, debug: bool = False, new
         page = context.new_page()
 
         venue.ensure_signed_in(page, context, debug=debug)
+        # A saved session (or a fresh sign-in) can land on Springer Nature's
+        # account-details check instead of the journal dashboard.
+        _leave_account_interstitial(page, cfg)
 
         if debug:
             page.pause()
@@ -1193,7 +1337,10 @@ def submit_nature(values: dict, headless: bool = False, debug: bool = False, new
         _enter_declarations(page, values, cfg)
         _click_button(page, BTN_SAVE_CONTINUE)
 
-        logger.info("Reached the declarations step; leaving the browser open for " "review (the remaining steps and the final submit are left to you)")
+        if cfg.validate_before_review:
+            _advance_to_submission_review(page, cfg)
+
+        logger.info("Reached the author review page; leaving the browser open. Final submission is manual.")
         # Leave the browser open so you can review/finish by hand.
         hold_open()
 
@@ -1418,6 +1565,15 @@ class EJPVenue(Venue):
             pwd_box.press("Enter")
         else:
             button.click()
+
+        # Sign-in may detour through Springer Nature's account-details check; wait
+        # for the redirect to settle, then continue on to the journal dashboard.
+        deadline = time.monotonic() + timeout_ms / 1000
+        while time.monotonic() < deadline and not _on_account_interstitial(page):
+            if self.is_logged_in(page, timeout_ms=500):
+                break
+            page.wait_for_timeout(500)
+        _leave_account_interstitial(page, cfg, timeout_ms)
 
         # A successful sign-in lands on the dashboard; if the log-out control
         # never appears, the sign-in did not take.

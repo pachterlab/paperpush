@@ -2,7 +2,7 @@
 
 Covers :func:`paperpush.validate.validate_report` (one status per check), the
 report renderers (terminal, PDF, HTML, Markdown, text; the colour-blind
-palette), the CLI's ``-o`` / ``--alt-color`` / ``--ai*`` flags, the AI task
+palette), the CLI's ``-o`` / ``--colorblind`` / ``--ai*`` flags, the AI task
 plumbing (:mod:`paperpush.ai_validate`), and the deterministic checks for
 layout, figures, citation order, and .sub-versus-manuscript consistency.
 """
@@ -193,6 +193,41 @@ def test_html_uses_the_status_colours_and_the_alt_palette():
     assert report.ALT_PALETTE.passed in alt and report.DEFAULT_PALETTE.passed not in alt
 
 
+def test_each_status_has_its_own_colour():
+    """Green / red / amber / purple / grey: needs AI is purple, and the two
+    "not checked" states that are not AI share grey rather than a new hue."""
+    for pal in (report.DEFAULT_PALETTE, report.ALT_PALETTE):
+        verdicts = {pal.for_status(s) for s in (report.PASSED, report.FAILED, report.WARNING, report.NEEDS_AI)}
+        assert len(verdicts) == 4
+        assert pal.for_status(report.NEEDS_AI) != pal.for_status(report.UNCHECKED)
+    assert report.DEFAULT_PALETTE.needs_ai == "#8250df"
+    assert report.ALT_PALETTE.needs_ai == "#aa3377"
+
+
+def test_web_and_report_palettes_agree():
+    """style.css's status colours are report.py's, in both palettes."""
+    css = (Path(report.__file__).parent / "web" / "static" / "style.css").read_text()
+    root, alt = css.split(":root {", 1)[1].split("}", 1)[0], css.split('html[data-palette="alt"] {', 1)[1].split("}", 1)[0]
+    for block, pal in ((root, report.DEFAULT_PALETTE), (alt, report.ALT_PALETTE)):
+        for var, colour in (("--st-passed", pal.passed), ("--st-failed", pal.failed), ("--st-warning", pal.warning), ("--st-ai", pal.needs_ai), ("--st-unchecked", pal.unchecked)):
+            assert f"{var}: {colour};" in block, (var, colour)
+
+
+def test_colorblind_flag_opens_the_web_page_in_the_same_palette(tmp_path, monkeypatch):
+    from paperpush import cli
+    from paperpush.web.app import local_url
+
+    assert local_url("127.0.0.1", 1, "t", "biorxiv", colorblind=True) == "http://127.0.0.1:1/?local=t&palette=alt#/v/biorxiv"
+    assert "palette" not in local_url("127.0.0.1", 1, "t", "biorxiv")
+    seen = {}
+    monkeypatch.setattr(cli, "_open_web", lambda path, **kw: seen.update(kw) or 0)
+    sub = tmp_path / "paper.sub"
+    sub.write_text("venue: biorxiv\n")
+    assert main(["validate", str(sub), "--web", "--colorblind"]) == 0
+    assert seen["colorblind"] is True
+    assert main(["validate", str(sub), "--web", "--alt-color"]) == 0 and seen["colorblind"] is True
+
+
 def test_pdf_report_is_a_readable_pdf_with_colours(tmp_path):
     pypdf = pytest.importorskip("pypdf")
     out = report.save(_sample_report(), tmp_path / "r.pdf")
@@ -256,10 +291,27 @@ def test_cli_saves_the_report_in_the_requested_format(_use, tmp_path, monkeypatc
     sub = _sub(tmp_path, "title: A study\n")
     assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "-o"]) == 0
     assert (tmp_path / "paper_validation.pdf").read_bytes().startswith(b"%PDF-")
-    assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "-o", str(tmp_path / "r.html"), "--alt-color"]) == 0
+    assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "-o", str(tmp_path / "r.html"), "--colorblind"]) == 0
     assert report.ALT_PALETTE.passed in (tmp_path / "r.html").read_text()
     out = capsys.readouterr().out
     assert "PASSED" in out and "Saved the report to" in out
+
+
+def test_cli_refuses_to_replace_a_saved_report_without_overwrite(_use, tmp_path, monkeypatch, capsys):
+    _use({})
+    _cli_venue(monkeypatch, TITLE)
+    sub = _sub(tmp_path, "title: A study\n")
+    target = tmp_path / "r.md"
+    target.write_text("old", encoding="utf-8")
+    args = ["validate", str(sub), "--dont-check-links", "--dont-check-references", "-o", str(target)]
+    assert main(args) == 1
+    assert "use --overwrite" in capsys.readouterr().err
+    assert target.read_text(encoding="utf-8") == "old"
+    assert main(args + ["--overwrite"]) == 0
+    assert target.read_text(encoding="utf-8") != "old"
+    target.write_text("old", encoding="utf-8")
+    assert main(args + ["--force"]) == 0  # old name for --overwrite
+    assert target.read_text(encoding="utf-8") != "old"
 
 
 def test_cli_exit_code_follows_errors(_use, tmp_path, monkeypatch, capsys):
@@ -504,6 +556,59 @@ def test_panel_order_check_runs_on_the_manuscript(_use, tmp_path):
     rep = _report(_venue(MANUSCRIPT), {"manuscript_file": str(doc)})
     result = _result(rep, "citations.panels")
     assert "Fig. 1c is first cited before Fig. 1b" in result.issues[0].message
+
+
+def test_tex_undefined_refs_finds_keys_no_label_defines():
+    source = (
+        r"\label{fig:a} \label[figure]{fig:typed} See \ref{fig:a}, \cref{fig:a,fig:b} and \eqref{eq:1}."
+        r" \newcommand{\figref}[1]{Fig.~\ref{fig:#1}} \crefrange{fig:a}{fig:z} \hyperref[sec:x]{X}"
+        r" \begin{lstlisting}[label=lst:1] \end{lstlisting} \ref{lst:1} \autoref{fig:typed}"
+    )
+    assert citation_check.tex_undefined_refs(source) == ["fig:b", "eq:1", "fig:z", "sec:x"]
+    # Labels made by a macro: keys with its prefix may exist.
+    assert citation_check.tex_undefined_refs(r"\newcommand{\fl}[1]{\label{fig:#1}} \ref{fig:one} \ref{tab:two}") == ["tab:two"]
+    # xr: the labels live in another document.
+    assert citation_check.tex_undefined_refs(r"\externaldocument{supp} \ref{fig:s1}") is None
+
+
+def test_placeholder_problems_find_query_marks_and_word_errors():
+    pages = ["See Figure ?? and Section ??. Really?? We cite [?] and [?, ?].", "As in Error! Reference source not found. above."]
+    problems = citation_check.placeholder_problems(pages, citations=True, word=True)
+    assert problems[0].startswith("2 × “??”") and "page 1:" in problems[0]
+    assert problems[1].startswith("2 × “[?]”")
+    assert problems[2].startswith("1 × a broken Word cross-reference field") and "page 2:" in problems[2]
+    assert citation_check.placeholder_problems(["What?? No."], citations=True, word=True) == []
+    # Compiled LaTeX: undefined citations are bibliography.uncited's to report.
+    assert len(citation_check.placeholder_problems(["Table ?? and [?]"], citations=False, word=False)) == 1
+
+
+def test_cross_reference_check_reports_latex_source(_use, tmp_path):
+    _use({"testj": {}})
+    bundle = tmp_path / "src.zip"
+    with zipfile.ZipFile(bundle, "w") as zf:
+        zf.writestr("main.tex", "\\documentclass{article}\\begin{document}\\input{body}\\end{document}")
+        zf.writestr("body.tex", "\\section{Intro}\\label{sec:intro} See Section~\\ref{sec:intro} and Figure~\\ref{fig:missing}.")
+    rep = _report(_venue(MANUSCRIPT), {"manuscript_file": str(bundle)})
+    result = _result(rep, "citations.cross_references")
+    assert result.status == report.WARNING
+    assert "fig:missing" in result.issues[0].message and "sec:intro" not in result.issues[0].message
+
+
+def test_cross_reference_check_reports_word_field_errors(_use, tmp_path):
+    _use({"testj": {}})
+    doc = tmp_path / "ms.docx"
+    _build_docx(doc, ["Intro", "As shown in Error! Reference source not found., the effect is large."])
+    result = _result(_report(_venue(MANUSCRIPT), {"manuscript_file": str(doc)}), "citations.cross_references")
+    assert result.status == report.WARNING and "Error! Reference source not found" in result.issues[0].message
+
+
+def test_cross_reference_check_passes_clean_text(_use, tmp_path):
+    _use({"testj": {}})
+    doc = tmp_path / "ms.docx"
+    _build_docx(doc, ["Intro", "As shown in Figure 1, the effect is large [3]."])
+    result = _result(_report(_venue(MANUSCRIPT), {"manuscript_file": str(doc)}), "citations.cross_references")
+    assert result.status == report.PASSED
+    assert _result(_report(_venue(MANUSCRIPT), {}), "citations.cross_references").status == report.NOT_APPLICABLE
 
 
 # ===========================================================================

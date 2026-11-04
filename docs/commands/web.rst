@@ -6,6 +6,13 @@ opens with that file filled in: every field as a card, coloured by status, with
 the side menu, totals, and checks. Each edit you make there is saved back to
 the file.
 
+The checks use the same colours as ``paperpush validate``: green for passed,
+red for failed, amber for warnings, purple for needs AI, and grey for checks
+that could not run (with the reason) or that paperpush has not implemented.
+*Colorblind-friendly colors* in the settings menu switches to the palette of
+``paperpush validate --colorblind`` (blue, vermillion, dark yellow, reddish
+purple, grey).
+
 The page runs locally from the installed package, not from the hosted
 website. It opens at once (the hosted site can take a while to wake), your
 manuscript files never leave your computer, and an API key set in your
@@ -14,7 +21,7 @@ line.
 
 .. code-block:: text
 
-   usage: paperpush web [-h] [-v] [-q] [-d DIR] [--port PORT] [--no-browser]
+   usage: paperpush web [-h] [-v] [-q] [-p PATH] [--port PORT] [--no-browser]
                         [subfile]
 
 Needs the web extra: ``pip install 'paperpush[web]'``.
@@ -31,11 +38,12 @@ Synopsis
    paperpush web biorxiv.sub
 
    # The same, and offer the files in ./manuscript in the file pickers.
-   paperpush web biorxiv.sub -d manuscript
+   paperpush web biorxiv.sub -p manuscript
 
 The server listens on ``127.0.0.1`` only and runs until you press Ctrl-C.
-Paths in the ``.sub`` resolve against the directory you run the command
-from, as they do for :doc:`validate` and :doc:`submit`.
+Relative paths in the ``.sub`` resolve against the ``.sub`` file's own
+folder first, then the directory you run the command from, as they do for
+:doc:`validate` and :doc:`submit`.
 
 ``subfile``, ``autofill``, and ``validate`` take ``--web`` to finish in the same
 page: ``paperpush validate biorxiv.sub --web`` opens it with the checks already
@@ -49,9 +57,10 @@ Options
    create one with ``paperpush subfile VENUE`` (add ``--web`` to open it
    straight away).
 
-``-d DIR``, ``--directory DIR``
-   A manuscript directory whose files the page offers in its file pickers.
-   Needs a ``.sub`` file. May be repeated.
+``-p PATH``, ``--path PATH``
+   A manuscript directory whose files the page offers in its file pickers; a
+   file stands for the directory holding it. Needs a ``.sub`` file. May be
+   repeated. (``-d``/``--directory`` are accepted as older names.)
 
 ``--port PORT``
    The port to listen on. Default: any free port.

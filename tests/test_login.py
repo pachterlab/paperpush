@@ -108,6 +108,65 @@ def test_login_without_venue_or_list_errors(capsys):
     assert "venue is required" in err
 
 
+# --- login --check ------------------------------------------------------------
+
+
+def test_login_check_without_stored_credentials(capsys):
+    # Nothing stored: --check fails without opening a browser.
+    assert main(["login", "biorxiv", "--check"]) == 1
+    assert "Not logged in" in capsys.readouterr().out
+
+
+def test_login_check_signs_in_headless_with_stored_credentials(monkeypatch, capsys):
+    from paperpush.venues import login as venues_login
+
+    credentials.save_credential("biorxiv", _USERNAME, _PASSWORD)
+    calls = []
+    monkeypatch.setattr(venues_login, "verify_login", lambda slug, u, p, **k: calls.append((slug, u, p, k)))
+
+    assert main(["login", "biorxiv", "--check"]) == 0
+    assert "Sign-in confirmed" in capsys.readouterr().out
+    assert len(calls) == 1
+    slug, u, p, kwargs = calls[0]
+    assert (slug, u, p) == ("biorxiv", _USERNAME, _PASSWORD)
+    assert kwargs["headless"] is True
+    assert kwargs["method"] == "password"
+
+
+def test_login_check_reports_a_stale_password(monkeypatch, capsys):
+    # A password changed since login: --check fails and keeps the credential
+    # (the user re-runs login to replace it).
+    from paperpush.venues import login as venues_login
+
+    credentials.save_credential("biorxiv", _USERNAME, "old-token")
+
+    def _boom(slug, u, p, **k):
+        raise venues_login.LoginVerificationError("the username or password may be wrong")
+
+    monkeypatch.setattr(venues_login, "verify_login", _boom)
+
+    assert main(["login", "biorxiv", "--check"]) == 1
+    err = capsys.readouterr().err
+    assert "did not work" in err
+    assert "paperpush login biorxiv" in err
+    assert credentials.get_credential("biorxiv") is not None
+
+
+def test_login_check_venue_without_automated_sign_in(monkeypatch, capsys):
+    # A venue paperpush cannot sign in to automatically is a note, not a failure.
+    from paperpush.venues import login as venues_login
+
+    credentials.save_credential("biorxiv", _USERNAME, _PASSWORD)
+
+    def _unsupported(slug, u, p, **k):
+        raise venues_login.LoginVerificationError(f"{slug} has no automated sign-in to verify against")
+
+    monkeypatch.setattr(venues_login, "verify_login", _unsupported)
+
+    assert main(["login", "biorxiv", "--check"]) == 0
+    assert "could not be checked" in capsys.readouterr().out
+
+
 def test_login_verifies_before_storing(monkeypatch, capsys):
     # By default, login confirms the credentials by signing in. A confirmed
     # sign-in stores the credentials.

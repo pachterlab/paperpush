@@ -424,6 +424,8 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     run("figures.lettering", "Figure panel labels", True, "", _lettering_check, checks, venue, values, inv, rules)
     run("figures.color_mode", "Figure colour mode", rules.color_mode and inv.attached, "the guidelines set no colour mode (or no figure files are attached)", _color_mode_check, inv, rules)
     run("figures.dimensions", "Figure print size", (rules.max_width_mm or rules.max_height_mm) and inv.attached, "the guidelines set no maximum figure size (or no figure files are attached)", _dimensions_check, inv, rules)
+    # Reads the colours itself (pypdf and Pillow), so it does not need the inventory's figures.
+    checks.run("figures.colorblind", COLORBLIND_TITLE, FIGURES, _colorblind_check, venue, values, inv)
     placement = rules.placement or reqs.manuscript.figures_placement or ("inline" if reqs.manuscript.single_file else None)
     checks.run("figures.placement", "Figures placed where the guidelines ask", FIGURES, _placement_check, venue, values, inv, placement, reqs)
 
@@ -677,6 +679,85 @@ def _lettering_check(checks: Checks, venue: Venue, values: dict[str, str], inv: 
 
 
 # --- attached raster files: colour mode and print size ------------------------------------
+
+
+COLORBLIND_TITLE = "Figure colours distinguishable with red-green colour blindness"
+
+
+def _figure_drawings(venue: Venue, values: dict[str, str], inv: _Inventory) -> list:
+    """The figures' colours, as :class:`~paperpush.colorblind.Drawing` items."""
+    from . import colorblind
+    from .requirements_check import manuscript_files
+
+    drawings: list[colorblind.Drawing] = []
+
+    def add(make, *args) -> None:
+        try:
+            drawings.extend(make(*args))
+        except Exception:  # noqa: BLE001 -- one unreadable figure does not stop the rest
+            logger.debug("could not read the colours of %s", args[-1], exc_info=True)
+
+    def raster(path: Path, name: str, field_id: str) -> list:
+        return [colorblind.Drawing(name, colorblind.image_file_colours(path), raster=True, field_id=field_id)]
+
+    def pdf(path: Path, name: str, field_id: str, embedded: bool) -> list:
+        found = colorblind.manuscript_drawings(path, name) if embedded else colorblind.pdf_figure_drawings(path, name)
+        for d in found:
+            d.field_id = field_id
+        return found
+
+    def svg(path: Path, name: str, field_id: str) -> list:
+        return [colorblind.Drawing(name, colorblind.svg_colours(path.read_text("utf-8", "replace")), field_id=field_id)]
+
+    if inv.attached:
+        for fig in inv.figures:
+            suffix = fig.path.suffix.lower()
+            if suffix in RASTER:
+                add(raster, fig.path, fig.name, fig.field_id)
+            elif suffix == ".pdf":
+                add(pdf, fig.path, fig.name, fig.field_id, False)
+            elif suffix == ".svg":
+                add(svg, fig.path, fig.name, fig.field_id)
+        return drawings
+    for fld, path in manuscript_files(venue, values):
+        doc = document.get(path)
+        if doc.is_docx:
+            for fig in inv.figures:
+                if fig.path == path and fig.image_path is not None:
+                    add(raster, fig.image_path, fig.name, fld.id)
+        elif doc.pdf is not None:
+            add(pdf, doc.pdf, path.name, fld.id, True)
+    return drawings
+
+
+def _colorblind_check(venue: Venue, values: dict[str, str], inv: _Inventory) -> Outcome:
+    drawings = _figure_drawings(venue, values, inv)
+    checked = [d for d in drawings if d.colours is not None]
+    photos = len(drawings) - len(checked)
+    if not drawings:
+        raise NotApplicable(inv.why_empty or "no figures found")
+    if not checked:
+        if photos:
+            raise NotApplicable(f"the {photos} figure image(s) are photographs or micrographs, not charts, so their colours were not compared")
+        raise Unchecked("could not read the colours of the figures")
+    issues: list[Issue] = []
+    for d in checked:
+        pairs = d.confusions()
+        if not pairs:
+            continue
+        worst = pairs[0]
+        listed = "; ".join(c.describe() for c in pairs)
+        issues.append(
+            Issue(
+                WARNING,
+                d.field_id,
+                f"{d.name}: {listed} {'look' if len(pairs) == 1 else 'are pairs that look'} alike with red-green colour blindness "
+                f"(simulated {worst.deficiency}: colour difference {worst.simulated:.0f}, against {worst.normal:.0f} with normal vision). "
+                "Use a colour-blind-safe palette (such as Okabe-Ito or viridis), or tell them apart by lightness, marker, line style or direct labels as well",
+            )
+        )
+    detail = f"{len(checked)} figure(s) checked" + (f"; {photos} photographic image(s) not compared" if photos else "")
+    return Outcome(issues, detail)
 
 
 def _color_mode_check(inv: _Inventory, rules: FigureRules) -> list[Issue]:

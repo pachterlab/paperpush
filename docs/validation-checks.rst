@@ -38,8 +38,11 @@ to it:
   nothing for the check to look at. Listed at the end, one check per line.
 
 In the terminal the sections are coloured: green for passed, red for failed,
-amber for warnings, yellow for anything not checked. ``--alt-color`` switches
-to a colour-blind-friendly palette (blue, vermillion, dark yellow, grey), and every line also
+amber for warnings, purple for needs AI, and grey for checks that could not
+run (each says why) or are not implemented. The web app uses the same colours.
+``--colorblind`` switches to a colour-blind-friendly palette (blue,
+vermillion, dark yellow, reddish purple, grey) -- the same one as the web
+app's *Colorblind-friendly colors* setting -- and every line also
 carries a marker (``✔``, ``✖``, ``▲``, ``?``, ``–``), so the status never
 depends on colour alone. ``-o`` saves the same report as a PDF (colours kept),
 or as HTML, Markdown, or plain text when the path ends in ``.html``, ``.md``,
@@ -457,6 +460,28 @@ The lettering of a raster figure is pixels, so its size, typeface, and panel
 labels go to an AI check, with the minimum size given as a fraction of the
 image width so it can be judged at any zoom.
 
+**Colour blindness** (``figures.colorblind``, every venue, a warning): pairs of
+figure colours that look clearly different with normal vision but nearly the
+same with red-green colour blindness. No AI is involved. paperpush collects
+the colours each figure is drawn in, simulates how they look with protanopia
+and deuteranopia (the Machado, Oliveira and Fernandes 2009 model), and compares
+them with the CIEDE2000 colour difference. A pair is reported when it is at
+least 20 apart for normal vision and less than 7 apart for either form of
+colour blindness. The Okabe-Ito palette and viridis pass, and the
+orange/green and red/green pairs of matplotlib's default palette are reported.
+
+- A raster figure's colours are its main flat colours. Antialiasing blends
+  between them and the background are left out. A photograph or micrograph
+  (an image not made of a few flat colours) is not compared, because its
+  colours do not stand for categories.
+- A PDF or SVG figure's colours are the fill and stroke colours it sets.
+- In a manuscript PDF, only the drawings and images placed as figures are read.
+  Coloured links and citations in the text are not figure colours, and a TikZ
+  drawing typeset inline with the text is not read either.
+
+Greys, near-black and near-white are never compared, since colour blindness
+does not change how they differ.
+
 .. _vc-citations:
 
 Figure and table citation order
@@ -475,6 +500,23 @@ The citation pass ignores the reference list.
 
 Figure legends are checked against ``legend_max_words`` and
 ``legends_location`` (after the references, at the end, or with each figure).
+
+**Unresolved cross-references** (``citations.cross_references``, a warning) in
+the manuscript and supplementary files:
+
+- in LaTeX source, a ``\ref``, ``\eqref``, ``\cref``, ``\autoref``,
+  ``\pageref``, ``\nameref`` or ``\hyperref[...]`` whose key no ``\label``
+  defines. Keys a macro builds (``\label{fig:#1}``) are allowed for, and a
+  source that uses ``\externaldocument`` (the xr package) is not checked this
+  way, because its labels live in another file. A lone ``.tex`` file that
+  pulls in other files with ``\input`` is read through its compiled PDF
+  instead;
+- in the text of a PDF, including one compiled from LaTeX, the ``??`` LaTeX
+  prints for such a reference, and (outside LaTeX, whose citation keys
+  :ref:`vc-bibliography` already checks) the ``[?]`` it prints for an
+  undefined citation;
+- in a Word file or a PDF exported from one, "Error! Reference source not
+  found." and the other messages Word prints for a broken field.
 
 .. _vc-consistency:
 
@@ -679,7 +721,7 @@ unless one of these runs them:
 - ``--ai``: one request to an LLM provider, whichever of
   ``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``, or ``GEMINI_API_KEY`` is set
   (``--provider`` and ``--model`` choose), with the files attached. Needs the
-  provider's SDK: ``pip install "paperpush[autofill]"``.
+  provider's SDK: ``pip install "paperpush[ai]"``.
 - An agent, with its own subscription and no API key: ``--ai-tasks FILE``
   writes the tasks (id, instructions, files to read) as JSON; the agent answers
   each with ``pass``, ``fail``, ``unclear``, or ``not_applicable``; and
@@ -735,6 +777,17 @@ compiled ``.bbl``). Each DOI is then compared with the text of the entry it
 sits in. A DOI outside the reference list, such as a dataset DOI in a
 data-availability sentence, is only checked to see that it resolves. Pass
 ``--dont-check-references`` to skip this pass.
+
+**Retracted references** (``integrity.retractions``, a warning) are reported as
+their own check, from the same lookups. The record ``doi.org`` returns lists
+the notices issued against the work, and Crossref includes the Retraction Watch
+database in it. A cited work that has been retracted, partially retracted,
+withdrawn, removed, or given an expression of concern is reported with the
+notice's DOI and year. Corrections and errata are not reported. When a DOI
+points to a different work than the reference describes, only the mismatch is
+reported, because the retraction would belong to the other paper. Only
+references with a DOI can be checked. ``--dont-check-references`` turns this
+check off too.
 
 .. _vc-sensitive:
 

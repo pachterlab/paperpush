@@ -10,8 +10,6 @@
 
 @venue: jmlr
 # submission guide: https://www.jmlr.org/author-info.html
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Files

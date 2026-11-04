@@ -664,3 +664,73 @@ def test_resolve_doi_treats_non_json_as_unknown(monkeypatch):
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
     assert _real_resolve_doi("10.1234/abc") == (DOI_UNKNOWN, None)
+
+
+# --- retractions -------------------------------------------------------------
+
+
+def _retracted(record: dict, kind: str = "retraction", year: int = 2010) -> dict:
+    record["updated-by"] = [
+        {"DOI": "10.1016/s0140-6736(04)15715-2", "type": "correction", "updated": {"date-parts": [[2004, 3, 6]]}},
+        {"DOI": "10.1016/s0140-6736(10)60175-4", "type": kind, "updated": {"date-parts": [[year, 2, 6]]}},
+    ]
+    return record
+
+
+def test_retraction_notice_ranks_retraction_over_correction():
+    assert references.retraction_notice(_retracted(_record())) == "has been retracted (notice 10.1016/s0140-6736(10)60175-4, 2010)"
+    assert "expression of concern" in references.retraction_notice(_retracted(_record(), "expression_of_concern"))
+    assert references.retraction_notice({"updated-by": [{"type": "correction"}]}) is None
+    assert references.retraction_notice(_record()) is None
+
+
+def test_retracted_bib_entry_is_reported(tmp_path, monkeypatch):
+    record = _retracted(_record(title="Notes on the Analytical Engine", family="Lovelace", year=1843))
+    monkeypatch.setattr(references, "_resolve_doi", lambda doi, **k: (DOI_FOUND, record))
+    path = _bib(tmp_path, "@article{k, author = {Ada Lovelace}, title = {Notes on the Analytical Engine}, year = {1843}, doi = {10.1234/abc}}\n")
+    (finding,) = scan_references([path])
+    assert finding.category == references.RETRACTED
+    assert "'k'" in finding.detail and "has been retracted" in finding.detail and "10.1234/abc" in finding.detail
+
+
+def test_retraction_of_a_mismatched_doi_is_not_reported(tmp_path, monkeypatch):
+    # The DOI points at another paper, so that paper's retraction says nothing about this one.
+    record = _retracted(_record(title="The Genome of C. elegans", family="Brenner", year=1974))
+    monkeypatch.setattr(references, "_resolve_doi", lambda doi, **k: (DOI_FOUND, record))
+    path = _bib(tmp_path, "@article{k, author = {Ada Lovelace}, title = {Notes on the Analytical Engine}, year = {1843}, doi = {10.1234/abc}}\n")
+    assert _categories(scan_references([path])) == {"DOI metadata mismatch"}
+
+
+def test_retracted_doi_in_the_text_is_reported(tmp_path, monkeypatch):
+    record = _retracted(_record(title="Notes on the Analytical Engine", family="Lovelace", year=1843), "withdrawal")
+    monkeypatch.setattr(references, "_resolve_doi", lambda doi, **k: (DOI_FOUND, record))
+    path = tmp_path / "ms.txt"
+    path.write_text("Data are deposited under doi:10.1234/abc.\n", encoding="utf-8")
+    (finding,) = scan_references([path])
+    assert finding.category == references.RETRACTED and "has been withdrawn" in finding.detail
+
+
+def test_validate_reports_retractions_as_their_own_check(tmp_path, monkeypatch):
+    import importlib
+
+    from paperpush import report
+    from paperpush.database import Field, Venue
+    from paperpush.subfile import SubFile
+    from paperpush.validate import validate_report
+
+    record = _retracted(_record(title="Notes on the Analytical Engine", family="Lovelace", year=1843))
+    monkeypatch.setattr(references, "_resolve_doi", lambda doi, **k: (DOI_FOUND, record))
+    bib = _bib(tmp_path, "@article{k, author = {Ada Lovelace}, title = {Notes on the Analytical Engine}, year = {1843}, doi = {10.1234/abc}}\n")
+    venue = Venue(slug="retraction_testj", name="T", fields=[Field(id="supplementary_files", label="Supp", type="filelist")])
+    models = importlib.import_module("paperpush.validate")._MODELS
+    request_values = {"supplementary_files": str(bib)}
+    try:
+        rep = validate_report(SubFile(venue=venue.slug, values=request_values), venue, check_links=False, check_sensitive=False, check_manuscript=False, check_openreview=False)
+        off = validate_report(SubFile(venue=venue.slug, values=request_values), venue, check_links=False, check_references=False, check_sensitive=False, check_manuscript=False, check_openreview=False)
+    finally:
+        models.pop(venue.slug, None)
+    results = {res.id: res for res in rep.results}
+    assert results["integrity.dois"].status == report.PASSED
+    assert results["integrity.retractions"].status == report.WARNING
+    assert "has been retracted" in results["integrity.retractions"].issues[0].message
+    assert {res.id: res for res in off.results}["integrity.retractions"].status == report.UNCHECKED

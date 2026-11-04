@@ -90,7 +90,7 @@ Journals
      - ``medical_image_analysis``
    * - `Nature <https://www.nature.com>`_
      - ``nature``
-   * - `Nature Biomedical Engineering <https://www.nature.com/natbiomedeng>`_ (validate only)
+   * - `Nature Biomedical Engineering <https://www.nature.com/natbiomedeng>`_
      - ``nature_biomedical_engineering``
    * - `Nature Biotechnology <https://www.nature.com/nbt>`_
      - ``nature_biotech``

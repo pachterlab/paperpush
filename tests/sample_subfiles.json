@@ -665,6 +665,42 @@
       "open_access": "no"
     }
   },
+  "nature_machine_intelligence.sub": {
+    "venue": "nature_machine_intelligence",
+    "fields": {
+      "manuscript_type": "Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "subject_level": "Biological sciences | Biochemistry | Proteomics\nBiological sciences | Biophysics",
+      "authors": "Dr | Joseph | Richie | jmrich@caltech.edu | California Institute of Technology | United States | Pasadena | no\nProfessor | Joseph | Rich | jmrich@usc.edu | University of Southern California | United States | Los Angeles | yes\n",
+      "manuscript_file": "tests/manuscript_files/nature_machine_intelligence/manuscript.pdf",
+      "figure_files": "tests/manuscript_files/nature_machine_intelligence/figures/fig1.tif | Figure 1\ntests/manuscript_files/nature_machine_intelligence/figures/fig2.tif | Figure 2",
+      "supplementary_files": "tests/manuscript_files/nature_machine_intelligence/supplement.pdf | Supplementary Information",
+      "are_you_corresponding": "yes",
+      "corresponding_gender": "Prefer not to disclose",
+      "competing_interests": "no",
+      "dual_publication": "no",
+      "peer_review": "single-anonymized"
+    }
+  },
+  "nature_biomedical_engineering.sub": {
+    "venue": "nature_biomedical_engineering",
+    "fields": {
+      "manuscript_type": "Article",
+      "title": "Title goes here",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "subject_level": "Biological sciences | Biochemistry | Proteomics\nBiological sciences | Biophysics",
+      "authors": "Dr | Joseph | Richie | jmrich@caltech.edu | California Institute of Technology | United States | Pasadena | no\nProfessor | Joseph | Rich | jmrich@usc.edu | University of Southern California | United States | Los Angeles | yes\n",
+      "manuscript_file": "tests/manuscript_files/nature_biomedical_engineering/manuscript.pdf",
+      "figure_files": "tests/manuscript_files/nature_biomedical_engineering/figures/fig1.tif | Figure 1\ntests/manuscript_files/nature_biomedical_engineering/figures/fig2.tif | Figure 2",
+      "supplementary_files": "tests/manuscript_files/nature_biomedical_engineering/supplement.pdf | Supplementary Information",
+      "are_you_corresponding": "yes",
+      "corresponding_gender": "Prefer not to disclose",
+      "competing_interests": "no",
+      "dual_publication": "no",
+      "peer_review": "single-anonymized"
+    }
+  },
   "nature_methods.sub": {
     "venue": "nature_methods",
     "fields": {
@@ -931,7 +967,8 @@
       "latex_source": "tests/manuscript_files/discrete_mathematics/manuscript_tex_bundle.zip",
       "supplementary_files": "tests/manuscript_files/discrete_mathematics/supplement.pdf | Supplement",
       "data_statement": "The data supporting this study are included in the supplementary material.",
-      "declarations_confirmed": "yes"
+      "declarations_confirmed": "yes",
+      "funding": "National Science Foundation | DMS-0000000, DMS-1111111 | Joseph Rich\nSimons Foundation"
     }
   },
   "discrete_mathematics_shared_data.sub": {

@@ -15,7 +15,12 @@ and then compares that against what the reference claims:
 
 * the DOI is well-formed (``10.NNNN/suffix``) and not cited by two references;
 * it resolves at all (a 404 means the citation points at nothing);
-* the registered title, first author, and year match the reference's.
+* the registered title, first author, and year match the reference's;
+* the work has not been retracted, withdrawn, removed, or given an expression
+  of concern. The same CSL JSON record carries the work's ``updated-by``
+  notices (Crossref merges in the Retraction Watch database), so this needs no
+  extra request. These findings have the category :data:`RETRACTED` so that
+  ``validate`` can report them as their own check.
 
 The reference is read from whichever of the two forms a submission ships, since
 most ship only one:
@@ -89,6 +94,19 @@ YEAR_TOLERANCE = 1
 DOI_FOUND = "found"  # resolved; CSL JSON metadata returned
 DOI_MISSING = "missing"  # 404/410 -- the DOI is not registered
 DOI_UNKNOWN = "unknown"  # offline, blocked, or an agency that won't serve CSL
+
+# The Finding category of a cited work that has been retracted (or withdrawn,
+# removed, or flagged with an expression of concern).
+RETRACTED = "retracted reference"
+# Crossref ``updated-by`` notice types worth warning about, with how a finding
+# words each. Corrections and errata leave the work citable, so they are left out.
+_RETRACTION_NOTICES = {
+    "retraction": "has been retracted",
+    "partial_retraction": "has been partially retracted",
+    "withdrawal": "has been withdrawn",
+    "removal": "has been removed by its publisher",
+    "expression_of_concern": "is the subject of an expression of concern",
+}
 
 # A DOI as registered: the "10." prefix, a 4+ digit registrant code, then a
 # suffix of any non-space characters. Deliberately permissive about the suffix,
@@ -860,6 +878,51 @@ def _resolve_with_fallback(candidate: tuple[str, str]) -> tuple[str, dict | None
     return status, record, candidate[0]
 
 
+def retraction_notice(record: dict) -> str | None:
+    """How ``record``'s most serious ``updated-by`` notice describes the work, or None.
+
+    Returns e.g. ``"has been retracted (notice 10.1016/..., 2010)"``. The notices
+    are ranked in :data:`_RETRACTION_NOTICES` order, so a retraction wins over
+    an earlier expression of concern on the same work.
+    """
+    updates = record.get("updated-by")
+    if not isinstance(updates, list):
+        return None
+    ranked = list(_RETRACTION_NOTICES)
+    best: dict | None = None
+    for update in updates:
+        if not isinstance(update, dict) or update.get("type") not in _RETRACTION_NOTICES:
+            continue
+        if best is None or ranked.index(update["type"]) < ranked.index(best["type"]):
+            best = update
+    if best is None:
+        return None
+    parts = []
+    notice = best.get("DOI")
+    if isinstance(notice, str) and notice.strip():
+        parts.append(f"notice {notice.strip()}")
+    try:
+        year = best["updated"]["date-parts"][0][0]
+        parts.append(str(int(year)))
+    except (KeyError, IndexError, TypeError, ValueError):
+        pass
+    words = _RETRACTION_NOTICES[best["type"]]
+    return f"{words} ({', '.join(parts)})" if parts else words
+
+
+def _retraction_finding(where: str, cited: str, doi: str, record: dict) -> list[Finding]:
+    notice = retraction_notice(record)
+    if notice is None:
+        return []
+    return [
+        Finding(
+            where,
+            RETRACTED,
+            f"{cited} (DOI {doi}) {notice}; cite it only to discuss that, and check whether the claim it supports still stands",
+        )
+    ]
+
+
 def _entry_findings(entry: Entry, status: str, record: dict | None) -> list[Finding]:
     """Report a ``.bib`` entry against the record its DOI resolved to."""
     if status == DOI_MISSING:
@@ -880,6 +943,9 @@ def _entry_findings(entry: Entry, status: str, record: dict | None) -> list[Find
                     f"{_cite(entry)} does not match the work its DOI ({entry.doi}) " f"points to: {'; '.join(problems)}. Check whether the DOI belongs to " "a different reference",
                 )
             ]
+        # Only once the DOI is known to be this entry's: a wrong DOI's
+        # retraction is some other paper's.
+        return _retraction_finding(entry.where, _cite(entry), entry.doi, record)
     return []
 
 
@@ -909,6 +975,9 @@ def _citation_findings(citation: Citation, status: str, record: dict | None, doi
                 f"the reference citing DOI {doi} does not match the work it points " f"to: the DOI is registered to {_describe(record)}, which does not " "appear in the reference. Check whether the DOI belongs to a " "different reference",
             )
         ]
+    if status == DOI_FOUND and record is not None:
+        cited = "the reference" if citation.in_reference_list else "the work cited in the text as"
+        return _retraction_finding(citation.where, f"{cited} {_describe(record)}", doi, record)
     return []
 
 

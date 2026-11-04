@@ -10,8 +10,6 @@
 
 @venue: cvpr_2027
 # submission guide: https://cvpr.thecvf.com/Conferences/2027/AuthorGuidelines
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Files

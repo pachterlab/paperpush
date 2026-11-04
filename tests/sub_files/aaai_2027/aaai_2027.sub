@@ -10,8 +10,6 @@
 
 @venue: aaai_2027
 # submission guide: https://aaai.org/conference/aaai/aaai-27/
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript details

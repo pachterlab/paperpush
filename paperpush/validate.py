@@ -681,7 +681,7 @@ def _link_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     return _findings_to_issues(sensitive.scan_links(paths))
 
 
-def _reference_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
+def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | None = None) -> list[Issue]:
     """Flag references whose DOI does not match the work they cite.
 
     Reads the submission's bibliography whichever way it ships it -- the ``.bib``
@@ -691,13 +691,30 @@ def _reference_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     or registered to a different title/author/year, which is the signature of a
     DOI copied from the wrong row. Runs by default (disable with
     ``--dont-check-references``) and makes network requests; anything
-    inconclusive is left unreported.
+    inconclusive is left unreported. The retracted works it finds are not
+    reported here: they go into ``retracted``, for :func:`_retraction_issues`.
     """
     from . import references
 
     paths = _upload_paths_or_skip(venue, values)
     logger.info("Checking %d upload file(s) for reference DOI problems (%s)", len(paths), venue.slug)
-    return _findings_to_issues(references.scan_references(paths))
+    findings = references.scan_references(paths)
+    if retracted is not None:
+        retracted.extend(f for f in findings if f.category == references.RETRACTED)
+    return _findings_to_issues([f for f in findings if f.category != references.RETRACTED])
+
+
+def _retraction_issues(venue: Venue, values: dict[str, str], retracted: list | None) -> list[Issue]:
+    """Report the cited works whose DOI record carries a retraction notice.
+
+    The notices come with the DOI lookups :func:`_reference_issues` already
+    made (``retracted`` is the list it filled), so this makes no requests of
+    its own. ``None`` means that lookup did not finish.
+    """
+    _upload_paths_or_skip(venue, values)
+    if retracted is None:
+        raise Unchecked("the reference DOI lookup did not finish")
+    return _findings_to_issues(retracted)
 
 
 def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
@@ -1230,10 +1247,14 @@ def validate_report(
         bar.run("Links", checks.run, "integrity.links", "Links cited in the files are reachable", integrity, _link_issues, venue, values)
     else:
         _record_switched_off(checks, "integrity.links", "Links cited in the files are reachable", integrity, venue, values, "switched off (--dont-check-links)")
+    retractions_title = "No cited work has been retracted"
     if check_references:
-        bar.run("Reference DOIs", checks.run, "integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values)
+        retracted: list = []
+        dois = bar.run("Reference DOIs", checks.run, "integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values, retracted)
+        checks.run("integrity.retractions", retractions_title, integrity, _retraction_issues, venue, values, None if dois.status == report.UNCHECKED else retracted)
     else:
         _record_switched_off(checks, "integrity.dois", "Reference DOIs match the works they cite", integrity, venue, values, "switched off (--dont-check-references)")
+        _record_switched_off(checks, "integrity.retractions", retractions_title, integrity, venue, values, "switched off (--dont-check-references)")
     if check_sensitive:
         bar.run("Sensitive information", checks.run, "integrity.sensitive", "No secrets or private information in the files", integrity, _sensitive_issues, venue, values)
     else:

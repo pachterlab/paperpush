@@ -10,8 +10,6 @@
 
 @venue: nature_communications
 # submission guide: https://www.nature.com/ncomms/submit
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

@@ -10,8 +10,6 @@
 
 @venue: nature_medicine
 # submission guide: https://www.nature.com/nm/submission-guidelines
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

@@ -875,7 +875,7 @@ def test_autofill_web_without_values_lets_the_page_autofill(tmp_path, monkeypatc
     paper = tmp_path / "paper"
     paper.mkdir()
     shutil.copy(MANUSCRIPT, paper / "manuscript.pdf")
-    assert main(["autofill", "-d", "paper", "biorxiv.sub", "--web"]) == 0
+    assert main(["autofill", "-p", "paper", "biorxiv.sub", "--web"]) == 0
     sub = parse((tmp_path / "biorxiv.sub").read_text())
     assert sub.venue == VENUE
     assert sub.values["manuscript_file"] == "paper/manuscript.pdf"
@@ -1042,3 +1042,20 @@ def test_shared_js_encrypts_and_derives_tokens():
 
     check_ciphertext(out["ct"])
     check_token(out["token"])
+
+
+def test_local_session_resolves_against_the_sub_folder_then_cwd(tmp_path, monkeypatch):
+    from paperpush.web.app import LocalSession
+
+    ms = tmp_path / "ms"
+    ms.mkdir()
+    (ms / "beside.pdf").write_bytes(b"%PDF-1.4\n")
+    (ms / "both.pdf").write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "both.pdf").write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "cwd_only.pdf").write_bytes(b"%PDF-1.4\n")
+    monkeypatch.chdir(tmp_path)
+    local = LocalSession(sub_path=ms / "x.sub", root=ms)
+    assert local.resolve("beside.pdf") == ms / "beside.pdf"
+    assert local.resolve("both.pdf") == ms / "both.pdf"
+    assert local.resolve("cwd_only.pdf").resolve() == (tmp_path / "cwd_only.pdf").resolve()
+    assert local.resolve("missing.pdf") == ms / "missing.pdf"

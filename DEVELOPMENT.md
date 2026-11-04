@@ -8,10 +8,72 @@ cd paperpush
 pip install -e .[dev]
 ```
 
+## Recording a runner with paperpush codegen
+
+`paperpush codegen` allows you to convert interaction with a venue's graphical submission portal to a python Playwright script. It extends `playwright codegen` in the following ways:
+- `undo/redo`: erases or restores a generated line of Playwright script
+  - does not change the state of the webpage
+- `branches`: create a switch statement to reflect a form with multiple choices
+  - when you create a branch, you will continue down that path until you click `next`, at which point you will enter the next switch statement. 
+  - you can end a branch to return back to the upper level
+- `optional block`: a toggle that wraps code in an "optional" comment
+- `dropdown choices`: click on an expanded dropdown list to copy all options as a comment
+  - does not work unless the dropdown list is expanded (i.e., options are displayed on the screen)
+- `variable`: replace a highlighted snippet with a variable inserted at the top of the script. 
+  - great for replacing placeholder values with their variable name from the subfile 
+- `HTML`: grab the HTML for a specific element, or copy for the entire page. 
+
+`paperpush codegen` usage:
+
+```bash
+paperpush codegen --venue biorxiv -o biorxiv_steps.py          # reuse the saved sign-in, offer biorxiv's fields
+paperpush codegen --sub biorxiv.sub                             # also bind values matching the .sub to its fields
+paperpush codegen https://portal.example.org --target python    # a standalone Playwright script
+```
+
+The toolbar (drag it by its grip; the code panel shows below it):
+
+| Button | Does |
+| --- | --- |
+| Record | start/stop recording (off: your clicks are not recorded) |
+| Play / Pause / Stop | replay the script in a new tab of the same context; with `--sub`, bound variables replay the `.sub` values |
+| Undo / Redo | undo or redo the last change to the script (not to the page) |
+| Branch / Next / End | record a choice between paths, such as a question's options: press Branch, record the first option's actions, press Next before each further option, press End after the last, then carry on (e.g. click Continue) |
+| Optional | toggle: press to start an optional section (`# ---OPTIONAL---`), press again to end it (`# ---END OPTIONAL---`) |
+| Dropdown Choices | pick a dropdown, list or radio group: its choices go into the code as a comment (`# Options of "Article type" (3):`), to bind or branch on later |
+| Variable | replace the selected line's value with a variable (`values.get(...)`), or rename the selected branch |
+| HTML / Copy Page HTML | copy one picked element's HTML, or the page's HTML (all frames) |
+| Code / Copy Code / Save Code | show or hide the code panel; copy the code; save it to a file (asks for the path, default `-o` or `paperpush_codegen.py`) |
+
+A branch renders as a `match` on its variable, one `case` per path keyed by the
+element's label, so a run takes the path its `.sub` value names:
+
+```python
+match server_suitability:
+    case "Diagnostic tools or medical equipment tested in humans":
+        page.get_by_role("radio", name="Diagnostic tools or medical equipment tested in humans").check()
+    case "Biological research":
+        page.get_by_role("radio", name="Biological research").check()
+page.get_by_role("button", name="Continue").click()
+```
+
+The variable is `branch_N` until the paths match a venue field's options (then it
+takes that field's name) or you rename it. Click the `match` line or a `case` line
+in the code panel to retype the name or a path's key (Enter saves, Esc cancels).
+Each path is one action. Replay takes the path the `.sub` value names, else the one
+recorded last.
+
+What it records for you: typing into one field is one `fill`; a button that opens a
+file chooser becomes `expect_file_chooser` (one `page.attempt` unit in the default
+`paperpush` target), with the real path read through DevTools; links that open
+a tab become `expect_popup`; accepted `confirm()` dialogs add `page.once("dialog", ...)`;
+iframes become `frame_locator(...)`; password fields are always a `password`
+variable and never written out.
+
 ## Debugging
 
 Use `page.pause()` to add a breakpoint in code, and stop before the final
-submit control during `playwright codegen`.
+submit control during `paperpush codegen`.
 
 For iterating on the script, the VS Code debugger is recommended:
 
@@ -89,6 +151,28 @@ Never edit an installed copy of paperpush to fix a run: fix the live page throug
 the recovery tools, then report it.
 
 
+## Agent skills
+
+The skills live in `skills/<name>/SKILL.md`, and that copy is the one to edit.
+Three things read it:
+
+- **The plugins.** `.claude-plugin/` and `.codex-plugin/` make the repo a
+  Claude Code and a Codex plugin marketplace (`/plugin marketplace add
+  pachterlab/paperpush`), so both install the skills straight from `skills/` on
+  GitHub. Bump `version` in both `plugin.json` files with each release.
+- **The wheel.** `scripts/sync_agent_docs.py` copies each skill unchanged into
+  `paperpush/_skills/`, the same way it copies `AGENTS.md` into
+  `paperpush/_docs/`. `paperpush install-skills` (`paperpush/skills.py`)
+  installs them from there. Skills in `CONTRIBUTOR_SKILLS` (the ones that need
+  a clone) are installed only with `--all` or by name. The pre-commit hook
+  re-syncs the copy whenever `skills/` is in a commit.
+- **This checkout.** `.claude/skills/<name>` are symlinks to `skills/<name>`,
+  so Claude Code loads them here with nothing installed.
+
+A new skill needs its directory in `skills/`, a symlink in `.claude/skills/`,
+and a row in the skills table in `AGENTS.md`. `tests/test_skills.py` checks all
+three, as well as the package copy.
+
 ## Website
 
 `paperpush/web/app.py` is a FastAPI app that wraps the same functions as the CLI and the MCP
@@ -126,6 +210,18 @@ Local tests only:
 pytest
 ```
 
+The sample `.sub` files in `tests/sub_files/<venue>/` point at input files
+(manuscript, supplement, cover letter, figures, ...) under
+`tests/manuscript_files/<venue>/`. Those input files are generated rather than
+committed: pytest builds any that are missing at the start of each session. To
+build them yourself, e.g. to run `paperpush submit tests/sub_files/<venue>/<venue>.sub`
+by hand or from the VS Code debug configs on a fresh clone, or to regenerate
+the sample `.sub` files after editing `tests/sample_subfiles.json`, run:
+
+```bash
+python tests/sample_subfiles.py
+```
+
 Including headless portal tests (requires login credentials):
 
 ```bash
@@ -152,7 +248,7 @@ pytest tests/test_submit.py --run-portal -s
 pytest tests/test_submit.py --run-portal -s --venue nature
 
 # Specific subfile (ie not default)
-pytest tests/test_submit.py --run-portal -s --venue nature --subfile tests/sub_files/nature.sub
+pytest tests/test_submit.py --run-portal -s --venue cell --subfile tests/sub_files/cell/cell_figures.sub
 
 # Shorthand: only the submit walkthrough, optionally for named venue(s)
 pytest --run-submit-only -s
@@ -378,11 +474,13 @@ code to be *read* correctly (a new key the loader must understand, a changed
 merge rule). Installed versions with the old format then keep their bundled data
 until they upgrade.
 
-In a source checkout, paperpush always reads the files in the checkout, so your
-edits are what you see, test and generate from. Set `PAPERPUSH_VENUE_DATA` to
-change the source: `remote` fetches the published copy even in a checkout,
-`bundled` uses only the packaged files, and a directory path reads the files
-from there. `PAPERPUSH_OFFLINE=1` uses the cache but never fetches, and
+A source checkout uses the published venue data just as a pip install does
+(refreshed daily, merged onto the checkout's files), so a clone gets data fixes
+without a `git pull`; new runners and the venues that need them still come with
+`git pull`. When you edit the venue data, opt in to your local files with
+`PAPERPUSH_VENUE_DATA=bundled`, or published entries for existing venues will
+override your edits. The tests and the generator scripts set it themselves. A
+directory path reads the files from there instead. `PAPERPUSH_OFFLINE=1` uses the cache but never fetches, and
 `PAPERPUSH_VENUE_DATA_URL` points at another published copy.
 
 ## Formatting

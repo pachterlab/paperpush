@@ -10,8 +10,6 @@
 
 @venue: discrete_mathematics
 # submission guide: https://www.sciencedirect.com/journal/discrete-mathematics/publish/guide-for-authors
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type
@@ -77,6 +75,12 @@ authors: |
 # ----------------------------------------------------------------------
 # Declarations
 # ----------------------------------------------------------------------
+
+# Funding (textarea, optional)
+#   Optional. One funder per line, in order of importance, as 'Funder name | award1, award2 | grant recipient' (awards and recipient optional). Drives the portal's 'Add your funder details' step: the funder name is typed into the institution-or-organisation autocomplete and the suggestion with exactly that name is picked (else the first, with a warning), the awards are entered as the grant/contract numbers, and the recipient (an author's name exactly as in the authors field) is picked from the grant-recipient drop-down. Leave empty to answer 'No' to 'Did you receive any funding?'.
+funding: |
+  National Science Foundation | DMS-0000000, DMS-1111111 | Joseph Rich
+  Simons Foundation
 
 # Final submission declarations confirmed (boolean, REQUIRED)
 #   Confirms the portal's final declarations (ethics-in-publishing policy, copyright terms, and that all sources/conflicts are mentioned). The runner ticks these boxes only when this is yes.

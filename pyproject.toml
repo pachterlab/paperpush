@@ -31,16 +31,15 @@ Documentation = "https://github.com/pachterlab/paperpush#readme"
 Issues = "https://github.com/pachterlab/paperpush/issues"
 
 [project.optional-dependencies]
-# LLM SDKs for `paperpush autofill --engine api`: one extra per provider, or
-# `autofill` for all three.
-autofill-anthropic = ["anthropic>=0.40"]
-autofill-openai = ["openai>=2.0"]
-autofill-google = ["google-genai>=2.3.0"]
-autofill = ["anthropic>=0.40", "openai>=2.0", "google-genai>=2.3.0"]
+ai-anthropic = ["anthropic>=0.40"]
+ai-openai = ["openai>=2.0"]
+ai-google = ["google-genai>=2.3.0"]
+ai = ["paperpush[ai-anthropic,ai-openai,ai-google]"]
 mcp = ["mcp>=1.2"]
 web = ["fastapi>=0.115", "uvicorn>=0.30", "python-multipart>=0.0.9", "psycopg[binary]>=3.1"]
 validate = ["pdfminer.six>=20240706", "arxiv_latex_cleaner>=0.1.0", "codespell>=2.2", "tqdm>=4.60"]
-dev = ["pytest>=7.0", "bandit", "black", "jsonschema>=4.18", "sphinx", "isort", "pdfminer.six>=20240706", "arxiv_latex_cleaner>=0.1.0", "codespell>=2.2", "tqdm>=4.60", "mcp>=1.2", "fastapi>=0.115", "uvicorn>=0.30", "python-multipart>=0.0.9", "httpx"]
+all = ["paperpush[ai,mcp,web,validate]"]
+dev = ["paperpush[mcp,web,validate]", "pytest>=7.0", "bandit", "black", "jsonschema>=4.18", "sphinx", "isort"]
 
 [project.scripts]
 paperpush = "paperpush.cli:main"
@@ -67,10 +66,12 @@ include = ["paperpush*"]
 # "_assets/*" (not "*.json") so the .txt category/keyword files ship too.
 # "_docs/*.md" carries the agent-facing guide (mirrored from the repo root by
 # scripts/sync_agent_docs.py) so `paperpush --agent-guide` works from a plain pip
-# install, where the repo's AGENTS.md is not present.
-paperpush = ["venues.json", "venues.schema.json", "submission_forms.json", "submission_forms.schema.json", "common_fields.json", "manuscript_requirements.json", "manuscript_requirements.schema.json", "subfile_templates/*.sub", "_docs/*.md"]
+# install, where the repo's AGENTS.md is not present. "_skills/*/SKILL.md" is the
+# same for the skills in skills/, for `paperpush install-skills`.
+paperpush = ["venues.json", "venues.schema.json", "submission_forms.json", "submission_forms.schema.json", "common_fields.json", "manuscript_requirements.json", "manuscript_requirements.schema.json", "subfile_templates/*.sub", "_docs/*.md", "_skills/*/SKILL.md"]
 "paperpush.venues" = ["_assets/*"]
-"paperpush.web" = ["static/*"]
+"paperpush.web" = ["static/*", "static/fonts/*"]
+"paperpush.codegen" = ["recorder.js"]
 
 [tool.black]
 target-version = ["py310", "py311", "py312"]

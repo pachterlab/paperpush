@@ -10,8 +10,6 @@
 
 @venue: bmc_bioinformatics
 # submission guide: https://link.springer.com/journal/12859/submission-guidelines
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

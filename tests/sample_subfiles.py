@@ -28,7 +28,8 @@ samples reference and builds each one from the shared ``conftest.SampleFiles``
 factory via :data:`_ASSET_BUILDERS`, so there are no per-venue generator
 modules to keep in sync.
 
-Regenerate the committed files after changing the JSON or the renderer::
+Regenerate the committed .sub files (and rebuild the gitignored input assets
+under ``tests/manuscript_files/``) after changing the JSON or the renderer::
 
     python tests/sample_subfiles.py
 
@@ -196,8 +197,13 @@ def _referenced_paths(values: dict[str, str], venue) -> list[str]:
     return paths
 
 
-def ensure_assets(root: Path | None = None) -> list[Path]:
+def ensure_assets(root: Path | None = None, *, missing_only: bool = False) -> list[Path]:
     """Create the real input assets every sample ``.sub`` references.
+
+    The assets are not committed (``tests/manuscript_files/`` is gitignored):
+    the test session builds any that are missing via this function with
+    ``missing_only=True`` (see ``conftest._sample_manuscript_files``), and
+    ``python tests/sample_subfiles.py`` rebuilds them all.
 
     The samples point at manuscript-bundle files under
     ``tests/manuscript_files/<venue>/`` (manuscript, supplement, cover letter,
@@ -220,6 +226,8 @@ def ensure_assets(root: Path | None = None) -> list[Path]:
     written: list[Path] = []
     for rel in sorted(wanted):
         target = root / rel
+        if missing_only and target.exists():
+            continue
         target.parent.mkdir(parents=True, exist_ok=True)
         factory = _sample_files_factory(target.parent)
         if target.parent.name == "figures":

@@ -10,8 +10,6 @@
 
 @venue: lancet
 # submission guide: https://www.thelancet.com/pb-assets/Lancet/authors/tl-info-for-authors-1740380189507.pdf
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

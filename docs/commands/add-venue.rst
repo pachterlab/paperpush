@@ -6,8 +6,8 @@ one, from a plain-text *venue file*.
 
 .. code-block:: text
 
-   usage: paperpush add-venue [-h] [-v] [-q] [--template] [--from SLUG] [-o PATH]
-                              [--force] [--dry-run] [--data-dir DIR] [FILE]
+   usage: paperpush add-venue [-h] [-v] [-q] [--template] [--from SLUG] [-o OUT]
+                              [--overwrite] [--dry-run] [--data-dir DIR] [FILE]
 
 The workflow has two steps:
 
@@ -64,14 +64,15 @@ Options
 
 ``--from SLUG``
    With ``--template``, start from an existing venue's entries, to correct them
-   (add the file back with ``--force``) or to add a sister journal (change the
+   (add the file back with ``--overwrite``) or to add a sister journal (change the
    slug).
 
-``-o PATH``, ``--output PATH``
+``-o OUT``, ``--output OUT``
    With ``--template``, where to write the file. ``-`` prints it.
 
-``--force``
+``--overwrite``
    Overwrite an existing template file, or replace an existing venue's entries.
+   (``--force`` is accepted as an older name.)
    A part the file leaves out (``include: no``) keeps the venue's existing entry.
 
 ``--dry-run``
@@ -86,8 +87,10 @@ Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags.
 Where the venue is written
 --------------------------
 
-In a source checkout, the venue goes into ``paperpush/``'s JSON files. Commit
-them and open a pull request to share it. In a ``pip`` install, it goes into the
+In a source checkout, the venue goes into ``paperpush/``'s JSON files. Set
+``PAPERPUSH_VENUE_DATA=bundled`` while you work on it so the published venue
+data does not override your entries, then commit them and open a pull request
+to share it. In a ``pip`` install, it goes into the
 installed package and is replaced when PaperPush is upgraded, so send the venue
 file in an issue to have it added for everyone. When ``PAPERPUSH_VENUE_DATA``
 names a directory, that directory is read and written.

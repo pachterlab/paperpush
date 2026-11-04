@@ -107,10 +107,11 @@ def test_add_venue_cli_merges_into_the_databases(tmp_path, data_dir, capsys):
     assert get_venue("my_journal").name == "My Journal"
     assert get_requirements("my_journal").abstract.max_words == 250
 
-    # A second add needs --force, and a venue file from --from round-trips.
+    # A second add needs --overwrite (old name: --force), and a venue file from --from round-trips.
     assert main(["add-venue", str(path), "--data-dir", str(data_dir)]) == 1
     out = tmp_path / "again.txt"
     assert main(["add-venue", "--template", "--from", "my_journal", "-o", str(out)]) == 0
+    assert main(["add-venue", str(out), "--data-dir", str(data_dir), "--overwrite"]) == 0
     assert main(["add-venue", str(out), "--data-dir", str(data_dir), "--force"]) == 0
 
 

@@ -13,8 +13,8 @@ Run the pre-submission checks on a filled ``.sub`` file. Run this before
                              [--dont-check-hidden-text]
                              [--dont-check-openreview-profiles]
                              [--arxiv-latex-cleaner] [--initial-submission]
-                             [-o [PATH]] [--cover-letter-max-age DAYS]
-                             [--alt-color]
+                             [-o [OUT]] [--overwrite] [--cover-letter-max-age DAYS]
+                             [--colorblind]
                              [--ai] [--provider {anthropic,openai,google}]
                              [--model MODEL] [--ai-only] [--ai-tasks FILE]
                              [--ai-results FILE]
@@ -31,9 +31,10 @@ Synopsis
    paperpush validate nature.sub --initial-submission  # errors become warnings
 
 ``validate`` prints a report of every check, grouped and coloured by what
-happened to it: **failed** (red), **warnings** (red), **not checked** --
-because it could not run here, needs AI, or is not implemented yet (yellow) --
-and **passed** (green). Errors must be fixed before the file can be submitted
+happened to it: **failed** (red), **warnings** (amber), **needs AI**
+(purple), **not checked** -- because it could not run here, with the reason
+on the line below, or because paperpush has no check for the rule yet (grey)
+-- and **passed** (green). Errors must be fixed before the file can be submitted
 (for example, a required field left blank, a referenced file that does not
 exist, or a choice value that isn't one of the venue's allowed options);
 warnings are worth reviewing but don't block submission. See
@@ -247,21 +248,30 @@ Arguments
    Warn when the date at the top of the cover letter is more than DAYS days
    old (default 7) or lies in the future. See :ref:`vc-cover-letter`.
 
-``-o [PATH]``, ``--output [PATH]``
+``-o [OUT]``, ``--output [OUT]``
    Also save the report. PDF by default, which keeps the colours; a path ending
-   in ``.html``, ``.md``, or ``.txt`` saves that format instead. With no PATH,
-   writes ``<subfile>_validation.pdf`` next to the ``.sub``.
+   in ``.html``, ``.md``, or ``.txt`` saves that format instead. With no OUT,
+   writes ``<subfile>_validation.pdf`` next to the ``.sub``. Refuses to replace
+   an existing file (checked before any checks run) unless ``--overwrite`` is
+   given.
 
-``--alt-color``
+``--overwrite``
+   Replace the report file named by ``-o`` if it already exists. (``--force``
+   is accepted as an older name.)
+
+``--colorblind``
    Use colour-blind-friendly colours (blue for passed, vermillion for failed,
-   dark yellow for warnings, grey for not checked) in the terminal and the
-   saved report.
+   dark yellow for warnings, reddish purple for needs AI, grey for could not
+   run / not implemented) in the terminal and the saved report. The web app's
+   *Colorblind-friendly colors* setting uses the same palette, and with
+   ``--web`` the page opens with that setting on. ``--alt-color`` is an older
+   name for this flag.
 
 ``--ai``
    Also run the checks that need a reader's judgement through an LLM API, with
    the manuscript, figures, and other files attached. Uses whichever of
    ``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``, or ``GEMINI_API_KEY`` is set and
-   the provider's SDK (``pip install "paperpush[autofill]"``). If the request
+   the provider's SDK (``pip install "paperpush[ai]"``). If the request
    fails, the report says why and lists those checks as needing AI.
 
 ``--provider {anthropic,openai,google}``, ``--model MODEL``
@@ -315,7 +325,7 @@ Save a colour-blind-friendly HTML report:
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub -o report.html --alt-color
+   paperpush validate biorxiv.sub -o report.html --colorblind
 
 Let an agent do the AI checks, then merge its answers:
 

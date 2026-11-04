@@ -21,9 +21,12 @@ ends in one of these states:
 The rest of this module renders a report for the terminal (with :mod:`rich`)
 and saves it as PDF, HTML, Markdown, or plain text (see :func:`save`). Colours
 follow the status: green for passed, red for failed, amber for warnings,
-yellow for anything not checked; ``alt_color`` swaps in a colour-blind-safe
-palette (blue / vermillion / dark yellow / grey, after Okabe and Ito), and every line also carries a text marker so the
-status never depends on colour alone.
+purple for checks that need AI, and grey for checks that could not run or are
+not implemented (a check that could not run says why on the line below it).
+``alt_color`` (``paperpush validate --colorblind``) swaps in a colour-blind-safe
+palette (blue / vermillion / dark yellow / reddish purple / grey, after Okabe
+and Ito), and every line also carries a text marker so the status never
+depends on colour alone.
 """
 
 from __future__ import annotations
@@ -73,6 +76,7 @@ class Palette:
     failed: str
     warning: str
     unchecked: str
+    needs_ai: str
     not_implemented: str
     muted: str
 
@@ -82,18 +86,21 @@ class Palette:
             FAILED: self.failed,
             WARNING: self.warning,
             UNCHECKED: self.unchecked,
-            NEEDS_AI: self.unchecked,
+            NEEDS_AI: self.needs_ai,
             NOT_IMPLEMENTED: self.not_implemented,
             NOT_APPLICABLE: self.muted,
         }[status]
 
 
-# Green / red / amber / yellow, dark enough to read on white paper.
-DEFAULT_PALETTE = Palette(passed="#1a7f37", failed="#cf222e", warning="#b35900", unchecked="#b08800", not_implemented="#9a6700", muted="#6e7781")
-# Okabe-Ito blue and vermillion, dark yellow for warnings, and grey for "not
-# checked": distinguishable under the common forms of colour-blindness. (Same
-# hues as the web page's colour-blind theme.)
-ALT_PALETTE = Palette(passed="#0072b2", failed="#d55e00", warning="#8a6d00", unchecked="#666666", not_implemented="#666666", muted="#999999")
+# Green / red / amber / purple / grey, dark enough to read on white paper. The
+# two "not checked" greys differ only in weight: a check that could not run is
+# a shade darker than one paperpush has not implemented, and both are darker
+# than a not-applicable one. (The same colours as the web page's.)
+DEFAULT_PALETTE = Palette(passed="#1a7f37", failed="#cf222e", warning="#b35900", unchecked="#57606a", needs_ai="#8250df", not_implemented="#6e7781", muted="#8c959f")
+# Okabe-Ito blue and vermillion, dark yellow for warnings, reddish purple for
+# needs AI, and grey for the rest: distinguishable under the common forms of
+# colour-blindness. (Same hues as the web page's colour-blind theme.)
+ALT_PALETTE = Palette(passed="#0072b2", failed="#d55e00", warning="#8a6d00", unchecked="#555555", needs_ai="#aa3377", not_implemented="#666666", muted="#999999")
 
 
 def palette(alt_color: bool = False) -> Palette:

@@ -434,6 +434,7 @@ def _reveal_login_panel(page, timeout_ms: int) -> None:
     if not splash.first.is_visible():
         return  # the panel itself is what showed
     _try(lambda: splash.click(timeout=5000), "reveal login panel")
+    _dismiss_cookies(page)  # some deployments raise the banner only after this click
     _first_visible(page, _panel_controls(page), timeout_ms)
 
 
@@ -455,17 +456,68 @@ def _open_main_menu(page) -> None:
     page.wait_for_timeout(1000)
 
 
-def _dismiss_cookies(page) -> None:
-    """Best-effort dismissal of the OneTrust cookie banner (shown only on a fresh
-    browser); any failure is ignored."""
+# How long each optional cookie-banner check waits for a banner to show. Kept
+# short because the check runs at every early sign-in stage and the banner is
+# absent on most of them (it shows once, on a fresh browser).
+COOKIE_CHECK_TIMEOUT_MS = 2000
 
-    def _seq() -> None:
-        page.get_by_role("button", name="Cookie settings, Opens the").click(timeout=2000)
-        page.locator(".ot-switch-nob").first.click()
-        page.locator("div:nth-child(4) > .ot-acc-hdr > .ot-tgl > .ot-switch > .ot-switch-nob").click()
-        page.get_by_role("button", name="Confirm my choices").click()
 
-    _try(_seq, "cookie banner")
+def _dismiss_cookies(page, timeout_ms: int | None = None) -> bool:
+    """Optional check for a OneTrust cookie banner; dismiss it if one shows.
+
+    The banner appears only on a fresh browser, but not always at the same
+    moment: some deployments (Cell Genomics) raise it after the splash "Log In"
+    click or over the username/password panel rather than on page load, where
+    it covers the controls the next step clicks. So this runs at each early
+    sign-in stage and waits at most ``timeout_ms`` for a banner, in the top page
+    or the content frame. When the banner offers "Cookie settings", the
+    optional categories are switched off and the choice confirmed; otherwise
+    its reject/accept button closes it. Returns ``True`` if a banner was
+    dismissed; any failure is logged and ignored. ``timeout_ms`` defaults to
+    :data:`COOKIE_CHECK_TIMEOUT_MS`.
+    """
+    if timeout_ms is None:
+        timeout_ms = COOKIE_CHECK_TIMEOUT_MS
+    roots = [page, _content(page)]
+    settings = [r.get_by_role("button", name="Cookie settings, Opens the") for r in roots]
+    closers = [
+        r.locator(sel)
+        for r in roots
+        for sel in ("#onetrust-reject-all-handler", "#onetrust-accept-btn-handler")
+    ] + [
+        r.get_by_role("button", name=name, exact=False)
+        for r in roots
+        for name in ("Reject all", "Accept all cookies", "Accept all")
+    ]
+    with unrecovered():
+        found = _first_visible(page, settings + closers, timeout_ms)
+    if found is None:
+        return False
+
+    for root, button in zip(roots, settings):
+        if not _visible(button):
+            continue
+
+        def _seq(root=root, button=button) -> None:
+            button.first.click(timeout=2000)
+            root.locator(".ot-switch-nob").first.click(timeout=2000)
+            root.locator("div:nth-child(4) > .ot-acc-hdr > .ot-tgl > .ot-switch > .ot-switch-nob").click(timeout=2000)
+            root.get_by_role("button", name="Confirm my choices").click(timeout=2000)
+
+        if _try(_seq, "cookie banner (settings)"):
+            return True
+        break  # settings panel drifted: close the banner outright instead
+    with unrecovered():
+        closer = _first_visible(page, closers, 0)
+    return closer is not None and _try(lambda: closer.click(timeout=2000), "cookie banner")
+
+
+def _visible(locator) -> bool:
+    """``locator.first.is_visible()``, treating a detached frame as not visible."""
+    try:
+        return locator.first.is_visible()
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _username_frame(page, timeout_ms: int):
@@ -492,12 +544,14 @@ def _login_form(page, timeout_ms: int):
     never appears within ``timeout_ms`` (the panel is likely still behind an
     unclicked splash "Log In" button, see :func:`_reveal_login_panel`).
     """
+    _dismiss_cookies(page)  # a banner over the panel would swallow the clicks below
     frame = _username_frame(page, 0)
     if frame is not None:
         return frame
     reveal = _content(page).get_by_text(EM_FORM_REVEAL_TEXT)
     if _first_visible(page, [reveal], 3000) is not None:
         _try(lambda: reveal.click(timeout=3000), "reveal username/password form")
+        _dismiss_cookies(page)
     return _username_frame(page, timeout_ms)
 
 
@@ -522,7 +576,7 @@ def _login_elsevier(page, email: str, password: str, *, cfg: Variant, timeout_ms
         logger.debug("No '%s' button on the %s sign-in panel", ELSEVIER_LOGIN_BUTTON_NAME, cfg.name)
         return False
     page.wait_for_load_state()
-    _try(lambda: page.get_by_role("button", name="Accept all cookies").click(timeout=3000), "Elsevier cookie banner")
+    _try(lambda: page.get_by_role("button", name="Accept all cookies").click(timeout=COOKIE_CHECK_TIMEOUT_MS), "Elsevier cookie banner")
     _try(lambda: page.get_by_role("link", name=ELSEVIER_OTHER_ACCOUNT_LINK_NAME).click(timeout=1500), "Elsevier 'Try another way'")
 
     email_box = page.get_by_role("textbox", name=ELSEVIER_EMAIL_LABEL)
@@ -1563,6 +1617,7 @@ class EditorialManagerVenue(Venue):
                     return
                 logger.info("Elsevier did not accept the pair; trying the %s username/password form", cfg.name)
             page.goto(cfg.login_url)
+            _dismiss_cookies(page)
             _reveal_login_panel(page, timeout_ms)
 
         frame = _login_form(page, timeout_ms)

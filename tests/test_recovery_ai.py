@@ -282,7 +282,7 @@ def test_cli_ai_needs_an_api_key(no_keys):
 def test_cli_ai_needs_the_sdk(no_keys, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setattr("importlib.util.find_spec", lambda name: None)
-    with pytest.raises(ValueError, match=r"pip install paperpush\[autofill-openai\]"):
+    with pytest.raises(ValueError, match=r"pip install paperpush\[ai-openai\]"):
         cli._submit_recovery_setup(_args(ai=True), "biorxiv", "biorxiv", {})
 
 

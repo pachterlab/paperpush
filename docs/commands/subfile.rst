@@ -6,8 +6,8 @@ submission.
 
 .. code-block:: text
 
-   usage: paperpush subfile [-h] [-v] [-q] [-o OUTPUT] [--fill-defaults]
-                            [--dont-fill-defaults] [--force] [--venue-order]
+   usage: paperpush subfile [-h] [-v] [-q] [-o OUT] [--dont-fill-defaults]
+                            [--overwrite] [--web] [--venue-order]
                             venue
 
 Synopsis
@@ -60,21 +60,18 @@ Arguments
 Options
 -------
 
-``-o OUTPUT``, ``--output OUTPUT``
-   Write the template to this path instead of ``<venue>.sub`` in the current
-   directory.
-
-``--fill-defaults``
-   Pre-populate fields that have a default value with that default. **This is
-   the default behaviour.**
+``-o OUT``, ``--output OUT``
+   Write the template to this path. Default: ``<venue>.sub`` in the current
+   directory (e.g. ``biorxiv.sub``). ``.sub`` is added if OUT lacks it.
 
 ``--dont-fill-defaults``
-   Leave defaulted fields empty instead of pre-populating them, so you fill in
-   every value yourself.
+   Fields that have a default value are pre-populated with it unless you pass
+   this flag; with it, they are left empty so you fill in every value yourself.
 
-``--force``
+``--overwrite``
    Overwrite an existing ``.sub`` file. Without this flag, ``subfile`` refuses
-   to clobber a file that already exists.
+   to clobber a file that already exists. (``--force`` is accepted as an older
+   name.)
 
 ``--web``
    After writing the template, open it in the paperpush web page on this
@@ -108,7 +105,7 @@ Write it somewhere specific and overwrite any existing file:
 
 .. code-block:: bash
 
-   paperpush subfile nature -o submissions/nature.sub --force
+   paperpush subfile nature -o submissions/nature.sub --overwrite
 
 Create a bare template with no defaults pre-filled:
 

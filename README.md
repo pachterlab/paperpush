@@ -2,15 +2,52 @@
 
 <!-- [![Documentation Status](https://readthedocs.org/projects/paperpush/badge/?version=latest)](https://paperpush.readthedocs.io/en/latest/?badge=latest) -->
 
-Prepare manuscripts for submission to preprint servers, venues, and conferences with just a few commands. No need to spend hours verifying manuscript files for journal compliance and filling out submission portal forms manually. Just provide a manuscript directory and submission venue of interest, and `paperpush` will validate the documents and fill out the submission portal for you.
+Prepare manuscripts for submission to preprint servers, journals, and conferences with just a few commands. No need to spend hours verifying manuscript files for journal compliance and filling out submission portal forms manually. Just provide a manuscript directory and submission venue of interest, and PaperPush will validate the documents and fill out the submission portal for you.
+
+PaperPush provides the following services:
+- A standardized system to share all data submitted to a journal/conference
+- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, anonymization, and much much more — up to 100 checks!
+- A central database of journal/conference manuscript requirements
+- Automated and fast submission portal filling with deterministic scripts
+- Free, open-source, actively-maintained, and never stores your data
+
+## tl;dr
+
+Workflow to create the manuscript metadata (.sub) file, validate against author guidelines, and fill out the submission portal. Follow your favorite path:
+
+### Claude Code (other AI agents listed below):
+- `/plugin marketplace add pachterlab/paperpush`
+- `/plugin install paperpush@paperpush`
+- `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.`
+
+### Website: 
+- Visit [paperpush.onrender.com](https://paperpush.onrender.com)
+- Select the VENUE (or upload a .sub file)
+- Upload manuscript files and fill out the metadata fields
+- Click the blue "Validate" button to validate the files and metadata against author guidelines
+- Click the blue "Share" button to share the editable form with co-authors (or download and share the .sub file)
+- (If available) Click the "Fill out submission portal automatically" button and follow the instructions
+
+### CLI: 
+- `paperpush subfile VENUE`  # create a .sub file
+- Fill out VENUE.sub
+- `paperpush validate VENUE.sub`  # validate the files and date in VENUE.sub
+- Share VENUE.sub with co-authors (it can be viewed in a text editor, with `paperpush web VENUE.sub`, or via upload onto [paperpush.onrender.com](https://paperpush.onrender.com))
+- (If available) `paperpush login VENUE`  # log in to the VENUE submission portal
+- (If available) `paperpush submit VENUE.sub`  # fill out the VENUE submission portal with information in VENUE.sub
+
+## Website
+
+[paperpush.onrender.com](https://paperpush.onrender.com): prepare a submission in your browser, validate it, and share the editable form with co-authors — no install needed. 
 
 ## Install
 
 ```bash
-pip install paperpush
+pip install paperpush  # basic CLI usage
+pip install paperpush["all"]  # for AI API usage, MCP server, and additional manuscript validation checks
 ```
 
-To install the playwright dependency and the required chromium browser, run:
+(Required for `submit`): To install the playwright dependency and the required chromium browser, run:
 
 ```bash
 playwright install chromium
@@ -18,34 +55,53 @@ playwright install chromium
 
 ## Use with AI
 
-```bash
-git clone https://github.com/pachterlab/paperpush.git
-cd paperpush
+Install the paperpush skills for your agent, so it knows how to autofill, validate, and submit:
+
+**Claude Code** (two separate prompts):
+
 ```
+/plugin marketplace add pachterlab/paperpush
+```
+```
+/plugin install paperpush@paperpush
+```
+
+**Codex:**
+
+```bash
+codex plugin marketplace add pachterlab/paperpush
+codex plugin add paperpush@paperpush
+```
+
+**From a pip install** (any agent):
+
+```bash
+paperpush install-skills                 # Claude Code, every project (~/.claude/skills)
+paperpush install-skills --agent codex   # Codex (~/.codex/skills)
+paperpush install-skills --dest DIR      # any other agent's skills directory
+```
+
+Then ask:
 
 ```LLM
-Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.
+/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.
 ```
-
-The Claude skill `/paperpush-prepare-submission` helps with this. 
 
 See [`docs/example-session.md`](docs/example-session.md) for a full worked example of this flow.
 
 ## Quickstart
 1. `paperpush subfile VENUE`: creates a file VENUE.sub that is a template for the VENUE submission. Fields are grouped into the same sections for every venue (manuscript type, files, details, authors, reviewers, declarations, additional); add `--venue-order` to list them in the order the venue's portal asks for them instead.
-2. **fill out VENUE.sub - 3 options:**
-   - **a.** *fill out manually*
-   - **b.** *Ask an LLM*: Use Claude skill `/paperpush-autofill`, or any AI agent following [`AGENTS.md`](AGENTS.md).
-   - **c.** `paperpush autofill -d /PATH/TO/MANUSCRIPT/DIRECTORY [MORE_DIRS_OR_FILES ...] --engine api VENUE.sub`: Use an LLM API (Anthropic, OpenAI, or Google; pick one with `--provider`, otherwise the first one with an API key set is used). Requires that provider's API key and `pip install "paperpush[autofill]"`. `-d` takes one or more directories and/or documents (`.tex`, `.doc`, `.docx`, `.odt`, `.rtf`, `.txt`, `.md`, `.rst`, `.pdf`), up to the next flag or the `.sub` file, and can be repeated.
-3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`, including the manuscript against the venue's author guidelines (`paperpush requirements VENUE` prints those; a `.tex` manuscript is compiled with `latexmk`/`pdflatex`, if installed, to check its page count), its page layout (template, margins, font, spacing, line/page numbers), its figures (resolution, lettering size and typeface, panel labels — in attached files or embedded in the manuscript), the order figures and tables are cited in, whether the title, abstract, authors, and keywords in the `.sub` match the manuscript, whether the word, figure, and table counts on the title page are right, and whether the cover letter is dated within the last week (`--cover-letter-max-age`) and names the right venue. It prints a colour-coded report of what passed (green), failed (red), warnings (amber), and was not checked and why (yellow; `--alt-color` for a colour-blind-friendly palette); for venues that accept an initial submission in any format (Nature, Cell, PLOS Comp Bio, PNAS, ...) it notes the rule at the top, and `--initial-submission` reports every error as a warning; `-o` also saves it as PDF (or `.html`/`.md`/`.txt`). Checks that need a reader's judgement — lettering in raster figures, the guidelines' free-text rules — run with `--ai` (an Anthropic, OpenAI, or Gemini API key), or with your own Claude Code/Codex subscription through the `paperpush-validate` skill (`--ai-tasks` / `--ai-results`); `--ai-only` reports just those checks.
+2. **fill out VENUE.sub:** Open VENUE.sub in a text editor to edit manually, or run `paperpush web VENUE.sub` to edit in a web browser. Use the agent skill `/paperpush-autofill My manuscript files are in /PATH/TO/MANUSCRIPT/DIRECTORY. Fill out VENUE.sub` or the command `paperpush autofill --engine api -p /PATH/TO/MANUSCRIPT/DIRECTORY ... VENUE.sub` (API) to automatically fill from the manuscript directory with AI. `paperpush autofill` requires the provider's API key and `pip install "paperpush[ai]"`. The AI agent may not be able to fill out all fields if some information is not in the manuscript directory.
+3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`. Use the agent skill `/paperpush-validate` or the CLI flag `--ai` (API) to run checks with AI. The AI checks require the provider's API key and `pip install "paperpush[validate]"`.
 4. `paperpush login VENUE`: log in to the VENUE submission portal.
-5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. If a portal has changed and a step fails partway, `--recover by-hand` pauses so you can fix that step in the browser and carry on. `--ai` has an LLM fix it instead, with the same API keys and `--provider`/`--model` as `autofill --engine api`. The model can never send the submission. A run that needed recovery ends by suggesting `paperpush recovery-report`, which drafts a redacted bug report you can choose to file, so the venue gets fixed for everyone.
+5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. Use the agent skill `/paperpush-portal-debug` or the CLI flag `--ai` (API) to have AI fix any issues that may arise. Ignore validation checks with the `--skip-validate` flag.
 
 Helper commands:
-- `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
-- `paperpush add-venue --template [SLUG]` / `paperpush add-venue FILE`: write a venue file to fill in for a journal, preprint server, or conference paperpush does not support yet (or correct one with `--from SLUG`), then add it. On the website, **Add venue** fills in the same file through a form.
+- `paperpush --venues`: List all supported venues. Some venues only support validation and basic sub files (`paperpush --venues all`), while others additionally support automated submission portal filling (`paperpush --venues submit`)
 - `paperpush update-venues`: Update the venue data (venues.json, submission_forms.json, manuscript_requirements.json) from the remote venue-data branch.
+- `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
 - `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
+- `paperpush web VENUE.sub`: open a sub file in a local deployment of the web application
 
 See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 
@@ -53,41 +109,107 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 
 [paperpush.readthedocs.io](https://paperpush.readthedocs.io)
 
-## Run the whole pipeline at once
-
-`scripts/paperpush_pipeline.py` sequentially runs the commands above — `subfile`, `autofill`, `validate`, `login`, `submit`. This allows going from a manuscript directory to a filled submission portal in just one command.
-
-```bash
-python scripts/paperpush_pipeline.py -d /PATH/TO/MANUSCRIPT/DIRECTORY --engine api VENUE
-```
-
-See `python scripts/paperpush_pipeline.py --help` for the full list of options, grouped by step.
-
-## Website
-
-[paperpush.onrender.com](https://paperpush.onrender.com) — prepare and validate a submission in your browser, no install needed.
-
 ## Supported venues
 
 <!-- BEGIN SUPPORTED VENUES -->
-**Preprint servers:** [arXiv](https://arxiv.org), [bioRxiv](https://www.biorxiv.org), [medRxiv](https://www.medrxiv.org)
+**Preprint servers**
 
-**Journals:** [AJHG](https://www.cell.com/ajhg), [Bioinformatics](https://academic.oup.com/bioinformatics), [BMC Bioinformatics](https://link.springer.com/journal/12859), [The BMJ](https://www.bmj.com), [Cell](https://www.cell.com/cell/home), [Cell Genomics](https://www.cell.com/cell-genomics/home), [Cell Reports](https://www.cell.com/cell-reports), [Cell Systems](https://www.cell.com/cell-systems/home), [Combinatorica](https://link.springer.com/journal/493), [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics), [eLife](https://elifesciences.org), [European Radiology](https://link.springer.com/journal/330), [Genome Biology](https://genomebiology.biomedcentral.com), [Genome Medicine](https://genomemedicine.biomedcentral.com), [Genome Research](https://genome.cshlp.org), [IEEE TMI](https://ieeetmi.org/), [IEEE TNNLS](https://cis.ieee.org/publications/t-neural-networks-and-learning-systems), [IEEE TPAMI](https://www.computer.org/csdl/journal/tp), [JAMA](https://jamanetwork.com/journals/jama), [JMLR](https://www.jmlr.org), [JNM](https://jnm.snmjournals.org), [The Lancet](https://www.thelancet.com/journals/lancet/home), [Lancet Digital Health](https://www.thelancet.com/journals/landig/home), [Medical Image Analysis](https://www.sciencedirect.com/journal/medical-image-analysis), [Nature](https://www.nature.com), [Nature Biomedical Engineering](https://www.nature.com/natbiomedeng), [Nature Biotechnology](https://www.nature.com/nbt), [Nature Communications](https://www.nature.com/ncomms), [Nature Genetics](https://www.nature.com/ng), [Nature Machine Intelligence](https://www.nature.com/natmachintell), [Nature Medicine](https://www.nature.com/nm), [Nature Methods](https://www.nature.com/nmeth), [NEJM](https://www.nejm.org), [Neuron](https://www.cell.com/neuron), [npj Digital Medicine](https://www.nature.com/npjdigitalmed), [Nucleic Acids Research](https://academic.oup.com/nar), [PLOS Computational Biology](https://journal.plos.org/ploscompbiol/), [PNAS](https://www.pnas.org), [Radiology](https://pubs.rsna.org/journal/radiology), [Radiology: Artificial Intelligence](https://pubs.rsna.org/journal/ai), [Science](https://www.science.org/journal/science), [Science Advances](https://www.science.org/journal/sciadv), [Science Immunology](https://www.science.org/journal/sciimmunol), [Science Robotics](https://www.science.org/journal/scirobotics), [Science Signaling](https://www.science.org/journal/signaling), [Science Translational Medicine](https://www.science.org/journal/stm), [TMLR](https://jmlr.org/tmlr/)
+| Venue | Slug | Validate + basic .sub | Submit + full .sub |
+| --- | --- | :---: | :---: |
+| [arXiv](https://arxiv.org) | `arxiv` | ✅ | ✅ |
+| [bioRxiv](https://www.biorxiv.org) | `biorxiv` | ✅ | ✅ |
+| [medRxiv](https://www.medrxiv.org) | `medrxiv` | ✅ | ✅ |
 
-**Conferences:** [ACL Rolling Review](https://aclrollingreview.org), [CVPR 2027](https://cvpr.thecvf.com/Conferences/2027)
+**Journals**
+
+| Venue | Slug | Validate + basic .sub | Submit + full .sub |
+| --- | --- | :---: | :---: |
+| [AJHG](https://www.cell.com/ajhg) | `ajhg` | ✅ |  |
+| [Bioinformatics](https://academic.oup.com/bioinformatics) | `bioinformatics` | ✅ | ✅ |
+| [BMC Bioinformatics](https://link.springer.com/journal/12859) | `bmc_bioinformatics` | ✅ | ✅ |
+| [The BMJ](https://www.bmj.com) | `bmj` | ✅ |  |
+| [Cell](https://www.cell.com/cell/home) | `cell` | ✅ | ✅ |
+| [Cell Genomics](https://www.cell.com/cell-genomics/home) | `cell_genomics` | ✅ | ✅ |
+| [Cell Reports](https://www.cell.com/cell-reports) | `cell_reports` | ✅ |  |
+| [Cell Systems](https://www.cell.com/cell-systems/home) | `cell_systems` | ✅ | ✅ |
+| [Combinatorica](https://link.springer.com/journal/493) | `combinatorica` | ✅ | ✅ |
+| [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics) | `discrete_mathematics` | ✅ | ✅ |
+| [eLife](https://elifesciences.org) | `elife` | ✅ |  |
+| [European Radiology](https://link.springer.com/journal/330) | `european_radiology` | ✅ |  |
+| [Genome Biology](https://genomebiology.biomedcentral.com) | `genome_biology` | ✅ | ✅ |
+| [Genome Medicine](https://genomemedicine.biomedcentral.com) | `genome_medicine` | ✅ |  |
+| [Genome Research](https://genome.cshlp.org) | `genome_research` | ✅ |  |
+| [IEEE TMI](https://ieeetmi.org/) | `ieee_tmi` | ✅ |  |
+| [IEEE TNNLS](https://cis.ieee.org/publications/t-neural-networks-and-learning-systems) | `ieee_tnnls` | ✅ |  |
+| [IEEE TPAMI](https://www.computer.org/csdl/journal/tp) | `ieee_tpami` | ✅ |  |
+| [JAMA](https://jamanetwork.com/journals/jama) | `jama` | ✅ |  |
+| [JMLR](https://www.jmlr.org) | `jmlr` | ✅ |  |
+| [JNM](https://jnm.snmjournals.org) | `jnm` | ✅ |  |
+| [The Lancet](https://www.thelancet.com/journals/lancet/home) | `lancet` | ✅ |  |
+| [Lancet Digital Health](https://www.thelancet.com/journals/landig/home) | `lancet_digital_health` | ✅ |  |
+| [Medical Image Analysis](https://www.sciencedirect.com/journal/medical-image-analysis) | `medical_image_analysis` | ✅ |  |
+| [Nature](https://www.nature.com) | `nature` | ✅ | ✅ |
+| [Nature Biomedical Engineering](https://www.nature.com/natbiomedeng) | `nature_biomedical_engineering` | ✅ | ✅ |
+| [Nature Biotechnology](https://www.nature.com/nbt) | `nature_biotech` | ✅ | ✅ |
+| [Nature Communications](https://www.nature.com/ncomms) | `nature_communications` | ✅ |  |
+| [Nature Genetics](https://www.nature.com/ng) | `nature_genetics` | ✅ |  |
+| [Nature Machine Intelligence](https://www.nature.com/natmachintell) | `nature_machine_intelligence` | ✅ | ✅ |
+| [Nature Medicine](https://www.nature.com/nm) | `nature_medicine` | ✅ |  |
+| [Nature Methods](https://www.nature.com/nmeth) | `nature_methods` | ✅ | ✅ |
+| [NEJM](https://www.nejm.org) | `nejm` | ✅ |  |
+| [Neuron](https://www.cell.com/neuron) | `neuron` | ✅ |  |
+| [npj Digital Medicine](https://www.nature.com/npjdigitalmed) | `npj_digital_medicine` | ✅ |  |
+| [Nucleic Acids Research](https://academic.oup.com/nar) | `nucleic_acids_research` | ✅ | ✅ |
+| [PLOS Computational Biology](https://journal.plos.org/ploscompbiol/) | `plos_compbio` | ✅ | ✅ |
+| [PNAS](https://www.pnas.org) | `pnas` | ✅ |  |
+| [Radiology](https://pubs.rsna.org/journal/radiology) | `radiology` | ✅ |  |
+| [Radiology: Artificial Intelligence](https://pubs.rsna.org/journal/ai) | `radiology_ai` | ✅ |  |
+| [Science](https://www.science.org/journal/science) | `science` | ✅ | ✅ |
+| [Science Advances](https://www.science.org/journal/sciadv) | `science_advances` | ✅ | ✅ |
+| [Science Immunology](https://www.science.org/journal/sciimmunol) | `science_immunology` | ✅ | ✅ |
+| [Science Robotics](https://www.science.org/journal/scirobotics) | `science_robotics` | ✅ | ✅ |
+| [Science Signaling](https://www.science.org/journal/signaling) | `science_signaling` | ✅ | ✅ |
+| [Science Translational Medicine](https://www.science.org/journal/stm) | `science_translational_medicine` | ✅ | ✅ |
+| [TMLR](https://jmlr.org/tmlr/) | `tmlr` | ✅ |  |
+
+**Conferences**
+
+| Venue | Slug | Validate + basic .sub | Submit + full .sub |
+| --- | --- | :---: | :---: |
+| [ACL Rolling Review](https://aclrollingreview.org) | `acl_arr` | ✅ |  |
+| [CVPR 2027](https://cvpr.thecvf.com/Conferences/2027) | `cvpr_2027` | ✅ |  |
 <!-- END SUPPORTED VENUES -->
 
 View the list on the command line with `paperpush --venues`.
 
-Venue details (field options, limits, author-guideline rules) are updated independently of releases: paperpush fetches the latest published data at most once a day, and `paperpush update-venues` fetches it right away. New venues arrive with new releases (`pip install -U paperpush`).
+Venues are added (for validate) and updated (for validate and submit) daily. `paperpush update-venues` updates immediately.
 
-For more details, see [`venues.md`](venues.md)
+New venues are added for submit with paperpush releases - `pip install -U paperpush`.
 
 ## Adding new venues
 
-The quickest way is a venue file: `paperpush add-venue --template my_journal` writes `my_journal.txt`, with a section for the submission portal's form and one for the author guidelines, every key described. Fill it in (yourself, with an AI agent, or with the website's **Add venue** form), then run `paperpush add-venue my_journal.txt`, which checks it and merges it into the JSON files below. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for instructions on adding new venues. See [`DEVELOPMENT.md`](DEVELOPMENT.md) for tips on adding new venues and running unit tests.
+Each venue is listed in `paperpush/venues.json` (the master list of venues and their general metadata), `paperpush/manuscript_requirements.json` (the manuscript guidelines), and `paperpush/submission_forms.json` (the fields the portal asks for). The script for automatic venue login and submission lives in `/paperpush/venues/PLATFORM/VENUE.py` in a VENUE class with methods `login` and `submit`. See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`DEVELOPMENT.md`](DEVELOPMENT.md) for more details.
 
-Each venue is listed in `paperpush/venues.json` (the master list of venues and their general metadata). A venue paperpush can submit to has a submission-form entry in `paperpush/submission_forms.json` (the fields the portal asks for), and a venue paperpush can validate against has a manuscript-requirements entry in `paperpush/manuscript_requirements.json` (what the venue's author guidelines demand of the manuscript: file formats and sizes, word/page limits, required sections and statements, title-page items, figure resolution and dimensions, reference rules). A venue may have either or both, so it can be supported by `validate` without `submit` or the other way round; `paperpush --venues` and [`venues.md`](venues.md) show which. Each file has a generated JSON schema, and `paperpush validate` checks a `.sub` against the form and the requirements (a venue without a requirements entry gets only the form checks; a venue without a form gets a default one naming the manuscript files).
+## What is a .sub file
+
+The .sub file is the yaml-like text file that contains all metadata and file paths required to upload a manuscript onto a venue's submission portal. An example snippet is shown below. In this case, you would provide "/PATH/TO/MANUSCRIPT.pdf", "TITLE", and "HERE IS THE ABSTRACT".
+
+```
+@venue: venue
+
+# Manuscript file (file, REQUIRED)
+#   Path to the submission.
+manuscript_file: /PATH/TO/MANUSCRIPT.pdf
+
+# Title (text, REQUIRED)
+#   The full title of the article.
+title: TITLE
+
+# Abstract (textarea, REQUIRED)
+#   Plain-text abstract, at least 20 characters
+abstract: |
+  HERE IS THE ABSTRACT
+```
 
 ## MCP server
 
@@ -111,80 +233,16 @@ pip install 'paperpush[mcp]'
 The server exposes the whole pipeline as tools. See [`AGENTS.md`](AGENTS.md) for
 the tool list and the contract agents should follow.
 
-## Website
+## AI Skills
 
-For authors who would rather not use a terminal, paperpush also runs as a website.
-Pick a venue and the form fills in with every field its portal asks for and the limits
-its author guidelines set. Upload the manuscript (and optionally autofill the rest from
-it), then validate. Simple limits such as word and keyword counts are checked as you
-type. The checks that read your files run when you press **Validate**, and the ones
-that need a reader run with **Validate, extended with AI**. When you are done, download
-the `.sub` (or a zip of the `.sub` plus your files) and run `paperpush submit` on it.
-
-To pick up where you left off, open a `.sub` or that zip on the site (**Open a .sub or
-.zip…**, or drop it onto the page). A zip of your manuscript folder works too: each file
-goes into the upload field its name or folder points to (`main.pdf` → manuscript,
-`figures/Fig1.tif` → figures, `cover_letter.docx` → cover letter, `SuppTable1.xlsx` →
-supplementary tables, …). This uses keyword matching that tolerates typos, not AI, and
-only fills fields that are still empty.
-
-```bash
-pip install 'paperpush[web]'
-paperpush web                   # the page, served from this computer, opened in your browser
-paperpush web biorxiv.sub       # the same page with biorxiv.sub filled in; edits are saved to it
-```
-
-`paperpush web` runs the page locally rather than on the hosted site, so it opens at
-once and your files stay on your computer.
-
-The buttons at the bottom of the page download the `.sub` file, a `.zip` bundle (one
-folder with the `.sub` and every file it names, figures, tables, and supplements each in their own subfolder), the last
-validation's report, or the page as a single read-only **HTML** file that
-opens in any browser, with the side menu, filters, and search still working. **Share**
-on the hosted site lets co-authors work on the form with you: everyone with the link
-edits the same form (with its word counts, options, and checks), edits to different
-fields merge, and the server stores it encrypted with a key that only the link holds. On a `paperpush web` page, **Share** opens the form, filled in, on the hosted site,
-where you can share it for editing. **Portal** fills out the venue's submission portal. (`paperpush-web --host 0.0.0.0` serves the page for a
-deployment.)
-
-Autofill and the AI checks require a visitor to enter their provider and API key
-in the page header. The key is sent only with AI requests. Set `PAPERPUSH_WEB_AI=0` to turn them off on a
-public deployment, and `PAPERPUSH_WEB_NETWORK_CHECKS=0` to stop the server from fetching
-the links and DOIs found in uploads. Other settings: `PAPERPUSH_WEB_DATA` (where uploads
-live), `PAPERPUSH_WEB_TTL_HOURS` (default 24), `PAPERPUSH_WEB_MAX_WORKSPACE_MB` (default 500).
-Shared forms are stored in the Postgres database at `PAPERPUSH_WEB_DATABASE_URL` (or
-`DATABASE_URL`), e.g. a free [Neon](https://neon.tech) database; without one they go in an
-SQLite file in `PAPERPUSH_WEB_DATA`, which a redeploy on a host like Render wipes.
-`PAPERPUSH_WEB_SHARED_TTL_DAYS` (default 90) deletes forms nobody has edited for that long,
-and `PAPERPUSH_WEB_SHARED=0` turns sharing off.
-
-### `--web`: the page for a `.sub` file on your computer
-
-`subfile`, `autofill`, and `validate` each take `--web`, and `paperpush web FILE.sub`
-opens an existing one. Each opens that `.sub` in the same page, served from your machine on 127.0.0.1, until you press Ctrl-C. Every edit
-in the form is saved straight back to the file. Paths stay real paths, relative to
-the directory you ran the command in, so the file works unchanged with the other
-commands.
-
-```bash
-paperpush subfile biorxiv --web                     # create biorxiv.sub, fill it in through the form
-paperpush autofill -d paper/ biorxiv.sub --web      # the page autofills from paper/, then you review
-paperpush validate biorxiv.sub --web [--ai]         # run the checks in the page, fix, re-validate
-```
-
-Without `--web`, `subfile` and `autofill` still end by printing a localhost link that
-shows the `.sub` in the same page. The page is served by a background process, so the
-command returns at once. The server stops on its own after 30 minutes with the page
-closed. The link is printed only when the output is a terminal and the web extra is
-installed. Set `PAPERPUSH_NO_WEB_LINK=1` to turn it off.
-
-With `--web` and no `--values`/`--engine api`, `autofill` leaves the extraction to the
-page. The page uses an API key typed into it, or one set in your environment
-(`ANTHROPIC_API_KEY`, ...). Files you add in the page are saved next to the
-manuscript, and the page never deletes anything on disk.
-
-The included Dockerfile uses Python 3.12 and installs `paperpush[web,autofill,validate]`.
-Build and run it with `docker build -t paperpush-web .` and `docker run -p 8000:8000 paperpush-web`.
+| Skill | Use it to |
+| --- | --- |
+| `/paperpush-prepare-submission` | go from a manuscript directory to a filled-in portal (autofill, validate, submit) |
+| `/paperpush-autofill` | fill a `.sub` from the manuscript files |
+| `/paperpush-validate` | run every check, including the ones that need a reader |
+| `/paperpush-portal-debug` | get a stalled `paperpush submit` run unstuck |
+| `/paperpush-add-venue-validate` | add or refresh a venue's author guidelines (contributors) |
+| `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and  `submit` support for a venue, with tests (contributors) |
 
 ## For AI agents
 
@@ -197,8 +255,55 @@ your **own** field extraction (reading the manuscript and writing a
 API-backed engine. It also asks the agent to check `paperpush login --list`
 before it starts, and to tell you right away if you still need to run
 `paperpush login <venue>` yourself — that sign-in is interactive and belongs in
-your terminal. Claude Code should prefer the `/paperpush-prepare-submission`
-and `/paperpush-autofill` skills, which encode the same contract.
+your terminal. Agents that support skills should install them (see
+[Use with AI](#use-with-ai)); `AGENTS.md` lists what each skill does and when
+to use it.
+
+## FAQ
+
+*How does PaperPush work?*
+
+Supported venues are listed in `paperpush/venues.json`, their submission forms are in `paperpush/submission_forms.json`, and their author guidelines are in `paperpush/manuscript_requirements.json`. `paperpush subfile` generates a file from the form for the specified venue. The file can be filled out manually, or with the help of an LLM via `paperpush autofill`. The submission portal for a selected venue is filled out with the information from this file with a `paperpush submit`. This runs a Playwright script that is written specifically for each supported venue.
+
+
+*The repository says that is supports a given venue, but it fails when I try. Why is that?*
+
+Here are a few possibilities, in order of decreasing ease of resolution:
+- Sometimes, submission portals can be a bit funny, and the solution can be as simply as retrying the command 1-2 more times.
+- The submission portal is having server issues. You can try logging in to the portal manually to see if it is working, as well as on a different browser and at a different time.
+- The sub file has an option that we did not anticipate. You can try running the unit test for the venue with `pytest tests/test_submit.py --run-portal -s --venue VENUE`. If this passes, then it indicates an option in the sub file is not being handled correctly. If this fails, then it indicates that the submission portal has changed since the last time the venue was tested. In either case, please open an issue with the error message.
+- The submission portal has changed since the last time the venue was tested (monthly jobs scheduled every 2 months). You can run the unit test listed above to see if this is the case. If so, please open an issue with the error message.
+
+
+*I do not see my venue in the supported list. Is it possible to add a venue?*
+
+Yes! See [`CONTRIBUTING.md`](CONTRIBUTING.md) if you would like to add a journal yourself, and feel free to ask any questions in the Discussion forum. The recommended process involves running `Playwright codegen`, walking through all options for your journal of interest, replacing values with variables, encoding these variables in venues.json, and creating sample files for unit testing in `sample_subfiles.json`.
+
+
+*Does PaperPush press submit for me?*
+
+No. PaperPush will bring you to one of the final steps on your venue of interest, but it will never actually press submit. I always recommend viewing any compiled PDFs and entered information to ensure accuracy and acknowledgment of guidelines.
+
+
+*Does every venue have a unique submission portal?*
+
+No - in fact, many share the same type of platform. PaperPush has a unique Playwright script for each supported venue, but many venues share the same submission platform. The big ones are Editorial Manager (including the Cell family and PLOS family), ScholarOne Manuscripts, eJournalPress, Snapp, and OpenReview (for many computer science conferences). The submission script may be highly similar for venues that share the same platform, so check the folders within `paperpush/venues` to see which venues share the same submission platform. See screenshots of each of the major supported venues in [`docs/portal_screenshots`](docs/portal_screenshots) to see what each submission portal looks like.
+
+
+*How long does it take to add a new journal?*
+
+It depends on the complexity of the submission portal and your comfort with coding, but I would say roughly 1-3 hours.
+
+
+*Can I vibe code a new journal?*
+
+As of now, LLMs cannot reliably observe the state of a submission portal, which means adding a new journal requires some human oversight. However, when provided with the Playwright script outlining the steps to fill out a submission portal, LLMs can be pretty good at generating the Venue class for login and submit. In my experience, LLMs can make the code a bit verbose and abstract away some of the action names, which may be harder to read/maintain in my opinion, but this is just stylistic. My favorite code style is in arxiv.py.
+
+
+*I want to add another journal from the Nature family, but Playwright codegen is not working. What do I do?*
+
+This is an issue with the Nature submission portal. My solution was to use the Chrome DevTools to inspect the elements and write the Playwright script manually from the HTML. If you find a solution to this issue, please let me know in the Discussion forum.
+
 
 ## License
 This project is licensed under the BSD-2 License - see the [LICENSE](LICENSE) file for details.

@@ -7,6 +7,39 @@ Guidance for any AI agent (Codex, Claude, or otherwise) that decides to use
 `paperpush` to submit a manuscript to a venue - a journal, preprint server, or conference -
 on a user's behalf.
 
+## Skills: which one to use, and when
+
+paperpush ships its workflows as agent skills (`skills/<name>/SKILL.md`). If
+yours are installed, use the matching skill instead of working from this file
+alone: it holds the same contract, step by step. If you can't load skills,
+open the `SKILL.md` and follow it as written.
+
+| Skill | What it does | Call it when the user... |
+| --- | --- | --- |
+| `paperpush-prepare-submission` | The whole flow: checks the login, finds or creates the `.sub`, runs autofill, runs validate, then (once the user confirms) runs submit. | asks to prepare, get ready, or submit a manuscript to a venue, and has not named a single step. **Start here when in doubt.** |
+| `paperpush-autofill` | Reads the manuscript directory, writes `values.json`, and applies it with `paperpush autofill --engine manual`. Leaves `never` fields for the author. | wants a `.sub` filled from their files, and nothing else yet. |
+| `paperpush-validate` | Runs `paperpush validate`, then does the checks that need a reader (lettering in raster figures, panel labels, free-text guideline rules, `.sub` vs manuscript) through `--ai-tasks` / `--ai-results`. Optionally saves the report. | asks whether a manuscript or `.sub` is ready, meets a venue's guidelines, or passes validation, or wants the AI checks or a saved report. |
+| `paperpush-portal-debug` | Gets a stalled `paperpush submit` run past the failing step on the live page (`submit_page` / `submit_act` / `submit_resume`), logs every runner change it needs, and puts those changes into the runner with a test when working in a source checkout. Never sends the submission. | reports that `submit` is stuck, failed at a step, or hit a portal that changed. Also use it yourself whenever `submit_status` shows `recovery.paused`. |
+| `paperpush-add-venue-validate` | Reads a venue's author guidelines and records them in `manuscript_requirements.json`, and its basic submission fields in `submission_forms.json`, through a venue file and `paperpush add-venue`. For an existing venue, re-reads the pages and updates what changed. | wants a venue that `validate` can check against, or wants a venue's guidelines, limits, or rules added or refreshed. *Contributor skill: needs a clone of the repo.* |
+| `paperpush-add-venue` | Full `submit` support: a `Venue` class with Playwright `login()` / `submit()`, the portal's fields, a sample `.sub` with generated documents, unit tests, and a live run that stops before the final submit. For an existing runner, runs its tests and fixes what fails. Has the user create an account and run `paperpush login` rather than handing over a password. | wants to submit to a venue paperpush can't submit to yet, or reports that a venue's runner or tests are broken. Runs `paperpush-add-venue-validate` first if the venue has no guidelines entry yet. *Contributor skill: needs a clone of the repo.* |
+
+The skills call each other where the steps overlap: `prepare-submission` runs
+`autofill` and `validate`; `add-venue` runs `add-venue-validate`, and uses
+`portal-debug` for a live step that stalls. Don't run the same step twice.
+
+### Installing the skills
+
+- **Claude Code**: `/plugin marketplace add pachterlab/paperpush`, then
+  `/plugin install paperpush@paperpush`. Or, with paperpush installed,
+  `paperpush install-skills` (`--all` adds the contributor skills,
+  `--project .` installs into the current project only).
+- **Codex**: `codex plugin marketplace add pachterlab/paperpush`, then
+  `codex plugin add paperpush@paperpush`. Or `paperpush install-skills --agent codex`.
+- **Any other agent**: `paperpush install-skills --dest <that agent's skills
+  directory>`, or point it at `skills/<name>/SKILL.md`.
+- **In a clone of this repo**, Claude Code already loads them from
+  `.claude/skills/`, which links to `skills/`.
+
 ## The one rule: you are the extractor
 
 `paperpush` splits submission into two layers:
@@ -52,8 +85,11 @@ paperpush login <venue>
 Say plainly that this opens a browser and is theirs to complete, and that you
 will keep going in the meantime. Do not run `paperpush login` yourself, and do
 not treat a missing login as a reason to skip the extraction work — do the
-`.sub` creation, autofill, and validation regardless, then re-check
-`paperpush login --list` before the submit step.
+`.sub` creation, autofill, and validation regardless, then run
+`paperpush login <venue> --check` before the submit step. `--check` signs in
+headless with the stored credentials, so it also catches a password changed
+since login; `--list` and `--status` only show that something is stored. On
+exit 1, ask the user to run `paperpush login <venue>` again.
 
 Some public submission systems do not have author accounts. If the target is
 absent from `--list`, check it with `paperpush login <venue> --status` before
@@ -65,7 +101,10 @@ login and exits successfully; proceed without credentials in that case.
 
 **Connected over MCP instead of a shell?** `login_status` is this check, and
 `login_status(venue=...)` is the per-venue form — it returns the exact
-`login_command` to pass along when the venue is not signed in. The `login` tool
+`login_command` to pass along when the venue is not signed in. Before
+`submit`, call `login_status(venue=..., check=true)`, the MCP form of
+`--check`: a `check.status` of `failed` or `timed_out` sets `logged_in` to false
+and gives the `login_command`. The `login` tool
 is the same guard in one call: it reports an existing login, and otherwise hands
 back the command for the user to run, so the user's password never passes
 through the conversation. (It does run the login itself when
@@ -197,7 +236,7 @@ defaults to `--engine manual`, which applies the `values.json` **you** wrote. So
 
    ```
    python scripts/paperpush_pipeline.py <venue> \
-       -d /abs/path/to/manuscript-dir \
+       -p /abs/path/to/manuscript-dir \
        --values /abs/path/to/values.json
    ```
 
@@ -219,12 +258,12 @@ If you prefer to drive the steps yourself instead of the pipeline script, the
 autofill step alone is:
 
 ```
-paperpush autofill <venue>.sub -d <manuscript-dir> --engine manual --values values.json
+paperpush autofill <venue>.sub -p <manuscript-dir> --engine manual --values values.json
 ```
 
-(Add `--dry-run` to preview without writing. `-d` accepts several directories
+(Add `--dry-run` to preview without writing. `-p` accepts several directories
 and/or documents -- `.tex`, `.doc`, `.docx`, `.odt`, `.rtf`, `.txt`, `.md`, `.rst`,
-`.pdf` -- e.g. `-d ms/ figures/ cover_letter.docx`; it stops at the next flag or
+`.pdf` -- e.g. `-p ms/ figures/ cover_letter.docx`; it stops at the next flag or
 the first `.sub` file, and may be repeated.)
 
 ## The manuscript itself is checked too
@@ -256,7 +295,7 @@ things to confirm, not as blockers. `--dont-check-manuscript` skips the pass.
 `validate` reports every check as passed, failed, warning, could not run, needs
 AI, not implemented, or not applicable (MCP: `checks` in the `validate_subfile`
 result). `-o` saves the report (PDF by default; `.html`/`.md`/`.txt` by
-extension); `--alt-color` is the colour-blind-friendly palette.
+extension); `--colorblind` is the colour-blind-friendly palette.
 When the venue lets the initial submission be in any format
 (`manuscript.initial_submission_any_format`), the report opens with that rule
 (MCP: `initial_submission_rule`); `--initial-submission` (MCP:
@@ -339,6 +378,6 @@ file will not submit until those are resolved).
 
 ## Claude Code note
 
-If you are Claude Code, prefer the packaged skills, which encode this same
-contract: `/paperpush-prepare-submission` for the end-to-end flow, or
-`/paperpush-autofill` for the extraction step alone.
+If you are Claude Code, use the skills in
+[Skills: which one to use, and when](#skills-which-one-to-use-and-when) above.
+They hold this same contract.

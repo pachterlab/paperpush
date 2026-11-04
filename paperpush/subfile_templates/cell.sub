@@ -10,8 +10,6 @@
 
 @venue: cell
 # submission guide: https://www.cell.com/cell/authors
-# Fields are grouped by section. 'paperpush subfile --venue-order' lists them
-# in the order the venue's submission form asks for them instead.
 
 # ----------------------------------------------------------------------
 # Manuscript type

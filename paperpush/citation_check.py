@@ -23,6 +23,20 @@ calls outside them are the citations.
 The legends are checked against ``figures.legend_max_words`` and
 ``figures.legends_location`` (at the end of the manuscript, after the
 references, or with each figure).
+
+``citations.cross_references`` looks for cross-references that point at
+nothing, in the manuscript and the supplementary files:
+
+* in **LaTeX source**, a ``\\ref`` (``\\eqref``, ``\\cref``, ``\\autoref``,
+  ...) whose key no ``\\label`` defines;
+* in the **text** of a PDF (or the PDF compiled from LaTeX), the ``??`` LaTeX
+  prints for such a reference, and the ``[?]`` it prints for an undefined
+  citation;
+* in a **Word** file (or a PDF exported from one), "Error! Reference source not
+  found." and the other messages Word prints for a broken field.
+
+A citation key missing from the ``.bib`` is ``bibliography.uncited``'s to
+report, so in LaTeX only ``??`` is looked for in the compiled text.
 """
 
 from __future__ import annotations
@@ -361,9 +375,151 @@ def _manuscript_mentions(venue: Venue, values: dict[str, str]) -> tuple[list[Men
     return mentions(text), field.id
 
 
+# --- cross-references -------------------------------------------------------------------
+
+CROSS_REF_TITLE = "Cross-references resolve (no \u201c??\u201d)"
+# Commands whose argument is one label key, or a comma-separated list of them.
+_XREF = re.compile(r"\\(?:ref|eqref|pageref|autoref|nameref|cref|Cref|cpageref|Cpageref|labelcref|vref|Vref|vpageref|subref|zref|crefrange|Crefrange)\*?\s*(?:\[[^\]]*\]\s*)?\{([^{}]*)\}(?:\s*\{([^{}]*)\})?")
+# \hyperref[key]{text}
+_HYPERREF = re.compile(r"\\hyperref\s*\[([^\]]*)\]")
+# \label{key}, \label[type]{key} (cleveref), \zlabel{key}, and label=key in a
+# listings/minted/algorithm option list.
+_XLABEL = re.compile(r"\\z?label\s*(?:\[[^\]]*\]\s*)?\{([^{}]*)\}|\blabel\s*=\s*\{?([^,{}\]\s]+)")
+_RANGE_CMDS = ("crefrange", "Crefrange")
+# A file the source pulls in; a lone .tex cannot be checked without it.
+_TEX_INCLUDE = re.compile(r"\\(?:input|include|subfile|import|subimport)\s*(?:\{[^{}]*\}\s*)?\{([^{}]+)\}")
+# Placeholders printed for a reference that did not resolve.
+_QUERY_REF = re.compile(r"(?<![\w?!])\?\?(?![\w?])")
+_QUERY_CITE = re.compile(r"\[\?(?:\s*[,;]\s*\?)*\]")
+_WORD_FIELD_ERRORS = re.compile(r"Error!\s+(?:Reference\s+source\s+not\s+found|Bookmark\s+not\s+defined|No\s+text\s+of\s+specified\s+style\s+in\s+document|Unknown\s+switch\s+argument)\.?", re.IGNORECASE)
+MAX_XREF_EXAMPLES = 5
+
+
+def tex_undefined_refs(source: str) -> list[str] | None:
+    """Keys referenced in ``source`` that no label defines, in order of first use.
+
+    Keys built inside macro definitions (``\\ref{fig:#1}``) are skipped, and so
+    is any key a parameterised label (``\\label{fig:#1}``) could produce. With
+    ``\\externaldocument`` (the xr package) labels can live in another file, so
+    nothing is reported: None.
+    """
+    if re.search(r"\\(?:externaldocument|externalcitedocument)\b", source):
+        return None
+    labels: set[str] = set()
+    macro_prefixes: list[str] = []
+    for m in _XLABEL.finditer(source):
+        key = (m.group(1) if m.group(1) is not None else m.group(2)).strip()
+        if "#" in key:
+            macro_prefixes.append(key.split("#", 1)[0])
+        elif key:
+            labels.add(key)
+    used: list[str] = []
+    for m in _XREF.finditer(source):
+        keys = m.group(1).split(",")
+        if m.group(2) is not None and any(m.group(0).lstrip("\\").startswith(c) for c in _RANGE_CMDS):
+            keys.append(m.group(2))
+        used.extend(keys)
+    for m in _HYPERREF.finditer(source):
+        used.append(m.group(1))
+    undefined: list[str] = []
+    for key in (k.strip() for k in used):
+        if not key or "#" in key or "\\" in key or key in labels or key in undefined:
+            continue
+        if any(key.startswith(prefix) for prefix in macro_prefixes):
+            continue
+        undefined.append(key)
+    return undefined
+
+
+def _snippet(text: str, start: int, end: int, width: int = 35) -> str:
+    before = text[max(0, start - width) : start].split("\n")[-1]
+    if start - width > 0 and " " in before:
+        before = before.split(" ", 1)[1]  # drop the word cut in half
+    after = text[end : end + width].split("\n")[0]
+    if end + width < len(text) and " " in after.strip():
+        after = after.rsplit(" ", 1)[0]
+    before, after = before.lstrip(), after.rstrip()
+    return f"\u201c{before}{text[start:end]}{after}\u201d"
+
+
+def placeholder_problems(pages: list[str], *, citations: bool, word: bool) -> list[str]:
+    """The unresolved-reference placeholders in a document's text, as sentences.
+
+    ``pages`` is the text page by page (one item for a file without pages).
+    ``citations`` also looks for ``[?]``; ``word`` for Word's field errors.
+    """
+    kinds = [(_QUERY_REF, "\u201c??\u201d (a reference to a label that is not defined)")]
+    if citations:
+        kinds.append((_QUERY_CITE, "\u201c[?]\u201d (a citation with no reference-list entry)"))
+    if word:
+        kinds.append((_WORD_FIELD_ERRORS, "a broken Word cross-reference field (\u201cError! ...\u201d)"))
+    problems: list[str] = []
+    for pattern, what in kinds:
+        hits = [(n, page, m) for n, page in enumerate(pages, start=1) for m in pattern.finditer(page)]
+        if not hits:
+            continue
+        shown = []
+        for n, page, m in hits[:MAX_XREF_EXAMPLES]:
+            where = f"page {n}: " if len(pages) > 1 else ""
+            shown.append(where + _snippet(page, m.start(), m.end()))
+        more = f", and {len(hits) - MAX_XREF_EXAMPLES} more" if len(hits) > MAX_XREF_EXAMPLES else ""
+        problems.append(f"{len(hits)} \u00d7 {what}: {'; '.join(shown)}{more}")
+    return problems
+
+
+def _xref_files(venue: Venue, values: dict[str, str]) -> list[tuple[str, Path]]:
+    from .requirements_check import _existing, _fields_for, _paths, manuscript_files
+
+    files = [(f.id, p) for f, p in manuscript_files(venue, values)]
+    for f in _fields_for(venue, "supplementary"):
+        files += [(f.id, p) for p in _existing(_paths(f, values))]
+    readable = (".pdf", ".docx", ".txt", ".md") + document.TEX_SUFFIXES
+    seen: set[Path] = set()
+    out = []
+    for field_id, path in files:
+        if path.suffix.lower() in readable and path not in seen:
+            seen.add(path)
+            out.append((field_id, path))
+    return out
+
+
+def _cross_reference_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    files = _xref_files(venue, values)
+    if not files:
+        raise NotApplicable("no manuscript or supplementary file to read")
+    issues: list[Issue] = []
+    read: list[str] = []
+    for field_id, path in files:
+        doc = document.get(path)
+        problems: list[str] = []
+        source_checked = False
+        if doc.is_tex and doc.tex_source is not None:
+            lone_tex_with_includes = doc.suffix == ".tex" and _TEX_INCLUDE.search(doc.tex_source)
+            undefined = None if lone_tex_with_includes else tex_undefined_refs(doc.tex_source)
+            if undefined is not None:
+                source_checked = True
+                if undefined:
+                    shown = ", ".join(undefined[:MAX_XREF_EXAMPLES * 2]) + (f", and {len(undefined) - MAX_XREF_EXAMPLES * 2} more" if len(undefined) > MAX_XREF_EXAMPLES * 2 else "")
+                    problems.append(f"{len(undefined)} reference(s) to a label that no \\label defines, which print as \u201c??\u201d: {shown}")
+        pages = doc.page_texts
+        if pages is None and (doc.is_docx or doc.suffix in (".txt", ".md")):
+            pages = [doc.text] if doc.text is not None else None
+        if pages is not None and not (source_checked and problems):
+            # A compiled LaTeX source's own \cite keys are bibliography.uncited's.
+            problems += placeholder_problems(pages, citations=not doc.is_tex, word=not doc.is_tex)
+        if pages is None and not source_checked:
+            continue
+        read.append(path.name)
+        issues += [Issue(WARNING, field_id, f"{path.name}: {p}") for p in problems]
+    if not read:
+        raise Unchecked("could not read the text of " + ", ".join(p.name for _, p in files))
+    return Outcome(issues, "" if issues else f"read {', '.join(read)}")
+
+
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     from .report import NOT_APPLICABLE, UNCHECKED
 
+    checks.run("citations.cross_references", CROSS_REF_TITLE, CITATIONS, _cross_reference_check, venue, values)
     try:
         found, field_id = _manuscript_mentions(venue, values)
     except (NotApplicable, Unchecked) as exc:

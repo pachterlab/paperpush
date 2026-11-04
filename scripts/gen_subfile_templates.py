@@ -25,12 +25,15 @@ database) are deleted.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 # Import the package directly from the repo without requiring an install.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+# Generate from the checkout's own venue data, never the published copy.
+os.environ["PAPERPUSH_VENUE_DATA"] = "bundled"
 
 from paperpush.database import list_venues  # noqa: E402
 from paperpush.subfile import default_filename, render_template  # noqa: E402

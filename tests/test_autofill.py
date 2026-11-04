@@ -10,7 +10,7 @@ the ``paperpush autofill`` CLI.
   with fake ``anthropic``, ``openai``, and ``google.genai`` modules injected into
   ``sys.modules``, and the document-reading / prompt-building helpers are tested
   directly.
-* CLI (``paperpush autofill -d <dir|file> [...] <subfile>``) -- the manual engine reads
+* CLI (``paperpush autofill -p <dir|file> [...] <subfile>``) -- the manual engine reads
   proposed field values from a ``--values`` JSON file (the same file the Claude
   skill produces), so these exercise the full CLI path without any model or
   network; the api engine is driven with a fake SDK.
@@ -504,7 +504,7 @@ def test_openai_incomplete_raises(fake_openai, tmp_path):
 def test_missing_openai_dependency_raises(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "openai", None)
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    with pytest.raises(api.AutofillApiError, match=r"autofill-openai"):
+    with pytest.raises(api.AutofillApiError, match=r"ai-openai"):
         api.extract_via_api(BIORXIV, _docs(tmp_path), ["manuscript.pdf"], provider="openai")
 
 
@@ -626,7 +626,7 @@ def _write_values(path: Path, **extra) -> Path:
 
 def test_autofill_creates_and_fills_subfile(in_tmp, manuscript_dir):
     values = _write_values(in_tmp / "values.json")
-    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--values", str(values)])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values)])
     assert rc == 0
 
     out = in_tmp / "biorxiv.sub"
@@ -644,7 +644,7 @@ def test_autofill_creates_and_fills_subfile(in_tmp, manuscript_dir):
 
 def test_autofill_summary_groups_outcomes(in_tmp, manuscript_dir, capsys):
     values = _write_values(in_tmp / "values.json")
-    main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--values", str(values)])
+    main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values)])
     out = capsys.readouterr().out
     assert "Filled" in out
     assert "need your review" in out  # subject_category + authors confidence
@@ -654,7 +654,7 @@ def test_autofill_summary_groups_outcomes(in_tmp, manuscript_dir, capsys):
 
 def test_autofill_dry_run_writes_nothing(in_tmp, manuscript_dir, capsys):
     values = _write_values(in_tmp / "values.json")
-    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--values", str(values), "--dry-run"])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values), "--dry-run"])
     assert rc == 0
     assert not (in_tmp / "biorxiv.sub").exists()
     assert "dry run" in capsys.readouterr().out
@@ -662,27 +662,31 @@ def test_autofill_dry_run_writes_nothing(in_tmp, manuscript_dir, capsys):
 
 def test_autofill_fills_existing_subfile_in_place(in_tmp, manuscript_dir):
     # Pre-create a skeleton, then autofill into it.
-    main(["subfile", "biorxiv", "--fill-defaults"])
+    main(["subfile", "biorxiv"])
     values = _write_values(in_tmp / "values.json")
-    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--values", str(values)])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values)])
     assert rc == 0
     assert subfile.load(in_tmp / "biorxiv.sub").values["title"] == "A New Method"
 
 
-def test_autofill_output_flag_and_force(in_tmp, manuscript_dir):
+def test_autofill_output_flag_and_overwrite(in_tmp, manuscript_dir):
     values = _write_values(in_tmp / "values.json")
     target = in_tmp / "out.sub"
-    assert main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--values", str(values), "-o", str(target)]) == 0
+    assert main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values), "-o", str(target)]) == 0
     assert target.exists()
-    # Refuses to overwrite without --force.
-    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--values", str(values), "-o", str(target)])
+    # Refuses to overwrite without --overwrite; --force is its old name.
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values), "-o", str(target)])
     assert rc == 1
-    assert main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--values", str(values), "-o", str(target), "--force"]) == 0
+    assert main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values), "-o", str(target), "--overwrite"]) == 0
+    assert main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values), "-o", str(target), "--force"]) == 0
+    # -d/--directory still work as old names for -p/--path.
+    assert main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--values", str(values)]) == 0
+    assert main(["autofill", "biorxiv.sub", "--directory", str(manuscript_dir), "--values", str(values)]) == 0
 
 
 def test_autofill_min_confidence_high_skips_medium(in_tmp, manuscript_dir):
     values = _write_values(in_tmp / "values.json")
-    main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--values", str(values), "--min-confidence", "high"])
+    main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values), "--min-confidence", "high"])
     parsed = subfile.load(in_tmp / "biorxiv.sub")
     # subject_category was medium confidence -> not written under a high floor.
     assert parsed.values["subject_category"] == ""
@@ -692,18 +696,18 @@ def test_autofill_min_confidence_high_skips_medium(in_tmp, manuscript_dir):
 
 def test_autofill_missing_directory_errors(in_tmp):
     values = _write_values(in_tmp / "values.json")
-    rc = main(["autofill", "biorxiv.sub", "-d", "no_such_dir", "--values", str(values)])
+    rc = main(["autofill", "biorxiv.sub", "-p", "no_such_dir", "--values", str(values)])
     assert rc == 1
 
 
 def test_autofill_unknown_venue_errors(in_tmp, manuscript_dir):
     values = _write_values(in_tmp / "values.json")
-    rc = main(["autofill", "nonsense.sub", "-d", str(manuscript_dir), "--values", str(values)])
+    rc = main(["autofill", "nonsense.sub", "-p", str(manuscript_dir), "--values", str(values)])
     assert rc == 2
 
 
 def test_autofill_manual_requires_values(in_tmp, manuscript_dir):
-    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir)])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir)])
     assert rc == 1
 
 
@@ -717,7 +721,7 @@ def test_autofill_command_for_each_venue(venue, in_tmp, manuscript_dir):
     """
     values = in_tmp / "values.json"
     values.write_text(json.dumps({"fields": [], "unfilled": []}), encoding="utf-8")
-    rc = main(["autofill", f"{venue.slug}.sub", "-d", str(manuscript_dir), "--values", str(values)])
+    rc = main(["autofill", f"{venue.slug}.sub", "-p", str(manuscript_dir), "--values", str(values)])
     assert rc == 0
     out = in_tmp / f"{venue.slug}.sub"
     assert out.exists()
@@ -763,7 +767,7 @@ def test_autofill_api_engine_end_to_end(in_tmp, manuscript_dir, monkeypatch):
             "unfilled": [{"id": "funding", "reason": "none found"}],
         },
     )
-    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--engine", "api", "--manuscript", str(manuscript_dir / "paper.pdf")])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--engine", "api", "--manuscript", str(manuscript_dir / "paper.pdf")])
     assert rc == 0
     parsed = subfile.load(in_tmp / "biorxiv.sub")
     assert parsed.values["title"] == "A New Method"
@@ -773,14 +777,14 @@ def test_autofill_api_engine_end_to_end(in_tmp, manuscript_dir, monkeypatch):
     assert parsed.values["license"] == "CC-BY-NC-ND"
 
 
-# --- multiple -d inputs ----------------------------------------------------
+# --- multiple -p inputs ----------------------------------------------------
 
 
 def test_autofill_inputs_stop_at_sub_file(in_tmp, manuscript_dir):
     notes = in_tmp / "notes.md"
     notes.write_text("notes", encoding="utf-8")
     values = _write_values(in_tmp / "values.json")
-    rc = main(["autofill", "-d", str(manuscript_dir), str(notes), "biorxiv.sub", "--values", str(values)])
+    rc = main(["autofill", "-p", str(manuscript_dir), str(notes), "biorxiv.sub", "--values", str(values)])
     assert rc == 0
     assert subfile.load(in_tmp / "biorxiv.sub").values["manuscript_file"] == str(manuscript_dir / "paper.pdf")
 
@@ -790,7 +794,7 @@ def test_autofill_repeated_d_flags_resolve_across_dirs(in_tmp, manuscript_dir):
     figs.mkdir()
     (manuscript_dir / "fig1.png").rename(figs / "fig1.png")
     values = _write_values(in_tmp / "values.json")
-    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "-d", str(figs), "--values", str(values)])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "-p", str(figs), "--values", str(values)])
     assert rc == 0
     assert subfile.load(in_tmp / "biorxiv.sub").values["figure_files"] == f"{figs / 'fig1.png'} | Figure 1"
 
@@ -798,9 +802,9 @@ def test_autofill_repeated_d_flags_resolve_across_dirs(in_tmp, manuscript_dir):
 @pytest.mark.parametrize(
     "argv",
     [
-        ["autofill", "biorxiv.sub"],  # no -d at all
-        ["autofill", "-d", "biorxiv.sub"],  # -d with only the .sub
-        ["autofill", "-d", "ms", "biorxiv.sub", "extra"],  # stray input after the .sub
+        ["autofill", "biorxiv.sub"],  # no -p at all
+        ["autofill", "-p", "biorxiv.sub"],  # -p with only the .sub
+        ["autofill", "-p", "ms", "biorxiv.sub", "extra"],  # stray input after the .sub
     ],
 )
 def test_autofill_inputs_usage_errors(in_tmp, manuscript_dir, argv):
@@ -811,18 +815,18 @@ def test_autofill_inputs_usage_errors(in_tmp, manuscript_dir, argv):
 
 def test_autofill_requires_a_sub_file(in_tmp, manuscript_dir):
     values = _write_values(in_tmp / "values.json")
-    assert main(["autofill", "-d", str(manuscript_dir), "--values", str(values)]) == 2
+    assert main(["autofill", "-p", str(manuscript_dir), "--values", str(values)]) == 2
 
 
 def test_autofill_rejects_two_sub_files(in_tmp, manuscript_dir):
     values = _write_values(in_tmp / "values.json")
-    assert main(["autofill", "a.sub", "-d", str(manuscript_dir), "b.sub", "--values", str(values)]) == 2
+    assert main(["autofill", "a.sub", "-p", str(manuscript_dir), "b.sub", "--values", str(values)]) == 2
 
 
 def test_autofill_rejects_unsupported_or_missing_input(in_tmp, manuscript_dir):
     values = _write_values(in_tmp / "values.json")
-    assert main(["autofill", "-d", str(manuscript_dir / "fig1.png"), "biorxiv.sub", "--values", str(values)]) == 1
-    assert main(["autofill", "-d", str(in_tmp / "nope"), "biorxiv.sub", "--values", str(values)]) == 1
+    assert main(["autofill", "-p", str(manuscript_dir / "fig1.png"), "biorxiv.sub", "--values", str(values)]) == 1
+    assert main(["autofill", "-p", str(in_tmp / "nope"), "biorxiv.sub", "--values", str(values)]) == 1
     assert not (in_tmp / "biorxiv.sub").exists()
 
 
@@ -830,7 +834,7 @@ def test_autofill_api_uses_document_given_directly(in_tmp, monkeypatch):
     _install_fake_anthropic(monkeypatch, {"fields": [{"id": "title", "value": "Direct", "confidence": "high", "source": "p.1"}], "unfilled": []})
     draft = in_tmp / "draft.md"
     draft.write_text("# Direct\n\nBody.", encoding="utf-8")
-    rc = main(["autofill", "-d", str(draft), "biorxiv.sub", "--engine", "api"])
+    rc = main(["autofill", "-p", str(draft), "biorxiv.sub", "--engine", "api"])
     assert rc == 0
     assert subfile.load(in_tmp / "biorxiv.sub").values["title"] == "Direct"
 
@@ -839,7 +843,7 @@ def test_autofill_api_missing_manuscript_errors(in_tmp, monkeypatch, tmp_path):
     _install_fake_anthropic(monkeypatch, {"fields": [], "unfilled": []})
     empty = tmp_path / "empty"
     empty.mkdir()
-    rc = main(["autofill", "biorxiv.sub", "-d", str(empty), "--engine", "api"])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(empty), "--engine", "api"])
     assert rc == 1
 
 
@@ -847,7 +851,7 @@ def test_autofill_api_without_sdk_errors(in_tmp, manuscript_dir, monkeypatch):
     # No anthropic module importable, but a manuscript is present.
     monkeypatch.setitem(sys.modules, "anthropic", None)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--engine", "api", "--manuscript", str(manuscript_dir / "paper.pdf")])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--engine", "api", "--manuscript", str(manuscript_dir / "paper.pdf")])
     assert rc == 1
 
 
@@ -867,13 +871,13 @@ def test_autofill_api_engine_openai_provider(in_tmp, manuscript_dir, monkeypatch
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     # An Anthropic key is set too, but --provider picks OpenAI.
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--engine", "api", "--provider", "openai", "--manuscript", str(manuscript_dir / "paper.pdf")])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--engine", "api", "--provider", "openai", "--manuscript", str(manuscript_dir / "paper.pdf")])
     assert rc == 0
     assert subfile.load(in_tmp / "biorxiv.sub").values["title"] == "A New Method"
 
 
 def test_autofill_api_no_key_errors(in_tmp, manuscript_dir):
-    rc = main(["autofill", "biorxiv.sub", "-d", str(manuscript_dir), "--engine", "api", "--manuscript", str(manuscript_dir / "paper.pdf")])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--engine", "api", "--manuscript", str(manuscript_dir / "paper.pdf")])
     assert rc == 1
 
 

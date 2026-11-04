@@ -235,6 +235,19 @@ def test_discrete_mathematics_declining_requires_a_data_statement():
         _discrete_mathematics_runner().submit({"share_data": "no", "data_statement": ""})
 
 
+def test_discrete_mathematics_parses_funders():
+    """``funding`` lines are 'Funder | award1, award2 | recipient', the last two optional."""
+    from paperpush.venues.discrete_mathematics.discrete_mathematics import _parse_funders
+
+    value = "National Science Foundation | DMS-1, DMS-2 | Joseph Rich\n\nSimons Foundation\nNIH | | Jane Doe\n"
+    assert _parse_funders(value) == [
+        {"name": "National Science Foundation", "awards": ["DMS-1", "DMS-2"], "recipient": "Joseph Rich"},
+        {"name": "Simons Foundation", "awards": [], "recipient": ""},
+        {"name": "NIH", "awards": [], "recipient": "Jane Doe"},
+    ]
+    assert _parse_funders("") == []
+
+
 def test_combinatorica_requires_the_author_agreement_before_browser_launch():
     from paperpush.venues.editflow.combinatorica import CombinatoricaVenue
 

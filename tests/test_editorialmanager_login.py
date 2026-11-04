@@ -64,8 +64,11 @@ class _Page:
     def frame_locator(self, selector):
         return self
 
-    def get_by_role(self, role, name=""):
+    def get_by_role(self, role, name="", **kwargs):
         return _Locator(self, name)
+
+    def locator(self, selector):
+        return _Locator(self, selector)
 
     def get_by_text(self, text):
         return _Locator(self, text)
@@ -79,6 +82,12 @@ class _Page:
 
     def wait_for_timeout(self, ms):
         pass
+
+
+@pytest.fixture(autouse=True)
+def _instant_cookie_check(monkeypatch):
+    """The stub's clock does not advance, so a 2 s banner wait would spin."""
+    monkeypatch.setattr(em, "COOKIE_CHECK_TIMEOUT_MS", 0)
 
 
 CELL = em.VARIANTS["cell"]
@@ -250,3 +259,34 @@ def test_plos_form_is_filled_directly():
 def test_missing_form_raises_the_venue_error():
     with pytest.raises(em.EditorialManagerLoginError, match="username/password fields"):
         _Venue(False)._login_with_password(_Page(), "jdoe", "pw", timeout_ms=100)
+
+
+# --- optional cookie-banner checks ------------------------------------------
+
+COOKIE_ACCEPT = "#onetrust-accept-btn-handler"
+
+
+def test_cookie_check_is_a_no_op_without_a_banner():
+    page = _Page(visible={"Log In"})
+    assert em._dismiss_cookies(page) is False
+    assert page.actions == []
+
+
+def test_cookie_check_closes_a_plain_banner():
+    page = _Page(visible={COOKIE_ACCEPT})
+    assert em._dismiss_cookies(page) is True
+    assert ("click", COOKIE_ACCEPT) in page.actions
+
+
+def test_banner_raised_by_the_splash_click_is_dismissed_before_the_panel():
+    """Cell Genomics: the OneTrust banner shows only after "Log In" is clicked,
+    covering the "Alternatively..." link the next step needs."""
+    page = _Page(visible={"Log In"}, reveals={"Log In": {ELSEVIER, ALT, COOKIE_ACCEPT}, ALT: {USERNAME_FIELD, "password", "Author Login"}})
+    em._reveal_login_panel(page, timeout_ms=100)
+    assert page.actions[:2] == [("click", "Log In"), ("click", COOKIE_ACCEPT)]
+
+
+def test_banner_raised_by_the_form_reveal_is_dismissed():
+    page = _Page(visible={ELSEVIER, ALT}, reveals={ALT: {USERNAME_FIELD, COOKIE_ACCEPT}})
+    assert em._login_form(page, timeout_ms=100) is not None
+    assert page.actions == [("click", ALT), ("click", COOKIE_ACCEPT)]

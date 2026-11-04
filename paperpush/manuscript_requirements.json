@@ -8851,7 +8851,7 @@
       "https://www.nature.com/natbiomedeng/content"
     ],
     "retrieved": "2026-10-23",
-    "article_type_field": "article_type",
+    "article_type_field": "manuscript_type",
     "article_types": {
       "Article": {},
       "Review Article": {
@@ -9445,7 +9445,7 @@
       "https://www.nature.com/natmachintell/content"
     ],
     "retrieved": "2026-10-23",
-    "article_type_field": "article_type",
+    "article_type_field": "manuscript_type",
     "article_types": {
       "Article": {},
       "Analysis": {

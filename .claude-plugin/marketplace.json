@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "paperpush",
+  "description": "Skills for preparing, checking, and submitting academic manuscripts with paperpush.",
+  "owner": {
+    "name": "Pachter Lab",
+    "url": "https://github.com/pachterlab"
+  },
+  "plugins": [
+    {
+      "name": "paperpush",
+      "description": "Autofill a .sub from a manuscript, run validate's AI checks, submit, debug a stalled portal run, and add venues.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

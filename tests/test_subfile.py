@@ -4,8 +4,9 @@ This file covers the ``subfile`` command end to end and the ground-truth sample
 ``.sub`` files it produces:
 
 * the ``subfile`` command for every venue in the database -- the generated
-  template parses back to that venue with a slot for every field, honors
-  ``--fill-defaults``, respects ``-o/--output`` and ``--force``, and rejects an
+  template parses back to that venue with a slot for every field, fills
+  defaults unless told not to, respects ``-o/--output`` and ``--overwrite``
+  (and its old name ``--force``), and rejects an
   unknown venue;
 * the ``--venues`` discovery listing, which is what points a user at the
   ``subfile`` command in the first place;
@@ -89,7 +90,7 @@ def test_subfile_creates_parseable_template(venue, in_tmp, capsys):
 
 @pytest.mark.parametrize("venue", VENUES, ids=SLUGS)
 def test_subfile_fill_defaults_populates_defaults(venue, in_tmp):
-    rc = main(["subfile", venue.slug, "--fill-defaults"])
+    rc = main(["subfile", venue.slug])
     assert rc == 0
 
     parsed = subfile.load(in_tmp / f"{venue.slug}.sub")
@@ -99,14 +100,15 @@ def test_subfile_fill_defaults_populates_defaults(venue, in_tmp):
 
 
 @pytest.mark.parametrize("venue", VENUES, ids=SLUGS)
-def test_subfile_custom_output_and_force(venue, in_tmp):
+def test_subfile_custom_output_and_overwrite(venue, in_tmp):
     target = in_tmp / "custom.sub"
     assert main(["subfile", venue.slug, "-o", str(target)]) == 0
     assert target.exists()
 
-    # Without --force a second write refuses and leaves the file in place.
+    # Without --overwrite a second write refuses and leaves the file in place.
     assert main(["subfile", venue.slug, "-o", str(target)]) == 1
-    # With --force it overwrites cleanly.
+    # With --overwrite (or its old name --force) it overwrites cleanly.
+    assert main(["subfile", venue.slug, "-o", str(target), "--overwrite"]) == 0
     assert main(["subfile", venue.slug, "-o", str(target), "--force"]) == 0
     assert subfile.load(target).venue == venue.slug
 
@@ -462,3 +464,16 @@ def test_load_keeps_cwd_relative_path_that_only_exists_there(tmp_path, monkeypat
     (tmp_path / "main.pdf").write_bytes(b"%PDF-1.4\n")
     monkeypatch.chdir(tmp_path)
     assert load(sub_path).values["manuscript_file"] == "main.pdf"
+
+
+def test_load_prefers_the_sub_folder_over_cwd_when_both_have_the_file(tmp_path, monkeypatch):
+    from paperpush.subfile import load
+
+    ms = tmp_path / "ms"
+    ms.mkdir()
+    (ms / "main.pdf").write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "main.pdf").write_bytes(b"%PDF-1.4\n")
+    sub_path = ms / "nucleic_acids_research.sub"
+    sub_path.write_text("@venue: nucleic_acids_research\nmanuscript_file: main.pdf\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    assert load(sub_path).values["manuscript_file"] == str(ms.resolve() / "main.pdf")
