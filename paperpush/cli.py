@@ -2392,7 +2392,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="check_anonymous",
         action="store_const",
         const=True,
-        help="check the submission for information identifying the authors, as " "for a double-blind venue. Venues marked anonymous (e.g. ICLR, AAAI) " "get this check automatically. Scans the attached files and the .sub's " "text fields for the authors' names, emails, ORCID/OpenReview IDs and " "affiliations, author metadata (PDF, Office, EXIF), home-directory " "paths, acknowledgments, and camera-ready LaTeX switches, and fetches " "every linked anonymous.4open.science repository to scan it the same " "way (requires network access).",
+        help="check the submission for information identifying the authors, as " "for a double-blind venue. Venues marked anonymous (e.g. ICLR, AAAI) " "get this check automatically. Scans the attached files and the .sub's " "text fields for the authors' names, emails, ORCID/OpenReview IDs and " "affiliations, author metadata (PDF, Office, EXIF), home-directory " "paths, acknowledgments, camera-ready LaTeX switches, and non-anonymized " "github.com links, and fetches " "every linked anonymous.4open.science repository to scan it the same " "way (requires network access).",
     )
     p_validate.add_argument(
         "--dont-check-hidden-text",

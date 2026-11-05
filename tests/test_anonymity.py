@@ -113,8 +113,44 @@ def test_home_path_username_reported_but_generic_users_ignored():
 def test_github_link_to_author_account_reported():
     text = "Code: https://github.com/adalovelace/engine and https://github.com/pytorch/pytorch"
     details = _details(anonymity.scan_text("m.tex", text, TERMS))
-    assert "github.com/adalovelace/engine" in details
+    assert "github.com/adalovelace/engine contains an author's name or handle" in details
+    # Other owners are still reported, as possibly identifying.
+    assert "non-anonymized GitHub link github.com/pytorch/pytorch" in details
+
+
+def test_github_link_to_lab_account_reported():
+    # A lab/org account matches no author handle but still identifies the authors.
+    text = "Code is at https://github.com/pachterlab/kallisto."
+    details = _details(anonymity.scan_text("m.tex", text, TERMS))
+    assert "non-anonymized GitHub link github.com/pachterlab/kallisto" in details
+
+
+def test_github_link_containing_author_surname_reported_firmly():
+    terms = [("author name", "Lior Pachter")]
+    text = "See https://github.com/pachterlab/kallisto and https://github.com/someone/pachter-tools"
+    details = _details(anonymity.scan_text("m.tex", text, terms))
+    assert "github.com/pachterlab/kallisto contains an author's name or handle ('pachter')" in details
+    assert "github.com/someone/pachter-tools contains an author's name or handle ('pachter')" in details
+
+
+def test_short_surname_not_matched_as_substring():
+    terms = [("author name", "Wei Li")]
+    details = _details(anonymity.scan_text("m.tex", "https://github.com/linux/kernel", terms))
+    assert "contains an author's name" not in details
+
+
+def test_github_links_in_reference_list_skipped():
+    terms = [("author name", "Lior Pachter")]
+    text = "Code: https://github.com/pachterlab/gget\nReferences\n[1] Bray et al. kallisto. https://github.com/pachterlab/kallisto\n[2] https://github.com/pytorch/pytorch\n"
+    details = _details(anonymity.scan_text("m.pdf", text, terms))
+    assert "pachterlab/gget" in details
+    assert "kallisto" not in details
     assert "pytorch" not in details
+
+
+def test_anonymous_mirror_link_not_reported_as_github():
+    text = "Code: https://anonymous.4open.science/r/engine-1234"
+    assert "GitHub link" not in _details(anonymity.scan_text("m.tex", text, TERMS))
 
 
 def test_acknowledgments_and_camera_ready_latex_flagged():

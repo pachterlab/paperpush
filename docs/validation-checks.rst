@@ -863,6 +863,14 @@ also fetched and scanned (see below).
   ``\iclrfinalcopy`` and ``\colmfinalcopy``, or a ``final``, ``camera-ready``,
   or ``preprint`` option on an ICLR, NeurIPS, ICML, AAAI, COLM, CoRL, or TMLR
   style package.
+- **Non-anonymized GitHub links**: every ``github.com/<owner>/<repo>`` link
+  outside the reference list, because the owner, often a lab or organization
+  account rather than a person, identifies the authors. Link an
+  ``anonymous.4open.science`` mirror instead. A link whose owner or repository
+  name contains one of the authors' handles or surnames (four or more letters,
+  so ``pachterlab`` for Lior Pachter) is worded more firmly; the others may be
+  third-party software you cite, which you can ignore. Links in the reference
+  list are not reported, for the same reason self-citations are not.
 
 **Anonymous GitHub mirrors.** anonymous.4open.science only redacts the terms
 you listed when you created the mirror. A name left in a LICENSE, a

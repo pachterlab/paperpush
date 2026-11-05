@@ -30,6 +30,10 @@ What counts as identifying:
 * an Acknowledgments section, and LaTeX set to camera-ready mode
   (``\\iclrfinalcopy``, ``\\usepackage[final]{neurips_...}``), which prints the
   author block.
+* any non-anonymized ``github.com/<owner>/<repo>`` link outside the reference
+  list, since its owner (often a lab or organization account) identifies the
+  authors; a link whose owner or repository name contains an author's handle
+  or surname (``pachterlab`` for Pachter) is worded more firmly.
 * in a linked anonymous repository, a LICENSE copyright line naming a holder.
 
 Every finding is advisory (the check is heuristic), reported through the same
@@ -58,6 +62,7 @@ from .sensitive import (
     Finding,
     _decode,
     _dedup_paths,
+    _GITHUB_RE,
     _find_github_repos,
     _iter_archive_members,
     _latex_comment,
@@ -229,11 +234,32 @@ def scan_text(
                 continue
             yield Finding(where, "identifying information", f"anonymity: {label} '{term}' appears")
             break
-    # github.com/<owner> where the owner is one of the authors' handles.
+    # Any github.com/<owner>/<repo> link shows its owner, and the owner is
+    # often a lab or organization account, so every one is reported -- except
+    # in the reference list, where (as with names) citing a repository is a
+    # permitted third-person citation. A link whose owner or repository name
+    # contains an author's handle or surname gets the firmer wording; the rest
+    # may be third-party code being cited.
     handles = _author_handles(terms)
-    for owner, repo in dict.fromkeys(_find_github_repos(text)):
-        if owner.lower() in handles:
-            yield Finding(where, "identifying information", f"anonymity: GitHub link github.com/{owner}/{repo} names an author's account; link an anonymous.4open.science mirror instead")
+    surnames = _author_surnames(terms)
+    seen: set[tuple[str, str]] = set()
+    for match in _GITHUB_RE.finditer(text):
+        if any(a <= match.start() < b for a, b in ref_spans):
+            continue
+        link = next(_find_github_repos(match.group(0)), None)
+        if link is None or link in seen:
+            continue
+        seen.add(link)
+        owner, repo = link
+        hit = _identifying_part(owner, repo, handles, surnames)
+        if hit:
+            yield Finding(where, "identifying information", f"anonymity: GitHub link github.com/{owner}/{repo} contains an author's name or handle ('{hit}'); link an anonymous.4open.science mirror instead")
+        else:
+            yield Finding(
+                where,
+                "identifying information",
+                f"anonymity: non-anonymized GitHub link github.com/{owner}/{repo} shows its owner ('{owner}'); if it is your or your lab's code, link an anonymous.4open.science mirror instead (ignore this if it is third-party software you cite)",
+            )
     for user in dict.fromkeys(m.group(1) for m in _HOME_PATH.finditer(text)):
         if user.lower() not in _GENERIC_USERS:
             yield Finding(where, "identifying information", f"anonymity: absolute path contains the username '{user}' (e.g. /Users/{user}/...)")
@@ -261,6 +287,38 @@ def _author_handles(terms: list[tuple[str, str]]) -> set[str]:
             if len(parts) >= 2:
                 handles.update({"".join(parts), parts[0] + parts[-1], parts[0][0] + parts[-1], "-".join(parts)})
     return {h for h in handles if len(h) >= 3}
+
+
+# Shorter than this, a surname ("Li", "Wu") would match inside unrelated
+# GitHub account and repository names.
+MIN_SURNAME_CHARS = 4
+
+
+def _author_surnames(terms: list[tuple[str, str]]) -> set[str]:
+    """Lowercase surnames of the authors, for substring matching in GitHub links."""
+    surnames: set[str] = set()
+    for label, term in terms:
+        if label == "author name":
+            parts = re.findall(r"[A-Za-z]+", term)
+            if len(parts) >= 2 and len(parts[-1]) >= MIN_SURNAME_CHARS:
+                surnames.add(parts[-1].lower())
+    return surnames
+
+
+def _identifying_part(owner: str, repo: str, handles: set[str], surnames: set[str]) -> str | None:
+    """The author handle or surname a GitHub owner/repo name contains, if any.
+
+    Handles must equal the owner; surnames may appear anywhere in the owner or
+    repository name, with separators ignored (``pachterlab``, ``rich-lab``).
+    """
+    if owner.lower() in handles:
+        return owner
+    for name in (owner, repo):
+        flat = re.sub(r"[^a-z]", "", name.lower())
+        for surname in sorted(surnames):
+            if surname in flat:
+                return surname
+    return None
 
 
 # --- attached files ------------------------------------------------------------
