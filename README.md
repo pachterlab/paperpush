@@ -43,7 +43,7 @@ Workflow to create the manuscript metadata (.sub) file, validate against author 
 ## Install
 
 ```bash
-pip install paperpush["all"]  # Recommended — for AI API usage, MCP server, and additional manuscript validation checks
+pip install paperpush["all"]  # Recommended — for AI API usage, MCP server, local web deployment, and additional manuscript validation checks
 pip install paperpush  # basic CLI usage
 ```
 
