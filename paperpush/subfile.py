@@ -141,9 +141,42 @@ def ordered_fields(venue: Venue, venue_order: bool = False) -> list[tuple[Option
     return ordered
 
 
+# Submission files are written as ``<venue>.sub.txt`` so they open in a text
+# editor on a double-click and downloaded copies are not flagged as an unknown
+# file type. The older bare ``.sub`` suffix is still read everywhere.
+SUFFIX = ".sub.txt"
+LEGACY_SUFFIX = ".sub"
+SUFFIXES = (SUFFIX, LEGACY_SUFFIX)
+
+
+def is_subfile_name(name: str | Path) -> bool:
+    """Whether ``name`` ends in a submission-file suffix (``.sub.txt`` or ``.sub``)."""
+    lower = Path(name).name.lower()
+    return any(lower.endswith(s) for s in SUFFIXES)
+
+
+def subfile_stem(name: str | Path) -> str:
+    """``name`` without its submission-file suffix: ``biorxiv.sub.txt`` -> ``biorxiv``.
+
+    A name with neither suffix loses only its last extension, like ``Path.stem``.
+    """
+    base = Path(name).name
+    lower = base.lower()
+    for s in SUFFIXES:
+        if lower.endswith(s) and len(base) > len(s):
+            return base[: -len(s)]
+    return Path(base).stem
+
+
+def with_subfile_suffix(path: str | Path) -> Path:
+    """``path`` as a submission file: kept if it already ends in ``.sub.txt`` or ``.sub``, else ``.sub.txt`` is appended."""
+    path = Path(path)
+    return path if is_subfile_name(path) else path.with_name(path.name + SUFFIX)
+
+
 def default_filename(venue: Venue) -> str:
-    """Conventional ``.sub`` filename for a venue (e.g. ``biorxiv.sub``)."""
-    return f"{venue.slug}.sub"
+    """Conventional submission filename for a venue (e.g. ``biorxiv.sub.txt``)."""
+    return f"{venue.slug}{SUFFIX}"
 
 
 def _format_default(field: Field) -> str:

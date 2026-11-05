@@ -1958,7 +1958,7 @@
   // The last validation as a text report, like `paperpush validate -o report.txt`.
   function downloadReport() {
     if (!state.results?.report_text) { toast("Validate first.", "error"); return; }
-    download(new Blob([state.results.report_text], { type: "text/plain" }), `${state.venue.subfile_name.replace(/\.sub$/, "")}_validation.txt`);
+    download(new Blob([state.results.report_text], { type: "text/plain" }), `${state.venue.subfile_name.replace(/\.sub(\.txt)?$/i, "")}_validation.txt`);
     if (state.resultsStale) toast("The form changed since this validation. Validate again for an up-to-date report.");
   }
 
@@ -1972,7 +1972,7 @@
     try {
       if (!state.ws) await ensureWorkspace();
       const res = await api(`/api/workspaces/${state.ws}/bundle`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: state.text }) });
-      download(await res.blob(), `${state.venue.subfile_name.replace(/\.sub$/, "")}-submission.zip`);
+      download(await res.blob(), `${state.venue.subfile_name.replace(/\.sub(\.txt)?$/i, "")}-submission.zip`);
     } catch (err) {
       toast(err.message, "error");
     }

@@ -186,15 +186,11 @@ prompts.txt
 # per-session security tokens, so they must not be committed.
 *_declarations.html
 
-# Screenshot + HTML captures written by the portal-drift tests when a check
-# fails (tests/test_portal_drift.py -> common.capture_failure). Diagnostic
-# scratch that embeds per-session tokens; never commit it.
-tests/portal_snapshots/_failures/
 /paper/
 # Page texts and run state of scripts/check_guidelines.py
 .guideline_cache/
-# Reports, logs, env and worktree of scripts/scheduled_portal_drift.sh
-.portal_drift/
+# Reports, logs, env and worktree of scripts/scheduled_submit_walkthrough.sh
+.submit_walkthrough/
 .neon
 node_modules/
 .env.local

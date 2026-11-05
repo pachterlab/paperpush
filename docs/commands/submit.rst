@@ -25,7 +25,7 @@ Synopsis
 
 .. code-block:: bash
 
-   paperpush submit biorxiv.sub
+   paperpush submit biorxiv.sub.txt
 
 By default the browser runs **headed** (a visible window) so you can complete
 sign-in, solve any CAPTCHA or two-factor prompt, and review each page as it is
@@ -41,7 +41,7 @@ Arguments
 ---------
 
 ``subfile``
-   Path to the ``.sub`` file to submit, e.g. ``biorxiv.sub``.
+   Path to the ``.sub`` file to submit, e.g. ``biorxiv.sub.txt``.
 
 Options
 -------
@@ -144,14 +144,14 @@ under:
 
 .. code-block:: text
 
-   tests/sub_files/<venue>/<venue>.sub
+   tests/sub_files/<venue>/<venue>.sub.txt
 
-For example, ``tests/sub_files/biorxiv/biorxiv.sub``,
-``tests/sub_files/nature/nature.sub``, or
-``tests/sub_files/cell/cell.sub``. Some venues include extra variants
+For example, ``tests/sub_files/biorxiv/biorxiv.sub.txt``,
+``tests/sub_files/nature/nature.sub.txt``, or
+``tests/sub_files/cell/cell.sub.txt``. Some venues include extra variants
 alongside the main file — for instance
-``tests/sub_files/biorxiv/biorxiv_figures.sub`` and
-``biorxiv_supplement.sub`` — showing how figure lists, supplements, and funding
+``tests/sub_files/biorxiv/biorxiv_figures.sub.txt`` and
+``biorxiv_supplement.sub.txt`` — showing how figure lists, supplements, and funding
 fields are laid out.
 
 These are the best reference for what a correctly filled file looks like: copy
@@ -166,31 +166,31 @@ Fill the portal, headed, so you can review before submitting:
 
 .. code-block:: bash
 
-   paperpush submit biorxiv.sub
+   paperpush submit biorxiv.sub.txt
 
 Step through the wizard with the Playwright Inspector:
 
 .. code-block:: bash
 
-   paperpush submit biorxiv.sub --debug
+   paperpush submit biorxiv.sub.txt --debug
 
 Have an LLM fix any step the portal has changed, using your OpenAI key:
 
 .. code-block:: bash
 
-   paperpush submit biorxiv.sub --ai --provider openai
+   paperpush submit biorxiv.sub.txt --ai --provider openai
 
 Pause on a failed step so you can fix it in the browser and carry on:
 
 .. code-block:: bash
 
-   paperpush submit biorxiv.sub --recover by-hand
+   paperpush submit biorxiv.sub.txt --recover by-hand
 
 Sign in fresh after switching accounts, with a longer timeout:
 
 .. code-block:: bash
 
-   paperpush submit biorxiv.sub --new-session --timeout 30
+   paperpush submit biorxiv.sub.txt --new-session --timeout 30
 
 See also
 --------

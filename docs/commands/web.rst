@@ -34,11 +34,11 @@ Synopsis
    # The page, with no file open yet: pick a venue and start a form.
    paperpush web
 
-   # biorxiv.sub, filled in. Edits are saved to biorxiv.sub.
-   paperpush web biorxiv.sub
+   # biorxiv.sub.txt, filled in. Edits are saved to biorxiv.sub.txt.
+   paperpush web biorxiv.sub.txt
 
    # The same, and offer the files in ./manuscript in the file pickers.
-   paperpush web biorxiv.sub -p manuscript
+   paperpush web biorxiv.sub.txt -p manuscript
 
 The server listens on ``127.0.0.1`` only and runs until you press Ctrl-C.
 Relative paths in the ``.sub`` resolve against the ``.sub`` file's own
@@ -46,7 +46,7 @@ folder first, then the directory you run the command from, as they do for
 :doc:`validate` and :doc:`submit`.
 
 ``subfile``, ``autofill``, and ``validate`` take ``--web`` to finish in the same
-page: ``paperpush validate biorxiv.sub --web`` opens it with the checks already
+page: ``paperpush validate biorxiv.sub.txt --web`` opens it with the checks already
 run.
 
 Options

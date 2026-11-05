@@ -30,11 +30,11 @@ Workflow to create the manuscript metadata (.sub) file, validate against author 
 
 ### CLI: 
 - `paperpush subfile VENUE`  # create a .sub file
-- Fill out VENUE.sub
-- `paperpush validate VENUE.sub`  # validate the files and data in VENUE.sub
-- Share VENUE.sub with co-authors (it can be viewed in a text editor, with `paperpush web VENUE.sub`, or via upload onto [paperpush.onrender.com](https://paperpush.onrender.com))
+- Fill out VENUE.sub.txt
+- `paperpush validate VENUE.sub.txt`  # validate the files and data in VENUE.sub.txt
+- Share VENUE.sub.txt with co-authors (it can be viewed in a text editor, with `paperpush web VENUE.sub.txt`, or via upload onto [paperpush.onrender.com](https://paperpush.onrender.com))
 - (If available) `paperpush login VENUE`  # log in to the VENUE submission portal
-- (If available) `paperpush submit VENUE.sub`  # fill out the VENUE submission portal with information in VENUE.sub
+- (If available) `paperpush submit VENUE.sub.txt`  # fill out the VENUE submission portal with information in VENUE.sub.txt
 
 ## Website
 
@@ -90,11 +90,11 @@ Then ask:
 See [`docs/example-session.md`](docs/example-session.md) for a full worked example of this flow.
 
 ## Quickstart
-1. `paperpush subfile VENUE`: creates a file VENUE.sub that is a template for the VENUE submission. Fields are grouped into the same sections for every venue (manuscript type, files, details, authors, reviewers, declarations, additional); add `--venue-order` to list them in the order the venue's portal asks for them instead.
-2. **fill out VENUE.sub:** Open VENUE.sub in a text editor to edit manually, or run `paperpush web VENUE.sub` to edit in a web browser. Use the agent skill `/paperpush-autofill My manuscript files are in /PATH/TO/MANUSCRIPT/DIRECTORY. Fill out VENUE.sub` or the command `paperpush autofill --engine api -p /PATH/TO/MANUSCRIPT/DIRECTORY ... VENUE.sub` (API) to automatically fill from the manuscript directory with AI. `paperpush autofill` requires the provider's API key. The AI agent may not be able to fill out all fields if some information is not in the manuscript directory.
-3. `paperpush validate VENUE.sub`: run the pre-submission checks on the filled `VENUE.sub`. Use the agent skill `/paperpush-validate` or the CLI flag `--ai` (API) to run checks with AI. The AI checks require the provider's API key.
+1. `paperpush subfile VENUE`: creates a file VENUE.sub.txt that is a template for the VENUE submission. Fields are grouped into the same sections for every venue (manuscript type, files, details, authors, reviewers, declarations, additional); add `--venue-order` to list them in the order the venue's portal asks for them instead.
+2. **fill out VENUE.sub.txt:** Open VENUE.sub.txt in a text editor to edit manually, or run `paperpush web VENUE.sub.txt` to edit in a web browser. Use the agent skill `/paperpush-autofill My manuscript files are in /PATH/TO/MANUSCRIPT/DIRECTORY. Fill out VENUE.sub.txt` or the command `paperpush autofill --engine api -p /PATH/TO/MANUSCRIPT/DIRECTORY ... VENUE.sub.txt` (API) to automatically fill from the manuscript directory with AI. `paperpush autofill` requires the provider's API key. The AI agent may not be able to fill out all fields if some information is not in the manuscript directory.
+3. `paperpush validate VENUE.sub.txt`: run the pre-submission checks on the filled `VENUE.sub.txt`. Use the agent skill `/paperpush-validate` or the CLI flag `--ai` (API) to run checks with AI. The AI checks require the provider's API key.
 4. `paperpush login VENUE`: log in to the VENUE submission portal.
-5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. Use the agent skill `/paperpush-portal-debug` or the CLI flag `--ai` (API) to have AI fix any issues that may arise. Ignore validation checks with the `--skip-validate` flag.
+5. `paperpush submit VENUE.sub.txt`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. Use the agent skill `/paperpush-portal-debug` or the CLI flag `--ai` (API) to have AI fix any issues that may arise. Ignore validation checks with the `--skip-validate` flag.
 
 Helper commands:
 - `paperpush venues`: List supported venues. Filters combine:
@@ -109,7 +109,7 @@ Helper commands:
 - `paperpush update-venues`: Update the venue data (venues.json, submission_forms.json, manuscript_requirements.json) from the remote venue-data branch.
 - `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
 - `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
-- `paperpush web VENUE.sub`: open a sub file in a local deployment of the web application
+- `paperpush web VENUE.sub.txt`: open a sub file in a local deployment of the web application
 
 See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 
@@ -142,6 +142,8 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 | [Cell](https://www.cell.com/cell/home) | `cell` | ✅ | ✅ |
 | [Cell Genomics](https://www.cell.com/cell-genomics/home) | `cell_genomics` | ✅ | ✅ |
 | [Cell Reports](https://www.cell.com/cell-reports) | `cell_reports` | ✅ |  |
+| [Cell Reports Methods](https://www.cell.com/cell-reports-methods) | `cell_reports_methods` | ✅ |  |
+| [Cell Stem Cell](https://www.cell.com/cell-stem-cell) | `cell_stem_cell` | ✅ |  |
 | [Cell Systems](https://www.cell.com/cell-systems/home) | `cell_systems` | ✅ | ✅ |
 | [Combinatorica](https://link.springer.com/journal/493) | `combinatorica` | ✅ | ✅ |
 | [Communications Biology](https://www.nature.com/commsbio) | `communications_biology` | ✅ |  |
@@ -157,12 +159,16 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 | [IEEE TMI](https://ieeetmi.org/) | `ieee_tmi` | ✅ |  |
 | [IEEE TNNLS](https://cis.ieee.org/publications/t-neural-networks-and-learning-systems) | `ieee_tnnls` | ✅ |  |
 | [IEEE TPAMI](https://www.computer.org/csdl/journal/tp) | `ieee_tpami` | ✅ |  |
+| [iScience](https://www.cell.com/iscience) | `iscience` | ✅ |  |
 | [JAMA](https://jamanetwork.com/journals/jama) | `jama` | ✅ |  |
 | [JMLR](https://www.jmlr.org) | `jmlr` | ✅ |  |
 | [JNM](https://jnm.snmjournals.org) | `jnm` | ✅ |  |
 | [The Lancet](https://www.thelancet.com/journals/lancet/home) | `lancet` | ✅ |  |
 | [Lancet Digital Health](https://www.thelancet.com/journals/landig/home) | `lancet_digital_health` | ✅ |  |
 | [Medical Image Analysis](https://www.sciencedirect.com/journal/medical-image-analysis) | `medical_image_analysis` | ✅ |  |
+| [Molecular Cell](https://www.cell.com/molecular-cell) | `molecular_cell` | ✅ |  |
+| [NAR Cancer](https://academic.oup.com/narcancer) | `nar_cancer` | ✅ |  |
+| [NAR Genomics and Bioinformatics](https://academic.oup.com/nargab) | `nar_genomics_bioinformatics` | ✅ |  |
 | [Nature](https://www.nature.com) | `nature` | ✅ | ✅ |
 | [Nature Biomedical Engineering](https://www.nature.com/natbiomedeng) | `nature_biomedical_engineering` | ✅ | ✅ |
 | [Nature Biotechnology](https://www.nature.com/nbt) | `nature_biotech` | ✅ | ✅ |
@@ -179,6 +185,7 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 | [Neuron](https://www.cell.com/neuron) | `neuron` | ✅ |  |
 | [npj Digital Medicine](https://www.nature.com/npjdigitalmed) | `npj_digital_medicine` | ✅ |  |
 | [Nucleic Acids Research](https://academic.oup.com/nar) | `nucleic_acids_research` | ✅ | ✅ |
+| [Patterns](https://www.cell.com/patterns) | `patterns` | ✅ |  |
 | [PLOS Biology](https://journals.plos.org/plosbiology/) | `plos_biology` | ✅ |  |
 | [PLOS Computational Biology](https://journal.plos.org/ploscompbiol/) | `plos_compbio` | ✅ | ✅ |
 | [PLOS Genetics](https://journals.plos.org/plosgenetics/) | `plos_genetics` | ✅ |  |
@@ -218,7 +225,7 @@ Each venue is listed in `paperpush/venues.json` (the master list of venues and t
 
 The .sub file is the yaml-like text file that contains all metadata and file paths required to upload a manuscript onto a venue's submission portal. An example snippet is shown below. In this case, you would provide "/PATH/TO/MANUSCRIPT.pdf", "TITLE", and "HERE IS THE ABSTRACT".
 
-```
+```venue.sub.txt
 @venue: venue
 
 # Manuscript file (file, REQUIRED)

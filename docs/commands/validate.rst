@@ -25,10 +25,10 @@ Synopsis
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub
-   paperpush validate biorxiv.sub -o              # also save biorxiv_validation.pdf
-   paperpush validate biorxiv.sub --ai            # also run the AI checks via an API
-   paperpush validate nature.sub --initial-submission  # errors become warnings
+   paperpush validate biorxiv.sub.txt
+   paperpush validate biorxiv.sub.txt -o              # also save biorxiv_validation.pdf
+   paperpush validate biorxiv.sub.txt --ai            # also run the AI checks via an API
+   paperpush validate nature.sub.txt --initial-submission  # errors become warnings
 
 ``validate`` prints a report of every check, grouped and coloured by what
 happened to it: **failed** (red), **warnings** (amber), **needs AI**
@@ -180,7 +180,7 @@ Arguments
 ---------
 
 ``subfile``
-   Path to the ``.sub`` file to check, e.g. ``biorxiv.sub``.
+   Path to the ``.sub`` file to check, e.g. ``biorxiv.sub.txt``.
 
 ``--web``
    Instead of printing the report, open the ``.sub`` in the paperpush web page
@@ -307,45 +307,45 @@ Examples
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub
+   paperpush validate biorxiv.sub.txt
 
 Fail a CI job if the submission isn't ready:
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub || exit 1
+   paperpush validate biorxiv.sub.txt || exit 1
 
 Run the field and file checks alone, with no network access:
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub --dont-check-links --dont-check-references
+   paperpush validate biorxiv.sub.txt --dont-check-links --dont-check-references
 
 Save a colour-blind-friendly HTML report:
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub -o report.html --colorblind
+   paperpush validate biorxiv.sub.txt -o report.html --colorblind
 
 Let an agent do the AI checks, then merge its answers:
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub --ai-tasks tasks.json
+   paperpush validate biorxiv.sub.txt --ai-tasks tasks.json
    # ... the agent writes results.json ...
-   paperpush validate biorxiv.sub --ai-results results.json -o
+   paperpush validate biorxiv.sub.txt --ai-results results.json -o
 
 Re-run just the AI checks, e.g. after fixing a figure:
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub --ai-only --ai-results results.json
+   paperpush validate biorxiv.sub.txt --ai-only --ai-results results.json
 
 Clean arXiv LaTeX source and check the result:
 
 .. code-block:: bash
 
-   paperpush validate arxiv.sub --arxiv-latex-cleaner
+   paperpush validate arxiv.sub.txt --arxiv-latex-cleaner
 
 See also
 --------

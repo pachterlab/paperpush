@@ -163,7 +163,7 @@ Sample submission files
 -----------------------
 
 Every supported venue has a complete, filled example ``.sub`` file in the
-repository under ``tests/sub_files/<venue>/<venue>.sub``. These are the best
+repository under ``tests/sub_files/<venue>/<venue>.sub.txt``. These are the best
 reference for a correctly filled submission — see :doc:`commands/submit`.
 
 Adding a venue

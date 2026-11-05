@@ -17,13 +17,13 @@ The five-step workflow
 
       paperpush subfile biorxiv
 
-   This writes ``biorxiv.sub`` — a commented, YAML-like template listing every
+   This writes ``biorxiv.sub.txt`` — a commented, YAML-like template listing every
    field bioRxiv requires, with the allowed options for each choice field. See
    :doc:`commands/subfile`.
 
 2. **Fill it in.** You have three options:
 
-   a. Edit ``biorxiv.sub`` by hand.
+   a. Edit ``biorxiv.sub.txt`` by hand.
 
    b. Ask an AI agent to fill it (the Claude skill ``/paperpush-autofill``, or
       any agent following ``AGENTS.md``).
@@ -32,7 +32,7 @@ The five-step workflow
 
       .. code-block:: bash
 
-         paperpush autofill -p MANUSCRIPT_DIR --engine api biorxiv.sub
+         paperpush autofill -p MANUSCRIPT_DIR --engine api biorxiv.sub.txt
 
    See :doc:`commands/autofill`.
 
@@ -40,7 +40,7 @@ The five-step workflow
 
    .. code-block:: bash
 
-      paperpush validate biorxiv.sub
+      paperpush validate biorxiv.sub.txt
 
    Checks for missing required fields, files that don't exist, and values that
    aren't valid options. See :doc:`commands/validate`.
@@ -57,7 +57,7 @@ The five-step workflow
 
    .. code-block:: bash
 
-      paperpush submit biorxiv.sub
+      paperpush submit biorxiv.sub.txt
 
    PaperPush drives the venue's submission portal in a browser. It stops
    **before** the final submit click so you can review everything. See

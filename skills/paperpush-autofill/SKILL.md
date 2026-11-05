@@ -11,7 +11,7 @@ description: >-
 
 # paperpush autofill (Claude skill)
 
-Populate a `<venue>.sub` file from a directory of manuscript files. You read
+Populate a `<venue>.sub.txt` file from a directory of manuscript files. You read
 the files and decide the values; the `paperpush autofill` command does all
 the writing, gating, and validation, so you cannot accidentally overwrite a
 policy field or produce an invalid file. Your job is extraction, not writing.
@@ -34,7 +34,7 @@ named the venue, use it; otherwise infer or ask per the inputs below.
 ## Inputs you need
 
 1. **The venue slug** (e.g. `biorxiv`). If the user did not say, ask, or infer
-   it from a `<slug>.sub` filename they mention. Confirm it is supported with
+   it from a `<slug>.sub.txt` filename they mention. Confirm it is supported with
    `paperpush venues`.
 2. **The manuscript directory** and **what each file is**. Ask the user to
    describe the directory if they have not, for example:
@@ -83,7 +83,7 @@ named the venue, use it; otherwise infer or ask per the inputs below.
    restate each field's options and help):
 
    ```
-   paperpush subfile <venue> -o <venue>.sub
+   paperpush subfile <venue> -o <venue>.sub.txt
    ```
 
 3. **Read the files and extract values.** Read the user-identified files with
@@ -138,7 +138,7 @@ named the venue, use it; otherwise infer or ask per the inputs below.
 5. **Apply it** (use absolute paths for the `.sub`, `-p`, and `--values`):
 
    ```
-   paperpush autofill <venue>.sub -p <manuscript-dir> --engine manual --values values.json
+   paperpush autofill <venue>.sub.txt -p <manuscript-dir> --engine manual --values values.json
    ```
 
    `-p` takes several directories and/or documents if the files are spread
@@ -172,7 +172,7 @@ named the venue, use it; otherwise infer or ask per the inputs below.
    Then give them the next commands, with the absolute `.sub` path:
    ```
    paperpush login <venue>
-   paperpush submit <venue>.sub
+   paperpush submit <venue>.sub.txt
    ```
    Remind them these open the portal and stop before the final click, so they
    can review everything in the submission system before submitting.

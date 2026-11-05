@@ -17,11 +17,11 @@ The workflow is five short commands:
 
 .. code-block:: bash
 
-   paperpush subfile VENUE                          # 1. create a VENUE.sub template
-   paperpush autofill -p MANUSCRIPT_DIR VENUE.sub   # 2. fill out VENUE.sub from your files
-   paperpush validate VENUE.sub                     # 3. run pre-submission checks
+   paperpush subfile VENUE                          # 1. create a VENUE.sub.txt template
+   paperpush autofill -p MANUSCRIPT_DIR VENUE.sub.txt   # 2. fill out VENUE.sub.txt from your files
+   paperpush validate VENUE.sub.txt                     # 3. run pre-submission checks
    paperpush login VENUE                            # 4. store your credentials
-   paperpush submit VENUE.sub                       # 5. drive the submission portal
+   paperpush submit VENUE.sub.txt                       # 5. drive the submission portal
 
 .. note::
 

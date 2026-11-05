@@ -1,2 +1,3 @@
 # Color .sub submission files as YAML on GitHub (the format is YAML-like).
 *.sub linguist-language=YAML
+*.sub.txt linguist-language=YAML

@@ -3,7 +3,8 @@
   // even when the "Highlight" extension below is NOT installed (the format is
   // YAML-like). When Highlight IS installed, its rules layer on top by filename.
   "files.associations": {
-    "*.sub": "yaml"
+    "*.sub": "yaml",
+    "*.sub.txt": "yaml"
   },
 
   // Power autocomplete and inline validation for the venue databases from the
@@ -44,28 +45,28 @@
   "highlight.regexes": {
     // "optional" marker inside comments -> green (must precede the comment rule)
     "(optional)": {
-      "filterFileRegex": ".*\\.sub$",
+      "filterFileRegex": ".*\\.sub(\\.txt)?$",
       "decorations": [
         { "color": "#43a047", "fontWeight": "bold" }
       ]
     },
     // "REQUIRED" marker inside comments -> red (must precede the comment rule)
     "(REQUIRED)": {
-      "filterFileRegex": ".*\\.sub$",
+      "filterFileRegex": ".*\\.sub(\\.txt)?$",
       "decorations": [
         { "color": "#e53935", "fontWeight": "bold" }
       ]
     },
     // Whole comment line -> dim grey
     "^(#.*)$": {
-      "filterFileRegex": ".*\\.sub$",
+      "filterFileRegex": ".*\\.sub(\\.txt)?$",
       "decorations": [
         { "color": "#9e9e9e" }
       ]
     },
     // Field name at start of line, incl. "@venue" -> teal
     "^(@?[A-Za-z0-9_]+)(?=:)": {
-      "filterFileRegex": ".*\\.sub$",
+      "filterFileRegex": ".*\\.sub(\\.txt)?$",
       "decorations": [
         { "color": "#00897b", "fontWeight": "bold" }
       ]
@@ -74,14 +75,14 @@
     // (.+) is greedy, so a value containing a colon (e.g. a title) is fully
     // captured and colored.
     "^(?!#)@?[A-Za-z0-9_]+:[ \\t]+(.+)$": {
-      "filterFileRegex": ".*\\.sub$",
+      "filterFileRegex": ".*\\.sub(\\.txt)?$",
       "decorations": [
         { "color": "#1e88e5" }
       ]
     },
     // Answer value on an indented continuation line under "key: |" -> blue.
     "^(?!#)[ \\t]{2,}(\\S.*)$": {
-      "filterFileRegex": ".*\\.sub$",
+      "filterFileRegex": ".*\\.sub(\\.txt)?$",
       "decorations": [
         { "color": "#1e88e5" }
       ]

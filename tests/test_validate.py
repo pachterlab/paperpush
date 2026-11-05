@@ -1375,8 +1375,8 @@ def test_cli_validate_missing_file(capsys):
 # sample_subfiles (the single source of truth for the tests/sub_files/ fixtures).
 
 SCENARIOS = scenarios()
-# Sample ids without the ".sub" suffix, e.g. "biorxiv", "biorxiv_figures".
-SUB_IDS = [s.filename[: -len(".sub")] for s in SCENARIOS]
+# Sample ids without the ".sub.txt" suffix, e.g. "biorxiv", "biorxiv_figures".
+SUB_IDS = [s.filename[: -len(".sub.txt")] for s in SCENARIOS]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=SUB_IDS)

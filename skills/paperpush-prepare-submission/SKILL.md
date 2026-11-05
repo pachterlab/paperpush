@@ -28,8 +28,8 @@ underlying `paperpush` command does the real work.
    `paperpush venues`.
 
 Do **not** ask for a `.sub` path. Resolve it by this hierarchy: (1) an explicit
-`.sub` the user provided; (2) else an existing `<venue>.sub` in the manuscript
-directory; (3) else create `<venue>.sub` in the manuscript directory on the
+`.sub` the user provided; (2) else an existing `<venue>.sub.txt` in the manuscript
+directory; (3) else create `<venue>.sub.txt` in the manuscript directory on the
 fly. See step 1.
 
 ## Steps
@@ -65,12 +65,12 @@ fly. See step 1.
 1. **Resolve the `.sub` by hierarchy** (user-provided > in manuscript dir >
    create on the fly):
    - If the user named a `.sub` path, use it as-is.
-   - Else if `<manuscript-dir>/<venue>.sub` already exists, reuse it (do not
+   - Else if `<manuscript-dir>/<venue>.sub.txt` already exists, reuse it (do not
      overwrite unless the user asks to regenerate).
    - Else create it in the manuscript directory, with an absolute path:
 
      ```
-     paperpush subfile <venue> -o <manuscript-dir>/<venue>.sub
+     paperpush subfile <venue> -o <manuscript-dir>/<venue>.sub.txt
      ```
 
    A newly created `.sub` lives alongside the manuscript. Use the resolved path

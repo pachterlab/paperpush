@@ -68,7 +68,7 @@ include = ["paperpush*"]
 # scripts/sync_agent_docs.py) so `paperpush --agent-guide` works from a plain pip
 # install, where the repo's AGENTS.md is not present. "_skills/*/SKILL.md" is the
 # same for the skills in skills/, for `paperpush install-skills`.
-paperpush = ["venues.json", "venues.schema.json", "submission_forms.json", "submission_forms.schema.json", "common_fields.json", "manuscript_requirements.json", "manuscript_requirements.schema.json", "subfile_templates/*.sub", "_docs/*.md", "_skills/*/SKILL.md"]
+paperpush = ["venues.json", "venues.schema.json", "submission_forms.json", "submission_forms.schema.json", "common_fields.json", "manuscript_requirements.json", "manuscript_requirements.schema.json", "subfile_templates/*.sub.txt", "_docs/*.md", "_skills/*/SKILL.md"]
 "paperpush.venues" = ["_assets/*"]
 "paperpush.web" = ["static/*", "static/fonts/*"]
 "paperpush.codegen" = ["recorder.js"]

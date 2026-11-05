@@ -17216,5 +17216,1235 @@
         ]
       }
     }
+  },
+  "molecular_cell": {
+    "source_urls": [
+      "https://www.cell.com/molecular-cell/information-for-authors/revise-manuscript"
+    ],
+    "retrieved": "2026-11-04",
+    "article_type_field": "article_type",
+    "notes": [
+      "The source page gives the formatting rules and manuscript components for the revision stage; it states this information is not necessary for initial submission.",
+      "Molecular Cell requires the original source images underlying image-based figure panels (unprocessed, uncropped gels and blots; complete original fields of view with all channels for microscopy and histology) to be submitted to the editor through Mendeley Data or another approved repository when authors are invited to submit a revised paper.",
+      "Submission of other non-imaging source data is encouraged but not required.",
+      "Revised papers that are inactive for longer than 1 year are automatically withdrawn.",
+      "If the authorship changed in revision (addition, removal, or change in order), a completed authorship change form must be provided with the revised manuscript.",
+      "All authors must be entered in Editorial Manager in the order they appear in the manuscript."
+    ],
+    "manuscript": {
+      "tables_placement": "end",
+      "template_required": false,
+      "initial_submission_any_format": "The formatting tips and manuscript components on the revise-manuscript page apply at the revision stage and are not necessary for initial submission.",
+      "notes": [
+        "The final submission must be in an editable format, preferably Microsoft Word; optional article templates are available.",
+        "If LaTeX is used, a PDF version of the manuscript must also be included; LaTeX files are converted to Word for copyediting and typesetting.",
+        "Spelling and the use of periods and commas in numbers should conform to US usage.",
+        "Abbreviations should be kept to a minimum and avoided in the title if possible (an unavoidable title abbreviation is defined early in the summary); all nonstandard abbreviations are defined at first use.",
+        "Footnotes are used only in the author list and in tables.",
+        "Novelty claims such as 'novel' and 'first' are discouraged.",
+        "Math equations should be written in OMML if possible; other editable formats such as MathType are accepted but converted to OMML; equations must not be submitted as images.",
+        "Equations referred to later are labelled Equation 1, Equation 2, etc.",
+        "Main-text tables appear at the end of the manuscript, in a separate section after the figure/scheme legends."
+      ]
+    },
+    "title_page": {
+      "required_items": [
+        "title",
+        "authors",
+        "affiliations",
+        "corresponding_author",
+        "corresponding_email"
+      ],
+      "title_max_characters": 145,
+      "notes": [
+        "Titles should be concise, around 10-12 words (no more than 145 characters including spaces), avoid jargon and uncommon abbreviations, and capture the broad conceptual significance of the work.",
+        "Author first and last names are spelled out in full (middle initials are OK); Chinese characters may be included as an alternate name.",
+        "Affiliations are signified with numbered footnotes and give at minimum department/subunit, institution, city, state/region (if applicable), and country.",
+        "After the affiliations, numbered footnotes may indicate present address, equal contribution, and/or senior authorship; the final numbered footnote must indicate the lead contact (required).",
+        "There is exactly one lead contact, who must be a corresponding author; corresponding authors are marked with asterisks (*, **, *** in order) and their email addresses (one per author) are listed after the author-list footnotes."
+      ]
+    },
+    "abstract": {
+      "max_words": 150,
+      "structured": false,
+      "no_references": true,
+      "notes": [
+        "Called the 'Summary': a single paragraph of no more than 150 words giving the background and/or purpose, the principal results, approaches/model systems and major conclusions, and the broader significance of the work.",
+        "The summary must not include reference citations and should avoid non-standard abbreviations; novelty claims are discouraged."
+      ]
+    },
+    "keywords": {
+      "max": 10,
+      "notes": [
+        "Up to 10 keywords may be included after the summary, separated by commas."
+      ]
+    },
+    "sections": {
+      "required": [
+        "Introduction",
+        "Results",
+        "Discussion",
+        "Methods"
+      ],
+      "order": [
+        "Abstract",
+        "Introduction",
+        "Results",
+        "Discussion",
+        "Methods",
+        "References"
+      ],
+      "combined_allowed": [
+        "Results and Discussion"
+      ],
+      "notes": [
+        "Components in order for most research articles: title; author list; affiliations and footnotes; contact information; Summary; Keywords; Introduction; Design (Technology articles only); Results; Discussion (with a 'Limitations of the study' subsection); Resource availability; Acknowledgments; Author contributions; Declaration of interests; Declaration of generative AI and AI-assisted technologies (if applicable); Supplemental information titles and legends; Figure (and/or scheme) titles and legends; Tables; STAR Methods; Resource identification initiative; References.",
+        "The Introduction should not include subheadings; Results are divided into subsections with short, informative subheadings.",
+        "The Discussion must include a 'Limitations of the study' subsection highlighting caveats specific to the paper.",
+        "For some article types, the Discussion may be combined with the Results as a 'Results and Discussion' section.",
+        "The STAR Methods format is required in the revision and for acceptance; it replaces the experimental procedures/methods and supplemental experimental procedures sections.",
+        "Research Resource Identifiers (RRIDs) should be given for antibodies and genetically modified organisms in the key resources table.",
+        "A brief list of all supplemental files appears in the main text under the heading 'Supplemental information', with the primary PDF ('Document S1') listed first."
+      ]
+    },
+    "statements": {
+      "required": [
+        "lead_contact",
+        "materials_availability",
+        "data_availability",
+        "code_availability",
+        "competing_interests",
+        "author_contributions"
+      ],
+      "optional": [
+        "ai_use",
+        "acknowledgements"
+      ],
+      "notes": [
+        "The Resource availability section is required for all research articles, with the subsections 'Lead contact', 'Materials availability', and 'Data and code availability'.",
+        "Acknowledgments are strongly encouraged for all research articles and list non-author contributions and funding sources (including grant numbers).",
+        "Author contributions are required for all papers, using author initials; the CRediT taxonomy is encouraged but a traditional format is accepted.",
+        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'",
+        "A declaration of generative AI and AI-assisted technologies in the manuscript preparation process is required only if such tools (beyond basic grammar, spelling, and reference checkers) were used in preparing the manuscript; other uses of AI tools are reported in the methods or STAR Methods."
+      ]
+    },
+    "figures": {
+      "notes": [
+        "At initial submission it is often useful to include the figures and their titles/legends in the main text near where they are referenced; after acceptance, main-text figures must be uploaded as separate high-resolution image files rather than embedded in the manuscript.",
+        "Figure titles and legends go in a single 'figures' section within the main-text manuscript; each figure has a brief title describing the whole figure (without citing panels) followed by a legend describing each panel.",
+        "Main and supplemental legends must state the statistical tests used, define the p values indicated by asterisks, state the number of biological and technical replicates, and define all measures and error bars.",
+        "All scale bars must be defined in the image file or the legend, and each legend refers to supporting supplemental items (e.g. 'See also Figure S1').",
+        "All figures/schemes must be cited in the main text in numerical order."
+      ]
+    },
+    "tables": {
+      "editable": true,
+      "placement": "end_of_manuscript",
+      "notes": [
+        "Main-text tables are created with the Microsoft Word Table tool (or the LaTeX 'tabular' environment if needed), not in Excel or PDF format.",
+        "Tables are black and white with no colored text or shading (small embedded color graphics are OK), with no tabs or spaces separating items within a cell and discrete data in each cell.",
+        "Tables are numbered Table 1, Table 2, etc., never subdivided into panels, and include a title; legends and footnotes are optional, and footnotes use superscript lowercase letters.",
+        "All main-text tables must be cited in the main text."
+      ]
+    },
+    "references": {
+      "style": "Numbered superscript, e.g. 'Smith et al.1'",
+      "numbered": true,
+      "include_titles": true,
+      "unpublished_allowed": false,
+      "preprints_allowed": true,
+      "notes": [
+        "References are numbered sequentially by first citation and cited in the text as numbered superscripts.",
+        "References cited only in the supplemental information appear only in the supplemental information, not in the main text.",
+        "Each reference contains only one article (no parts a, b, c); 'et al.' is used only after 10 author names.",
+        "Only published or in-press material is listed; DOIs are encouraged whenever possible; in-press articles need a DOI and scheduled online publication date.",
+        "Preprints may be included with an independent persistent identifier such as a DOI; once formally published, cite the publication instead.",
+        "Unpublished data, personal communications, abstracts, and conference presentations may be cited in the text but not in the reference list.",
+        "All datasets, program code, and methods used must be cited in the text and listed in the references.",
+        "CSL and EndNote styles are available."
+      ]
+    },
+    "cover_letter": {
+      "required": true,
+      "notes": [
+        "With the revised manuscript, upload a new cover letter (confidential to the editor) briefly summarizing how the revision addresses the reviewer and editor comments, plus a separate letter with detailed point-by-point responses."
+      ]
+    },
+    "article_types": {
+      "Research article": {
+        "notes": [
+          "The source page's components list applies to most research articles; other formats (e.g. reviews, reports) follow the article types page and/or the decision letter."
+        ]
+      },
+      "Technology": {
+        "sections": {
+          "notes": [
+            "Technology articles include a Design section between the Introduction and the Results describing the issues that prompted the new technology, the design rationale, its development and implementation, and the options considered; no other article type includes this section."
+          ]
+        }
+      }
+    }
+  },
+  "patterns": {
+    "source_urls": [
+      "https://www.cell.com/patterns/information-for-authors/revise-manuscript"
+    ],
+    "retrieved": "2026-11-04",
+    "article_type_field": "article_type",
+    "notes": [
+      "The source page gives the formatting rules and manuscript components for the revision stage; it states this information is not necessary for initial submission.",
+      "Revised papers that are inactive for longer than 1 year are automatically withdrawn.",
+      "If the authorship changed in revision (addition, removal, or change in order), a completed authorship change form must be provided with the revised manuscript.",
+      "All authors must be entered in Editorial Manager in the order they appear in the manuscript."
+    ],
+    "manuscript": {
+      "tables_placement": "end",
+      "template_required": false,
+      "initial_submission_any_format": "The formatting tips and manuscript components on the revise-manuscript page apply at the revision stage and are not necessary for initial submission.",
+      "notes": [
+        "The final submission must be in an editable format, preferably Microsoft Word; optional article templates are available.",
+        "If LaTeX is used, a PDF version of the manuscript must also be included; LaTeX files are converted to Word for copyediting and typesetting.",
+        "Spelling and the use of periods and commas in numbers should conform to US usage.",
+        "Abbreviations should be kept to a minimum and avoided in the title if possible (an unavoidable title abbreviation is defined early in the summary); all nonstandard abbreviations are defined at first use.",
+        "Footnotes are used only in the author list and in tables.",
+        "Novelty claims such as 'novel' and 'first' are discouraged.",
+        "Math equations should be written in OMML if possible; other editable formats such as MathType are accepted but converted to OMML; equations must not be submitted as images.",
+        "Equations referred to later are labelled Equation 1, Equation 2, etc.",
+        "Main-text tables appear at the end of the manuscript, in a separate section after the figure/scheme legends."
+      ]
+    },
+    "title_page": {
+      "required_items": [
+        "title",
+        "authors",
+        "affiliations",
+        "corresponding_author",
+        "corresponding_email"
+      ],
+      "title_max_characters": 145,
+      "notes": [
+        "Titles should be concise, around 10-12 words (no more than 145 characters including spaces), avoid jargon and uncommon abbreviations, and capture the broad conceptual significance of the work.",
+        "Author first and last names are spelled out in full (middle initials are OK); Chinese characters may be included as an alternate name.",
+        "Affiliations are signified with numbered footnotes and give at minimum department/subunit, institution, city, state/region (if applicable), and country.",
+        "After the affiliations, numbered footnotes may indicate present address, equal contribution, and/or senior authorship; the final numbered footnote must indicate the lead contact (required).",
+        "There is exactly one lead contact, who must be a corresponding author; corresponding authors are marked with asterisks (*, **, *** in order) and their email addresses (one per author) are listed after the author-list footnotes."
+      ]
+    },
+    "abstract": {
+      "max_words": 150,
+      "structured": false,
+      "no_references": true,
+      "notes": [
+        "Called the 'Summary': a single paragraph of no more than 150 words giving the background and/or purpose, the principal results, approaches/model systems and major conclusions, and the broader significance of the work.",
+        "The summary must not include reference citations and should avoid non-standard abbreviations; novelty claims are discouraged."
+      ]
+    },
+    "keywords": {
+      "max": 10,
+      "notes": [
+        "Up to 10 keywords may be included after the summary, separated by commas."
+      ]
+    },
+    "sections": {
+      "required": [
+        "Introduction",
+        "Results",
+        "Discussion",
+        "Methods"
+      ],
+      "order": [
+        "Abstract",
+        "Introduction",
+        "Results",
+        "Discussion",
+        "Methods",
+        "References"
+      ],
+      "combined_allowed": [
+        "Results and Discussion"
+      ],
+      "notes": [
+        "Components in order for most research articles: title; author list; affiliations and footnotes; contact information; Summary; Keywords; Introduction; Results; Discussion; Methods; Resource availability; Acknowledgments; Author contributions; Declaration of interests; Declaration of generative AI and AI-assisted technologies (if applicable); Supplemental information titles and legends; Figure (and/or scheme) titles and legends; Tables; Resource identification initiative; References.",
+        "The Introduction should not include subheadings; Results are divided into subsections with short, informative subheadings.",
+        "For some article types, the Discussion may be combined with the Results as a 'Results and Discussion' section.",
+        "The Methods section (also/formerly 'experimental procedures') must appear in the main text after the Discussion and before the Resource availability section, with enough information to reproduce the study.",
+        "When further method details are in the supplemental information, the Methods section states: 'Further details regarding the methods can be found in the supplemental information.'",
+        "Research Resource Identifiers (RRIDs) should be given for antibodies and genetically modified organisms in the key resources table.",
+        "A brief list of all supplemental files appears in the main text under the heading 'Supplemental information', with the primary PDF ('Document S1') listed first."
+      ]
+    },
+    "statements": {
+      "required": [
+        "lead_contact",
+        "materials_availability",
+        "data_availability",
+        "code_availability",
+        "competing_interests",
+        "author_contributions"
+      ],
+      "optional": [
+        "ai_use",
+        "acknowledgements"
+      ],
+      "notes": [
+        "The Resource availability section is required for all research articles, with the subsections 'Lead contact', 'Materials availability', and 'Data and code availability'.",
+        "Acknowledgments are strongly encouraged for all research articles and list non-author contributions and funding sources (including grant numbers).",
+        "Author contributions are required for all papers, using author initials; the CRediT taxonomy is encouraged but a traditional format is accepted.",
+        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'",
+        "A declaration of generative AI and AI-assisted technologies in the manuscript preparation process is required only if such tools (beyond basic grammar, spelling, and reference checkers) were used in preparing the manuscript; other uses of AI tools are reported in the methods or STAR Methods."
+      ]
+    },
+    "figures": {
+      "notes": [
+        "At initial submission it is often useful to include the figures and their titles/legends in the main text near where they are referenced; after acceptance, main-text figures must be uploaded as separate high-resolution image files rather than embedded in the manuscript.",
+        "Figure titles and legends go in a single 'figures' section within the main-text manuscript; each figure has a brief title describing the whole figure (without citing panels) followed by a legend describing each panel.",
+        "Main and supplemental legends must state the statistical tests used, define the p values indicated by asterisks, state the number of biological and technical replicates, and define all measures and error bars.",
+        "All scale bars must be defined in the image file or the legend, and each legend refers to supporting supplemental items (e.g. 'See also Figure S1').",
+        "All figures/schemes must be cited in the main text in numerical order."
+      ]
+    },
+    "tables": {
+      "editable": true,
+      "placement": "end_of_manuscript",
+      "notes": [
+        "Main-text tables are created with the Microsoft Word Table tool (or the LaTeX 'tabular' environment if needed), not in Excel or PDF format.",
+        "Tables are black and white with no colored text or shading (small embedded color graphics are OK), with no tabs or spaces separating items within a cell and discrete data in each cell.",
+        "Tables are numbered Table 1, Table 2, etc., never subdivided into panels, and include a title; legends and footnotes are optional, and footnotes use superscript lowercase letters.",
+        "All main-text tables must be cited in the main text."
+      ]
+    },
+    "references": {
+      "style": "Numbered superscript, e.g. 'Smith et al.1'",
+      "numbered": true,
+      "include_titles": true,
+      "unpublished_allowed": false,
+      "preprints_allowed": true,
+      "notes": [
+        "References are numbered sequentially by first citation and cited in the text as numbered superscripts.",
+        "References cited only in the supplemental information appear only in the supplemental information, not in the main text.",
+        "Each reference contains only one article (no parts a, b, c); 'et al.' is used only after 10 author names.",
+        "Only published or in-press material is listed; DOIs are encouraged whenever possible; in-press articles need a DOI and scheduled online publication date.",
+        "Preprints may be included with an independent persistent identifier such as a DOI; once formally published, cite the publication instead.",
+        "Unpublished data, personal communications, abstracts, and conference presentations may be cited in the text but not in the reference list.",
+        "All datasets, program code, and methods used must be cited in the text and listed in the references.",
+        "CSL and EndNote styles are available."
+      ]
+    },
+    "cover_letter": {
+      "required": true,
+      "notes": [
+        "With the revised manuscript, upload a new cover letter (confidential to the editor) briefly summarizing how the revision addresses the reviewer and editor comments, plus a separate letter with detailed point-by-point responses."
+      ]
+    },
+    "article_types": {
+      "Research article": {
+        "notes": [
+          "The source page's components list applies to most research articles; other formats (e.g. reviews, reports) follow the article types page and/or the decision letter."
+        ]
+      }
+    }
+  },
+  "iscience": {
+    "source_urls": [
+      "https://www.cell.com/iscience/information-for-authors/revise-manuscript"
+    ],
+    "retrieved": "2026-11-04",
+    "article_type_field": "article_type",
+    "notes": [
+      "The source page gives the formatting rules and manuscript components for the revision stage; it states this information is not necessary for initial submission.",
+      "Revised papers that are inactive for longer than 1 year are automatically withdrawn.",
+      "If the authorship changed in revision (addition, removal, or change in order), a completed authorship change form must be provided with the revised manuscript.",
+      "All authors must be entered in Editorial Manager in the order they appear in the manuscript."
+    ],
+    "manuscript": {
+      "tables_placement": "end",
+      "template_required": false,
+      "initial_submission_any_format": "The formatting tips and manuscript components on the revise-manuscript page apply at the revision stage and are not necessary for initial submission.",
+      "notes": [
+        "The final submission must be in an editable format, preferably Microsoft Word; optional article templates are available.",
+        "If LaTeX is used, a PDF version of the manuscript must also be included; LaTeX files are converted to Word for copyediting and typesetting.",
+        "Spelling and the use of periods and commas in numbers should conform to US usage.",
+        "Abbreviations should be kept to a minimum and avoided in the title if possible (an unavoidable title abbreviation is defined early in the summary); all nonstandard abbreviations are defined at first use.",
+        "Footnotes are used only in the author list and in tables.",
+        "Novelty claims such as 'novel' and 'first' are discouraged.",
+        "Math equations should be written in OMML if possible; other editable formats such as MathType are accepted but converted to OMML; equations must not be submitted as images.",
+        "Equations referred to later are labelled Equation 1, Equation 2, etc.",
+        "Main-text tables appear at the end of the manuscript, in a separate section after the figure/scheme legends."
+      ]
+    },
+    "title_page": {
+      "required_items": [
+        "title",
+        "authors",
+        "affiliations",
+        "corresponding_author",
+        "corresponding_email"
+      ],
+      "title_max_characters": 145,
+      "notes": [
+        "Titles should be concise, around 10-12 words (no more than 145 characters including spaces), avoid jargon and uncommon abbreviations, and capture the broad conceptual significance of the work.",
+        "Author first and last names are spelled out in full (middle initials are OK); Chinese characters may be included as an alternate name.",
+        "Affiliations are signified with numbered footnotes and give at minimum department/subunit, institution, city, state/region (if applicable), and country.",
+        "After the affiliations, numbered footnotes may indicate present address, equal contribution, and/or senior authorship; the final numbered footnote must indicate the lead contact (required).",
+        "There is exactly one lead contact, who must be a corresponding author; corresponding authors are marked with asterisks (*, **, *** in order) and their email addresses (one per author) are listed after the author-list footnotes."
+      ]
+    },
+    "abstract": {
+      "max_words": 150,
+      "structured": false,
+      "no_references": true,
+      "notes": [
+        "Called the 'Summary': a single paragraph of no more than 150 words giving the background and/or purpose, the principal results, approaches/model systems and major conclusions, and the broader significance of the work.",
+        "The summary must not include reference citations and should avoid non-standard abbreviations; novelty claims are discouraged."
+      ]
+    },
+    "sections": {
+      "required": [
+        "Introduction",
+        "Results",
+        "Discussion",
+        "Methods"
+      ],
+      "order": [
+        "Abstract",
+        "Introduction",
+        "Results",
+        "Discussion",
+        "Methods",
+        "References"
+      ],
+      "combined_allowed": [
+        "Results and Discussion"
+      ],
+      "notes": [
+        "Components in order for most research articles: title; author list; affiliations and footnotes; contact information; Summary; Introduction; Results; Discussion (with a 'Limitations of the study' subsection); Resource availability; Acknowledgments; Author contributions; Declaration of interests; Declaration of generative AI and AI-assisted technologies (if applicable); Supplemental information titles and legends; Figure (and/or scheme) titles and legends; Tables; STAR Methods; Resource identification initiative; References.",
+        "The Introduction should not include subheadings; Results are divided into subsections with short, informative subheadings.",
+        "The Discussion must include a 'Limitations of the study' subsection highlighting caveats specific to the paper.",
+        "For some article types, the Discussion may be combined with the Results as a 'Results and Discussion' section.",
+        "The STAR Methods format is required in the revision and for acceptance; it replaces the experimental procedures/methods and supplemental experimental procedures sections.",
+        "Research Resource Identifiers (RRIDs) should be given for antibodies and genetically modified organisms in the key resources table.",
+        "A brief list of all supplemental files appears in the main text under the heading 'Supplemental information', with the primary PDF ('Document S1') listed first."
+      ]
+    },
+    "statements": {
+      "required": [
+        "lead_contact",
+        "materials_availability",
+        "data_availability",
+        "code_availability",
+        "competing_interests",
+        "author_contributions"
+      ],
+      "optional": [
+        "ai_use",
+        "acknowledgements"
+      ],
+      "notes": [
+        "The Resource availability section is required for all research articles, with the subsections 'Lead contact', 'Materials availability', and 'Data and code availability'.",
+        "Acknowledgments are strongly encouraged for all research articles and list non-author contributions and funding sources (including grant numbers).",
+        "Author contributions are required for all papers, using author initials; the CRediT taxonomy is encouraged but a traditional format is accepted.",
+        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'",
+        "A declaration of generative AI and AI-assisted technologies in the manuscript preparation process is required only if such tools (beyond basic grammar, spelling, and reference checkers) were used in preparing the manuscript; other uses of AI tools are reported in the methods or STAR Methods."
+      ]
+    },
+    "figures": {
+      "notes": [
+        "At initial submission it is often useful to include the figures and their titles/legends in the main text near where they are referenced; after acceptance, main-text figures must be uploaded as separate high-resolution image files rather than embedded in the manuscript.",
+        "Figure titles and legends go in a single 'figures' section within the main-text manuscript; each figure has a brief title describing the whole figure (without citing panels) followed by a legend describing each panel.",
+        "Main and supplemental legends must state the statistical tests used, define the p values indicated by asterisks, state the number of biological and technical replicates, and define all measures and error bars.",
+        "All scale bars must be defined in the image file or the legend, and each legend refers to supporting supplemental items (e.g. 'See also Figure S1').",
+        "All figures/schemes must be cited in the main text in numerical order."
+      ]
+    },
+    "tables": {
+      "editable": true,
+      "placement": "end_of_manuscript",
+      "notes": [
+        "Main-text tables are created with the Microsoft Word Table tool (or the LaTeX 'tabular' environment if needed), not in Excel or PDF format.",
+        "Tables are black and white with no colored text or shading (small embedded color graphics are OK), with no tabs or spaces separating items within a cell and discrete data in each cell.",
+        "Tables are numbered Table 1, Table 2, etc., never subdivided into panels, and include a title; legends and footnotes are optional, and footnotes use superscript lowercase letters.",
+        "All main-text tables must be cited in the main text."
+      ]
+    },
+    "references": {
+      "style": "Numbered superscript, e.g. 'Smith et al.1'",
+      "numbered": true,
+      "include_titles": true,
+      "unpublished_allowed": false,
+      "preprints_allowed": true,
+      "notes": [
+        "References are numbered sequentially by first citation and cited in the text as numbered superscripts.",
+        "References cited only in the supplemental information appear only in the supplemental information, not in the main text.",
+        "Each reference contains only one article (no parts a, b, c); 'et al.' is used only after 10 author names.",
+        "Only published or in-press material is listed; DOIs are encouraged whenever possible; in-press articles need a DOI and scheduled online publication date.",
+        "Preprints may be included with an independent persistent identifier such as a DOI; once formally published, cite the publication instead.",
+        "Unpublished data, personal communications, abstracts, and conference presentations may be cited in the text but not in the reference list.",
+        "All datasets, program code, and methods used must be cited in the text and listed in the references.",
+        "CSL and EndNote styles are available."
+      ]
+    },
+    "cover_letter": {
+      "required": true,
+      "notes": [
+        "With the revised manuscript, upload a new cover letter (confidential to the editor) briefly summarizing how the revision addresses the reviewer and editor comments, plus a separate letter with detailed point-by-point responses."
+      ]
+    },
+    "article_types": {
+      "Research article": {
+        "notes": [
+          "The source page's components list applies to most research articles; other formats (e.g. reviews, reports) follow the article types page and/or the decision letter."
+        ]
+      }
+    }
+  },
+  "cell_stem_cell": {
+    "source_urls": [
+      "https://www.cell.com/cell-stem-cell/information-for-authors/revise-manuscript"
+    ],
+    "retrieved": "2026-11-04",
+    "article_type_field": "article_type",
+    "notes": [
+      "The source page gives the formatting rules and manuscript components for the revision stage; it states this information is not necessary for initial submission.",
+      "Revised papers that are inactive for longer than 1 year are automatically withdrawn.",
+      "If the authorship changed in revision (addition, removal, or change in order), a completed authorship change form must be provided with the revised manuscript.",
+      "All authors must be entered in Editorial Manager in the order they appear in the manuscript."
+    ],
+    "manuscript": {
+      "tables_placement": "end",
+      "template_required": false,
+      "initial_submission_any_format": "The formatting tips and manuscript components on the revise-manuscript page apply at the revision stage and are not necessary for initial submission.",
+      "notes": [
+        "The final submission must be in an editable format, preferably Microsoft Word; optional article templates are available.",
+        "If LaTeX is used, a PDF version of the manuscript must also be included; LaTeX files are converted to Word for copyediting and typesetting.",
+        "Spelling and the use of periods and commas in numbers should conform to US usage.",
+        "Abbreviations should be kept to a minimum and avoided in the title if possible (an unavoidable title abbreviation is defined early in the summary); all nonstandard abbreviations are defined at first use.",
+        "Footnotes are used only in the author list and in tables.",
+        "Novelty claims such as 'novel' and 'first' are discouraged.",
+        "Math equations should be written in OMML if possible; other editable formats such as MathType are accepted but converted to OMML; equations must not be submitted as images.",
+        "Equations referred to later are labelled Equation 1, Equation 2, etc.",
+        "Main-text tables appear at the end of the manuscript, in a separate section after the figure/scheme legends."
+      ]
+    },
+    "title_page": {
+      "required_items": [
+        "title",
+        "authors",
+        "affiliations",
+        "corresponding_author",
+        "corresponding_email"
+      ],
+      "title_max_characters": 145,
+      "notes": [
+        "Titles should be concise, around 10-12 words (no more than 145 characters including spaces), avoid jargon and uncommon abbreviations, and capture the broad conceptual significance of the work.",
+        "Author first and last names are spelled out in full (middle initials are OK); Chinese characters may be included as an alternate name.",
+        "Affiliations are signified with numbered footnotes and give at minimum department/subunit, institution, city, state/region (if applicable), and country.",
+        "After the affiliations, numbered footnotes may indicate present address, equal contribution, and/or senior authorship; the final numbered footnote must indicate the lead contact (required).",
+        "There is exactly one lead contact, who must be a corresponding author; corresponding authors are marked with asterisks (*, **, *** in order) and their email addresses (one per author) are listed after the author-list footnotes."
+      ]
+    },
+    "abstract": {
+      "max_words": 150,
+      "structured": false,
+      "no_references": true,
+      "notes": [
+        "Called the 'Summary': a single paragraph of no more than 150 words giving the background and/or purpose, the principal results, approaches/model systems and major conclusions, and the broader significance of the work.",
+        "The summary must not include reference citations and should avoid non-standard abbreviations; novelty claims are discouraged."
+      ]
+    },
+    "keywords": {
+      "max": 10,
+      "notes": [
+        "Up to 10 keywords may be included after the summary, separated by commas."
+      ]
+    },
+    "sections": {
+      "required": [
+        "Introduction",
+        "Results",
+        "Discussion",
+        "Methods"
+      ],
+      "order": [
+        "Abstract",
+        "Introduction",
+        "Results",
+        "Discussion",
+        "Methods",
+        "References"
+      ],
+      "combined_allowed": [
+        "Results and Discussion"
+      ],
+      "notes": [
+        "Components in order for most research articles: title; author list; affiliations and footnotes; contact information; Summary; Keywords; Introduction; Design (Technology articles only); Results; Discussion; Limitations of the study (a subsection within the Discussion); Resource availability; Acknowledgments; Author contributions; Declaration of interests; Declaration of generative AI and AI-assisted technologies (if applicable); Supplemental information titles and legends; Figure (and/or scheme) titles and legends; Tables; STAR Methods; Resource identification initiative; References.",
+        "The Introduction should not include subheadings; Results are divided into subsections with short, informative subheadings.",
+        "The Discussion must include a 'Limitations of the study' subsection highlighting caveats specific to the paper.",
+        "For some article types, the Discussion may be combined with the Results as a 'Results and Discussion' section.",
+        "The STAR Methods format is required in the revision and for acceptance; it replaces the experimental procedures/methods and supplemental experimental procedures sections.",
+        "Research Resource Identifiers (RRIDs) should be given for antibodies and genetically modified organisms in the key resources table.",
+        "A brief list of all supplemental files appears in the main text under the heading 'Supplemental information', with the primary PDF ('Document S1') listed first."
+      ]
+    },
+    "statements": {
+      "required": [
+        "lead_contact",
+        "materials_availability",
+        "data_availability",
+        "code_availability",
+        "competing_interests",
+        "author_contributions"
+      ],
+      "optional": [
+        "ai_use",
+        "acknowledgements"
+      ],
+      "notes": [
+        "The Resource availability section is required for all research articles, with the subsections 'Lead contact', 'Materials availability', and 'Data and code availability'.",
+        "Acknowledgments are strongly encouraged for all research articles and list non-author contributions and funding sources (including grant numbers).",
+        "Author contributions are required for all papers, using author initials; the CRediT taxonomy is encouraged but a traditional format is accepted.",
+        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'",
+        "A declaration of generative AI and AI-assisted technologies in the manuscript preparation process is required only if such tools (beyond basic grammar, spelling, and reference checkers) were used in preparing the manuscript; other uses of AI tools are reported in the methods or STAR Methods."
+      ]
+    },
+    "figures": {
+      "notes": [
+        "At initial submission it is often useful to include the figures and their titles/legends in the main text near where they are referenced; after acceptance, main-text figures must be uploaded as separate high-resolution image files rather than embedded in the manuscript.",
+        "Figure titles and legends go in a single 'figures' section within the main-text manuscript; each figure has a brief title describing the whole figure (without citing panels) followed by a legend describing each panel.",
+        "Main and supplemental legends must state the statistical tests used, define the p values indicated by asterisks, state the number of biological and technical replicates, and define all measures and error bars.",
+        "All scale bars must be defined in the image file or the legend, and each legend refers to supporting supplemental items (e.g. 'See also Figure S1').",
+        "All figures/schemes must be cited in the main text in numerical order."
+      ]
+    },
+    "tables": {
+      "editable": true,
+      "placement": "end_of_manuscript",
+      "notes": [
+        "Main-text tables are created with the Microsoft Word Table tool (or the LaTeX 'tabular' environment if needed), not in Excel or PDF format.",
+        "Tables are black and white with no colored text or shading (small embedded color graphics are OK), with no tabs or spaces separating items within a cell and discrete data in each cell.",
+        "Tables are numbered Table 1, Table 2, etc., never subdivided into panels, and include a title; legends and footnotes are optional, and footnotes use superscript lowercase letters.",
+        "All main-text tables must be cited in the main text."
+      ]
+    },
+    "references": {
+      "style": "Numbered superscript, e.g. 'Smith et al.1'",
+      "numbered": true,
+      "include_titles": true,
+      "unpublished_allowed": false,
+      "preprints_allowed": true,
+      "notes": [
+        "References are numbered sequentially by first citation and cited in the text as numbered superscripts.",
+        "References cited only in the supplemental information appear only in the supplemental information, not in the main text.",
+        "Each reference contains only one article (no parts a, b, c); 'et al.' is used only after 10 author names.",
+        "Only published or in-press material is listed; DOIs are encouraged whenever possible; in-press articles need a DOI and scheduled online publication date.",
+        "Preprints may be included with an independent persistent identifier such as a DOI; once formally published, cite the publication instead.",
+        "Unpublished data, personal communications, abstracts, and conference presentations may be cited in the text but not in the reference list.",
+        "All datasets, program code, and methods used must be cited in the text and listed in the references.",
+        "CSL and EndNote styles are available."
+      ]
+    },
+    "cover_letter": {
+      "required": true,
+      "notes": [
+        "With the revised manuscript, upload a new cover letter (confidential to the editor) briefly summarizing how the revision addresses the reviewer and editor comments, plus a separate letter with detailed point-by-point responses."
+      ]
+    },
+    "article_types": {
+      "Research article": {
+        "notes": [
+          "The source page's components list applies to most research articles; other formats (e.g. reviews, reports) follow the article types page and/or the decision letter."
+        ]
+      },
+      "Technology": {
+        "sections": {
+          "notes": [
+            "Technology articles include a Design section between the Introduction and the Results describing the issues that prompted the new technology, the design rationale, its development and implementation, and the options considered; no other article type includes this section."
+          ]
+        }
+      }
+    }
+  },
+  "nar_cancer": {
+    "source_urls": [
+      "https://academic.oup.com/narcancer/pages/author-guidelines"
+    ],
+    "retrieved": "2026-11-04",
+    "article_type_field": "article_type",
+    "notes": [
+      "NAR Cancer publishes Standard, Review, and Cancer Data Resource articles.",
+      "An impact statement of approximately 100 words is required, explaining to a broad audience how the findings may affect cancer diagnosis or treatment, in simple language, in the third person, and with minimal acronyms.",
+      "Authors of all article types must submit a graphical abstract (in addition to the text abstract) at initial submission, as a separate file named 'graphical_abstract'.",
+      "The graphical abstract has a 5:2 aspect ratio (127 x 50 mm or 5 x 2 in minimum), landscape orientation, and a sans serif font such as Arial at 12-16 points; it must be original (not an existing main or supplementary figure), use color, contain no trademarked or copyrighted images or logos, and use text sparingly.",
+      "Authors must suggest at least six potential reviewers at submission, plus one additional suggested reviewer for each requested excluded reviewer.",
+      "Submitting authors must provide an ORCID iD at submission; corresponding authors are required to register with ORCID and link their ORCID iD to their ScholarOne account.",
+      "Valid email addresses must be provided for all co-authors.",
+      "Large-scale datasets (e.g. genomic, transcriptomic, proteomic) must be deposited in an appropriate repository before submission, made available to reviewers, and released publicly on or before publication.",
+      "Authors complete an online Data Availability, Standardization, and Reproducibility Checklist at submission.",
+      "All non-third-party software must be open-source and available and functional at the time of submission.",
+      "Authors must provide alt text descriptions for all images, figures, illustrations, and photographs in the main article.",
+      "At initial submission, the corresponding author must declare if the Editor-in-Chief, an editor, or an editorial board member is an author of or contributor to the manuscript.",
+      "Authors are encouraged to complete revisions within 30-60 days; extensions up to six months from the decision date may be requested, after which the article is automatically withdrawn."
+    ],
+    "manuscript": {
+      "line_numbers": false,
+      "double_spacing": false,
+      "page_numbers": true,
+      "figures_placement": "end_or_inline",
+      "tables_placement": "end_or_inline",
+      "anonymized": false,
+      "template_required": false,
+      "notes": [
+        "For the initial submission, a single .pdf file including the main text, references, tables, and figures is encouraged, with all figures and tables embedded in the text either in-line with the Results or in a separate section at the end; supplementary data are uploaded as separate file(s).",
+        "Manuscripts prepared in TeX/LaTeX are uploaded as a complete PDF (figures at the end); only the PDF is required on submission and LaTeX files are requested at revision.",
+        "Authors are encouraged to use the NAR Word and OUP LaTeX templates; for LaTeX the OUP template in its 'Modern Large' design is recommended.",
+        "Do: number all pages; embed TrueType fonts in Word documents; insert special characters using the Symbol font; use single-column, single-spaced text (unless using LaTeX).",
+        "Don't: use line-numbering; use footnotes.",
+        "Revised manuscripts are supplied in .docx, .rtf, or LaTeX format (not PDF), with tables, figures, and captions embedded, as a copy with changes in red and a clean copy, together with responses to referee or editor comments.",
+        "There is no separate abbreviations section; non-standard abbreviations are defined in the text at first occurrence."
+      ]
+    },
+    "title_page": {
+      "required_items": [
+        "title",
+        "authors",
+        "affiliations",
+        "corresponding_author",
+        "corresponding_email"
+      ],
+      "notes": [
+        "The title must be clearly intelligible to a non-specialist; jargon and non-standard abbreviations are not permitted.",
+        "Author names are given as first name followed by initial(s) and last name (e.g. John Smith or John E. Smith).",
+        "Affiliations must include at minimum Department/Division/Unit, Institution, Town, Postal Code, and Country.",
+        "Email address(es) of the corresponding author(s) are listed; corresponding authors are identified by an asterisk.",
+        "Equal-contribution authors are identified by a dagger symbol and a footnote such as '† The first X authors contributed equally to this work.'"
+      ]
+    },
+    "abstract": {
+      "max_words": 200,
+      "structured": false,
+      "no_references": true,
+      "no_abbreviations": true,
+      "notes": [
+        "The text abstract is written in English as a single paragraph not exceeding 200 words; subheadings are not permitted.",
+        "URLs, references to figures or schemes, reference citations, and non-standard abbreviations must not be included, except that Cancer Data Resource articles include the resource URL, if applicable."
+      ]
+    },
+    "sections": {
+      "required": [
+        "Introduction",
+        "Methods",
+        "Results",
+        "Discussion"
+      ],
+      "order": [
+        "Abstract",
+        "Introduction",
+        "Methods",
+        "Results",
+        "Discussion",
+        "Data Availability",
+        "Acknowledgements",
+        "Author Contributions Statement",
+        "Funding",
+        "Conflict of Interest Disclosure",
+        "References"
+      ],
+      "combined_allowed": [
+        "Results and Discussion"
+      ],
+      "notes": [
+        "Manuscripts are ordered: Title; Authors and affiliations; Graphical abstract; Text abstract; Introduction; Materials and Methods; Results; Discussion; Data Availability; Supplementary Data statement; Acknowledgements; Author Contributions Statement; Funding; Conflict of Interest Disclosure; References; Tables; Figures.",
+        "Materials and Methods are described in enough detail (with the Supplementary Material) for a qualified investigator to repeat the work.",
+        "Results and Discussion may be combined; Results call out every display item (tables and each figure panel).",
+        "If the manuscript includes supplementary material for publication, it must state: 'Supplementary Data are available at NAR Online'."
+      ]
+    },
+    "statements": {
+      "required": [
+        "data_availability",
+        "author_contributions",
+        "funding",
+        "competing_interests"
+      ],
+      "optional": [
+        "acknowledgements",
+        "ai_use"
+      ],
+      "notes": [
+        "A Data Availability Statement, following the Discussion, is required and gives accession numbers and editor/reviewer access information (token or user name/password) for deposited data; if an exception to data sharing is granted, the statement must say what cannot be shared and why.",
+        "Data types that must be deposited before submission include genome-wide analyses (e.g. ChIP-Seq, RNA-Seq), novel nucleic acid or protein sequences (with raw high-throughput data), novel 3D structures, mass spectrometry proteomics data, software and source codes, and flow cytometry data.",
+        "The Author Contributions statement is mandatory for all articles, preferably at original submission but no later than revision; the CRediT taxonomy is encouraged.",
+        "All funding support, including industry and foreign talents program awards, must be acknowledged, with funder names as in the Crossref funder registry and specific grant numbers.",
+        "Acknowledgments of persons precede acknowledgments of funding sources.",
+        "All authors must disclose any potential conflict of interest at submission.",
+        "Use of AI (e.g. to generate content or images, write code, process data, or translate) must be disclosed in the cover letter and in the Methods or Acknowledgements section.",
+        "Research with human participants or animals requires an ethics/approval statement (committee name and permit numbers where available) in the Methods section, or a statement of exemption."
+      ]
+    },
+    "figures": {
+      "formats": [
+        ".pdf",
+        ".png",
+        ".eps",
+        ".tif",
+        ".tiff",
+        ".ppt",
+        ".pptx"
+      ],
+      "min_dpi": 300,
+      "single_column_width_mm": 84,
+      "double_column_width_mm": 178,
+      "max_width_mm": 178,
+      "max_height_mm": 230,
+      "color_mode": [
+        "RGB"
+      ],
+      "min_font_size_pt": 5,
+      "font": "plain sans serif",
+      "legends_location": "with_figure",
+      "color_charge": false,
+      "placement": "end_or_inline",
+      "notes": [
+        "All figures and their captions are embedded in the text to facilitate reviewing; high-resolution images are also required, preferably at initial submission but no later than revision.",
+        "Figures are numbered consecutively in the order cited; multipanel figures are submitted as one composite image clearly labelled with its figure number.",
+        "The recommended file format is editable PDF; PNG, EPS, TIF, and Microsoft PowerPoint are accommodated and converted to PDF for review.",
+        "Figure files should be no more than 2 MB each if possible.",
+        "Figures should have a 2.5 cm (one inch) top and left white margin in addition to the stated dimensions.",
+        "Image resolution should be 300 dpi at final size; lettering is internally consistent, in a plain sans serif font, and no smaller than 5 points at final size.",
+        "RGB is the preferred colour space; CMYK may result in a loss of image quality.",
+        "Figures prepared according to the Nucleic Acids Research instructions are deemed compliant.",
+        "Captions are detailed enough to understand each panel without extensive reliance on the main text, with no interpretation; alt text for each figure goes directly under its caption in the main manuscript file, preceded by 'Alt text:'.",
+        "No specific feature within an image may be enhanced, obscured, moved, removed, or introduced; composite images must be made explicit by dividing lines and in the legend.",
+        "BioRender figures require a paid BioRender Academic licence, a credit line, and public availability on the BioRender site.",
+        "The journal does not charge for colour and has no page charges."
+      ]
+    },
+    "tables": {
+      "editable": true,
+      "placement": "end_or_inline",
+      "notes": [
+        "All tables and captions are embedded in the text; if needed, individual tables are also submitted in an editable format (such as Microsoft Word, Excel, or PowerPoint), not as an image file.",
+        "Tables are numbered consecutively, have a clear title and short descriptive caption, give units in column or row headers, explain abbreviations and symbols in a table footnote, avoid colour, shading, and tabbed spacing, and are all cited in the text."
+      ]
+    },
+    "supplementary": {
+      "notes": [
+        "Supplementary material is uploaded at submission as separate file(s) from the main article; the preferred format is a single .pdf file, which is appended to the main manuscript for reviewers.",
+        "The supplementary material file size should preferably not exceed 5 MB; larger files are accommodated at the discretion of the editorial office.",
+        "All supplementary data must be referred to at an appropriate point in the main manuscript; it is not copyedited or typeset, and revisions should not be marked in red in supplementary files.",
+        "Videos are accepted as .mp4 files at the highest possible resolution with a still image; videos hosted on third-party sites are not accepted."
+      ]
+    },
+    "references": {
+      "style": "Nucleic Acids Research style",
+      "unpublished_allowed": false,
+      "preprints_allowed": true,
+      "notes": [
+        "NAR Cancer follows the reference style of Nucleic Acids Research.",
+        "Non-peer-reviewed items with a DOI (e.g. bioRxiv preprints) may be included in the reference list and are tagged as non-peer reviewed at copy-editing.",
+        "Citations of URLs are embedded in the main text.",
+        "Items without a DOI (e.g. personal communications, unpublished results) are noted parenthetically in the main text.",
+        "Data and software available online are cited in full in the reference list."
+      ]
+    },
+    "cover_letter": {
+      "required": true,
+      "notes": [
+        "The cover letter briefly lists the main conclusions and explains the significance of the work in its field.",
+        "It must give details of any previous rejected submission of the work to NAR Cancer or Nucleic Acids Research (with the manuscript number, responses to the reports, and a summary of changes), any data cited as personal communication (with confirmation of permission), and any related manuscripts under consideration (a file of which must be uploaded).",
+        "It must disclose all related or similar preprints, dissertations, manuscripts, and papers by the same authors, with a concise explanation of how the submission differs.",
+        "Any use of AI must be disclosed in the cover letter; requests to exclude reviewers, with a brief explanation, may be made in it."
+      ]
+    },
+    "article_types": {
+      "Standard": {
+        "notes": [
+          "Standard articles report original research results; findings should be validated using multiple approaches or models when possible, and general conclusions from experiments in a single cancer cell line are discouraged.",
+          "Categories: Cancer Computational Biology; Cancer Genomics; DNA Damage, Sensing and Repair; Cancer Gene Regulation, Chromatin, and Epigenetics; Cancer-specific RNAs and RNA Processing; Nucleic Acid-Based Cancer Therapeutics."
+        ]
+      },
+      "Critical Reviews and Perspectives": {
+        "sections": {
+          "required": null,
+          "combined_allowed": null
+        },
+        "notes": [
+          "Critical Reviews and Perspectives provide critical analyses, a synthesis of ideas, and new insights within a broad area; they typically occupy about 15 printed pages, with 4-6 display items and 100-150 references, and may contain a very limited amount of original data.",
+          "Prospective authors of review articles should send a pre-submission enquiry to the Editor-in-Chief."
+        ]
+      },
+      "Short Reviews": {
+        "sections": {
+          "required": null,
+          "combined_allowed": null
+        },
+        "references": {
+          "max_count": 50
+        },
+        "notes": [
+          "Short Reviews are briefer articles focused on a single topic; they generally occupy 4 printed pages or less, with 1-2 display items and no more than 50 references.",
+          "Prospective authors of review articles should send a pre-submission enquiry to the Editor-in-Chief."
+        ]
+      },
+      "Cancer Data Resource": {
+        "notes": [
+          "Cancer Data Resource articles describe queryable databases, web-based services, or stand-alone software implementations; the resource name is featured in the title and its URL, if applicable, appears in the abstract.",
+          "Resources must be freely available to all users via the web or a repository, and authors must commit to maintaining availability under the same URL for at least 5 years.",
+          "Pre-submission inquiries to the Editor-in-Chief are strongly encouraged."
+        ]
+      }
+    }
+  },
+  "cell_reports_methods": {
+    "source_urls": [
+      "https://www.cell.com/cell-reports-methods/information-for-authors/revise-manuscript"
+    ],
+    "retrieved": "2026-11-04",
+    "article_type_field": "article_type",
+    "notes": [
+      "The source page gives the formatting rules and manuscript components for the revision stage; it states this information is not necessary for initial submission.",
+      "Revised papers that are inactive for longer than 1 year are automatically withdrawn.",
+      "If the authorship changed in revision (addition, removal, or change in order), a completed authorship change form must be provided with the revised manuscript.",
+      "All authors must be entered in Editorial Manager in the order they appear in the manuscript."
+    ],
+    "manuscript": {
+      "tables_placement": "end",
+      "template_required": false,
+      "initial_submission_any_format": "The formatting tips and manuscript components on the revise-manuscript page apply at the revision stage and are not necessary for initial submission.",
+      "notes": [
+        "The final submission must be in an editable format, preferably Microsoft Word; optional article templates are available.",
+        "If LaTeX is used, a PDF version of the manuscript must also be included; LaTeX files are converted to Word for copyediting and typesetting.",
+        "Spelling and the use of periods and commas in numbers should conform to US usage.",
+        "Abbreviations should be kept to a minimum and avoided in the title if possible (an unavoidable title abbreviation is defined early in the summary); all nonstandard abbreviations are defined at first use.",
+        "Footnotes are used only in the author list and in tables.",
+        "Novelty claims such as 'novel' and 'first' are discouraged.",
+        "Math equations should be written in OMML if possible; other editable formats such as MathType are accepted but converted to OMML; equations must not be submitted as images.",
+        "Equations referred to later are labelled Equation 1, Equation 2, etc.",
+        "Main-text tables appear at the end of the manuscript, in a separate section after the figure/scheme legends."
+      ]
+    },
+    "title_page": {
+      "required_items": [
+        "title",
+        "authors",
+        "affiliations",
+        "corresponding_author",
+        "corresponding_email"
+      ],
+      "title_max_characters": 145,
+      "notes": [
+        "Titles should be concise, around 10-12 words (no more than 145 characters including spaces), avoid jargon and uncommon abbreviations, and capture the broad conceptual significance of the work.",
+        "Author first and last names are spelled out in full (middle initials are OK); Chinese characters may be included as an alternate name.",
+        "Affiliations are signified with numbered footnotes and give at minimum department/subunit, institution, city, state/region (if applicable), and country.",
+        "After the affiliations, numbered footnotes may indicate present address, equal contribution, and/or senior authorship; the final numbered footnote must indicate the lead contact (required).",
+        "There is exactly one lead contact, who must be a corresponding author; corresponding authors are marked with asterisks (*, **, *** in order) and their email addresses (one per author) are listed after the author-list footnotes."
+      ]
+    },
+    "abstract": {
+      "max_words": 150,
+      "structured": false,
+      "no_references": true,
+      "notes": [
+        "Called the 'Summary': a single paragraph of no more than 150 words giving the background and/or purpose, the principal results, approaches/model systems and major conclusions, and the broader significance of the work.",
+        "The summary must not include reference citations and should avoid non-standard abbreviations; novelty claims are discouraged."
+      ]
+    },
+    "keywords": {
+      "max": 10,
+      "notes": [
+        "Up to 10 keywords may be included after the summary, separated by commas."
+      ]
+    },
+    "sections": {
+      "required": [
+        "Introduction",
+        "Results",
+        "Discussion",
+        "Methods"
+      ],
+      "order": [
+        "Abstract",
+        "Introduction",
+        "Results",
+        "Discussion",
+        "Methods",
+        "References"
+      ],
+      "combined_allowed": [
+        "Results and Discussion"
+      ],
+      "notes": [
+        "Components in order for most research articles: title; author list; affiliations and footnotes; contact information; Summary; Keywords; Introduction; Results; Discussion (with a 'Limitations of the study' subsection); Resource availability; Acknowledgments; Author contributions; Declaration of interests; Declaration of generative AI and AI-assisted technologies (if applicable); Supplemental information titles and legends; Figure (and/or scheme) titles and legends; Tables; STAR Methods; Resource identification initiative; References.",
+        "The Introduction should not include subheadings; Results are divided into subsections with short, informative subheadings.",
+        "The Discussion must end with a 'Limitations of the study' subsection discussing any conditions that must be met for the method to be successful and highlighting potential caveats (e.g. drawbacks of the system studied, limitations of the model, situations where related methods might be preferable).",
+        "For some article types, the Discussion may be combined with the Results as a 'Results and Discussion' section.",
+        "The STAR Methods format is required in the revision and for acceptance; it replaces the experimental procedures/methods and supplemental experimental procedures sections.",
+        "Research Resource Identifiers (RRIDs) should be given for antibodies and genetically modified organisms in the key resources table.",
+        "A brief list of all supplemental files appears in the main text under the heading 'Supplemental information', with the primary PDF ('Document S1') listed first."
+      ]
+    },
+    "statements": {
+      "required": [
+        "lead_contact",
+        "materials_availability",
+        "data_availability",
+        "code_availability",
+        "competing_interests",
+        "author_contributions"
+      ],
+      "optional": [
+        "ai_use",
+        "acknowledgements"
+      ],
+      "notes": [
+        "The Resource availability section is required for all research articles (and might also be required for applicable reviews and perspectives), with the subsections 'Lead contact', 'Materials availability', and 'Data and code availability'.",
+        "Acknowledgments are strongly encouraged for all research articles and list non-author contributions and funding sources (including grant numbers).",
+        "Author contributions are required for all papers, using author initials; the CRediT taxonomy is encouraged but a traditional format is accepted.",
+        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'",
+        "A declaration of generative AI and AI-assisted technologies in the manuscript preparation process is required only if such tools (beyond basic grammar, spelling, and reference checkers) were used in preparing the manuscript; other uses of AI tools are reported in the methods or STAR Methods."
+      ]
+    },
+    "figures": {
+      "notes": [
+        "At initial submission it is often useful to include the figures and their titles/legends in the main text near where they are referenced; after acceptance, main-text figures must be uploaded as separate high-resolution image files rather than embedded in the manuscript.",
+        "Figure titles and legends go in a single 'figures' section within the main-text manuscript; each figure has a brief title describing the whole figure (without citing panels) followed by a legend describing each panel.",
+        "Main and supplemental legends must state the statistical tests used, define the p values indicated by asterisks, state the number of biological and technical replicates, and define all measures and error bars.",
+        "All scale bars must be defined in the image file or the legend, and each legend refers to supporting supplemental items (e.g. 'See also Figure S1').",
+        "All figures/schemes must be cited in the main text in numerical order."
+      ]
+    },
+    "tables": {
+      "editable": true,
+      "placement": "end_of_manuscript",
+      "notes": [
+        "Main-text tables are created with the Microsoft Word Table tool (or the LaTeX 'tabular' environment if needed), not in Excel or PDF format.",
+        "Tables are black and white with no colored text or shading (small embedded color graphics are OK), with no tabs or spaces separating items within a cell and discrete data in each cell.",
+        "Tables are numbered Table 1, Table 2, etc., never subdivided into panels, and include a title; legends and footnotes are optional, and footnotes use superscript lowercase letters.",
+        "All main-text tables must be cited in the main text."
+      ]
+    },
+    "references": {
+      "style": "Numbered superscript, e.g. 'Smith et al.1'",
+      "numbered": true,
+      "include_titles": true,
+      "unpublished_allowed": false,
+      "preprints_allowed": true,
+      "notes": [
+        "References are numbered sequentially by first citation and cited in the text as numbered superscripts.",
+        "References cited only in the supplemental information appear only in the supplemental information, not in the main text.",
+        "Each reference contains only one article (no parts a, b, c); 'et al.' is used only after 10 author names.",
+        "Only published or in-press material is listed; DOIs are encouraged whenever possible; in-press articles need a DOI and scheduled online publication date.",
+        "Preprints may be included with an independent persistent identifier such as a DOI; once formally published, cite the publication instead.",
+        "Unpublished data, personal communications, abstracts, and conference presentations may be cited in the text but not in the reference list.",
+        "All datasets, program code, and methods used must be cited in the text and listed in the references.",
+        "CSL and EndNote styles are available."
+      ]
+    },
+    "cover_letter": {
+      "required": true,
+      "notes": [
+        "With the revised manuscript, upload a new cover letter (confidential to the editor) briefly summarizing how the revision addresses the reviewer and editor comments, plus a separate letter with detailed point-by-point responses."
+      ]
+    },
+    "article_types": {
+      "Research article": {
+        "notes": [
+          "The source page's components list applies to most research articles; other formats (e.g. reviews, reports) follow the article types page and/or the decision letter."
+        ]
+      }
+    }
+  },
+  "nar_genomics_bioinformatics": {
+    "source_urls": [
+      "https://academic.oup.com/nargab/pages/author-guidelines"
+    ],
+    "retrieved": "2026-11-04",
+    "notes": [
+      "The article types are described on the journal's Scope and Criteria page, not on the author guidelines page; standard papers are expected to comply with the main Nucleic Acids Research guidelines.",
+      "NAR Genomics and Bioinformatics has a strict open-source policy and only considers contributions whose novel bioinformatics components are open source; bioinformatics methods and analyses must implement the FAIR principles.",
+      "A graphical (or video) abstract is optional; if provided, it is submitted for peer review as a separate file named e.g. graphical_abstract.tif or video_abstract.mp4.",
+      "The graphical abstract has a 5:2 aspect ratio (127 x 50 mm or 5 x 2 in minimum), landscape orientation, and a sans serif font such as Arial at 12-16 points; it must be original (not an existing main or supplementary figure), use colour, contain no trademarked or copyrighted images or logos, and use text sparingly.",
+      "Authors must suggest at least six potential reviewers at submission; opposed reviewers may be indicated during submission, possibly with a brief explanation.",
+      "Submitting authors must provide an ORCID iD at submission; corresponding authors are required to register with ORCID and link their ORCID iD to their ScholarOne account.",
+      "Authors must provide access to the data underlying the results at submission; submissions not complying with the NAR data deposition, standardization, and reproducibility policy are returned without review.",
+      "Authors complete an online Data Availability, Standardization, and Reproducibility Checklist at submission.",
+      "Software must be available and functional at the time of submission.",
+      "Genome-wide analyses follow the ENCODE guidelines, microarray experiments the MIAME guidelines, and quantitative PCR experiments the MIQE guidelines.",
+      "Authors must provide alt text descriptions for all images, figures, illustrations, and photographs in the main article.",
+      "A copy of the written permission to reuse any third-party content must be uploaded with the initial submission.",
+      "A file of any related manuscript under consideration at NAR Genomics and Bioinformatics or another journal must be uploaded into the submission system.",
+      "If the manuscript was previously rejected by NAR Genomics and Bioinformatics, authors must upload a response to the earlier editorial or referee reports and a summary of the changes made, including changes in authorship.",
+      "At initial submission, the corresponding author must declare if the Editor-in-Chief, an editor, or an editorial board member is an author of or contributor to the manuscript.",
+      "Revised manuscripts should preferably be uploaded within 30-60 days of the decision email; a manuscript not revised within six months is withdrawn unless the handling editor extends the deadline."
+    ],
+    "manuscript": {
+      "line_numbers": false,
+      "double_spacing": false,
+      "page_numbers": true,
+      "figures_placement": "end_or_inline",
+      "tables_placement": "end_or_inline",
+      "anonymized": false,
+      "template_required": false,
+      "notes": [
+        "For the initial submission, a single .pdf file including the main text, references, tables, and figures is encouraged, with all figures and tables embedded in the text to facilitate reviewing; supplementary data are uploaded as separate file(s).",
+        "Manuscripts prepared in TeX/LaTeX are uploaded as a complete PDF (figures at the end); only the PDF is required on submission and LaTeX files are requested at revision.",
+        "Authors are encouraged to use the NAR Word and OUP LaTeX templates; for LaTeX the OUP template in its 'Modern Large' design is recommended.",
+        "Do: number all pages; embed TrueType fonts in Word documents; insert special characters using the Symbol font; use single-column, single-spaced text (unless using LaTeX).",
+        "Don't: use line-numbering; use footnotes.",
+        "Revised manuscripts are supplied in .docx, .rtf, or LaTeX format (not PDF), with tables, figures, and captions embedded, as a copy with changes in red and a clean copy, together with responses to referee or editor comments.",
+        "There is no separate abbreviations section; non-standard abbreviations are defined in the text at first occurrence."
+      ]
+    },
+    "title_page": {
+      "required_items": [
+        "title",
+        "authors",
+        "affiliations",
+        "corresponding_author",
+        "corresponding_email"
+      ],
+      "notes": [
+        "The title must be clearly intelligible to a non-specialist; jargon and non-standard abbreviations are not permitted.",
+        "Author names are given as first name followed by initial(s) and last name (e.g. John Smith or John E. Smith).",
+        "Affiliations must include at minimum Department/Division/Unit, Institution, Town, Postal Code, and Country.",
+        "Email address(es) of the corresponding author(s) are listed; corresponding authors are identified by an asterisk.",
+        "Equal-contribution authors are identified by a dagger symbol and a footnote such as '† These authors contributed equally to this work.'; the relative contributions of all authors then appear under Acknowledgements."
+      ]
+    },
+    "abstract": {
+      "max_words": 200,
+      "structured": false,
+      "no_references": true,
+      "no_abbreviations": true,
+      "notes": [
+        "The text abstract is written in English as a single paragraph not exceeding 200 words; subheadings are not permitted.",
+        "URLs, references to figures or schemes, reference citations, and non-standard abbreviations must not be included."
+      ]
+    },
+    "sections": {
+      "required": [
+        "Introduction",
+        "Methods",
+        "Results",
+        "Discussion"
+      ],
+      "order": [
+        "Abstract",
+        "Introduction",
+        "Methods",
+        "Results",
+        "Discussion",
+        "Data Availability",
+        "Acknowledgements",
+        "Author Contributions Statement",
+        "Funding",
+        "Conflict of Interest Disclosure",
+        "References"
+      ],
+      "combined_allowed": [
+        "Results and Discussion"
+      ],
+      "notes": [
+        "Manuscripts are ordered: Title; Authors and affiliations; Graphical abstract (optional); Text abstract; Introduction; Materials and Methods; Results; Discussion; Data Availability; Supplementary Data statement; Acknowledgements; Author Contributions Statement; Funding; Conflict of Interest Disclosure; References; Tables; Figures.",
+        "Materials and Methods are described in enough detail (with the Supplementary Material) for a qualified investigator to repeat the work.",
+        "Results and Discussion may be combined; Results call out every display item (tables and each figure panel).",
+        "If the manuscript includes supplementary material for publication, it must state: 'Supplementary Data are available at NAR Genomics and Bioinformatics Online'."
+      ]
+    },
+    "statements": {
+      "required": [
+        "data_availability",
+        "author_contributions",
+        "funding",
+        "competing_interests"
+      ],
+      "optional": [
+        "acknowledgements",
+        "ai_use"
+      ],
+      "notes": [
+        "A Data Availability Statement, following the Discussion, is required and gives accession numbers and editor/reviewer access information (token or user name/password) for deposited data; if an exception to data sharing is granted, the statement must say what cannot be shared and why.",
+        "Data types that must be deposited before submission include genome-wide analyses (e.g. ChIP-Seq, RNA-Seq), novel nucleic acid or protein sequences (with raw high-throughput data), novel 3D structures, mass spectrometry proteomics data, and software and source codes.",
+        "The Author Contributions statement is mandatory for all articles, preferably at original submission but no later than revision; the CRediT taxonomy is encouraged.",
+        "All funding support, including industry and foreign talents program awards, must be acknowledged, with funder names as in the Crossref funder registry and specific grant numbers.",
+        "Acknowledgments of persons precede acknowledgments of funding sources.",
+        "All authors must disclose any potential conflict of interest at submission.",
+        "Use of AI (e.g. to generate content or images, write code, process data, or translate) should be disclosed in the cover letter and in the Methods or Acknowledgements section.",
+        "Research with human participants or animals requires an ethics/approval statement (committee name and permit numbers where available) in the Methods section, or a statement of exemption."
+      ]
+    },
+    "figures": {
+      "formats": [
+        ".pdf",
+        ".png",
+        ".eps",
+        ".tif",
+        ".tiff",
+        ".ppt",
+        ".pptx"
+      ],
+      "min_dpi": 300,
+      "single_column_width_mm": 84,
+      "double_column_width_mm": 178,
+      "max_width_mm": 178,
+      "max_height_mm": 230,
+      "color_mode": [
+        "RGB"
+      ],
+      "min_font_size_pt": 5,
+      "font": "plain sans serif",
+      "legends_location": "with_figure",
+      "color_charge": false,
+      "placement": "end_or_inline",
+      "notes": [
+        "All figures and their captions are embedded in the text to facilitate reviewing; high-resolution images are also required, preferably at initial submission but no later than revision.",
+        "Figures are numbered consecutively in the order cited; multipanel figures are submitted as one composite image clearly labelled with its figure number.",
+        "The recommended file format is editable PDF; PNG, EPS, TIF, and Microsoft PowerPoint are accommodated and converted to PDF for review.",
+        "Figure files should be no more than 2 MB each if possible.",
+        "Figures should have a 2.5 cm (one inch) top and left white margin in addition to the stated dimensions.",
+        "Image resolution should be 300 dpi at final size; lettering is internally consistent, in a plain sans serif font, and no smaller than 5 points at final size.",
+        "RGB is the preferred colour space; CMYK may result in a loss of image quality.",
+        "Figures prepared according to the Nucleic Acids Research instructions are deemed compliant.",
+        "Captions are detailed enough to understand each panel without extensive reliance on the main text, with no interpretation; alt text for each figure goes directly under its caption in the main manuscript file, preceded by 'Alt text:'.",
+        "No specific feature within an image may be enhanced, obscured, moved, removed, or introduced; composite images must be made explicit by dividing lines and in the legend.",
+        "BioRender figures require a paid BioRender Academic licence, a credit line, and public availability on the BioRender site.",
+        "The journal does not charge for colour and has no page charges."
+      ]
+    },
+    "tables": {
+      "editable": true,
+      "placement": "end_or_inline",
+      "notes": [
+        "All tables and captions are embedded in the text; if needed, individual tables are also submitted in an editable format (such as Microsoft Word, Excel, or PowerPoint), not as an image file.",
+        "Tables are numbered consecutively, have a clear title and short descriptive caption, give units in column or row headers, explain abbreviations and symbols in a table footnote, avoid colour, shading, and tabbed spacing, and are all cited in the text."
+      ]
+    },
+    "supplementary": {
+      "notes": [
+        "Supplementary material is uploaded at submission as separate file(s) from the main article; the preferred format is a single .pdf file, which is appended to the main manuscript for reviewers.",
+        "The supplementary material file size should preferably not exceed 5 MB; larger files are accommodated at the discretion of the editorial office.",
+        "All supplementary data must be referred to at an appropriate point in the main manuscript; it is not copyedited or typeset, and revisions should not be marked in red in supplementary files.",
+        "Videos are accepted as .mp4 files at the highest possible resolution with a still image; videos hosted on third-party sites are not accepted."
+      ]
+    },
+    "references": {
+      "style": "Nucleic Acids Research style",
+      "unpublished_allowed": false,
+      "preprints_allowed": true,
+      "notes": [
+        "NAR Genomics and Bioinformatics follows the reference style of Nucleic Acids Research.",
+        "Non-peer-reviewed items with a DOI (e.g. bioRxiv preprints) may be included in the reference list and are tagged as non-peer reviewed at copy-editing.",
+        "Citations of URLs are embedded in the main text.",
+        "Items without a DOI (e.g. personal communications, unpublished results) are noted parenthetically in the main text.",
+        "Data and software available online are cited in full in the reference list."
+      ]
+    },
+    "cover_letter": {
+      "notes": [
+        "If the manuscript was previously rejected by NAR Genomics and Bioinformatics, the cover letter must give the manuscript number of the earlier submission.",
+        "The cover letter gives details of any third-party data cited as personal communication, and the corresponding author confirms permission was obtained for each.",
+        "The submitting author must disclose in the cover letter (and provide copies of) all related or similar preprints, dissertations, manuscripts, and papers by the same authors, with a concise explanation of how the submission differs.",
+        "Any use of AI should be disclosed in the cover letter."
+      ]
+    }
   }
 }

@@ -1,5 +1,5 @@
 {
-  "biorxiv.sub": {
+  "biorxiv.sub.txt": {
     "venue": "biorxiv",
     "fields": {
       "result_type": "New Results",
@@ -17,7 +17,7 @@
       "author_consent": "yes"
     }
   },
-  "biorxiv_figures.sub": {
+  "biorxiv_figures.sub.txt": {
     "venue": "biorxiv",
     "fields": {
       "result_type": "New Results",
@@ -36,7 +36,7 @@
       "figure_files": "tests/manuscript_files/biorxiv/figures/fig1.png | Figure 1\ntests/manuscript_files/biorxiv/figures/fig2.png | Figure 2"
     }
   },
-  "biorxiv_funding.sub": {
+  "biorxiv_funding.sub.txt": {
     "venue": "biorxiv",
     "fields": {
       "result_type": "New Results",
@@ -55,7 +55,7 @@
       "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
     }
   },
-  "biorxiv_supplement.sub": {
+  "biorxiv_supplement.sub.txt": {
     "venue": "biorxiv",
     "fields": {
       "result_type": "New Results",
@@ -74,7 +74,7 @@
       "supplementary_files": "tests/manuscript_files/biorxiv/supplement.pdf | pdf | Supplementary Text"
     }
   },
-  "medrxiv.sub": {
+  "medrxiv.sub.txt": {
     "venue": "medrxiv",
     "fields": {
       "subject_category": "Epidemiology",
@@ -93,7 +93,7 @@
       "author_consent": "yes"
     }
   },
-  "medrxiv_figures.sub": {
+  "medrxiv_figures.sub.txt": {
     "venue": "medrxiv",
     "fields": {
       "subject_category": "Epidemiology",
@@ -113,7 +113,7 @@
       "figure_files": "tests/manuscript_files/medrxiv/figures/fig1.png | Figure 1\ntests/manuscript_files/medrxiv/figures/fig2.png | Figure 2"
     }
   },
-  "medrxiv_funding.sub": {
+  "medrxiv_funding.sub.txt": {
     "venue": "medrxiv",
     "fields": {
       "subject_category": "Epidemiology",
@@ -133,7 +133,7 @@
       "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
     }
   },
-  "medrxiv_supplement.sub": {
+  "medrxiv_supplement.sub.txt": {
     "venue": "medrxiv",
     "fields": {
       "subject_category": "Epidemiology",
@@ -153,7 +153,7 @@
       "supplementary_files": "tests/manuscript_files/medrxiv/supplement.pdf | pdf | Supplementary Text"
     }
   },
-  "medrxiv_human_subjects.sub": {
+  "medrxiv_human_subjects.sub.txt": {
     "venue": "medrxiv",
     "fields": {
       "subject_category": "Epidemiology",
@@ -174,7 +174,7 @@
       "ethics_statement": "Ethics committee/IRB of the California Institute of Technology gave ethical approval for this work."
     }
   },
-  "bioinformatics.sub": {
+  "bioinformatics.sub.txt": {
     "venue": "bioinformatics",
     "fields": {
       "article_type": "Original Paper",
@@ -210,7 +210,7 @@
       "cited_unpublished_works": "no"
     }
   },
-  "bioinformatics_figures.sub": {
+  "bioinformatics_figures.sub.txt": {
     "venue": "bioinformatics",
     "fields": {
       "article_type": "Original Paper",
@@ -249,7 +249,7 @@
       "figures": "tests/manuscript_files/bioinformatics/figures/fig1.png\ntests/manuscript_files/bioinformatics/figures/fig2.png"
     }
   },
-  "nucleic_acids_research.sub": {
+  "nucleic_acids_research.sub.txt": {
     "venue": "nucleic_acids_research",
     "fields": {
       "article_type": "Standard Article",
@@ -273,7 +273,7 @@
       "institution_verification": "verified"
     }
   },
-  "nucleic_acids_research_declarations.sub": {
+  "nucleic_acids_research_declarations.sub.txt": {
     "venue": "nucleic_acids_research",
     "fields": {
       "article_type": "Standard Article",
@@ -300,7 +300,7 @@
       "data_deposition_types": "Novel nucleic acid sequences, Software and source codes"
     }
   },
-  "arxiv.sub": {
+  "arxiv.sub.txt": {
     "venue": "arxiv",
     "fields": {
       "primary_archive": "cs",
@@ -312,7 +312,7 @@
       "manuscript_file": "tests/manuscript_files/arxiv/manuscript.pdf"
     }
   },
-  "arxiv_tex.sub": {
+  "arxiv_tex.sub.txt": {
     "venue": "arxiv",
     "fields": {
       "primary_archive": "cs",
@@ -324,7 +324,7 @@
       "manuscript_file": "tests/manuscript_files/arxiv/manuscript_tex_bundle.zip"
     }
   },
-  "cell.sub": {
+  "cell.sub.txt": {
     "venue": "cell",
     "fields": {
       "article_type": "Research Article",
@@ -342,7 +342,7 @@
       "declarations_confirmed": "yes"
     }
   },
-  "cell_code.sub": {
+  "cell_code.sub.txt": {
     "venue": "cell",
     "fields": {
       "article_type": "Research Article",
@@ -361,7 +361,7 @@
       "code_url": "https://github.com/example/repo"
     }
   },
-  "cell_funding.sub": {
+  "cell_funding.sub.txt": {
     "venue": "cell",
     "fields": {
       "article_type": "Research Article",
@@ -380,7 +380,7 @@
       "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
     }
   },
-  "cell_figures.sub": {
+  "cell_figures.sub.txt": {
     "venue": "cell",
     "fields": {
       "article_type": "Research Article",
@@ -399,7 +399,7 @@
       "figure_files": "tests/manuscript_files/cell/figures/fig1.png | Figure 1\ntests/manuscript_files/cell/figures/fig2.png | Figure 2"
     }
   },
-  "cell_corresponding_second.sub": {
+  "cell_corresponding_second.sub.txt": {
     "venue": "cell",
     "fields": {
       "article_type": "Research Article",
@@ -417,7 +417,7 @@
       "declarations_confirmed": "yes"
     }
   },
-  "cell_systems.sub": {
+  "cell_systems.sub.txt": {
     "venue": "cell_systems",
     "fields": {
       "article_type": "Research Article",
@@ -435,7 +435,7 @@
       "declarations_confirmed": "yes"
     }
   },
-  "cell_systems_code.sub": {
+  "cell_systems_code.sub.txt": {
     "venue": "cell_systems",
     "fields": {
       "article_type": "Research Article",
@@ -454,7 +454,7 @@
       "code_url": "https://github.com/example/repo"
     }
   },
-  "cell_systems_funding.sub": {
+  "cell_systems_funding.sub.txt": {
     "venue": "cell_systems",
     "fields": {
       "article_type": "Research Article",
@@ -473,7 +473,7 @@
       "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
     }
   },
-  "cell_systems_figures.sub": {
+  "cell_systems_figures.sub.txt": {
     "venue": "cell_systems",
     "fields": {
       "article_type": "Research Article",
@@ -492,7 +492,7 @@
       "figure_files": "tests/manuscript_files/cell_systems/figures/fig1.png | Figure 1\ntests/manuscript_files/cell_systems/figures/fig2.png | Figure 2"
     }
   },
-  "cell_systems_corresponding_second.sub": {
+  "cell_systems_corresponding_second.sub.txt": {
     "venue": "cell_systems",
     "fields": {
       "article_type": "Research Article",
@@ -510,7 +510,7 @@
       "declarations_confirmed": "yes"
     }
   },
-  "cell_genomics.sub": {
+  "cell_genomics.sub.txt": {
     "venue": "cell_genomics",
     "fields": {
       "article_type": "Research Article",
@@ -528,7 +528,7 @@
       "declarations_confirmed": "yes"
     }
   },
-  "cell_genomics_code.sub": {
+  "cell_genomics_code.sub.txt": {
     "venue": "cell_genomics",
     "fields": {
       "article_type": "Research Article",
@@ -547,7 +547,7 @@
       "code_url": "https://github.com/example/repo"
     }
   },
-  "cell_genomics_funding.sub": {
+  "cell_genomics_funding.sub.txt": {
     "venue": "cell_genomics",
     "fields": {
       "article_type": "Research Article",
@@ -566,7 +566,7 @@
       "funding": "NIH Common Fund | award1\nCaltech Alumni Association | award2, award3"
     }
   },
-  "cell_genomics_figures.sub": {
+  "cell_genomics_figures.sub.txt": {
     "venue": "cell_genomics",
     "fields": {
       "article_type": "Research Article",
@@ -585,7 +585,7 @@
       "figure_files": "tests/manuscript_files/cell_genomics/figures/fig1.png | Figure 1\ntests/manuscript_files/cell_genomics/figures/fig2.png | Figure 2"
     }
   },
-  "cell_genomics_corresponding_second.sub": {
+  "cell_genomics_corresponding_second.sub.txt": {
     "venue": "cell_genomics",
     "fields": {
       "article_type": "Research Article",
@@ -603,7 +603,7 @@
       "declarations_confirmed": "yes"
     }
   },
-  "plos_compbio.sub": {
+  "plos_compbio.sub.txt": {
     "venue": "plos_compbio",
     "fields": {
       "article_type": "Research Article",
@@ -627,7 +627,7 @@
       "human_participants": "No"
     }
   },
-  "nature.sub": {
+  "nature.sub.txt": {
     "venue": "nature",
     "fields": {
       "manuscript_type": "Biological Sciences - Article",
@@ -646,7 +646,7 @@
       "open_access": "no"
     }
   },
-  "nature_biotech.sub": {
+  "nature_biotech.sub.txt": {
     "venue": "nature_biotech",
     "fields": {
       "manuscript_type": "Article",
@@ -665,7 +665,7 @@
       "open_access": "no"
     }
   },
-  "nature_machine_intelligence.sub": {
+  "nature_machine_intelligence.sub.txt": {
     "venue": "nature_machine_intelligence",
     "fields": {
       "manuscript_type": "Article",
@@ -683,7 +683,7 @@
       "peer_review": "single-anonymized"
     }
   },
-  "nature_biomedical_engineering.sub": {
+  "nature_biomedical_engineering.sub.txt": {
     "venue": "nature_biomedical_engineering",
     "fields": {
       "manuscript_type": "Article",
@@ -701,7 +701,7 @@
       "peer_review": "single-anonymized"
     }
   },
-  "nature_methods.sub": {
+  "nature_methods.sub.txt": {
     "venue": "nature_methods",
     "fields": {
       "manuscript_type": "Article",
@@ -720,7 +720,7 @@
       "open_access": "no"
     }
   },
-  "genome_biology.sub": {
+  "genome_biology.sub.txt": {
     "venue": "genome_biology",
     "fields": {
       "article_type": "research",
@@ -735,7 +735,7 @@
       "research_funding": "no"
     }
   },
-  "bmc_bioinformatics.sub": {
+  "bmc_bioinformatics.sub.txt": {
     "venue": "bmc_bioinformatics",
     "fields": {
       "article_type": "research",
@@ -750,7 +750,7 @@
       "research_funding": "no"
     }
   },
-  "science.sub": {
+  "science.sub.txt": {
     "venue": "science",
     "fields": {
       "publication": "Science",
@@ -771,7 +771,7 @@
       "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
     }
   },
-  "science_advances.sub": {
+  "science_advances.sub.txt": {
     "venue": "science_advances",
     "fields": {
       "publication": "Science Advances",
@@ -792,7 +792,7 @@
       "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
     }
   },
-  "science_immunology.sub": {
+  "science_immunology.sub.txt": {
     "venue": "science_immunology",
     "fields": {
       "publication": "Science Immunology",
@@ -813,7 +813,7 @@
       "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
     }
   },
-  "science_robotics.sub": {
+  "science_robotics.sub.txt": {
     "venue": "science_robotics",
     "fields": {
       "publication": "Science Robotics",
@@ -834,7 +834,7 @@
       "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
     }
   },
-  "science_signaling.sub": {
+  "science_signaling.sub.txt": {
     "venue": "science_signaling",
     "fields": {
       "publication": "Science Signaling",
@@ -855,7 +855,7 @@
       "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
     }
   },
-  "science_translational_medicine.sub": {
+  "science_translational_medicine.sub.txt": {
     "venue": "science_translational_medicine",
     "fields": {
       "publication": "Science Translational Medicine",
@@ -876,7 +876,7 @@
       "excluded_reviewers": "Carol | Rival | carol.rival@lab.edu | Competing Lab | Direct competitor on the same problem"
     }
   },
-  "aaai_2027.sub": {
+  "aaai_2027.sub.txt": {
     "venue": "aaai_2027",
     "fields": {
       "title": "Title goes here",
@@ -889,7 +889,7 @@
       "pdf_file": "tests/manuscript_files/aaai_2027/manuscript.pdf"
     }
   },
-  "aaai_2027_supplements.sub": {
+  "aaai_2027_supplements.sub.txt": {
     "venue": "aaai_2027",
     "fields": {
       "title": "Title goes here",
@@ -906,7 +906,7 @@
       "conflicts": " | Jane Smith | mit.edu | "
     }
   },
-  "iclr_2027.sub": {
+  "iclr_2027.sub.txt": {
     "venue": "iclr_2027",
     "fields": {
       "title": "Title goes here",
@@ -922,7 +922,7 @@
       "license": "CC BY 4.0"
     }
   },
-  "iclr_2027_exemption.sub": {
+  "iclr_2027_exemption.sub.txt": {
     "venue": "iclr_2027",
     "fields": {
       "title": "Title goes here",
@@ -939,7 +939,7 @@
       "license": "CC BY 4.0"
     }
   },
-  "discrete_mathematics.sub": {
+  "discrete_mathematics.sub.txt": {
     "venue": "discrete_mathematics",
     "fields": {
       "article_type": "Contribution",
@@ -953,7 +953,7 @@
       "declarations_confirmed": "yes"
     }
   },
-  "discrete_mathematics_supplements.sub": {
+  "discrete_mathematics_supplements.sub.txt": {
     "venue": "discrete_mathematics",
     "fields": {
       "article_type": "Note",
@@ -971,7 +971,7 @@
       "funding": "National Science Foundation | DMS-0000000, DMS-1111111 | Joseph Rich\nSimons Foundation"
     }
   },
-  "discrete_mathematics_shared_data.sub": {
+  "discrete_mathematics_shared_data.sub.txt": {
     "venue": "discrete_mathematics",
     "fields": {
       "article_type": "Contribution",
@@ -990,7 +990,7 @@
       "declarations_confirmed": "yes"
     }
   },
-  "discrete_mathematics_reference_data.sub": {
+  "discrete_mathematics_reference_data.sub.txt": {
     "venue": "discrete_mathematics",
     "fields": {
       "article_type": "Note",
@@ -1010,7 +1010,7 @@
       "declarations_confirmed": "yes"
     }
   },
-  "combinatorica.sub": {
+  "combinatorica.sub.txt": {
     "venue": "combinatorica",
     "fields": {
       "author_agreement": "yes",

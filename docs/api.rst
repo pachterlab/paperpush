@@ -13,7 +13,7 @@ workflow operations that have a library-level entry point.
    import paperpush
 
    venue = paperpush.get_venue("biorxiv")
-   sub = paperpush.load("biorxiv.sub")
+   sub = paperpush.load("biorxiv.sub.txt")
    issues = paperpush.validate(sub, venue)
 
 .. note::

@@ -26,7 +26,7 @@ ScholarOne portal up to (but not including) the final submit click.
   Ran 5 shell commands (ctrl+o to expand)
 
 ⏺ JOURNAL is supported, and your manuscript directory has MANUSCRIPT.pdf
-  plus a cover letter. The workflow is: create a JOURNAL.sub template,
+  plus a cover letter. The workflow is: create a JOURNAL.sub.txt template,
   then autofill it from your files using the paperpush-autofill skill.
 
   Before I run the autofill, I need to confirm the two paths (my memory says
@@ -34,7 +34,7 @@ ScholarOne portal up to (but not including) the final submit click.
   ⎿  Invalid tool parameters
 
 ⏺ User answered Claude's questions:
-  ⎿  · Where should I write the JOURNAL.sub submission file? (Manuscript 
+  ⎿  · Where should I write the JOURNAL.sub.txt submission file? (Manuscript 
      dir confirmed as 
      /PATH/TO/MANUSCRIPT/DIRECTORY) → In 
      the manuscript dir
@@ -81,7 +81,7 @@ ScholarOne portal up to (but not including) the final submit click.
 
   Ran 1 shell command (ctrl+o to expand)
 
-⏺ Done. Your JOURNAL.sub is created and populated at /PATH/TO/MANUSCRIPT/DIRECTORY/JOURNAL.sub.
+⏺ Done. Your JOURNAL.sub.txt is created and populated at /PATH/TO/MANUSCRIPT/DIRECTORY/JOURNAL.sub.txt.
 
   Filled with high confidence (12, copied from the manuscript)
 
@@ -131,13 +131,13 @@ ScholarOne portal up to (but not including) the final submit click.
   Add reviewers (and any of the above), then:
   paperpush login JOURNAL
   paperpush submit /PATH/TO/MANUSCRIPT/DIRECTORY/bioin
-  formatics/JOURNAL.sub
+  formatics/JOURNAL.sub.txt
   submit opens the ScholarOne portal and stops before the final click so you can
   review everything in the submission system first.
 
 ✻ Crunched for 2m 59s
 
-※ recap: Preparing your MANUSCRIPT manuscript for JOURNAL submission via PaperPush. The JOURNAL.sub file is created and autofilled from the manuscript. Next, add at least 4 recommended reviewers (the one blocking field), then run login and submit. (disable recaps in /config)
+※ recap: Preparing your MANUSCRIPT manuscript for JOURNAL submission via PaperPush. The JOURNAL.sub.txt file is created and autofilled from the manuscript. Next, add at least 4 recommended reviewers (the one blocking field), then run login and submit. (disable recaps in /config)
 
 ❯ I have verified and filled gaps in the sub file. Please fill out submission portal.                                                                       
 ⏺ Let me validate the completed .sub file before opening the portal.
@@ -163,7 +163,7 @@ ScholarOne portal up to (but not including) the final submit click.
   for Bootstrap/Subsampling, which get added as custom keywords).
   - Signed in to JOURNAL (PUBLISHER) automatically using your stored
   credentials (EMAIL), and saved the session for next time.
-  - Ran the click-through — every field value from JOURNAL.sub was
+  - Ran the click-through — every field value from JOURNAL.sub.txt was
   entered into the wizard, and it stopped before the final submit.
   - The browser is left open for you to take over.
 

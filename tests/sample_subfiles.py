@@ -5,8 +5,8 @@ that turns it into files. Keeping the two apart means contributors extend the
 fixtures by editing plain JSON, never this module (see ``CONTRIBUTING.md``).
 
 Each supported venue gets a subdirectory ``sub_files/<venue>/`` holding one or
-more ready-to-submit sample submission files (``<venue>.sub`` and, optionally,
-``<venue>_<variant>.sub``). They serve two purposes:
+more ready-to-submit sample submission files (``<venue>.sub.txt`` and, optionally,
+``<venue>_<variant>.sub.txt``). They serve two purposes:
 
 * committed ground-truth fixtures that ``paperpush submit <file>`` can run
   end to end, and
@@ -62,7 +62,7 @@ DEFINITIONS_FILE = TESTS_DIR / "sample_subfiles.json"
 # Each venue's sample .sub points at the input assets in that venue's own bundle
 # under tests/manuscript_files/<venue>/, written as repo-relative paths so a
 # generated file can be submitted from the repository root with
-# `paperpush submit tests/sub_files/<venue>/<f>.sub`. The bundles are built
+# `paperpush submit tests/sub_files/<venue>/<f>.sub.txt`. The bundles are built
 # by ensure_assets() from the paths the samples reference (see _ASSET_BUILDERS).
 MANUSCRIPT_FILES = "tests/manuscript_files"
 
@@ -96,8 +96,8 @@ class Scenario:
 
     @property
     def variant(self) -> str:
-        """The variant tag: ``""`` for ``<venue>.sub``, else the ``_<tag>`` suffix."""
-        stem = self.filename[: -len(".sub")]
+        """The variant tag: ``""`` for ``<venue>.sub.txt``, else the ``_<tag>`` suffix."""
+        stem = self.filename[: -len(".sub.txt")]
         return "" if stem == self.venue else stem[len(self.venue) + 1 :]
 
     @property
@@ -118,7 +118,7 @@ class Scenario:
 def _load_definitions() -> list[Scenario]:
     """Parse ``sample_subfiles.json`` into scenarios, validating its invariants.
 
-    The JSON maps ``<filename>.sub`` -> ``{"venue": <slug>, "fields": {...}}``.
+    The JSON maps ``<filename>.sub.txt`` -> ``{"venue": <slug>, "fields": {...}}``.
     Raises ``ValueError`` if a filename is not prefixed with its venue slug, if
     a venue has no sample, or if two samples for the same venue are identical --
     the guarantees CONTRIBUTING.md asks contributors to uphold.
@@ -127,12 +127,12 @@ def _load_definitions() -> list[Scenario]:
     scenarios: list[Scenario] = []
     seen_per_venue: dict[str, dict[str, str]] = {}
     for filename, entry in raw.items():
-        if not filename.endswith(".sub"):
-            raise ValueError(f"{filename!r}: sample filenames must end in '.sub'")
+        if not filename.endswith(".sub.txt"):
+            raise ValueError(f"{filename!r}: sample filenames must end in '.sub.txt'")
         venue = entry["venue"]
-        stem = filename[: -len(".sub")]
+        stem = filename[: -len(".sub.txt")]
         if stem != venue and not stem.startswith(f"{venue}_"):
-            raise ValueError(f"{filename!r}: filename must be '{venue}.sub' or '{venue}_<variant>.sub'")
+            raise ValueError(f"{filename!r}: filename must be '{venue}.sub.txt' or '{venue}_<variant>.sub.txt'")
         values = entry["fields"]
         fingerprint = json.dumps(values, sort_keys=True)
         prior = seen_per_venue.setdefault(venue, {})

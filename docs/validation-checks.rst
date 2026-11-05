@@ -7,7 +7,7 @@ MCP tool ``validate_subfile`` runs them too.
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub
+   paperpush validate biorxiv.sub.txt
 
 .. _vc-report:
 

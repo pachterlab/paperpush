@@ -122,19 +122,17 @@ python scripts/gen_subfile_templates.py
 Then do credentials step 3 and have the user run `paperpush login <slug>`.
 
 **A5. Ground-truth sample and tests.**
-- Add `<slug>.sub` to `tests/sample_subfiles.json`, with values for every
+- Add `<slug>.sub.txt` to `tests/sample_subfiles.json`, with values for every
   required field and each option branch you want covered. Its files live
   under `tests/manuscript_files/<slug>/`. They are generated, not
   committed, so run `python tests/sample_subfiles.py` to build them and to
-  write `tests/sub_files/<slug>/<slug>.sub`. Add more variants
-  (`<slug>_figures.sub`, ...) for branches such as article types and
+  write `tests/sub_files/<slug>/<slug>.sub.txt`. Add more variants
+  (`<slug>_figures.sub.txt`, ...) for branches such as article types and
   optional uploads.
 - Write `tests/test_<slug>.py` with offline tests in the style of
   `tests/test_nature_machine_intelligence.py`: dispatch through
   `get_runner`, form and field invariants, and each tricky helper (author
   rows, file metadata, branch choices) checked against a `Mock` page.
-- Optionally add a `SPECS` entry in `tests/test_portal_drift.py` and a
-  baseline with `--update-snapshots`.
 
 **A6. Test until it passes**, then go to **Verify** below.
 

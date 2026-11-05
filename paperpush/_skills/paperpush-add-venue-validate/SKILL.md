@@ -136,7 +136,7 @@ Run the tests that cover these files:
 pytest tests/test_requirements.py tests/test_venue_consistency.py tests/test_subfile.py tests/test_internals.py tests/test_venuefile.py tests/test_validate_only_venue.py -q
 ```
 
-Run `paperpush subfile <slug> -o <scratch>/<slug>.sub` and
+Run `paperpush subfile <slug> -o <scratch>/<slug>.sub.txt` and
 `paperpush requirements <slug>` to check the result reads correctly. If the
 repo has sample manuscripts for this venue (`tests/sub_files/<slug>/`), also
 run `paperpush validate` on them.

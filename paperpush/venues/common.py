@@ -14,9 +14,6 @@ implementation instead of each keeping a private copy:
   through, so a failed wizard leaves its window on screen instead of vanishing.
 * :func:`session_path` / :func:`save_storage` -- persisting and locating a
   signed-in Playwright session so later runs skip the login.
-* :func:`capture_failure` -- dumping a screenshot and the live HTML of a page
-  when a portal check fails, so the changed page can be inspected (and the
-  broken selector fixed) offline instead of only from a text diff.
 
 The sign-in helpers (the login error types, ``verify_login``, ``first_visible``,
 ``fill_login_form``) live next door in :mod:`paperpush.venues.login`, which
@@ -220,57 +217,6 @@ def open_run_context(browser, session: Path, *, new_session: bool = False):
     if session.exists():
         return browser.new_context(storage_state=str(session))
     return browser.new_context()
-
-
-def capture_failure(page, slug: str, page_name: str, dest_dir: Path) -> dict[str, Path]:
-    """Save a screenshot and the live HTML of ``page`` for offline diagnosis.
-
-    When a portal check fails -- a selector the runner depends on is gone, or the
-    page's structure drifted from its committed baseline -- the failure text says
-    *that* something changed but not *what* the page now looks like. This writes
-    two artifacts so the changed page can be inspected, and the broken selector
-    re-derived, without re-running against the live portal:
-
-      * ``<slug>_<page_name>.png``  -- a full-page screenshot, and
-      * ``<slug>_<page_name>.html`` -- the page's current DOM (``page.content()``).
-
-    Both are best-effort: a browser that has already crashed or navigated away
-    may refuse one or the other, so each is guarded and a failure to capture
-    never masks the original test failure. Returns a dict of the artifacts
-    actually written, keyed ``"screenshot"`` / ``"html"`` (empty if both failed).
-
-    The captures embed whatever the live page held at failure time, including
-    per-session tokens, so ``dest_dir`` must be git-ignored (it is: see the
-    ``tests/portal_snapshots/_failures`` rule in ``.gitignore``).
-    """
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    written: dict[str, Path] = {}
-    stem = f"{slug}_{page_name}"
-
-    png = dest_dir / f"{stem}.png"
-    try:
-        page.screenshot(path=str(png), full_page=True)
-        written["screenshot"] = png
-    except Exception as exc:  # noqa: BLE001 -- capture is best-effort, never fatal
-        logger.warning("capture_failure: screenshot of %s failed (%s)", stem, exc)
-
-    html = dest_dir / f"{stem}.html"
-    try:
-        html.write_text(page.content(), encoding="utf-8")
-        written["html"] = html
-    except Exception as exc:  # noqa: BLE001 -- capture is best-effort, never fatal
-        logger.warning("capture_failure: HTML dump of %s failed (%s)", stem, exc)
-
-    return written
-
-
-# ---------------------------------------------------------------------------
-# Pure-data helpers shared by the per-venue runners.
-#
-# These reshape a name or parse a ``.sub`` field value for a submission form and
-# carry no Playwright or venue-specific logic, so every runner that needs one
-# imports it from here instead of keeping a private copy.
-# ---------------------------------------------------------------------------
 
 
 def split_name_first_last(name: str) -> tuple[str, str]:

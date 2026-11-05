@@ -25,6 +25,7 @@ fixture in ``conftest.py``.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from dataclasses import replace
 
 import pytest
@@ -77,9 +78,9 @@ def test_subfile_creates_parseable_template(venue, in_tmp, capsys):
     out = capsys.readouterr().out
 
     assert rc == 0
-    out_path = in_tmp / f"{venue.slug}.sub"
+    out_path = in_tmp / f"{venue.slug}.sub.txt"
     assert out_path.exists()
-    assert f"Created {venue.slug}.sub" in out
+    assert f"Created {venue.slug}.sub.txt" in out
 
     parsed = subfile.load(out_path)
     assert parsed.venue == venue.slug
@@ -93,7 +94,7 @@ def test_subfile_fill_defaults_populates_defaults(venue, in_tmp):
     rc = main(["subfile", venue.slug])
     assert rc == 0
 
-    parsed = subfile.load(in_tmp / f"{venue.slug}.sub")
+    parsed = subfile.load(in_tmp / f"{venue.slug}.sub.txt")
     for field in venue.fields:
         if field.default is not None and field.type != "boolean":
             assert parsed.values[field.id] == str(field.default)
@@ -225,7 +226,7 @@ def test_subfile_venue_order_flag(in_tmp):
     venue = get_venue("biorxiv")
     assert main(["subfile", "biorxiv"]) == 0
     assert main(["subfile", "biorxiv", "-o", "portal.sub", "--venue-order"]) == 0
-    canonical = (in_tmp / "biorxiv.sub").read_text(encoding="utf-8")
+    canonical = (in_tmp / "biorxiv.sub.txt").read_text(encoding="utf-8")
     portal = (in_tmp / "portal.sub").read_text(encoding="utf-8")
     assert _ids_in_text(portal) == [f.id for f in venue.fields]
     assert _ids_in_text(canonical) != _ids_in_text(portal)
@@ -363,7 +364,7 @@ def test_no_orphan_sample_files():
     sample files may linger.
     """
     expected = {s.path.resolve() for s in SCENARIOS}
-    on_disk = {p.resolve() for p in sample_subfiles.SAMPLES_DIR.rglob("*.sub")}
+    on_disk = {p.resolve() for p in sample_subfiles.SAMPLES_DIR.rglob("*.sub.txt")}
     orphans = sorted(str(p.relative_to(sample_subfiles.SAMPLES_DIR)) for p in on_disk - expected)
     assert not orphans, f"orphan sample .sub file(s) not produced by the generator: {orphans}; " "remove them or add a matching scenario"
 
@@ -479,3 +480,39 @@ def test_load_prefers_the_sub_folder_over_cwd_when_both_have_the_file(tmp_path, 
     sub_path.write_text("@venue: nucleic_acids_research\nmanuscript_file: main.pdf\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     assert load(sub_path).values["manuscript_file"] == str(ms.resolve() / "main.pdf")
+
+
+# --- file suffix: .sub.txt is written, bare .sub is still read -------------
+
+
+@pytest.mark.parametrize(
+    "name, is_sub, stem",
+    [
+        ("biorxiv.sub.txt", True, "biorxiv"),
+        ("biorxiv.sub", True, "biorxiv"),
+        ("dir/BIORXIV.SUB.TXT", True, "BIORXIV"),
+        ("biorxiv_figures.sub.txt", True, "biorxiv_figures"),
+        ("notes.txt", False, "notes"),
+        ("paper.pdf", False, "paper"),
+    ],
+)
+def test_subfile_suffix_helpers(name, is_sub, stem):
+    assert subfile.is_subfile_name(name) is is_sub
+    assert subfile.subfile_stem(name) == stem
+
+
+def test_with_subfile_suffix_keeps_either_suffix_and_appends_the_new_one():
+    assert subfile.with_subfile_suffix("out") == Path("out.sub.txt")
+    assert subfile.with_subfile_suffix("out.sub.txt") == Path("out.sub.txt")
+    assert subfile.with_subfile_suffix("out.sub") == Path("out.sub")
+
+
+def test_subfile_writes_sub_txt_and_legacy_sub_still_validates(in_tmp):
+    assert main(["subfile", "biorxiv"]) == 0
+    assert (in_tmp / "biorxiv.sub.txt").is_file()
+    assert not (in_tmp / "biorxiv.sub").exists()
+    assert main(["subfile", "biorxiv", "-o", "mine"]) == 0
+    assert (in_tmp / "mine.sub.txt").is_file()
+    # A file under the old bare .sub suffix is read like any other, without a warning.
+    (in_tmp / "biorxiv.sub.txt").rename(in_tmp / "biorxiv.sub")
+    assert subfile.load(in_tmp / "biorxiv.sub").venue == "biorxiv"

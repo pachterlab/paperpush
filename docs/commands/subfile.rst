@@ -1,7 +1,7 @@
 ``paperpush subfile``
 =====================
 
-Create a ``<venue>.sub`` submission template — the starting point for every
+Create a ``<venue>.sub.txt`` submission template — the starting point for every
 submission.
 
 .. code-block:: text
@@ -17,7 +17,7 @@ Synopsis
 
    paperpush subfile biorxiv
 
-This writes ``biorxiv.sub`` in the current directory: a commented, YAML-like
+This writes ``biorxiv.sub.txt`` in the current directory: a commented, YAML-like
 file listing every field the venue requires. Each field carries its type
 (``text``, ``textarea``, ``choice``, ``file``, ``filelist``, ``authorlist``,
 …), whether it is required, a short description, and — for choice fields — the
@@ -61,8 +61,8 @@ Options
 -------
 
 ``-o OUT``, ``--output OUT``
-   Write the template to this path. Default: ``<venue>.sub`` in the current
-   directory (e.g. ``biorxiv.sub``). ``.sub`` is added if OUT lacks it.
+   Write the template to this path. Default: ``<venue>.sub.txt`` in the current
+   directory (e.g. ``biorxiv.sub.txt``). ``.sub`` is added if OUT lacks it.
 
 ``--dont-fill-defaults``
    Fields that have a default value are pre-populated with it unless you pass
@@ -105,7 +105,7 @@ Write it somewhere specific and overwrite any existing file:
 
 .. code-block:: bash
 
-   paperpush subfile nature -o submissions/nature.sub --overwrite
+   paperpush subfile nature -o submissions/nature.sub.txt --overwrite
 
 Create a bare template with no defaults pre-filled:
 
@@ -125,4 +125,4 @@ See also
 - :doc:`options` — list the allowed values for a single choice field.
 - :doc:`autofill` — fill the template from a manuscript directory.
 - Sample filled ``.sub`` files live in the repo under
-  ``tests/sub_files/<venue>/<venue>.sub``.
+  ``tests/sub_files/<venue>/<venue>.sub.txt``.

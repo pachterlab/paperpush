@@ -4,92 +4,92 @@
 
         {
             "name": "Debug AAAI 2027",
-            "args": ["submit", "tests/sub_files/aaai_2027/aaai_2027.sub"],
+            "args": ["submit", "tests/sub_files/aaai_2027/aaai_2027.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug arXiv",
-            "args": ["submit", "tests/sub_files/arxiv/arxiv.sub"],
+            "args": ["submit", "tests/sub_files/arxiv/arxiv.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Bioinformatics",
-            "args": ["submit", "tests/sub_files/bioinformatics/bioinformatics.sub"],
+            "args": ["submit", "tests/sub_files/bioinformatics/bioinformatics.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug bioRxiv",
-            "args": ["submit", "tests/sub_files/biorxiv/biorxiv.sub"],
+            "args": ["submit", "tests/sub_files/biorxiv/biorxiv.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug BMC Bioinformatics",
-            "args": ["submit", "--new-session", "tests/sub_files/bmc_bioinformatics/bmc_bioinformatics.sub"],
+            "args": ["submit", "--new-session", "tests/sub_files/bmc_bioinformatics/bmc_bioinformatics.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Cell",
-            "args": ["submit", "tests/sub_files/cell/cell.sub"],
+            "args": ["submit", "tests/sub_files/cell/cell.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Cell Genomics",
-            "args": ["submit", "tests/sub_files/cell_genomics/cell_genomics.sub"],
+            "args": ["submit", "tests/sub_files/cell_genomics/cell_genomics.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Cell Systems",
-            "args": ["submit", "tests/sub_files/cell_systems/cell_systems.sub"],
+            "args": ["submit", "tests/sub_files/cell_systems/cell_systems.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Discrete Mathematics",
-            "args": ["submit", "tests/sub_files/discrete_mathematics/discrete_mathematics.sub"],
+            "args": ["submit", "tests/sub_files/discrete_mathematics/discrete_mathematics.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Genome Biology",
-            "args": ["submit", "tests/sub_files/genome_biology/genome_biology.sub"],
+            "args": ["submit", "tests/sub_files/genome_biology/genome_biology.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug ICLR 2027",
-            "args": ["submit", "tests/sub_files/iclr_2027/iclr_2027.sub"],
+            "args": ["submit", "tests/sub_files/iclr_2027/iclr_2027.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug medRxiv",
-            "args": ["submit", "tests/sub_files/medrxiv/medrxiv.sub"],
+            "args": ["submit", "tests/sub_files/medrxiv/medrxiv.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Nature",
-            "args": ["submit", "tests/sub_files/nature/nature.sub"],
+            "args": ["submit", "tests/sub_files/nature/nature.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Nature Biotech",
-            "args": ["submit", "tests/sub_files/nature_biotech/nature_biotech.sub"],
+            "args": ["submit", "tests/sub_files/nature_biotech/nature_biotech.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Nature Methods",
-            "args": ["submit", "tests/sub_files/nature_methods/nature_methods.sub"],
+            "args": ["submit", "tests/sub_files/nature_methods/nature_methods.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Nucleic Acids Research",
-            "args": ["submit", "tests/sub_files/nucleic_acids_research/nucleic_acids_research.sub"],
+            "args": ["submit", "tests/sub_files/nucleic_acids_research/nucleic_acids_research.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug PLOS Computational Biology",
-            "args": ["submit", "tests/sub_files/plos_compbio/plos_compbio.sub"],
+            "args": ["submit", "tests/sub_files/plos_compbio/plos_compbio.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
             "name": "Debug Science",
-            "args": ["submit", "tests/sub_files/science/science.sub"],
+            "args": ["submit", "tests/sub_files/science/science.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         }
     ]

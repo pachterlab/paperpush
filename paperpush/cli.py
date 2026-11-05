@@ -10,7 +10,7 @@ Implemented so far:
     paperpush pick-venue <keywords|manuscript>
                                       rank venues for a manuscript (--title, --abstract,
                                       --manuscript; --venue-name to search by name)
-    paperpush subfile <venue>   create a <venue>.sub template
+    paperpush subfile <venue>   create a <venue>.sub.txt template
     paperpush options <venue>.<field>
                                       list the allowed values for a field
     paperpush autofill -p <dir|file> [<dir|file> ...] <subfile>
@@ -56,7 +56,7 @@ from pydantic import ConfigDict, validate_call
 from . import __url__, __version__, credentials, venue_data
 from ._logging import configure_logging
 from .database import get_venue, list_venues
-from .subfile import default_filename, write_template
+from .subfile import default_filename, is_subfile_name, subfile_stem, with_subfile_suffix, write_template
 from .venues.common import DEFAULT_TIMEOUT_SECONDS
 
 logger = logging.getLogger(__name__)
@@ -509,7 +509,7 @@ def _print_web_link(sub_path: Path, *, manuscript_dirs=(), blank_line: bool = Fa
     from .subfile import parse
 
     try:
-        venue = parse(sub_path.read_text(encoding="utf-8")).venue or sub_path.stem
+        venue = parse(sub_path.read_text(encoding="utf-8")).venue or subfile_stem(sub_path)
     except (OSError, UnicodeDecodeError):
         return
     host = "127.0.0.1"
@@ -540,7 +540,7 @@ def _print_web_link(sub_path: Path, *, manuscript_dirs=(), blank_line: bool = Fa
 
 
 def _cmd_web(args: argparse.Namespace) -> int:
-    """``paperpush web [FILE.sub]``: serve the web page on this machine, optionally with a .sub open in it.
+    """``paperpush web [FILE.sub.txt]``: serve the web page on this machine, optionally with a .sub open in it.
 
     Runs the page locally rather than pointing at the hosted site, so it opens
     at once (no cold start) and the .sub's files never leave this computer.
@@ -703,9 +703,7 @@ def _cmd_subfile(args: argparse.Namespace) -> int:
         return 2
 
     if args.output:
-        target = Path(args.output)
-        if target.suffix != ".sub":
-            target = target.with_name(target.name + ".sub")
+        target = with_subfile_suffix(args.output)
     else:
         target = Path(default_filename(venue))
     try:
@@ -1693,7 +1691,7 @@ class _AutofillInputsAction(argparse.Action):
     """Collect ``-p`` inputs, stopping at the first ``.sub`` file.
 
     argparse hands an ``nargs="+"`` option every string up to the next flag, so
-    ``-p ms/ notes.md biorxiv.sub`` would swallow the .sub file. This action
+    ``-p ms/ notes.md biorxiv.sub.txt`` would swallow the .sub file. This action
     keeps the inputs before the first ``.sub`` and records that file as the
     subfile (reconciled with the positional in :func:`_cmd_autofill`). Repeated
     ``-p`` flags accumulate.
@@ -1702,7 +1700,7 @@ class _AutofillInputsAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         inputs = list(getattr(namespace, self.dest, None) or [])
         for i, value in enumerate(values):
-            if value.lower().endswith(".sub"):
+            if is_subfile_name(value):
                 if not inputs:
                     parser.error(f"{option_string}: expected at least one directory or document before {value}")
                 if getattr(namespace, "_subfile_from_inputs", None):
@@ -1767,7 +1765,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
         return 2
     args.subfile = args.subfile or trailing_sub
     if not args.subfile:
-        print("error: no .sub file given, e.g. 'paperpush autofill -p MANUSCRIPT_DIR biorxiv.sub'", file=sys.stderr)
+        print("error: no .sub file given, e.g. 'paperpush autofill -p MANUSCRIPT_DIR biorxiv.sub.txt'", file=sys.stderr)
         return 2
 
     logger.debug(
@@ -1802,7 +1800,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
         return 1
 
     # Load the target .sub if it exists; otherwise render a fresh template,
-    # taking the venue slug from the filename stem (e.g. biorxiv.sub).
+    # taking the venue slug from the filename stem (e.g. biorxiv.sub.txt).
     sub_path = Path(args.subfile)
     if sub_path.exists():
         try:
@@ -1810,9 +1808,9 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
         except OSError as exc:
             print(f"error: cannot read {sub_path}: {exc}", file=sys.stderr)
             return 1
-        slug = parse(text).venue or sub_path.stem
+        slug = parse(text).venue or subfile_stem(sub_path)
     else:
-        slug = sub_path.stem
+        slug = subfile_stem(sub_path)
         text = None
 
     try:
@@ -1886,9 +1884,9 @@ def _autofill_in_browser(args: argparse.Namespace, input_dirs: list[Path], input
     out_path = Path(args.output) if args.output else sub_path
     if sub_path.exists():
         text = sub_path.read_text(encoding="utf-8")
-        slug = parse(text).venue or sub_path.stem
+        slug = parse(text).venue or subfile_stem(sub_path)
     else:
-        text, slug = None, sub_path.stem
+        text, slug = None, subfile_stem(sub_path)
     try:
         venue = get_venue(slug)
     except KeyError:
@@ -2307,9 +2305,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_venues.add_argument("--hide-columns", dest="hide_columns", metavar="COL[,COL...]", help="hide these comma-separated columns")
     p_venues.set_defaults(func=_cmd_venues)
 
-    p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub submission template")
+    p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub.txt submission template")
     p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv")
-    p_subfile.add_argument("-o", "--output", metavar="OUT", help="output path for the .sub file (default: VENUE.sub in the current directory, e.g. biorxiv.sub; .sub is added if missing)")
+    p_subfile.add_argument("-o", "--output", metavar="OUT", help="output path for the .sub file (default: VENUE.sub.txt in the current directory, e.g. biorxiv.sub.txt; .sub.txt is added unless the name already ends in .sub.txt or .sub)")
     p_subfile.add_argument("--dont-fill-defaults", dest="fill_defaults", action="store_false", help="leave fields with default values empty instead of pre-populating them")
     p_subfile.add_argument("--overwrite", action="store_true", help="overwrite an existing .sub file")
     p_subfile.add_argument("--force", dest="overwrite", action="store_true", help=argparse.SUPPRESS)
@@ -2323,7 +2321,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_options.set_defaults(func=_cmd_options)
 
     p_autofill = sub.add_parser("autofill", parents=[verbosity], help="fill a .sub file from a directory of manuscript files")
-    p_autofill.add_argument("subfile", nargs="?", help="the .sub file to fill (created from the filename's venue slug " "if it does not exist yet), e.g. biorxiv.sub")
+    p_autofill.add_argument("subfile", nargs="?", help="the .sub file to fill (created from the filename's venue slug " "if it does not exist yet), e.g. biorxiv.sub.txt")
     p_autofill.add_argument(
         "-p",
         "--path",
@@ -2363,7 +2361,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=_VALIDATE_CHECKS,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p_validate.add_argument("subfile", help="path to the .sub file to check, e.g. biorxiv.sub")
+    p_validate.add_argument("subfile", help="path to the .sub file to check, e.g. biorxiv.sub.txt")
     p_validate.add_argument("--web", action="store_true", help="show the checks in the paperpush web page on this computer instead of the terminal, where you can fix the fields and re-validate; edits are saved to the .sub (with --ai, the AI checks run too). Needs pip install 'paperpush[web]'")
     p_validate.add_argument(
         "--dont-check-links",
@@ -2567,7 +2565,7 @@ def build_parser() -> argparse.ArgumentParser:
         "Given a .sub file, the page opens with it filled in, and every edit there is saved back to the file. "
         "Needs pip install 'paperpush[web]'.",
     )
-    p_web.add_argument("subfile", nargs="?", help="a .sub file to open, e.g. biorxiv.sub")
+    p_web.add_argument("subfile", nargs="?", help="a .sub file to open, e.g. biorxiv.sub.txt")
     p_web.add_argument("-p", "--path", dest="paths", action="append", metavar="PATH", help="a manuscript directory (or a file in it) whose files the page offers in its file pickers (with a .sub file; may be repeated)")
     p_web.add_argument("-d", "--directory", dest="paths", action="append", help=argparse.SUPPRESS)  # old name for -p/--path
     p_web.add_argument("--port", type=int, default=0, help="port to listen on (default: any free port)")

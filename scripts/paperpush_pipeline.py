@@ -4,7 +4,7 @@
 This drives the public ``paperpush`` subcommands back to back, in the
 order they are meant to be used:
 
-    1. subfile   create <venue>.sub from the venue's template
+    1. subfile   create <venue>.sub.txt from the venue's template
     2. autofill  populate that .sub from a manuscript directory
     3. validate  run the pre-submission checks on the filled .sub
     4. login     store credentials for the venue's submission portal
@@ -36,7 +36,7 @@ Examples:
     python scripts/paperpush_pipeline.py cell_genomics \\
         -d ./my_manuscript --engine api --orcid --headless
 
-    # Re-run end to end, overwriting an existing nature.sub:
+    # Re-run end to end, overwriting an existing nature.sub.txt:
     python scripts/paperpush_pipeline.py nature -d ./ms --values v.json --force
 """
 
@@ -54,7 +54,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from paperpush._logging import configure_logging  # noqa: E402
 from paperpush.cli import _cmd_autofill, _cmd_login, _cmd_subfile, _cmd_submit, _cmd_validate  # noqa: E402
 from paperpush.database import get_venue  # noqa: E402
-from paperpush.subfile import default_filename  # noqa: E402
+from paperpush.subfile import default_filename, with_subfile_suffix  # noqa: E402
 from paperpush.venues.common import DEFAULT_TIMEOUT_SECONDS  # noqa: E402
 
 
@@ -68,7 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Shared across steps.
     parser.add_argument("venue", help="venue slug, e.g. biorxiv (used by subfile and login)")
-    parser.add_argument("-o", "--output", help="path for the .sub file (default: <venue>.sub); the same file is filled and submitted")
+    parser.add_argument("-o", "--output", help="path for the .sub file (default: <venue>.sub.txt); the same file is filled and submitted")
     parser.add_argument("--force", action="store_true", help="overwrite an existing .sub file (applies to subfile and autofill)")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase logging verbosity (-v info, -vv debug)")
     parser.add_argument("-q", "--quiet", action="store_true", help="only log errors")
@@ -113,10 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
 def _resolve_sub_path(args: argparse.Namespace, venue) -> Path:
     """The single .sub path used across all steps (mirrors ``subfile``'s logic)."""
     if args.output:
-        target = Path(args.output)
-        if target.suffix != ".sub":
-            target = target.with_name(target.name + ".sub")
-        return target
+        return with_subfile_suffix(args.output)
     return Path(default_filename(venue))
 
 

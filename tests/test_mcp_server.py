@@ -64,7 +64,7 @@ def test_list_supported_venues_matches_the_database():
 def test_describe_venue_carries_fields_and_roles():
     described = mcp_server.describe_venue(VENUE)
     assert described["slug"] == VENUE
-    assert described["default_subfile_name"] == f"{VENUE}.sub"
+    assert described["default_subfile_name"] == f"{VENUE}.sub.txt"
     roles = {f["id"]: f["role"] for f in described["fields"]}
     assert roles["title"] == "extract"
     assert roles["manuscript_file"] == "filemap"
@@ -471,8 +471,8 @@ def test_login_reports_a_failed_sign_in(monkeypatch):
 
 # A committed, fully-filled sample that passes validation, so the submit tests
 # exercise the launch path rather than tripping the preflight.
-VALID_SUB = Path(__file__).resolve().parent / "sub_files" / VENUE / f"{VENUE}.sub"
-LOGINLESS_SUB = Path(__file__).resolve().parent / "sub_files" / LOGINLESS_VENUE / f"{LOGINLESS_VENUE}.sub"
+VALID_SUB = Path(__file__).resolve().parent / "sub_files" / VENUE / f"{VENUE}.sub.txt"
+LOGINLESS_SUB = Path(__file__).resolve().parent / "sub_files" / LOGINLESS_VENUE / f"{LOGINLESS_VENUE}.sub.txt"
 
 
 class FakePopen:

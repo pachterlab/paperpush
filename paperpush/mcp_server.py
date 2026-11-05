@@ -61,7 +61,7 @@ from ._logging import configure_logging
 from .autofill import autofill as _apply_autofill
 from .autofill import field_schema, parse_extraction
 from .database import Venue, get_venue, list_venues
-from .subfile import default_filename, parse as parse_subfile, render_template, resolve_paths, write_template
+from .subfile import default_filename, is_subfile_name, parse as parse_subfile, subfile_stem, render_template, resolve_paths, write_template
 from .validate import Issue
 from .validate import validate_report as _run_validate_report
 
@@ -127,7 +127,7 @@ def _venue_or_error(slug: str) -> Venue:
 def _slug_from_reference(reference: str) -> str:
     """Resolve a venue reference that may be a slug or a ``.sub`` file.
 
-    Accepts ``biorxiv``, ``biorxiv.sub``, or ``/path/to/biorxiv.sub`` -- callers
+    Accepts ``biorxiv``, ``biorxiv.sub.txt``, ``biorxiv.sub``, or a path to either -- callers
     (and the people instructing them) tend to use these interchangeably. For an
     existing file the venue recorded *inside* it wins over the filename, since
     the file is the authority on which venue it targets.
@@ -136,7 +136,7 @@ def _slug_from_reference(reference: str) -> str:
     if not reference:
         raise ValueError("a venue slug or .sub file path is required")
     path = Path(reference).expanduser()
-    if path.suffix != ".sub":
+    if not is_subfile_name(path):
         return reference
     if path.is_file():
         try:
@@ -145,7 +145,7 @@ def _slug_from_reference(reference: str) -> str:
             recorded = ""
         if recorded:
             return recorded
-    return path.stem
+    return subfile_stem(path)
 
 
 def _load_subfile(subfile: str, base: Optional[str] = None) -> tuple[Path, str, Venue]:
@@ -162,7 +162,7 @@ def _load_subfile(subfile: str, base: Optional[str] = None) -> tuple[Path, str, 
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise ValueError(f"cannot read {path}: {exc}") from exc
-    return path, text, _venue_or_error(parse_subfile(text).venue or path.stem)
+    return path, text, _venue_or_error(parse_subfile(text).venue or subfile_stem(path))
 
 
 def _issue_dicts(issues: list[Issue]) -> list[dict[str, str]]:
@@ -363,7 +363,7 @@ def create_subfile(
 
     `path` is where to write it; pass an absolute path, since a relative one is
     resolved against the server's working directory rather than yours. Omit it
-    to write `<venue>.sub` there.
+    to write `<venue>.sub.txt` there.
 
     Refuses to clobber an existing file unless `overwrite` is true.
     """
@@ -577,7 +577,7 @@ def autofill_subfile(
         _, text, venue = _load_subfile(str(sub_path))
         created_from_template = False
     else:
-        venue = _venue_or_error(sub_path.stem)
+        venue = _venue_or_error(subfile_stem(sub_path))
         # render_template is what `subfile` writes; autofill on a missing file
         # starts from the same place rather than an empty document.
         text = render_template(venue, fill_defaults=True)

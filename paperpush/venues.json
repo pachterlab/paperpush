@@ -945,5 +945,94 @@
       "immunology",
       "biology"
     ]
+  },
+  "molecular_cell": {
+    "name": "Molecular Cell",
+    "full_name": "Molecular Cell",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.cell.com/molecular-cell",
+    "submission_guide": "https://www.cell.com/molecular-cell/information-for-authors",
+    "description": "Cell Press journal in the life and medical sciences.",
+    "keywords": [
+      "biology"
+    ]
+  },
+  "patterns": {
+    "name": "Patterns",
+    "full_name": "Patterns",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.cell.com/patterns",
+    "submission_guide": "https://www.cell.com/patterns/information-for-authors",
+    "description": "Multidisciplinary Cell Press journal.",
+    "keywords": [
+      "general"
+    ]
+  },
+  "iscience": {
+    "name": "iScience",
+    "full_name": "iScience",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.cell.com/iscience",
+    "submission_guide": "https://www.cell.com/iscience/information-for-authors",
+    "description": "Multidisciplinary Cell Press journal.",
+    "keywords": [
+      "general",
+      "biology"
+    ]
+  },
+  "cell_stem_cell": {
+    "name": "Cell Stem Cell",
+    "full_name": "Cell Stem Cell",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.cell.com/cell-stem-cell",
+    "submission_guide": "https://www.cell.com/cell-stem-cell/information-for-authors",
+    "description": "Cell Press journal in the life and medical sciences.",
+    "keywords": [
+      "biology",
+      "medicine"
+    ]
+  },
+  "nar_cancer": {
+    "name": "NAR Cancer",
+    "full_name": "NAR Cancer",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://academic.oup.com/narcancer",
+    "submission_guide": "https://academic.oup.com/narcancer/pages/author-guidelines",
+    "description": "Fully open-access Oxford University Press journal publishing original research and review articles at the intersection of the nucleic acids and cancer fields.",
+    "keywords": [
+      "biology",
+      "genetics",
+      "medicine"
+    ]
+  },
+  "cell_reports_methods": {
+    "name": "Cell Reports Methods",
+    "full_name": "Cell Reports Methods",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.cell.com/cell-reports-methods",
+    "submission_guide": "https://www.cell.com/cell-reports-methods/information-for-authors",
+    "description": "Multidisciplinary Cell Press journal.",
+    "keywords": [
+      "general"
+    ]
+  },
+  "nar_genomics_bioinformatics": {
+    "name": "NAR Genomics and Bioinformatics",
+    "full_name": "NAR Genomics and Bioinformatics",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://academic.oup.com/nargab",
+    "submission_guide": "https://academic.oup.com/nargab/pages/author-guidelines",
+    "description": "Fully open-access Oxford University Press journal focused on genomics and bioinformatics large-scale data analysis, publishing novel methods and biological findings.",
+    "keywords": [
+      "genetics",
+      "bioinformatics"
+    ]
   }
 }

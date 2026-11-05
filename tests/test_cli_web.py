@@ -15,7 +15,7 @@ pytest.importorskip("fastapi")
 from paperpush.cli import main  # noqa: E402
 from paperpush.web import app as web_app  # noqa: E402
 
-SUB = Path(__file__).parent / "sub_files" / "nucleic_acids_research" / "nucleic_acids_research.sub"
+SUB = Path(__file__).parent / "sub_files" / "nucleic_acids_research" / "nucleic_acids_research.sub.txt"
 
 
 @pytest.fixture
@@ -108,7 +108,7 @@ def test_subfile_prints_a_link_and_serves_the_file_in_the_background(spawned, tm
     token = kw["env"]["PAPERPUSH_WEB_TOKEN"]
     port = cmd[cmd.index("--port") + 1]
     assert f"http://127.0.0.1:{port}/?local={token}#/v/biorxiv" in out
-    assert cmd[cmd.index("web") + 1] == str((tmp_path / "biorxiv.sub").resolve())
+    assert cmd[cmd.index("web") + 1] == str((tmp_path / "biorxiv.sub.txt").resolve())
     assert "--idle-timeout" in cmd and kw["start_new_session"]
 
 

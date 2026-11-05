@@ -37,7 +37,7 @@ from tests.submit_walkthrough_status import record_failure, record_success
 
 # Sample submission files, base files first; shared by the offline sweep tests.
 SCENARIOS = scenarios()
-SUB_IDS = [s.filename[: -len(".sub")] for s in SCENARIOS]
+SUB_IDS = [s.filename[: -len(".sub.txt")] for s in SCENARIOS]
 
 _USERNAME = "researcher@example.edu"
 _PASSWORD = "s3cret-token"
@@ -361,7 +361,7 @@ def test_every_venue_has_a_sample_subfile():
 #
 # The ``.vscode/launch.json`` "Debug <Venue>" entries each just run
 #
-#     paperpush submit tests/sub_files/<venue>/<venue>.sub
+#     paperpush submit tests/sub_files/<venue>/<venue>.sub.txt
 #
 # against the real portal in a visible browser. The parametrized test below runs
 # the same thing, but as one pytest so a single command walks every venue in
@@ -393,7 +393,7 @@ def test_every_venue_has_a_sample_subfile():
 # (repeatable); the venue is read from the file itself::
 #
 #     pytest tests/test_submit.py --run-portal -s \
-#         --subfile tests/sub_files/arxiv/arxiv_tex.sub
+#         --subfile tests/sub_files/arxiv/arxiv_tex.sub.txt
 #
 # Unlike the rest of the suite, this walkthrough reuses your *real* saved
 # sessions and credentials (saved by a prior ``paperpush submit`` /
@@ -422,7 +422,7 @@ def _walkthrough_venues() -> list[str]:
         if not sub_dir.is_dir():
             continue
         slug = sub_dir.name
-        if not (sub_dir / f"{slug}.sub").is_file():
+        if not (sub_dir / f"{slug}.sub.txt").is_file():
             continue
         try:
             venues.get_runner(slug)
@@ -457,7 +457,7 @@ def _walkthrough_params(config):
                 raise pytest.UsageError(f"--subfile: could not read venue from {raw!r}: {exc}")
             params.append((slug, path, path.stem))
         return params
-    return [(slug, SUB_FILES_DIR / slug / f"{slug}.sub", slug) for slug in _walkthrough_venues()]
+    return [(slug, SUB_FILES_DIR / slug / f"{slug}.sub.txt", slug) for slug in _walkthrough_venues()]
 
 
 def pytest_generate_tests(metafunc):

@@ -74,7 +74,7 @@ from ..mcp_server import field_options, list_supported_venues
 from ..requirements import any_format_initial_rule, get_requirements
 from ..requirements import resolve as resolve_requirements
 from ..requirements_check import upload_role_ids
-from ..subfile import default_filename
+from ..subfile import default_filename, is_subfile_name, subfile_stem
 from ..subfile import parse as parse_subfile
 from ..subfile import replace_block, replace_scalar, resolve_relative_path
 from ..subfile import render_template
@@ -197,7 +197,7 @@ class LocalSession:
                     add(path)
         if self.upload_dir.is_dir():
             for path in sorted(self.upload_dir.iterdir()):
-                if not path.name.startswith(".") and path.suffix != ".sub":
+                if not path.name.startswith(".") and not is_subfile_name(path):
                     add(path)
         try:
             sub = parse_subfile(self.sub_path.read_text(encoding="utf-8"))
@@ -388,7 +388,7 @@ def import_zip(archive: Path, files: Path, cap_bytes: int) -> dict[str, Any]:
                 if (member.external_attr >> 16) & 0o170000 == 0o120000:
                     skipped.append({"name": member.filename, "reason": "symbolic link"})
                     continue
-                if base.lower().endswith(".sub"):
+                if is_subfile_name(base):
                     with zf.open(member) as src:
                         data = src.read(_MAX_SUB_BYTES + 1)
                     if len(data) > _MAX_SUB_BYTES:
@@ -1064,7 +1064,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         for upload_file in files:
             name = upload_file.filename or ""
             lower = name.lower()
-            if lower.endswith(".sub"):
+            if is_subfile_name(lower):
                 data = upload_file.file.read(_MAX_SUB_BYTES + 1)
                 if len(data) > _MAX_SUB_BYTES:
                     raise HTTPException(413, f"{safe_name(name)} is too large for a .sub file")
@@ -1257,8 +1257,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         files, local = workspace(ws_id, x_paperpush_token)
         slug = parse_subfile(req.text).venue
         venue = _venue_or_404(slug) if slug else None
-        sub_name = default_filename(venue) if venue else "submission.sub"
-        stem = Path(sub_name).stem
+        sub_name = default_filename(venue) if venue else "submission.sub.txt"
+        stem = subfile_stem(sub_name)
         if local is not None:
             resolve, extra, tmp_dir = local.resolve, (), None
         else:
@@ -1401,7 +1401,7 @@ def serve_local(
     host = "127.0.0.1"
     port = port or _free_port(host)
     sub_path = Path(sub_path).resolve()
-    venue = parse_subfile(sub_path.read_text(encoding="utf-8")).venue or sub_path.stem
+    venue = parse_subfile(sub_path.read_text(encoding="utf-8")).venue or subfile_stem(sub_path)
     local = LocalSession(
         sub_path=sub_path,
         root=sub_path.parent,

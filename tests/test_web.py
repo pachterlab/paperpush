@@ -24,7 +24,7 @@ pytest.importorskip("httpx")
 from fastapi.testclient import TestClient
 
 from paperpush.database import get_venue, list_venues
-from paperpush.subfile import default_filename, parse, render_template, replace_block, replace_scalar
+from paperpush.subfile import default_filename, parse, render_template, replace_block, replace_scalar, subfile_stem
 from paperpush.validate import validate_report
 from paperpush.web.app import LIVE_CHECKS, Settings, create_app, live_rules, localize_values, safe_name, venue_schema_issues
 
@@ -69,7 +69,7 @@ def test_venue_detail_carries_template_and_field_definitions(client):
     assert detail["template"] == render_template(get_venue(VENUE), fill_defaults=True)
     authors = next(f for f in detail["fields"] if f["id"] == "authors")
     assert authors["fields"] and authors["role"]
-    assert detail["subfile_name"] == f"{VENUE}.sub"
+    assert detail["subfile_name"] == f"{VENUE}.sub.txt"
 
 
 def test_unknown_venue_is_404(client):
@@ -365,8 +365,8 @@ def test_bundle_holds_the_sub_and_every_upload(client, ws):
     res = client.post(f"/api/workspaces/{ws}/bundle", json={"text": text})
     assert res.headers["content-type"] == "application/zip"
     with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
-        assert sorted(zf.namelist()) == ["biorxiv-submission/biorxiv.sub", "biorxiv-submission/manuscript.pdf"]
-        assert zf.read("biorxiv-submission/biorxiv.sub").decode() == text
+        assert sorted(zf.namelist()) == ["biorxiv-submission/biorxiv.sub.txt", "biorxiv-submission/manuscript.pdf"]
+        assert zf.read("biorxiv-submission/biorxiv.sub.txt").decode() == text
 
 
 def test_bundle_puts_figures_in_a_folder_and_rewrites_the_sub(client, ws):
@@ -378,9 +378,9 @@ def test_bundle_puts_figures_in_a_folder_and_rewrites_the_sub(client, ws):
     res = client.post(f"/api/workspaces/{ws}/bundle", json={"text": text})
     with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
         names = sorted(zf.namelist())
-        sub = parse(zf.read("biorxiv-submission/biorxiv.sub").decode()).values
+        sub = parse(zf.read("biorxiv-submission/biorxiv.sub.txt").decode()).values
     # Uploads the .sub does not name come along too.
-    assert names == [f"biorxiv-submission/{n}" for n in ("biorxiv.sub", "figures/fig1.png", "manuscript.pdf", "notes.txt")]
+    assert names == [f"biorxiv-submission/{n}" for n in ("biorxiv.sub.txt", "figures/fig1.png", "manuscript.pdf", "notes.txt")]
     assert sub["manuscript_file"] == "manuscript.pdf"
     assert sub["figure_files"].strip() == "figures/fig1.png | Figure 1"
 
@@ -396,7 +396,7 @@ def test_bundle_sorts_by_upload_box_not_by_file_name(client, ws):
     )
     res = client.post(f"/api/workspaces/{ws}/bundle", json={"text": text})
     assert res.status_code == 200, res.text
-    folder = f"{Path(default_filename(venue)).stem}-submission"
+    folder = f"{subfile_stem(default_filename(venue))}-submission"
     with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
         got = set(zf.namelist())
     assert {f"{folder}/figures/plot.png", f"{folder}/tables/results.xlsx", f"{folder}/supplementary/figure_legends.docx"} <= got
@@ -425,7 +425,7 @@ process.stdout.write(JSON.stringify(out));
 
 def _sample_texts() -> list[str]:
     texts = [render_template(v, fill_defaults=True) for v in list_venues()]
-    texts += [p.read_text(encoding="utf-8") for p in sorted((Path(__file__).parent / "sub_files").rglob("*.sub"))]
+    texts += [p.read_text(encoding="utf-8") for p in sorted((Path(__file__).parent / "sub_files").rglob("*.sub.txt"))]
     texts.append("@venue: biorxiv\ntitle: a: b\nabstract: |\n  one\n\n  two\n\n\nauthors: |\n\nlicense: CC0")
     return texts
 
@@ -808,8 +808,8 @@ def test_local_bundle_packs_the_files_from_this_computer(local_client):
     res = c.post("/api/workspaces/local/bundle", json={"text": text})
     assert res.status_code == 200, res.text
     with zipfile.ZipFile(io.BytesIO(res.content)) as zf:
-        assert sorted(zf.namelist()) == [f"biorxiv-submission/{n}" for n in ("biorxiv.sub", "figures/fig1.png", "manuscript.pdf")]
-        sub = parse(zf.read("biorxiv-submission/biorxiv.sub").decode()).values
+        assert sorted(zf.namelist()) == [f"biorxiv-submission/{n}" for n in ("biorxiv.sub.txt", "figures/fig1.png", "manuscript.pdf")]
+        sub = parse(zf.read("biorxiv-submission/biorxiv.sub.txt").decode()).values
         assert zf.read("biorxiv-submission/manuscript.pdf") == (local.root / "paper" / "manuscript.pdf").read_bytes()
     assert sub["manuscript_file"] == "manuscript.pdf" and sub["figure_files"].strip() == "figures/fig1.png"
     # A path that is not on this computer is named, relative to where paperpush ran.
@@ -849,12 +849,12 @@ def test_subfile_web_writes_the_template_then_opens_it(tmp_path, monkeypatch, se
 
     monkeypatch.chdir(tmp_path)
     assert main(["subfile", VENUE, "--web"]) == 0
-    assert (tmp_path / "biorxiv.sub").is_file()
-    assert served == [(Path("biorxiv.sub"), {"manuscript_dirs": (), "action": None})]
+    assert (tmp_path / "biorxiv.sub.txt").is_file()
+    assert served == [(Path("biorxiv.sub.txt"), {"manuscript_dirs": (), "action": None})]
     # Run again, the existing file is opened rather than refused.
-    (tmp_path / "biorxiv.sub").write_text("@venue: biorxiv\nmine\n")
+    (tmp_path / "biorxiv.sub.txt").write_text("@venue: biorxiv\nmine\n")
     assert main(["subfile", VENUE, "--web"]) == 0
-    assert (tmp_path / "biorxiv.sub").read_text() == "@venue: biorxiv\nmine\n"
+    assert (tmp_path / "biorxiv.sub.txt").read_text() == "@venue: biorxiv\nmine\n"
     assert len(served) == 2
 
 

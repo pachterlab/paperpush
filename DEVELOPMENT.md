@@ -27,7 +27,7 @@ pip install -e .[dev]
 
 ```bash
 paperpush codegen --venue biorxiv -o biorxiv_steps.py          # reuse the saved sign-in, offer biorxiv's fields
-paperpush codegen --sub biorxiv.sub                             # also bind values matching the .sub to its fields
+paperpush codegen --sub biorxiv.sub.txt                             # also bind values matching the .sub to its fields
 paperpush codegen https://portal.example.org --target python    # a standalone Playwright script
 ```
 
@@ -214,7 +214,7 @@ The sample `.sub` files in `tests/sub_files/<venue>/` point at input files
 (manuscript, supplement, cover letter, figures, ...) under
 `tests/manuscript_files/<venue>/`. Those input files are generated rather than
 committed: pytest builds any that are missing at the start of each session. To
-build them yourself, e.g. to run `paperpush submit tests/sub_files/<venue>/<venue>.sub`
+build them yourself, e.g. to run `paperpush submit tests/sub_files/<venue>/<venue>.sub.txt`
 by hand or from the VS Code debug configs on a fresh clone, or to regenerate
 the sample `.sub` files after editing `tests/sample_subfiles.json`, run:
 
@@ -248,7 +248,7 @@ pytest tests/test_submit.py --run-portal -s
 pytest tests/test_submit.py --run-portal -s --venue nature
 
 # Specific subfile (ie not default)
-pytest tests/test_submit.py --run-portal -s --venue cell --subfile tests/sub_files/cell/cell_figures.sub
+pytest tests/test_submit.py --run-portal -s --venue cell --subfile tests/sub_files/cell/cell_figures.sub.txt
 
 # Shorthand: only the submit walkthrough, optionally for named venue(s)
 pytest --run-submit-only -s
@@ -256,44 +256,37 @@ pytest --run-submit-only arxiv -s
 pytest --run-submit-only arxiv,biorxiv -s
 ```
 
-Update portal snapshots:
+### Scheduled submit walkthrough
+
+`scripts/check_submit_walkthrough.py` runs the live submit walkthrough above for
+every venue (no `-s`, so each runner's `hold_open` returns at the final page and
+the venues run back to back), and sorts each venue into failed (all three
+attempts), skipped, or walked to the final page. The report goes to
+`.submit_walkthrough/report.md` and `report.json` (gitignored). When a venue
+failed, it opens a GitHub issue labelled `submit-walkthrough`, or adds the report
+as a comment if one is already open. It never closes the issue: close it once
+the runner fix is merged. A run that takes longer than four hours
+(`--timeout-hours`) is interrupted, and the venues it finished are still reported.
 
 ```bash
-# All venues
-pytest tests/test_portal_drift.py --run-portal --update-snapshots
-
-# Single venue (e.g. Nature)
-pytest tests/test_portal_drift.py --run-portal --update-snapshots --venue nature
+python scripts/check_submit_walkthrough.py --dry-run            # run, report, print instead of filing
+python scripts/check_submit_walkthrough.py --venue biorxiv      # one venue
+python scripts/check_submit_walkthrough.py --headless           # no browser windows
+python scripts/check_submit_walkthrough.py --junit FILE --dry-run   # re-report an earlier run
 ```
 
-### Scheduled portal-drift check
-
-`scripts/check_portal_drift.py` runs the drift tests and sorts each venue into
-one of five groups: drift (a selector the runner needs is gone, or the page
-structure changed), no committed baseline, no drift spec, not checked (bot wall,
-no or expired session), and unchanged. The report goes to
-`.portal_drift/report.md` and `report.json` (gitignored). When something
-drifted, it opens a GitHub issue labelled `portal-drift`. If one is already
-open, it adds the report as a comment instead. It never closes the issue: close
-it once the runner fix or refreshed snapshot is merged. Gaps in coverage are
-listed in the report but never open an issue by themselves.
-
-```bash
-python scripts/check_portal_drift.py --dry-run            # run, report, print instead of filing
-python scripts/check_portal_drift.py --venue biorxiv      # one venue
-python scripts/check_portal_drift.py --junit FILE --dry-run   # re-report an earlier run
-```
-
-`scripts/scheduled_portal_drift.sh` is the cron entry point. It runs the check
-against a detached checkout of `origin/main` (`.portal_drift/worktree`), reuses
-the saved sessions in paperpush's config directory, and reads optional
-`PAPERPUSH_TEST_USERNAME` / `PAPERPUSH_TEST_PASSWORD` from the gitignored
-`.portal_drift/env`. Logs go to `.portal_drift/logs/`. Like the guideline check,
-it runs on the maintainer's machine because that is where the sessions are. Each
-`test_first_step_drift` run leaves a dummy draft on its portal.
+`scripts/scheduled_submit_walkthrough.sh` is the scheduled entry point, meant to
+run every three months. It runs the check against a detached checkout of
+`origin/main` (`.submit_walkthrough/worktree`), reuses the saved logins in
+paperpush's config directory, and reads optional `PAPERPUSH_TEST_USERNAME` /
+`PAPERPUSH_TEST_PASSWORD` from the gitignored `.submit_walkthrough/env`. Browsers
+run headed: in the desktop session on macOS, under `xvfb-run` on Linux when
+there is no display. Logs go to `.submit_walkthrough/logs/`. It runs on the
+maintainer's machine because that is where the logins are. Each run leaves an
+unsent draft on every portal, and an expired login shows up as a failure.
 
 ```
-0 5 1 * * /home/jrich/Desktop/paperpush/scripts/scheduled_portal_drift.sh
+0 5 1 */3 * /path/to/paperpush/scripts/scheduled_submit_walkthrough.sh
 ```
 
 Update venues.md checklist after running `pytest tests/test_submit.py --run-portal` (also run automatically by the pre-commit hook):

@@ -356,7 +356,7 @@ def tasks_payload(tasks: list[AiTask], venue: Venue, subfile: str = "") -> dict[
     return {
         "venue": venue.slug,
         "subfile": subfile,
-        "instructions": ("For each task, read the files it lists and judge it as the task says. " 'Write {"results": [{"id": <task id>, "status": "pass" | "fail" | "unclear" | "not_applicable", ' '"details": <what you found>, "evidence": <a short quote or location>}]} to a JSON file, then run ' f"`paperpush validate {subfile or '<venue>.sub'} --ai-results <that file>` to merge the verdicts into the report."),
+        "instructions": ("For each task, read the files it lists and judge it as the task says. " 'Write {"results": [{"id": <task id>, "status": "pass" | "fail" | "unclear" | "not_applicable", ' '"details": <what you found>, "evidence": <a short quote or location>}]} to a JSON file, then run ' f"`paperpush validate {subfile or '<venue>.sub.txt'} --ai-results <that file>` to merge the verdicts into the report."),
         "system": _SYSTEM,
         "tasks": [t.to_dict() for t in tasks],
     }

@@ -256,7 +256,7 @@ If you prefer to drive the steps yourself instead of the pipeline script, the
 autofill step alone is:
 
 ```
-paperpush autofill <venue>.sub -p <manuscript-dir> --engine manual --values values.json
+paperpush autofill <venue>.sub.txt -p <manuscript-dir> --engine manual --values values.json
 ```
 
 (Add `--dry-run` to preview without writing. `-p` accepts several directories

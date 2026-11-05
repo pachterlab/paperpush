@@ -36,7 +36,7 @@ sys.path.insert(0, str(REPO_ROOT))
 os.environ["PAPERPUSH_VENUE_DATA"] = "bundled"
 
 from paperpush.database import list_venues  # noqa: E402
-from paperpush.subfile import default_filename, render_template  # noqa: E402
+from paperpush.subfile import default_filename, is_subfile_name, render_template  # noqa: E402
 
 TEMPLATES_DIR = REPO_ROOT / "paperpush" / "subfile_templates"
 
@@ -50,7 +50,7 @@ def _existing() -> dict[str, str]:
     """Map each currently checked-in ``*.sub`` filename to its text."""
     if not TEMPLATES_DIR.is_dir():
         return {}
-    return {p.name: p.read_text(encoding="utf-8") for p in TEMPLATES_DIR.glob("*.sub")}
+    return {p.name: p.read_text(encoding="utf-8") for p in TEMPLATES_DIR.iterdir() if is_subfile_name(p)}
 
 
 def main() -> int:

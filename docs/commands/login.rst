@@ -177,7 +177,7 @@ Same, backfilling your author details into a ``.sub`` from your public record:
 
 .. code-block:: bash
 
-   paperpush login cell_genomics --orcid-id 0000-0002-1825-0097 --into cell_genomics.sub
+   paperpush login cell_genomics --orcid-id 0000-0002-1825-0097 --into cell_genomics.sub.txt
 
 Remove stored credentials:
 

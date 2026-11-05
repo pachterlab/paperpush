@@ -30,7 +30,7 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
 ## Inputs
 
 - The `.sub` file (absolute path). If the user did not give one, look for a
-  `<venue>.sub` in the manuscript directory they named; otherwise ask.
+  `<venue>.sub.txt` in the manuscript directory they named; otherwise ask.
 - Whether they want the report saved, and where (default: none; `-o` with no
   path writes `<sub stem>_validation.pdf` next to the `.sub`). Mention
   `--colorblind` if they ask for colour-blind-friendly colours.

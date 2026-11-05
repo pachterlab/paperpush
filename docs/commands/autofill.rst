@@ -22,10 +22,10 @@ Synopsis
 
 .. code-block:: bash
 
-   paperpush autofill -p MANUSCRIPT_DIR biorxiv.sub
+   paperpush autofill -p MANUSCRIPT_DIR biorxiv.sub.txt
 
 If the ``.sub`` file does not exist yet, ``autofill`` creates it first from the
-venue slug in the filename (so ``biorxiv.sub`` is templated as if you had run
+venue slug in the filename (so ``biorxiv.sub.txt`` is templated as if you had run
 ``paperpush subfile biorxiv``).
 
 Engines
@@ -61,7 +61,7 @@ Arguments
 ---------
 
 ``subfile``
-   The ``.sub`` file to fill, e.g. ``biorxiv.sub``. Created from the filename's
+   The ``.sub`` file to fill, e.g. ``biorxiv.sub.txt``. Created from the filename's
    venue slug if it does not already exist.
 
 Options
@@ -136,26 +136,26 @@ Preview an API-based autofill without writing the file:
 
 .. code-block:: bash
 
-   paperpush autofill -p ./my_manuscript --engine api --dry-run biorxiv.sub
+   paperpush autofill -p ./my_manuscript --engine api --dry-run biorxiv.sub.txt
 
 Fill from an agent-produced ``values.json`` (the default manual engine):
 
 .. code-block:: bash
 
-   paperpush autofill -p ./my_manuscript --values values.json biorxiv.sub
+   paperpush autofill -p ./my_manuscript --values values.json biorxiv.sub.txt
 
 Use OpenAI even though an Anthropic key is also set:
 
 .. code-block:: bash
 
-   paperpush autofill -p ./my_manuscript --engine api --provider openai biorxiv.sub
+   paperpush autofill -p ./my_manuscript --engine api --provider openai biorxiv.sub.txt
 
 Write the result to a new file and only accept high-confidence values:
 
 .. code-block:: bash
 
    paperpush autofill -p ./my_manuscript --engine api \
-       --min-confidence high -o biorxiv.filled.sub biorxiv.sub
+       --min-confidence high -o biorxiv.filled.sub.txt biorxiv.sub.txt
 
 .. note::
 
