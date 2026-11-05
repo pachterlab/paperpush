@@ -256,14 +256,37 @@ pytest --run-submit-only arxiv -s
 pytest --run-submit-only arxiv,biorxiv -s
 ```
 
-Update portal snapshots:
+### Scheduled submit walkthrough
+
+`scripts/check_submit_walkthrough.py` runs the live submit walkthrough above for
+every venue (no `-s`, so each runner's `hold_open` returns at the final page and
+the venues run back to back), and sorts each venue into failed (all three
+attempts), skipped, or walked to the final page. The report goes to
+`.submit_walkthrough/report.md` and `report.json` (gitignored). When a venue
+failed, it opens a GitHub issue labelled `submit-walkthrough`, or adds the report
+as a comment if one is already open. It never closes the issue: close it once
+the runner fix is merged. A run that takes longer than four hours
+(`--timeout-hours`) is interrupted, and the venues it finished are still reported.
 
 ```bash
-# All venues
-pytest tests/test_portal_drift.py --run-portal --update-snapshots
+python scripts/check_submit_walkthrough.py --dry-run            # run, report, print instead of filing
+python scripts/check_submit_walkthrough.py --venue biorxiv      # one venue
+python scripts/check_submit_walkthrough.py --headless           # no browser windows
+python scripts/check_submit_walkthrough.py --junit FILE --dry-run   # re-report an earlier run
+```
 
-# Single venue (e.g. Nature)
-pytest tests/test_portal_drift.py --run-portal --update-snapshots --venue nature
+`scripts/scheduled_submit_walkthrough.sh` is the scheduled entry point, meant to
+run every three months. It runs the check against a detached checkout of
+`origin/main` (`.submit_walkthrough/worktree`), reuses the saved logins in
+paperpush's config directory, and reads optional `PAPERPUSH_TEST_USERNAME` /
+`PAPERPUSH_TEST_PASSWORD` from the gitignored `.submit_walkthrough/env`. Browsers
+run headed: in the desktop session on macOS, under `xvfb-run` on Linux when
+there is no display. Logs go to `.submit_walkthrough/logs/`. It runs on the
+maintainer's machine because that is where the logins are. Each run leaves an
+unsent draft on every portal, and an expired login shows up as a failure.
+
+```
+0 5 1 */3 * /path/to/paperpush/scripts/scheduled_submit_walkthrough.sh
 ```
 
 Update venues.md checklist after running `pytest tests/test_submit.py --run-portal` (also run automatically by the pre-commit hook):

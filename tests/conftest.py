@@ -43,8 +43,9 @@ from paperpush.database import list_venues  # noqa: E402
 # are skipped by default; everything else -- including submit logic that does
 # not touch a live portal -- runs as usual. So a bare ``pytest`` exercises all
 # offline behavior and skips only the network/portal tests. Opt in with
-# ``pytest --run-portal`` or by setting ``PAPERPUSH_RUN_PORTAL=1`` (the
-# monthly CI job does the latter). ``pytest --run-portal-only`` runs the portal
+# ``pytest --run-portal`` or by setting ``PAPERPUSH_RUN_PORTAL=1``. The quarterly
+# walkthrough check (scripts/scheduled_submit_walkthrough.sh, run on the
+# maintainer's machine, not CI) uses ``--run-submit-only``. ``pytest --run-portal-only`` runs the portal
 # tests and deselects everything else; ``pytest --run-submit-only`` runs only the
 # live submit walkthrough. Both take optional venue slug(s), e.g.
 # ``pytest --run-submit-only arxiv`` or ``--run-submit-only arxiv,biorxiv``.
@@ -157,12 +158,6 @@ def pytest_addoption(parser):
         "``--run-submit-only arxiv,biorxiv`` (same as adding ``--venue``)",
     )
     parser.addoption(
-        "--update-snapshots",
-        action="store_true",
-        default=False,
-        help="rewrite the committed portal-page fingerprints in " "tests/portal_snapshots from the live pages instead of comparing " "against them (used with --run-portal after an intended portal change)",
-    )
-    parser.addoption(
         "--venue",
         action="append",
         default=None,
@@ -214,7 +209,7 @@ def _item_venue(item) -> str | None:
     """The venue slug a collected test is parametrized for, or None.
 
     Covers every way a test names a venue in this suite: a ``slug`` string
-    (drift, submit walkthrough), a ``venue`` :class:`Venue` object (subfile,
+    (submit walkthrough), a ``venue`` :class:`Venue` object (subfile,
     login loops), or a ``scenario`` object carrying ``.venue`` (validate/submit
     sample sweeps). A test with no venue parameter returns None and is left
     alone by the filter.
@@ -299,14 +294,6 @@ def pytest_collection_modifyitems(config, items):
 
 TEST_USERNAME_ENV = "PAPERPUSH_TEST_USERNAME"
 TEST_PASSWORD_ENV = "PAPERPUSH_TEST_PASSWORD"
-
-
-@pytest.fixture
-def update_snapshots(request) -> bool:
-    """True when ``--update-snapshots`` (or ``PAPERPUSH_UPDATE_SNAPSHOTS=1``)
-    is set, telling the portal-drift tests to rewrite their baselines rather than
-    assert against them."""
-    return bool(request.config.getoption("--update-snapshots")) or os.environ.get("PAPERPUSH_UPDATE_SNAPSHOTS") == "1"
 
 
 @pytest.fixture

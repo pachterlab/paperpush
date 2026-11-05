@@ -133,8 +133,6 @@ Then do credentials step 3 and have the user run `paperpush login <slug>`.
   `tests/test_nature_machine_intelligence.py`: dispatch through
   `get_runner`, form and field invariants, and each tricky helper (author
   rows, file metadata, branch choices) checked against a `Mock` page.
-- Optionally add a `SPECS` entry in `tests/test_portal_drift.py` and a
-  baseline with `--update-snapshots`.
 
 **A6. Test until it passes**, then go to **Verify** below.
 
