@@ -130,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         venue = get_venue(args.venue)
     except KeyError:
         print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
     sub_path = str(_resolve_sub_path(args, venue))
 

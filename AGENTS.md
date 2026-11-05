@@ -107,7 +107,8 @@ back the command for the user to run, so the user's password never passes
 through the conversation. (It does run the login itself when
 `PAPERPUSH_USERNAME` and `PAPERPUSH_PASSWORD` are already set in the server's
 environment.) Everything else in this document maps to a tool too —
-`list_supported_venues`, `describe_venue` for the schema, `field_options`,
+`list_supported_venues`, `pick_venue` (rank venues for a manuscript: read it
+yourself and pass the subjects you judge it covers as `keywords`), `describe_venue` for the schema, `field_options`,
 `create_subfile`, `read_subfile`, `autofill_subfile` (same `values.json` shape,
 passed as the `values` argument), `validate_subfile`, `submit`, `submit_status`,
 `submit_page`, `submit_act`, `submit_resume`, and `submit_close`. Pass **absolute paths**: the server has its own working

@@ -66,7 +66,7 @@ Arguments
 ---------
 
 ``venue``
-   Venue slug, e.g. ``nature`` (see ``paperpush --venues``).
+   Venue slug, e.g. ``nature`` (see ``paperpush venues``).
 
 ``--article-type TYPE``
    Show the rules for this article type -- the exact option string of the

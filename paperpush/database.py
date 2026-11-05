@@ -446,6 +446,30 @@ class Field:
         )
 
 
+VENUE_KEYWORDS = (
+    "general",
+    "biology",
+    "genetics",
+    "bioinformatics",
+    "immunology",
+    "neuroscience",
+    "medicine",
+    "radiology",
+    "machine learning",
+    "computer vision",
+    "natural language processing",
+    "robotics",
+    "math",
+    "statistics",
+    "physics",
+    "computer science",
+)
+"""The subject keywords a venue can carry (``VenueInfo.keywords``), the vocabulary
+``paperpush venues --keywords`` filters on."""
+
+VenueKeyword = Literal[VENUE_KEYWORDS]  # type: ignore[valid-type]
+
+
 @dataclass(frozen=True)
 class VenueInfo:
     """What the master database (``venues.json``) records about a venue.
@@ -476,7 +500,7 @@ class VenueInfo:
     ] = False
     # Deprecated venues stay in the database (their sign-in/login wiring still
     # works via get_venue) but are hidden from list_venues, so they no longer
-    # appear in `paperpush --venues` or the generated README.
+    # appear in `paperpush venues` or the generated README.
     deprecated: Annotated[
         bool,
         PField(description="Hidden from listings but still reachable by get_venue."),
@@ -484,6 +508,10 @@ class VenueInfo:
     site_url: Annotated[str, PField(description="Public homepage URL.")] = ""
     submission_guide: Annotated[str, PField(description="URL of the author/submission guide.")] = ""
     description: Annotated[str, PField(description="Short description of the venue.")] = ""
+    keywords: Annotated[
+        list[VenueKeyword],
+        PField(description="Subject areas the venue covers, from a fixed vocabulary; 'paperpush venues --keywords' filters on them."),
+    ] = dataclass_field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -574,6 +602,7 @@ class Venue(SubmissionForm, VenueInfo):
             site_url=data.get("site_url", ""),
             submission_guide=data.get("submission_guide", ""),
             description=data.get("description", ""),
+            keywords=list(data.get("keywords") or []),
             file_type_options=data.get("file_type_options"),
             max_upload_mb=data.get("max_upload_mb"),
             fields=[Field.from_dict(f) for f in data.get("fields", [])],
@@ -769,7 +798,9 @@ def merge_published_info(bundled: dict[str, Any], published: dict[str, Any], pub
     is validate-only -- it has no published submission form. A new venue that
     can be submitted to needs its runner, which only a release can bring, so it
     is held back; a new validate-only venue needs nothing but data and is added.
-    A bundled venue the published list omits keeps its bundled entry.
+    A bundled venue the published list omits keeps its bundled entry, and a
+    published entry without ``keywords`` (published before venues carried them)
+    keeps the bundled entry's keywords.
     """
     merged = dict(bundled)
     held_back: list[str] = []
@@ -779,6 +810,8 @@ def merge_published_info(bundled: dict[str, Any], published: dict[str, Any], pub
             logger.info("Published venue list: %s; keeping the bundled entry", problem)
             held_back.append(slug)
         elif slug in bundled or slug not in published_forms:
+            if "keywords" not in entry and isinstance(bundled.get(slug), dict) and "keywords" in bundled[slug]:
+                entry = {**entry, "keywords": bundled[slug]["keywords"]}
             merged[slug] = entry
         else:
             held_back.append(slug)

@@ -35,7 +35,7 @@ named the venue, use it; otherwise infer or ask per the inputs below.
 
 1. **The venue slug** (e.g. `biorxiv`). If the user did not say, ask, or infer
    it from a `<slug>.sub` filename they mention. Confirm it is supported with
-   `paperpush --venues`.
+   `paperpush venues`.
 2. **The manuscript directory** and **what each file is**. Ask the user to
    describe the directory if they have not, for example:
    "`manuscript.pdf` is the paper, `title_page.pdf` has the authors and

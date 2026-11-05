@@ -193,6 +193,8 @@ tests/portal_snapshots/_failures/
 /paper/
 # Page texts and run state of scripts/check_guidelines.py
 .guideline_cache/
+# Reports, logs, env and worktree of scripts/scheduled_portal_drift.sh
+.portal_drift/
 .neon
 node_modules/
 .env.local

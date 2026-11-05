@@ -29,7 +29,7 @@ Read `DEVELOPMENT.md` ("Manuscript requirements", "Keeping entries current",
 
 ## Inputs
 
-- **The venue**: a name, slug, or URL. Get the slug from `paperpush --venues`.
+- **The venue**: a name, slug, or URL. Get the slug from `paperpush venues`.
   A new slug is lowercase letters, digits, and underscores (`nature_genetics`).
 - **The guideline URLs**, if the user has them. Otherwise find the venue's own
   author-guidelines and submission-instructions pages. Use only pages the venue
@@ -38,7 +38,7 @@ Read `DEVELOPMENT.md` ("Manuscript requirements", "Keeping entries current",
 ## 1. New venue or existing one?
 
 ```
-paperpush --venues | grep -i <name>
+paperpush venues | grep -i <name>
 paperpush requirements <slug>
 ```
 
@@ -77,7 +77,8 @@ Read the whole file first. Every key has a comment describing it.
   say", and paperpush then checks nothing for it. Never fill a key with a
   typical value.
 - `[venue]`: name, full name, type, homepage, guide URL. Set
-  `anonymous: yes` only for double-blind review.
+  `anonymous: yes` only for double-blind review. Set `keywords` to the subject
+  areas it covers, from the listed choices (e.g. `medicine, radiology`).
 - `[requirements.*]`: the primary research-article rules. Use the structured
   keys where they fit, with canonical ids (`data_availability`, `Methods`, ...;
   see `$aliases` in `manuscript_requirements.json`). Put every other rule in
@@ -94,7 +95,7 @@ Read the whole file first. Every key has a comment describing it.
 
 ### `[form]`: the basic fields
 
-- **New venue, or one with no runner** (`paperpush --venues` shows no submit
+- **New venue, or one with no runner** (`paperpush venues` shows no submit
   support): set `include: yes` and keep only the fields that the submission
   instructions show the portal asks for. Usually these are the article type,
   title, abstract, keywords, authors, manuscript file, figures, tables,

@@ -97,7 +97,15 @@ See [`docs/example-session.md`](docs/example-session.md) for a full worked examp
 5. `paperpush submit VENUE.sub`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. Use the agent skill `/paperpush-portal-debug` or the CLI flag `--ai` (API) to have AI fix any issues that may arise. Ignore validation checks with the `--skip-validate` flag.
 
 Helper commands:
-- `paperpush --venues`: List all supported venues. Some venues only support validation and basic sub files (`paperpush --venues all`), while others additionally support automated submission portal filling (`paperpush --venues submit`)
+- `paperpush venues`: List supported venues. Filters combine:
+  - `--validate`: only venues paperpush can validate a manuscript against.
+  - `--submit`: only venues that also support automated submission portal filling.
+  - `-k/--keywords KW[,KW...]`: only venues tagged with any of these subject keywords (e.g. `biology,genetics`).
+  - `-t/--type TYPE`: only venues of this kind (`preprint`, `journal`, or `conference`; repeatable).
+  - `--columns COL[,COL...]` / `--hide-columns COL[,COL...]`: choose which columns to show (`slug`, `venue`, `keywords`, `type`, `link`, `validate`, `submit`).
+
+  For example, `paperpush venues --submit -t journal -k biology` lists the biology journals paperpush can submit to.
+- `paperpush pick-venue`: List supported venues that are a good thematic fit for your manuscript. Give it the manuscript's keywords (`pick-venue hippocampus, place cells`; a keyword can be a venue subject such as `immunology`), the manuscript itself (`pick-venue manuscript.pdf`), or its `--title` and `--abstract`, which are matched against each venue's subject keywords (`--venue-name` searches by name instead); add `--ai` (API) for an LLM's ranking with a reason for each venue. Note that this only searches the venues supported in PaperPush; and it only checks for thematic fit, not impact or likelihood of acceptance.
 - `paperpush update-venues`: Update the venue data (venues.json, submission_forms.json, manuscript_requirements.json) from the remote venue-data branch.
 - `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
 - `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
@@ -127,15 +135,22 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 | [AJHG](https://www.cell.com/ajhg) | `ajhg` | ✅ |  |
 | [Bioinformatics](https://academic.oup.com/bioinformatics) | `bioinformatics` | ✅ | ✅ |
 | [BMC Bioinformatics](https://link.springer.com/journal/12859) | `bmc_bioinformatics` | ✅ | ✅ |
+| [BMC Biology](https://bmcbiol.biomedcentral.com) | `bmc_biology` | ✅ |  |
+| [BMC Genomics](https://bmcgenomics.biomedcentral.com) | `bmc_genomics` | ✅ |  |
+| [BMC Medicine](https://bmcmedicine.biomedcentral.com) | `bmc_medicine` | ✅ |  |
 | [The BMJ](https://www.bmj.com) | `bmj` | ✅ |  |
 | [Cell](https://www.cell.com/cell/home) | `cell` | ✅ | ✅ |
 | [Cell Genomics](https://www.cell.com/cell-genomics/home) | `cell_genomics` | ✅ | ✅ |
 | [Cell Reports](https://www.cell.com/cell-reports) | `cell_reports` | ✅ |  |
 | [Cell Systems](https://www.cell.com/cell-systems/home) | `cell_systems` | ✅ | ✅ |
 | [Combinatorica](https://link.springer.com/journal/493) | `combinatorica` | ✅ | ✅ |
+| [Communications Biology](https://www.nature.com/commsbio) | `communications_biology` | ✅ |  |
 | [Discrete Mathematics](https://www.sciencedirect.com/journal/discrete-mathematics) | `discrete_mathematics` | ✅ | ✅ |
 | [eLife](https://elifesciences.org) | `elife` | ✅ |  |
 | [European Radiology](https://link.springer.com/journal/330) | `european_radiology` | ✅ |  |
+| [Frontiers in Bioinformatics](https://www.frontiersin.org/journals/bioinformatics) | `frontiers_bioinformatics` | ✅ |  |
+| [Frontiers in Genetics](https://www.frontiersin.org/journals/genetics) | `frontiers_genetics` | ✅ |  |
+| [Frontiers in Immunology](https://www.frontiersin.org/journals/immunology) | `frontiers_immunology` | ✅ |  |
 | [Genome Biology](https://genomebiology.biomedcentral.com) | `genome_biology` | ✅ | ✅ |
 | [Genome Medicine](https://genomemedicine.biomedcentral.com) | `genome_medicine` | ✅ |  |
 | [Genome Research](https://genome.cshlp.org) | `genome_research` | ✅ |  |
@@ -151,16 +166,24 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 | [Nature](https://www.nature.com) | `nature` | ✅ | ✅ |
 | [Nature Biomedical Engineering](https://www.nature.com/natbiomedeng) | `nature_biomedical_engineering` | ✅ | ✅ |
 | [Nature Biotechnology](https://www.nature.com/nbt) | `nature_biotech` | ✅ | ✅ |
+| [Nature Cell Biology](https://www.nature.com/ncb) | `nature_cell_biology` | ✅ |  |
 | [Nature Communications](https://www.nature.com/ncomms) | `nature_communications` | ✅ |  |
+| [Nature Computational Science](https://www.nature.com/natcomputsci) | `nature_computational_science` | ✅ |  |
 | [Nature Genetics](https://www.nature.com/ng) | `nature_genetics` | ✅ |  |
 | [Nature Machine Intelligence](https://www.nature.com/natmachintell) | `nature_machine_intelligence` | ✅ | ✅ |
 | [Nature Medicine](https://www.nature.com/nm) | `nature_medicine` | ✅ |  |
 | [Nature Methods](https://www.nature.com/nmeth) | `nature_methods` | ✅ | ✅ |
+| [Nature Neuroscience](https://www.nature.com/neuro) | `nature_neuroscience` | ✅ |  |
+| [Nature Structural & Molecular Biology](https://www.nature.com/nsmb) | `nature_structural_molecular_biology` | ✅ |  |
 | [NEJM](https://www.nejm.org) | `nejm` | ✅ |  |
 | [Neuron](https://www.cell.com/neuron) | `neuron` | ✅ |  |
 | [npj Digital Medicine](https://www.nature.com/npjdigitalmed) | `npj_digital_medicine` | ✅ |  |
 | [Nucleic Acids Research](https://academic.oup.com/nar) | `nucleic_acids_research` | ✅ | ✅ |
+| [PLOS Biology](https://journals.plos.org/plosbiology/) | `plos_biology` | ✅ |  |
 | [PLOS Computational Biology](https://journal.plos.org/ploscompbiol/) | `plos_compbio` | ✅ | ✅ |
+| [PLOS Genetics](https://journals.plos.org/plosgenetics/) | `plos_genetics` | ✅ |  |
+| [PLOS Medicine](https://journals.plos.org/plosmedicine/) | `plos_medicine` | ✅ |  |
+| [PLOS ONE](https://journals.plos.org/plosone/) | `plos_one` | ✅ |  |
 | [PNAS](https://www.pnas.org) | `pnas` | ✅ |  |
 | [Radiology](https://pubs.rsna.org/journal/radiology) | `radiology` | ✅ |  |
 | [Radiology: Artificial Intelligence](https://pubs.rsna.org/journal/ai) | `radiology_ai` | ✅ |  |
@@ -170,6 +193,7 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 | [Science Robotics](https://www.science.org/journal/scirobotics) | `science_robotics` | ✅ | ✅ |
 | [Science Signaling](https://www.science.org/journal/signaling) | `science_signaling` | ✅ | ✅ |
 | [Science Translational Medicine](https://www.science.org/journal/stm) | `science_translational_medicine` | ✅ | ✅ |
+| [Scientific Reports](https://www.nature.com/srep) | `scientific_reports` | ✅ |  |
 | [TMLR](https://jmlr.org/tmlr/) | `tmlr` | ✅ |  |
 
 **Conferences**
@@ -180,7 +204,7 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 | [CVPR 2027](https://cvpr.thecvf.com/Conferences/2027) | `cvpr_2027` | ✅ |  |
 <!-- END SUPPORTED VENUES -->
 
-View the list on the command line with `paperpush --venues`.
+View the list on the command line with `paperpush venues`.
 
 Venues are added (for validate) and updated (for validate and submit) daily. `paperpush update-venues` updates immediately.
 

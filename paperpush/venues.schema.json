@@ -50,6 +50,31 @@
         "description": {
           "description": "Short description of the venue.",
           "type": "string"
+        },
+        "keywords": {
+          "description": "Subject areas the venue covers, from a fixed vocabulary; 'paperpush venues --keywords' filters on them.",
+          "items": {
+            "enum": [
+              "general",
+              "biology",
+              "genetics",
+              "bioinformatics",
+              "immunology",
+              "neuroscience",
+              "medicine",
+              "radiology",
+              "machine learning",
+              "computer vision",
+              "natural language processing",
+              "robotics",
+              "math",
+              "statistics",
+              "physics",
+              "computer science"
+            ],
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object",

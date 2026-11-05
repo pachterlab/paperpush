@@ -2,9 +2,14 @@
 
 Implemented so far:
 
-    paperpush --venues          list supported venues
-    paperpush --venues submit   list only the venues paperpush can submit to
-    paperpush pick-venue <terms> find a venue slug from a loose query
+    paperpush venues            list supported venues
+    paperpush venues --validate list only the venues paperpush can validate against
+    paperpush venues --submit   list only the venues paperpush can submit to
+    paperpush venues -k KW -t TYPE
+                                      filter by subject keywords and venue type
+    paperpush pick-venue <keywords|manuscript>
+                                      rank venues for a manuscript (--title, --abstract,
+                                      --manuscript; --venue-name to search by name)
     paperpush subfile <venue>   create a <venue>.sub template
     paperpush options <venue>.<field>
                                       list the allowed values for a field
@@ -60,7 +65,7 @@ logger = logging.getLogger(__name__)
 _validate = validate_call(config=ConfigDict(arbitrary_types_allowed=True))
 
 
-# Ordered venue_type groups for `--venues`, mirroring the README's "Supported
+# Ordered venue_type groups for `paperpush venues`, mirroring the README's "Supported
 # venues" section. Each tuple is (venue_type value, human-facing heading); a
 # group with no venues still prints ("none yet") so every supported kind stays
 # visible.
@@ -101,42 +106,132 @@ def _print_agent_guide() -> int:
 _VALIDATE_ONLY = "paperpush can check a manuscript against its author guidelines ('paperpush validate') but cannot submit to it, so there is nothing to log in to."
 
 
-def _support_note(venue) -> str:
-    """A suffix for the venue listing when a venue lacks validate or submit support."""
-    if not venue.supports_submit:
-        return " -- validate only"
-    if not venue.supports_validate:
-        return " -- submit only"
-    return ""
+_TYPE_LABELS = {venue_type: heading.removesuffix("s").removesuffix(" server") for venue_type, heading in _VENUE_GROUPS}
+_CHECK = "\u2713"
+
+
+def _parse_keywords(text: str) -> list[str]:
+    """Split a ``--keywords`` value into known keywords, or raise ValueError naming the bad ones."""
+    from difflib import get_close_matches
+
+    from .database import VENUE_KEYWORDS
+
+    wanted = [k.strip().lower() for k in text.split(",") if k.strip()]
+    if not wanted:
+        raise ValueError("--keywords needs at least one keyword")
+    problems = []
+    for k in wanted:
+        if k not in VENUE_KEYWORDS:
+            close = get_close_matches(k, VENUE_KEYWORDS, n=1)
+            problems.append(f"unknown keyword {k!r}" + (f" (did you mean {close[0]!r}?)" if close else ""))
+    if problems:
+        raise ValueError("; ".join(problems) + ". Known keywords: " + ", ".join(VENUE_KEYWORDS))
+    return wanted
+
+
+# Columns of the `paperpush venues` table, in display order: the names --columns and
+# --hide-columns take.
+_VENUE_COLUMNS = ("slug", "venue", "keywords", "type", "link", "validate", "submit")
+
+
+def _parse_columns(text: str, flag: str) -> list[str]:
+    """Split a ``--columns``/``--hide-columns`` value into known column names, or raise ValueError."""
+    from difflib import get_close_matches
+
+    wanted = [c.strip().lower() for c in text.split(",") if c.strip()]
+    if not wanted:
+        raise ValueError(f"{flag} needs at least one column")
+    problems = []
+    for c in wanted:
+        if c not in _VENUE_COLUMNS:
+            close = get_close_matches(c, _VENUE_COLUMNS, n=1)
+            problems.append(f"unknown column {c!r}" + (f" (did you mean {close[0]!r}?)" if close else ""))
+    if problems:
+        raise ValueError("; ".join(problems) + ". Columns: " + ", ".join(_VENUE_COLUMNS))
+    return list(dict.fromkeys(wanted))
+
+
+def _select_columns(columns: list[str] | None, hidden: list[str] | None) -> list[str]:
+    """The columns to show: ``columns`` in the order given (default: all), minus ``hidden``."""
+    shown = [c for c in (columns or _VENUE_COLUMNS) if c not in set(hidden or ())]
+    if not shown:
+        raise ValueError("no columns left to show")
+    return shown
 
 
 @_validate
-def _print_venues(submit_only: bool = False) -> int:
+def _print_venues(
+    validate: bool = False,
+    submit: bool = False,
+    keywords: list[str] | None = None,
+    types: list[str] | None = None,
+    columns: list[str] | None = None,
+) -> int:
+    from rich.console import Console
+    from rich.table import Table
+
     venues = list_venues()
-    if submit_only:
-        venues = [v for v in venues if v.supports_submit]
     if not venues:
-        print("No venues support submit." if submit_only else "No venues are configured.")
+        print("No venues are configured.")
         return 0
-    by_type: dict[str, list] = {}
+    # Filters combine with AND; --keywords matches a venue carrying any of them.
+    if validate:
+        venues = [v for v in venues if v.supports_validate]
+    if submit:
+        venues = [v for v in venues if v.supports_submit]
+    if keywords:
+        venues = [v for v in venues if set(keywords) & set(v.keywords)]
+    if types:
+        venues = [v for v in venues if v.venue_type in types]
+    if not venues:
+        print("No venues match the given filters.")
+        return 0
+
+    # Group by venue_type in _VENUE_GROUPS order (unknown types last), then by name.
+    order = {venue_type: i for i, (venue_type, _) in enumerate(_VENUE_GROUPS)}
+    venues = sorted(venues, key=lambda v: (order.get(v.venue_type, len(order)), v.name.lower()))
+
+    # name -> (header, rich column options, cell value for a venue)
+    specs = {
+        # Slug and name never truncate; keywords and link wrap instead when space is short.
+        "slug": ("Slug", dict(style="cyan", no_wrap=True, min_width=max(len(v.slug) for v in venues)), lambda v: v.slug),
+        "venue": ("Venue", dict(no_wrap=True, min_width=max(len(v.name) for v in venues)), lambda v: v.name),
+        "keywords": ("Keywords", dict(ratio=1, min_width=12), lambda v: ", ".join(v.keywords)),
+        "type": ("Type", dict(no_wrap=True), lambda v: _TYPE_LABELS.get(v.venue_type, v.venue_type.capitalize())),
+        "link": ("Link", dict(style="dim", overflow="fold", ratio=1, min_width=12), lambda v: v.site_url or v.submission_url),
+        "validate": ("Validate", dict(justify="center", style="green", no_wrap=True), lambda v: _CHECK if v.supports_validate else ""),
+        "submit": ("Submit", dict(justify="center", style="green", no_wrap=True), lambda v: _CHECK if v.supports_submit else ""),
+    }
+    shown = list(columns or _VENUE_COLUMNS)
+    table = Table(box=None, header_style="bold", pad_edge=False)
+    for name in shown:
+        header, options, _ = specs[name]
+        table.add_column(header, **options)
     for venue in venues:
-        by_type.setdefault(venue.venue_type, []).append(venue)
+        table.add_row(*(specs[name][2](venue) for name in shown))
 
-    for i, (venue_type, heading) in enumerate(_VENUE_GROUPS):
-        if i:
-            print()
-        print(f"{heading}:")
-        members = by_type.get(venue_type, [])
-        if not members:
-            print("  (none yet)")
-            continue
-        for venue in members:
-            note = "" if submit_only else _support_note(venue)
-            print(f"  {venue.name} ({venue.slug}){note}")
-
-    print(f"\nFor more details, see {_VENUES_URL}")
-    print(f"Venue data: {venue_data.active_source().describe()} (refresh with 'paperpush update-venues')")
+    console = Console()
+    if not console.is_terminal:
+        # Piped or captured: one row per line rather than squeezing to 80 columns.
+        console = Console(width=max(console.width, 250))
+    console.print(table)
+    console.print(f"\nFor more details, see {_VENUES_URL}", highlight=False, soft_wrap=True)
+    console.print(f"Venue data: {venue_data.active_source().describe()} (refresh with 'paperpush update-venues')", highlight=False, soft_wrap=True)
     return 0
+
+
+@_validate
+def _cmd_venues(args: argparse.Namespace) -> int:
+    try:
+        keywords = _parse_keywords(args.keywords) if args.keywords is not None else None
+        columns = _select_columns(
+            _parse_columns(args.columns, "--columns") if args.columns is not None else None,
+            _parse_columns(args.hide_columns, "--hide-columns") if args.hide_columns is not None else None,
+        )
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    return _print_venues(validate=args.validate, submit=args.submit, keywords=keywords, types=args.types, columns=columns)
 
 
 @_validate
@@ -292,7 +387,7 @@ def _cmd_add_venue(args: argparse.Namespace) -> int:
             text = venuefile.template(slug, from_slug=args.from_slug, filename=Path(out).name if out != "-" else "VENUE.txt")
         except KeyError:
             print(f"error: unknown venue '{args.from_slug}'", file=sys.stderr)
-            print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+            print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
             return 2
         if out == "-":
             sys.stdout.write(text)
@@ -494,43 +589,107 @@ def _cmd_web(args: argparse.Namespace) -> int:
 
 @_validate
 def _cmd_pick_venue(args: argparse.Namespace) -> int:
-    from .venue_select import format_hits, pick_venues
+    from .autofill import AutofillApiError
+    from .venue_select import format_hits, pick_venues, rank_via_api, select
 
-    query = " ".join(args.query).strip()
-    if not query and not args.types and not args.portal:
-        print("error: pick-venue needs a query, --type, or --portal", file=sys.stderr)
+    positional = list(args.keywords_pos or [])
+    manuscript = args.manuscript
+    # A single argument naming an existing file is the manuscript, not a keyword.
+    if not manuscript and len(positional) == 1 and Path(positional[0]).expanduser().is_file():
+        manuscript, positional = str(Path(positional[0]).expanduser()), []
+    # Positional words form phrases; commas separate keywords ("single cell, T cell exhaustion").
+    keywords = ([" ".join(positional)] if positional else []) + list(args.keywords or [])
+    name = args.venue_name or ""
+    if not (keywords or args.title or args.abstract or manuscript or name or args.types or args.portal):
+        print("error: pick-venue needs keywords, --title, --abstract, --manuscript, --venue-name, --type, or --portal", file=sys.stderr)
         print("Run 'paperpush pick-venue --help' for usage.", file=sys.stderr)
         return 2
 
-    hits = pick_venues(query, venue_types=tuple(args.types or ()), portals=tuple(args.portal or ()))
-
-    if not hits:
-        # A query with no tokens is rejected above, so reaching here with no
-        # hits means the input matched nothing -- an unusable answer for both
-        # humans and agents, hence a failing exit code rather than an empty
-        # list.
-        what = f" {query!r}" if query else " the given filters"
-        print(f"error: no venues matched{what}", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+    try:
+        selection = select(keywords=keywords, title=args.title or "", abstract=args.abstract or "", manuscript=manuscript, name=name, venue_types=tuple(args.types or ()), portals=tuple(args.portal or ()))
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    mq = selection.manuscript
+    if mq is not None and mq.is_empty():
+        print(f"error: found no title, abstract, or text to go on in {mq.source}", file=sys.stderr)
         return 1
 
+    ranking = None
+    if args.ai:
+        if mq is None:
+            print("error: --ai needs something to judge: keywords, --title, --abstract, or --manuscript", file=sys.stderr)
+            return 2
+        judged = mq
+        candidates = [h.venue for h in pick_venues("", venue_types=tuple(args.types or ()), portals=tuple(args.portal or ()))]
+        limit = len(candidates) if args.all else max(args.limit, 1)
+        try:
+            ranking = rank_via_api(judged, candidates, limit=limit, provider=args.provider, model=args.model)
+        except AutofillApiError as exc:
+            print(f"error: --ai: {exc}", file=sys.stderr)
+            return 1
+
     if args.json:
-        json.dump(
-            [{"slug": hit.venue.slug, "name": hit.venue.name, "venue_type": hit.venue.venue_type, "portal": hit.portal, "score": hit.score} for hit in hits],
-            sys.stdout,
-            indent=2,
-        )
+        data = selection.to_dict(limit=None if args.all else args.limit)
+        data["ai"] = ranking.to_dict() if ranking else None
+        json.dump(data, sys.stdout, indent=2)
         print()
+        return 0 if (selection.hits or (ranking and ranking.picks)) else 1
+
+    if mq is not None and mq.source not in ("query", "options"):
+        found = [name for name, value in (("title", mq.title), ("abstract", mq.abstract), ("keywords", mq.keywords)) if value]
+        if found:
+            print(f"Read the {' and '.join(found) if len(found) < 3 else 'title, abstract, and keywords'} from {mq.source}.")
+        else:
+            print(f"No title or abstract found in {mq.source}; used the start of its text.")
+        if mq.title:
+            print(f"  Title: {mq.title}")
+    if ranking is not None:
+        if ranking.subjects:
+            print(f"Subjects ({ranking.model}): {', '.join(ranking.subjects)}")
+        if not ranking.picks:
+            print("error: the model picked no venues", file=sys.stderr)
+            return 1
+        by_slug = {h.venue.slug: h for h in pick_venues("", venues=candidates)}
+        shown = [by_slug[p.slug] for p in ranking.picks]
+        reasons = {p.slug: f"{p.fit}: {p.reason}" for p in ranking.picks}
+        for line in format_hits(shown, reasons=reasons):
+            print(line)
+        print(f"\nUse 'paperpush subfile {ranking.picks[0].slug}' to create its submission template.")
         return 0
 
+    if selection.inferred:
+        print("Subjects inferred: " + ", ".join(f"{s.subject} ({', '.join(s.terms[:3])})" for s in selection.inferred))
+    elif mq is not None and not selection.subjects and not name:
+        print(f"error: could not tell the subject; add --keywords with one or more venue subjects ({', '.join(k for k in _venue_keywords() if k != 'general')}) or use --ai", file=sys.stderr)
+        return 1
+
+    hits = selection.hits
+    if not hits:
+        # Reaching here with no hits means the input matched nothing -- an
+        # unusable answer for both humans and agents, hence a failing exit code
+        # rather than an empty list.
+        what = f" the venue name {name!r}" if name and mq is None else " the given input"
+        print(f"error: no venues matched{what}", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
+        return 1
+
     shown = hits if args.all else hits[: max(args.limit, 0)]
-    for line in format_hits(shown):
+    for line in format_hits(shown, show_keywords=bool(selection.subjects)):
         print(line)
 
     # The subfile hint always names the top-ranked hit, even when --limit
     # hides it, so a scripted run stays actionable with a single glance.
     print(f"\nUse 'paperpush subfile {hits[0].venue.slug}' to create its submission template.")
+    if mq is not None:
+        print("This matched words against each venue's subject keywords; add --ai for an LLM's ranking with reasons.")
     return 0
+
+
+def _venue_keywords() -> tuple[str, ...]:
+    from .database import VENUE_KEYWORDS
+
+    return VENUE_KEYWORDS
 
 
 def _cmd_subfile(args: argparse.Namespace) -> int:
@@ -540,7 +699,7 @@ def _cmd_subfile(args: argparse.Namespace) -> int:
     except KeyError:
         logger.warning("subfile: unknown venue %r", args.venue)
         print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
     if args.output:
@@ -695,7 +854,7 @@ def _cmd_login(args: argparse.Namespace) -> int:
 
     if not args.venue:
         print("error: a venue is required (or use --list)", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
     logger.debug("login: venue=%r orcid=%s status=%s logout=%s", args.venue, bool(args.orcid or args.orcid_id), args.status, args.logout)
@@ -704,7 +863,7 @@ def _cmd_login(args: argparse.Namespace) -> int:
     except KeyError:
         logger.warning("login: unknown venue %r", args.venue)
         print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
     # A venue that submits through another's portal (e.g. the AAAS family)
@@ -1150,7 +1309,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     except KeyError:
         logger.error("validate: unknown venue %r in %s", venue, args.subfile)
         print(f"error: unknown venue '{venue}'", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
     ai_only = getattr(args, "ai_only", False)
@@ -1660,7 +1819,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
         venue = get_venue(slug)
     except KeyError:
         print(f"error: unknown venue '{slug}'", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
     if text is None:
         text = render_template(venue, fill_defaults=True)
@@ -1734,7 +1893,7 @@ def _autofill_in_browser(args: argparse.Namespace, input_dirs: list[Path], input
         venue = get_venue(slug)
     except KeyError:
         print(f"error: unknown venue '{slug}'", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
     if text is None:
         text = render_template(venue, fill_defaults=True)
@@ -1927,7 +2086,7 @@ def _cmd_codegen(args: argparse.Namespace) -> int:
         try:
             venue_def = get_venue(slug)
         except KeyError:
-            print(f"error: unknown venue {slug!r} (see 'paperpush --venues')", file=sys.stderr)
+            print(f"error: unknown venue {slug!r} (see 'paperpush venues')", file=sys.stderr)
             return 1
         fields = [f.id for f in venue_def.fields]
         file_fields = [f.id for f in venue_def.fields if f.type in ("file", "filelist")]
@@ -1969,7 +2128,7 @@ def _cmd_schema(args: argparse.Namespace) -> int:
         venue = get_venue(args.venue)
     except KeyError:
         print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
     print(
@@ -2003,7 +2162,7 @@ def _cmd_requirements(args: argparse.Namespace) -> int:
         venue = get_venue(args.venue)
     except KeyError:
         print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
     reqs = get_requirements(venue.slug)
     if reqs is None:
@@ -2076,7 +2235,7 @@ def _cmd_options(args: argparse.Namespace) -> int:
         venue = get_venue(venue_slug)
     except KeyError:
         print(f"error: unknown venue '{venue_slug}'", file=sys.stderr)
-        print("Run 'paperpush --venues' to see supported venues.", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
     field = next((f for f in venue.fields if f.id == field_id), None)
@@ -2121,15 +2280,6 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"paperpush {__version__}")
-    parser.add_argument(
-        "--venues",
-        nargs="?",
-        const="all",
-        default=None,
-        choices=("all", "submit"),
-        metavar="{all,submit}",
-        help="list supported venues and exit; 'submit' lists only the venues paperpush can submit to (default: all)",
-    )
     parser.add_argument("--agent-guide", dest="agent_guide", action="store_true", help="print the guide for AI agents driving this CLI (AGENTS.md) and exit")
 
     # Verbosity is a per-command concern, so -v/-q live on each subcommand
@@ -2140,7 +2290,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     # metavar lists only the public commands; the internal 'schema' command is
     # registered below but deliberately left out so it does not appear in --help.
-    sub = parser.add_subparsers(dest="command", metavar="{subfile,options,autofill,validate,requirements,login,submit,codegen,web,pick-venue,add-venue,update-venues,install-skills}")
+    sub = parser.add_subparsers(dest="command", metavar="{venues,subfile,options,autofill,validate,requirements,login,submit,codegen,web,pick-venue,add-venue,update-venues,install-skills}")
+
+    p_venues = sub.add_parser(
+        "venues",
+        parents=[verbosity],
+        help="list the supported venues",
+        description="List the venues paperpush supports, grouped by type. Filters combine: "
+        "'paperpush venues --submit -t journal -k biology' lists biology journals paperpush can submit to.",
+    )
+    p_venues.add_argument("--validate", action="store_true", help="only venues paperpush can validate a manuscript against")
+    p_venues.add_argument("--submit", action="store_true", help="only venues paperpush can submit to")
+    p_venues.add_argument("-k", "--keywords", metavar="KW[,KW...]", help="only venues tagged with any of these comma-separated subject keywords (e.g. 'medicine,biology,bioinformatics')")
+    p_venues.add_argument("-t", "--type", dest="types", action="append", choices=[t for t, _ in _VENUE_GROUPS], metavar="TYPE", help="only venues of this kind: preprint, journal, or conference (repeatable)")
+    p_venues.add_argument("--columns", metavar="COL[,COL...]", help=f"show only these comma-separated columns, in this order (from: {', '.join(_VENUE_COLUMNS)})")
+    p_venues.add_argument("--hide-columns", dest="hide_columns", metavar="COL[,COL...]", help="hide these comma-separated columns")
+    p_venues.set_defaults(func=_cmd_venues)
 
     p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub submission template")
     p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv")
@@ -2411,13 +2576,35 @@ def build_parser() -> argparse.ArgumentParser:
     p_web.add_argument("--idle-timeout", type=float, default=None, help=argparse.SUPPRESS)
     p_web.set_defaults(func=_cmd_web)
 
-    p_pick = sub.add_parser("pick-venue", parents=[verbosity], help="find a venue slug from a loose query")
-    p_pick.add_argument("query", nargs="*", metavar="QUERY", help="free-text terms: slug, name, topic, or portal (e.g. 'bio', 'nature', 'scholarone')")
+    p_pick = sub.add_parser(
+        "pick-venue",
+        parents=[verbosity],
+        help="find venues for a manuscript, from its keywords, title, and abstract",
+        description="Rank the supported venues for a manuscript.\n\n"
+        "  paperpush pick-venue hippocampus 'place cells'      keywords (a venue subject such as 'immunology' matches directly)\n"
+        "  paperpush pick-venue paper.pdf                      a manuscript (.tex, .zip, .docx, .pdf, or a .txt/.md with its title and abstract)\n"
+        "  paperpush pick-venue --title T --abstract A memory  the parts separately\n"
+        "  paperpush pick-venue --venue-name 'nature neuro'    venues by name\n"
+        "  paperpush pick-venue paper.pdf --ai                 an LLM's ranking, with a reason for each venue\n\n"
+        "Keywords and the title count three times as much as the abstract when they are matched to venue subjects "
+        "with a built-in word list (offline); --ai asks an LLM instead and needs a provider API key. "
+        "Only venues paperpush supports are ranked, on thematic fit alone.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_pick.add_argument("keywords_pos", nargs="*", metavar="KEYWORD", help="the manuscript's keywords, comma-separated as in a paper's keyword line (words without commas form one phrase, e.g. single cell RNA-seq, T cell exhaustion). A single existing file is read as --manuscript instead")
+    p_pick.add_argument("--manuscript", metavar="PATH", help="a manuscript (.tex, .zip, .docx, .pdf) to read the title, abstract, and keywords from, or a .txt/.md holding them")
+    p_pick.add_argument("--title", metavar="TEXT", help="the manuscript's title (replaces the one read from --manuscript)")
+    p_pick.add_argument("--abstract", metavar="TEXT", help="the manuscript's abstract (replaces the one read from --manuscript)")
+    p_pick.add_argument("-k", "--keywords", action="append", metavar="KW[,KW...]", help="more keywords, as for KEYWORD (repeatable; added to those read from --manuscript)")
+    p_pick.add_argument("--venue-name", "--journal-name", "--conference-name", dest="venue_name", metavar="NAME", help="search venues by slug, name, or full name, e.g. 'nature methods' or 'neuro'")
     p_pick.add_argument("-t", "--type", dest="types", action="append", choices=["preprint", "journal", "conference"], metavar="TYPE", help="only venues of this kind (repeatable)")
     p_pick.add_argument("--portal", dest="portal", action="append", metavar="PORTAL", help="only venues submitting through this portal (repeatable), e.g. scholarone")
     p_pick.add_argument("-n", "--limit", type=int, default=5, metavar="N", help="show at most N matches (default: 5)")
     p_pick.add_argument("--all", action="store_true", help="show every match instead of limiting")
-    p_pick.add_argument("--json", action="store_true", help="print matches as JSON (slug, name, venue_type, portal, score) for agents")
+    p_pick.add_argument("--ai", action="store_true", help="ask an LLM to choose the subjects and rank the venues, with a reason each (needs ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY)")
+    p_pick.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(--ai) LLM provider; defaults to the first whose API key is set")
+    p_pick.add_argument("--model", help="(--ai) model to use (default: the provider's autofill default)")
+    p_pick.add_argument("--json", action="store_true", help="print the result as JSON for agents: matches (slug, name, venue_type, portal, keywords, score, reasons), the subjects used, what was read from the manuscript, and the --ai ranking")
     p_pick.set_defaults(func=_cmd_pick_venue)
 
     p_add = sub.add_parser(
@@ -2497,9 +2684,6 @@ def main(argv: list[str] | None = None) -> int:
 
     configure_logging(verbosity=getattr(args, "verbose", 0), quiet=getattr(args, "quiet", False))
     logger.debug("dispatch: command=%r", getattr(args, "command", None))
-
-    if args.venues:
-        return _print_venues(submit_only=args.venues == "submit")
 
     if args.agent_guide:
         return _print_agent_guide()

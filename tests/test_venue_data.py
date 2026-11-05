@@ -566,5 +566,5 @@ def test_update_venues_reports_network_failure(server, capsys):
 
 
 def test_venues_listing_names_the_data_source(capsys):
-    assert main(["--venues"]) == 0
+    assert main(["venues"]) == 0
     assert "Venue data: bundled with paperpush" in capsys.readouterr().out

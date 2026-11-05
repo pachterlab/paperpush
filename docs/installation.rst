@@ -88,7 +88,7 @@ Verify the install
 .. code-block:: bash
 
    paperpush --version
-   paperpush --venues
+   paperpush venues
 
-``--venues`` prints every supported venue with its slug. See
+``paperpush venues`` prints every supported venue with its slug. See
 :doc:`venues` for the full list.

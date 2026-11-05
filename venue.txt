@@ -1,0 +1,578 @@
+# paperpush venue file  -*- mode: yaml -*-
+#
+# Describes one venue (journal, preprint server, or conference) for paperpush.
+# Fill it in, then add it with:   paperpush add-venue venue.txt
+#
+#   [venue]                       -> venues.json: the list of venues
+#   [form], [field ID]            -> submission_forms.json: what the portal asks for
+#   [requirements],
+#   [requirements.SECTION],
+#   [article_type NAME]           -> manuscript_requirements.json: what the author
+#                                    guidelines require of the manuscript
+#
+# Syntax (the same as a .sub file): `key: value` on one line, or `key: |` followed by
+# lines indented two spaces. Lists: comma-separated on one line, or one item per line
+# in a `|` block. Booleans: yes / no. Leave a value empty when the venue does not say;
+# empty keys are ignored. Lines starting with '#' are comments.
+#
+# Record only what the venue's own pages state. To fill it in with an AI agent: "Fill
+# in venue.txt for <venue> from its submission portal and author guidelines."
+
+# ======================================================================================
+# [venue]  ->  venues.json
+# General information about the venue.
+# ======================================================================================
+[venue]
+
+# The venue's id: lowercase letters, digits and underscores (e.g. 'nature_genetics').
+# Used as `paperpush subfile SLUG`.
+slug: ""
+
+# Display name. Defaults to the slug when omitted.
+name:
+
+# Full, unabbreviated venue name.
+full_name:
+
+# Kind of venue: a preprint server, a journal, or a conference. (one of: preprint |
+# journal | conference)
+venue_type: journal
+
+# Anonymous (double-blind) review: validate checks the attached files and linked
+# anonymous.4open.science repositories for information identifying the authors. (yes/no)
+anonymous: no
+
+# Hidden from listings but still reachable by get_venue. (yes/no)
+deprecated:
+
+# Public homepage URL.
+site_url:
+
+# URL of the author/submission guide.
+submission_guide:
+
+# Short description of the venue.
+description:
+
+# Subject areas the venue covers, from a fixed vocabulary; 'paperpush --venues
+# --keywords' filters on them. (list of: general, biology, genetics, bioinformatics,
+# immunology, neuroscience, medicine, radiology, machine learning, computer vision,
+# natural language processing, robotics, math, statistics, physics, computer science)
+keywords:
+
+# ======================================================================================
+# [form] and [field ID]  ->  submission_forms.json
+# The submission portal's form, for `paperpush subfile` / `submit`. List the fields in
+# the order the portal asks for them. Delete the [field] blocks the portal does not
+# have, edit the rest, and copy one to add a field. Submitting also needs a runner
+# script (see CONTRIBUTING.md); without one, the form still gives `subfile` and
+# `validate` the venue's fields.
+# ======================================================================================
+[form]
+
+# no = a validate-only venue: no submission form is written, and the [field] blocks are
+# ignored. (yes/no)
+include: yes
+
+# Submission/portal URL.
+submission_url:
+
+# Labels offered by the portal's per-file 'file type' dropdown (venue-level because the
+# same dropdown applies to every upload). (list)
+file_type_options:
+
+# Maximum combined size, in megabytes, of all files in one submission. (number)
+max_upload_mb:
+
+# Slug this venue inherits its field schema from. Empty/absent for a standalone venue.
+# Distinct from submission sharing (which portal/runner/login a venue submits through),
+# which is defined in code, not here. An inheriting form's [field] blocks only list the
+# keys they change.
+inherits:
+
+# Field keys ([field ID] blocks; ID is the key used in the .sub file):
+#   label: Human-readable prompt shown for the field
+#   type: Widget/value kind: text | textarea | choice | multichoice | boolean | int |
+#       file | filelist | authorlist
+#   required: Whether submission requires a value (yes/no)
+#   section: .sub template section the field is listed under, for an id paperpush does
+#       not already place: type | files | metadata | authors | reviewers | declarations
+#       | additional
+#   help: Guidance shown alongside the field
+#   options: Allowed values for `choice`/`multichoice` (list)
+#   options_file: Name of a newline-separated keyword file under `venues/_assets/` whose
+#       lines become this field's `options`
+#   options_recommended: For a `choice`/`multichoice` field, whether `options` is
+#       advisory (a value outside the list is a WARNING, not an ERROR) rather than a
+#       closed set (yes/no)
+#   default: Default value, written like the field's own value (yes/no for a boolean)
+#   accept: Permitted file extensions for `file`/`filelist`, e.g. [".pdf", ".docx"]
+#       (list)
+#   fields: Sub-field (column) names for a structured multi-item field such as an
+#       `authorlist` or a pipe-delimited `textarea` (funding, suggested reviewers)
+#       (list)
+#   type_options: Per-file 'file type' dropdown choices applied to this field's uploads
+#       (list)
+#   min_count: Inclusive lower bound on item count for a multi-item field (multichoice
+#       selections, filelist/authorlist/list-textarea lines) (whole number)
+#   max_count: Inclusive upper bound on item count for a multi-item field (whole number)
+#   word_count: Maximum length in words for a `text`/`textarea` value (whole number)
+#   character_count: Maximum length in characters for a `text`/`textarea` value, or for
+#       the free text of a `choice` with `options_recommended` (whole number)
+#   min_character_count: Minimum length in characters for a `text`/`textarea` value (the
+#       lower-bound counterpart to `character_count`) (whole number)
+#   require_url: For a `text`/`textarea`, require each non-blank line of the value to be
+#       a valid http/https URL (yes/no)
+#   max_words_before_refs: For a manuscript `file`, the maximum word count of the main
+#       text before the reference list (whole number)
+#   max_pages_before_refs: For a manuscript `file` (PDF), the maximum page count before
+#       the reference list (whole number)
+#   main_text_end_headings: For a manuscript `file`, headings *other than the reference
+#       list* that end the main text for the `*_before_refs` limits (e.g. `Appendix`,
+#       `Ethics Statement`) -- sections the venue excludes from its word/page count
+#       (list)
+#   max_words: For a manuscript `file`, the maximum word count of the whole document
+#       (references included) (whole number)
+#   max_pages: For a manuscript `file`, the maximum page count of the whole document
+#       (whole number)
+#   max_words_before_refs_by: `max_words_before_refs` selected by a sibling field's
+#       value (e.g. by article type) (JSON)
+#   max_pages_before_refs_by: `max_pages_before_refs` selected by a sibling field's
+#       value (JSON)
+#   max_words_by: `max_words` selected by a sibling field's value (JSON)
+#   max_pages_by: `max_pages` selected by a sibling field's value (e.g (JSON)
+#   min_value: Inclusive lower bound on the numeric value of an `int` field (whole
+#       number)
+#   max_value: Inclusive upper bound on the numeric value of an `int` field (whole
+#       number)
+#   max_file_size_mb: Maximum size, in megabytes, of each individual file uploaded for a
+#       `file`/`filelist` field (number)
+#   autofill: How an autofill engine may populate the field: extract | classify |
+#       filemap | never
+#   confirm: For a required `boolean`, whether it is a consent checkbox that must be
+#       affirmative (vs. an informational yes/no question) (yes/no)
+#   required_if: Id of another field in the same venue; when that field has a non-empty
+#       value, this field becomes required
+# Reuse a common id where one fits (abstract, acknowledgements, additional_datasets,
+# additional_files, agree_terms, alternate_contact, are_you_corresponding, article_type,
+# author_consent, author_contributions, authors, code_availability, code_url,
+# combined_pdf, comments_to_editor, competing_interest, competing_interests,
+# competing_interests_statement, conflict_of_interest, corresponding_gender,
+# cover_letter, data_availability, data_availability_links, data_availability_statement,
+# ...): it is placed in the .sub automatically.
+
+[field article_type]
+label: Article type
+type: choice
+required: yes
+help: The kind of article being submitted.
+options: |
+autofill: classify
+
+[field manuscript_file]
+label: Manuscript file
+type: file
+required: yes
+help: Path to the manuscript.
+accept: .pdf, .docx
+autofill: filemap
+
+[field figure_files]
+label: Figure files
+type: filelist
+help: Optional. One figure file per line as 'path | label' (label optional).
+autofill: filemap
+
+[field supplementary_files]
+label: Supplementary files
+type: filelist
+help: Optional. One supplementary file per line as 'path | label' (label optional).
+autofill: filemap
+
+[field cover_letter]
+label: Cover letter
+type: file
+help: Path to the cover letter.
+accept: .pdf, .docx
+autofill: filemap
+
+[field title]
+label: Title
+type: text
+required: yes
+help: The full title of the manuscript.
+autofill: extract
+
+[field abstract]
+label: Abstract
+type: textarea
+required: yes
+help: The abstract as it appears in the manuscript.
+autofill: extract
+
+[field keywords]
+label: Keywords
+type: text
+help: Comma-separated keywords.
+autofill: extract
+
+[field authors]
+label: Authors
+type: authorlist
+required: yes
+help: |
+  One author per line, in order. Format: Name | email | affiliation | ORCID |
+  corresponding(yes/no). Mark exactly one author as the corresponding author.
+fields: name, email, affiliation?, orcid?, corresponding
+autofill: extract
+
+[field suggested_reviewers]
+label: Suggested reviewers
+type: textarea
+help: Optional. One reviewer per line as 'Name | email | institution'.
+fields: name, email, institution?
+autofill: never
+
+[field excluded_reviewers]
+label: Excluded reviewers
+type: textarea
+help: Optional. One person per line as 'Name | email | institution'.
+fields: name, email?, institution?
+autofill: never
+
+[field funding]
+label: Funding statement
+type: textarea
+help: The funding statement as it appears in the manuscript.
+autofill: extract
+
+[field competing_interests]
+label: Competing interests
+type: textarea
+help: The competing interests statement as it appears in the manuscript.
+autofill: extract
+
+[field data_availability]
+label: Data availability statement
+type: textarea
+help: The data availability statement as it appears in the manuscript.
+autofill: extract
+
+[field comments_to_editor]
+label: Comments to the editor
+type: textarea
+help: Optional. Anything the editor should know.
+autofill: never
+
+# ======================================================================================
+# [requirements] and [requirements.SECTION]  ->  manuscript_requirements.json
+# What the author guidelines require of the manuscript itself. `paperpush validate`
+# measures the manuscript against these. Record only what the guidelines state, leaving
+# the rest empty. Rules with no key of their own go in a section's `notes`, one sentence
+# per line. These are the rules for a research article. Put another article type's
+# differences in an [article_type NAME] block at the end.
+# ======================================================================================
+[requirements]
+
+# no = skip the author guidelines: no manuscript_requirements.json entry is written.
+# (yes/no)
+include: yes
+
+# Guideline pages the entry was taken from. (list)
+source_urls:
+
+# Date (YYYY-MM-DD) you read the guideline pages.
+retrieved: 2026-11-04
+
+# Slug whose requirements this entry starts from. Empty for a standalone entry.
+inherits:
+
+# Id of the form field that selects the article type (usually article_type). Its options
+# name the [article_type ...] blocks below.
+article_type_field:
+
+# Venue-wide rules that fit no section. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# Rules for the main manuscript file: format, size, length, and layout.
+[requirements.manuscript]
+# File extensions accepted for the main manuscript upload (lowercase, with dot). (list)
+formats:
+# Maximum size of the manuscript file in MB. (number)
+max_file_size_mb:
+# Maximum word count of the whole document, references included. (whole number)
+max_words:
+# Maximum word count of the main text (before the reference list). (whole number)
+max_words_before_refs:
+# Maximum page count of the whole document. (whole number)
+max_pages:
+# Maximum page count of the main text (before the reference list). (whole number)
+max_pages_before_refs:
+# Headings other than the reference list that end the main text for the before-refs
+# limits (e.g. Appendix). (list)
+main_text_end_headings:
+# Headings that start the main text the venue's word count covers, when it is not the
+# Introduction (e.g. Main, Results). Used to check a word count stated on the title
+# page. (list)
+main_text_start_headings:
+# Parts of the manuscript the venue leaves out of its word/page count (informational).
+# (list)
+count_excludes:
+# Parts the venue explicitly counts that authors might not expect (informational).
+# (list)
+count_includes:
+# Maximum number of figures and tables combined. (whole number)
+max_display_items:
+# Continuous line numbers required. (yes/no)
+line_numbers:
+# Double line spacing required. (yes/no)
+double_spacing:
+# Page numbers required. (yes/no)
+page_numbers:
+# Mandated body font, if any.
+font:
+# Mandated body font size in points, if any. (number)
+font_size_pt:
+# Mandated page margins in mm, if any. (number)
+margins_mm:
+# Mandated page size (A4, US Letter), if any.
+page_size:
+# Manuscript must be a single file holding text, figures, and tables. (yes/no)
+single_file:
+# Where figures go relative to the main manuscript file. (one of: end | inline |
+# separate | end_or_inline)
+figures_placement:
+# Where tables go relative to the main manuscript file. (one of: end | inline | separate
+# | end_or_inline)
+tables_placement:
+# Double-blind: no author names or affiliations in the manuscript. (yes/no)
+anonymized:
+# Must use the venue's style file or template. (yes/no)
+template_required:
+# URL of the venue's template.
+template_url:
+# Required LaTeX document class or style file.
+latex_class:
+# Mandated language variant, if any.
+language:
+# Set only when the venue lets the initial submission be in any format (formatting rules
+# apply from revision or acceptance): the venue's rule, in one sentence. `validate`
+# prints it at the top of the report and `--initial-submission` turns errors into
+# warnings.
+initial_submission_any_format:
+# Rules with no structured key, one per string. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# What the title page must carry.
+[requirements.title_page]
+# Canonical ids of the items the title page must carry. (list of: title, authors,
+# affiliations, corresponding_author, corresponding_email, orcid, keywords,
+# running_title, word_count, figure_count, table_count, author_contributions, funding,
+# competing_interests, abstract, postal_address, phone, one_sentence_summary,
+# classification, author_footnotes)
+required_items:
+# Title page is uploaded as its own file (double-blind venues). (yes/no)
+separate_file:
+# Maximum title length in characters (spaces included). (whole number)
+title_max_characters:
+# Maximum title length in words. (whole number)
+title_max_words:
+# Maximum running/short title length in characters. (whole number)
+running_title_max_characters:
+# Rules with no structured key. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# Abstract length and structure.
+[requirements.abstract]
+# Maximum abstract length in words. (whole number)
+max_words:
+# Minimum abstract length in words. (whole number)
+min_words:
+# Maximum abstract length in characters. (whole number)
+max_characters:
+# Abstract must be structured into labelled subsections. (yes/no)
+structured:
+# The subsection labels a structured abstract must carry. (list)
+structured_headings:
+# Abstract must not cite references. (yes/no)
+no_references:
+# Undefined abbreviations are banned in the abstract. (yes/no)
+no_abbreviations:
+# Rules with no structured key. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# How many keywords the manuscript must list.
+[requirements.keywords]
+# Minimum number of keywords. (whole number)
+min:
+# Maximum number of keywords. (whole number)
+max:
+# Rules with no structured key. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# Section headings the manuscript body must (or may) carry.
+[requirements.sections]
+# Canonical section names the manuscript must contain (matched via $aliases). (list)
+required:
+# Canonical section names the venue allows but does not require. (list)
+optional:
+# Prescribed section order, if the venue states one. (list)
+order:
+# Combined headings the venue accepts (e.g. Results and Discussion). (list)
+combined_allowed:
+# Rules with no structured key. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# Declarations that must appear in the manuscript text.
+[requirements.statements]
+# Canonical ids of the declarations the manuscript must contain (matched via $aliases).
+# (list of: data_availability, code_availability, competing_interests,
+# author_contributions, funding, acknowledgements, ethics_approval,
+# consent_to_participate, consent_to_publish, materials_availability, lead_contact,
+# inclusion_and_diversity, ai_use, reproducibility, ethics_statement,
+# clinical_trial_registration, reporting_guidelines)
+required:
+# Declarations the venue accepts but does not require. (list of: data_availability,
+# code_availability, competing_interests, author_contributions, funding,
+# acknowledgements, ethics_approval, consent_to_participate, consent_to_publish,
+# materials_availability, lead_contact, inclusion_and_diversity, ai_use,
+# reproducibility, ethics_statement, clinical_trial_registration, reporting_guidelines)
+optional:
+# Rules with no structured key. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# Figure file format, resolution, dimensions, and count.
+[requirements.figures]
+# Accepted figure file extensions. (list)
+formats:
+# Formats preferred for line art / vector figures. (list)
+vector_formats:
+# Minimum resolution for halftone/photographic figures. (whole number)
+min_dpi:
+# Minimum resolution for line art. (whole number)
+min_dpi_line_art:
+# Minimum resolution for combination (halftone + line) figures. (whole number)
+min_dpi_combination:
+# Maximum size of each figure file in MB. (number)
+max_file_size_mb:
+# Maximum number of main-text figures. (whole number)
+max_count:
+# Single-column figure width in mm. (number)
+single_column_width_mm:
+# Double-column figure width in mm. (number)
+double_column_width_mm:
+# Maximum figure width in mm. (number)
+max_width_mm:
+# Maximum figure height in mm. (number)
+max_height_mm:
+# Accepted colour spaces (RGB, CMYK, grayscale). (list)
+color_mode:
+# Minimum font size for figure lettering, in points. (number)
+min_font_size_pt:
+# Maximum font size for figure lettering, in points. (number)
+max_font_size_pt:
+# Mandated or recommended figure font.
+font:
+# Maximum words per figure legend. (whole number)
+legend_max_words:
+# Where figure legends go. (one of: end_of_manuscript | with_figure | after_references)
+legends_location:
+# Required style of panel labels.
+multipanel_labels:
+# Colour figures carry a charge. (yes/no)
+color_charge:
+# Where figures go for the initial submission. (one of: separate_files |
+# end_of_manuscript | inline | end_or_inline)
+placement:
+# Rules with no structured key. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# Table file format, editability, count, and placement.
+[requirements.tables]
+# Accepted table file extensions. (list)
+formats:
+# Tables must be editable text, not images. (yes/no)
+editable:
+# Maximum number of main-text tables. (whole number)
+max_count:
+# Where tables go for the initial submission. (one of: separate_files |
+# end_of_manuscript | inline | end_or_inline)
+placement:
+# Rules with no structured key. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# Supplementary-file format, size, count, and bundling.
+[requirements.supplementary]
+# Accepted supplementary file extensions. (list)
+formats:
+# Maximum size of each supplementary file in MB. (number)
+max_file_size_mb:
+# Maximum number of supplementary files. (whole number)
+max_count:
+# Supplementary text, figures, and tables must be combined into one PDF. (yes/no)
+combined_single_pdf:
+# Rules with no structured key. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# Reference style and count.
+[requirements.references]
+# Reference style, in words.
+style:
+# Numbered (true) vs author-year (false) citations. (yes/no)
+numbered:
+# Maximum number of references. (whole number)
+max_count:
+# Article titles are required in reference entries. (yes/no)
+include_titles:
+# DOIs are required in reference entries. (yes/no)
+doi_required:
+# Unpublished work may be cited in the list. (yes/no)
+unpublished_allowed:
+# Preprints may be cited in the list. (yes/no)
+preprints_allowed:
+# Rules with no structured key. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# Whether a cover letter is required and how it is supplied.
+[requirements.cover_letter]
+# A cover letter is required. (yes/no)
+required:
+# Accepted cover letter file extensions. (list)
+formats:
+# Maximum cover letter length in words. (whole number)
+max_words:
+# Rules with no structured key. (list)
+notes:
+
+# --------------------------------------------------------------------------------------
+# Size caps on the submission's uploads as a whole.
+[requirements.upload]
+# Maximum combined size of one submission's uploads in MB. (number)
+max_total_mb:
+# Per-file size cap that applies to every upload, in MB. (number)
+max_file_mb:
+# Rules with no structured key. (list)
+notes:
+
+# ======================================================================================
+# [article_type NAME]  ->  manuscript_requirements.json article_types
+# One block per article type whose rules differ from the research article's. NAME is the
+# type's option string exactly as in the form's article-type field (article_type_field).
+# Set only what differs, as `section.key: value` (e.g.
+# `manuscript.max_words_before_refs: 3000`), plus `notes`.
+# ======================================================================================
+
+# [article_type Brief Communication]
+# manuscript.max_words_before_refs: 1500
+# abstract.max_words: 100

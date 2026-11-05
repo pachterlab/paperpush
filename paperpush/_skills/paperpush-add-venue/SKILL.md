@@ -28,7 +28,7 @@ order.
 ## 0. Pick the path
 
 ```
-paperpush --venues | grep -i <name>
+paperpush venues | grep -i <name>
 ls paperpush/venues/*/ | grep -i <slug>
 ```
 

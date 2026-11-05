@@ -150,13 +150,13 @@ def build_table() -> str:
     lines = [
         f"_{len(venues)} supported venue" + ("s" if len(venues) != 1 else "") + " (auto-generated from `paperpush/venues.json`)._",
         "",
-        "| Slug | Venue | Venue type | Validate | Submit | Submission platform | Description | Submit walkthrough |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Slug | Venue | Keywords | Venue type | Validate | Submit | Submission platform | Description | Submit walkthrough |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for j in venues:
         validate, submit = ("yes" if j.supports_validate else "no"), ("yes" if j.supports_submit else "no")
         platform = platform_of(j) if j.has_form else "-"
-        lines.append(f"| `{j.slug}` | {_linked_name(j)} | {_cell(j.venue_type.capitalize())} | {validate} | {submit} | {_cell(platform)} | {_cell(j.description)} | {walkthrough_cell(j.slug, j.supports_submit)} |")
+        lines.append(f"| `{j.slug}` | {_linked_name(j)} | {_cell(', '.join(j.keywords))} | {_cell(j.venue_type.capitalize())} | {validate} | {submit} | {_cell(platform)} | {_cell(j.description)} | {walkthrough_cell(j.slug, j.supports_submit)} |")
     return "\n".join(lines)
 
 
@@ -166,7 +166,7 @@ def build_venue_groups() -> str:
     Each configured group (see :data:`VENUE_GROUPS`) becomes a heading plus a
     Markdown table with the venue (linked), its slug, a check for validate +
     basic .sub support (every listed venue), and a check for submit + full .sub
-    support (venues with a submit runner, i.e. ``paperpush --venues submit``).
+    support (venues with a submit runner, i.e. ``paperpush venues --submit``).
     Venues keep the database's display order; an empty group renders as
     "none yet" so every supported kind of venue stays visible.
     """

@@ -266,6 +266,36 @@ pytest tests/test_portal_drift.py --run-portal --update-snapshots
 pytest tests/test_portal_drift.py --run-portal --update-snapshots --venue nature
 ```
 
+### Scheduled portal-drift check
+
+`scripts/check_portal_drift.py` runs the drift tests and sorts each venue into
+one of five groups: drift (a selector the runner needs is gone, or the page
+structure changed), no committed baseline, no drift spec, not checked (bot wall,
+no or expired session), and unchanged. The report goes to
+`.portal_drift/report.md` and `report.json` (gitignored). When something
+drifted, it opens a GitHub issue labelled `portal-drift`. If one is already
+open, it adds the report as a comment instead. It never closes the issue: close
+it once the runner fix or refreshed snapshot is merged. Gaps in coverage are
+listed in the report but never open an issue by themselves.
+
+```bash
+python scripts/check_portal_drift.py --dry-run            # run, report, print instead of filing
+python scripts/check_portal_drift.py --venue biorxiv      # one venue
+python scripts/check_portal_drift.py --junit FILE --dry-run   # re-report an earlier run
+```
+
+`scripts/scheduled_portal_drift.sh` is the cron entry point. It runs the check
+against a detached checkout of `origin/main` (`.portal_drift/worktree`), reuses
+the saved sessions in paperpush's config directory, and reads optional
+`PAPERPUSH_TEST_USERNAME` / `PAPERPUSH_TEST_PASSWORD` from the gitignored
+`.portal_drift/env`. Logs go to `.portal_drift/logs/`. Like the guideline check,
+it runs on the maintainer's machine because that is where the sessions are. Each
+`test_first_step_drift` run leaves a dummy draft on its portal.
+
+```
+0 5 1 * * /home/jrich/Desktop/paperpush/scripts/scheduled_portal_drift.sh
+```
+
 Update venues.md checklist after running `pytest tests/test_submit.py --run-portal` (also run automatically by the pre-commit hook):
 
 ```bash
@@ -445,7 +475,7 @@ fix reaches installed copies without a PyPI release:
 2. Installed copies fetch that branch (`paperpush/venue_data.py`) at most once a
    day, verify every hash, check that the set loads, and cache it in
    `~/.cache/paperpush/venue-data`. `paperpush update-venues` refreshes the
-   cache right away, and `paperpush --venues` shows which copy is in use. With
+   cache right away, and `paperpush venues` shows which copy is in use. With
    no network or no cache, the bundled copy is used.
 
 Each installed version takes, entry by entry, only what its code can use. An
@@ -455,7 +485,8 @@ inherits from it:
 - `venues.json` (`merge_published_info` in `paperpush/database.py`): the
   general metadata is data only, so changes reach users. A new venue is added
   when it is validate-only (no published form); a new venue with a form waits
-  for the release that brings its runner.
+  for the release that brings its runner. A published entry without
+  `keywords` keeps the bundled entry's keywords.
 - `submission_forms.json` (`merge_published` in `paperpush/database.py`): a
   runner is written against its venue's field ids and types. So labels, help text,
   options, limits, `required` and URLs reach users without a release. New
@@ -531,8 +562,11 @@ A venue's data lives in three files under `paperpush/`, so a venue can be
 supported by `validate`, by `submit`, or both:
 
 - `venues.json`, the master list. A venue exists exactly when it has an entry
-  here: slug, name, type, homepage, `anonymous`, `deprecated`, ... (schema:
-  `VenueInfo` in `paperpush/database.py`).
+  here: slug, name, type, homepage, `anonymous`, `deprecated`, `keywords`, ...
+  (schema: `VenueInfo` in `paperpush/database.py`). `keywords` lists the
+  subject areas the venue covers, drawn from `VENUE_KEYWORDS` in the same file
+  (add a word there first if none fits); `paperpush venues --keywords
+  medicine,biology` filters the listing on them.
 - `submission_forms.json`, the submission form: the fields the portal asks for,
   its URL and upload limits (schema: `SubmissionForm` and `Field`). A venue with
   a form and a runner under `paperpush/venues/` supports `submit`.
@@ -542,7 +576,7 @@ supported by `validate`, by `submit`, or both:
 
 Support is worked out from the files rather than recorded as flags:
 `Venue.supports_validate` and `Venue.supports_submit` in
-`paperpush/database.py`, shown by `paperpush --venues` and in `venues.md`. A
+`paperpush/database.py`, shown by `paperpush venues` and in `venues.md`. A
 validate-only venue (no form) gets `default_form()`: title, abstract, keywords,
 authors, an article-type choice when its requirements have `article_types`, and
 the manuscript, figure, table, supplementary and cover-letter files. So

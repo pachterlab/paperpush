@@ -25,7 +25,7 @@ underlying `paperpush` command does the real work.
    fixtures.
 2. **The venue slug** (e.g. `bioinformatics`). If the user did not say it, ask
    or infer it from their message. Confirm it is supported with
-   `paperpush --venues`.
+   `paperpush venues`.
 
 Do **not** ask for a `.sub` path. Resolve it by this hierarchy: (1) an explicit
 `.sub` the user provided; (2) else an existing `<venue>.sub` in the manuscript

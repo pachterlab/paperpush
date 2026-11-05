@@ -203,6 +203,7 @@ def list_supported_venues(include_deprecated: bool = False) -> list[dict[str, An
             "full_name": venue.full_name,
             "venue_type": venue.venue_type,
             "description": venue.description,
+            "keywords": list(venue.keywords),
             "submission_url": venue.submission_url,
             "submission_guide": venue.submission_guide,
             "login_required": venue.has_form and venues_pkg.login_required(venue.slug),
@@ -213,6 +214,47 @@ def list_supported_venues(include_deprecated: bool = False) -> list[dict[str, An
         }
         for venue in list_venues(include_deprecated=include_deprecated)
     ]
+
+
+def pick_venue(
+    keywords: Optional[list[str]] = None,
+    title: str = "",
+    abstract: str = "",
+    manuscript: Optional[str] = None,
+    venue_name: str = "",
+    venue_types: Optional[list[Literal["preprint", "journal", "conference"]]] = None,
+    limit: int = 10,
+) -> dict[str, Any]:
+    """Rank the supported venues for a manuscript, or search them by name.
+
+    Give the manuscript's `title`, `abstract`, and `keywords`, or `manuscript`
+    (an absolute path to a .tex/.zip/.docx/.pdf, or a .txt/.md holding them)
+    to have them read from the file; title/abstract you pass replace what was
+    read, keywords are added. They are matched to venue subjects with a word
+    list, title and keywords counting more than the abstract. A keyword that is
+    itself one of `subject_vocabulary` (the subjects every venue is tagged with)
+    matches venues directly -- so when you can read the manuscript yourself,
+    pass the subjects you judge it covers as `keywords`: that is the better
+    ranking. `venue_name` searches venues by slug, name, or full name (e.g.
+    "nature methods"); `venue_types` narrows the field.
+
+    Returns the ranked `matches` (slug, name, venue_type, keywords, score, and
+    the reasons it matched), the subjects used, what was read from the
+    manuscript, and `subject_vocabulary`. Only venues paperpush supports are
+    ranked, on thematic fit alone; follow up with `describe_venue` and
+    `create_subfile` for the chosen slug.
+    """
+    from .database import VENUE_KEYWORDS
+    from .venue_select import select
+
+    if not (keywords or title.strip() or abstract.strip() or manuscript or venue_name.strip() or venue_types):
+        raise ValueError("give keywords, a title, abstract, manuscript, venue_name, or venue_types")
+    selection = select(keywords=keywords or (), title=title, abstract=abstract, manuscript=str(_resolve(manuscript)) if manuscript else None, name=venue_name, venue_types=tuple(venue_types or ()))
+    result = selection.to_dict(limit=limit)
+    result["subject_vocabulary"] = [k for k in VENUE_KEYWORDS if k != "general"]
+    if selection.manuscript is not None and not selection.subjects:
+        result["note"] = "No subject could be inferred; read the manuscript and pass subjects from subject_vocabulary as `keywords`."
+    return result
 
 
 def describe_venue(venue: str) -> dict[str, Any]:
@@ -1273,6 +1315,7 @@ def venue_resource(slug: str) -> str:
 
 TOOLS = (
     list_supported_venues,
+    pick_venue,
     describe_venue,
     field_options,
     create_subfile,
@@ -1329,7 +1372,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
     )
     for tool in TOOLS:
         server.tool()(tool)

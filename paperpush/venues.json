@@ -6,7 +6,14 @@
     "anonymous": false,
     "site_url": "https://www.biorxiv.org",
     "submission_guide": "https://www.biorxiv.org/submit-a-manuscript",
-    "description": "Free online archive and distribution service for unpublished preprints in the life sciences."
+    "description": "Free online archive and distribution service for unpublished preprints in the life sciences.",
+    "keywords": [
+      "biology",
+      "genetics",
+      "bioinformatics",
+      "neuroscience",
+      "immunology"
+    ]
   },
   "medrxiv": {
     "name": "medRxiv",
@@ -15,7 +22,10 @@
     "anonymous": false,
     "site_url": "https://www.medrxiv.org",
     "submission_guide": "https://www.medrxiv.org/submit-a-manuscript",
-    "description": "Free online archive and distribution server for complete but unpublished manuscripts (preprints) in the medical, clinical, and related health sciences."
+    "description": "Free online archive and distribution server for complete but unpublished manuscripts (preprints) in the medical, clinical, and related health sciences.",
+    "keywords": [
+      "medicine"
+    ]
   },
   "bioinformatics": {
     "name": "Bioinformatics",
@@ -24,7 +34,12 @@
     "anonymous": false,
     "site_url": "https://academic.oup.com/bioinformatics",
     "submission_guide": "https://academic.oup.com/bioinformatics/pages/General_Instructions",
-    "description": "Computational molecular biology covering new algorithms, software, databases, and analyses of biological data."
+    "description": "Computational molecular biology covering new algorithms, software, databases, and analyses of biological data.",
+    "keywords": [
+      "bioinformatics",
+      "biology",
+      "genetics"
+    ]
   },
   "nucleic_acids_research": {
     "name": "Nucleic Acids Research",
@@ -33,7 +48,12 @@
     "anonymous": false,
     "site_url": "https://academic.oup.com/nar",
     "submission_guide": "https://academic.oup.com/nar/pages/General_Instructions",
-    "description": "Leading research in nucleic acids, including their chemistry, biology, and applications, and computational and structural studies of nucleic acids and their interactions."
+    "description": "Leading research in nucleic acids, including their chemistry, biology, and applications, and computational and structural studies of nucleic acids and their interactions.",
+    "keywords": [
+      "biology",
+      "genetics",
+      "bioinformatics"
+    ]
   },
   "arxiv": {
     "name": "arXiv",
@@ -42,7 +62,15 @@
     "anonymous": false,
     "site_url": "https://arxiv.org",
     "submission_guide": "https://info.arxiv.org/help/submit/index.html",
-    "description": "Free distribution service and open-access archive for preprints in physics, mathematics, computer science, quantitative biology, quantitative finance, statistics, and more."
+    "description": "Free distribution service and open-access archive for preprints in physics, mathematics, computer science, quantitative biology, quantitative finance, statistics, and more.",
+    "keywords": [
+      "physics",
+      "math",
+      "computer science",
+      "machine learning",
+      "statistics",
+      "biology"
+    ]
   },
   "nature": {
     "name": "Nature",
@@ -51,7 +79,13 @@
     "anonymous": false,
     "site_url": "https://www.nature.com",
     "submission_guide": "https://www.nature.com/nature/for-authors/initial-submission",
-    "description": "Weekly multidisciplinary journal publishing peer-reviewed research of outstanding significance across all fields of science and technology, alongside news and commentary."
+    "description": "Weekly multidisciplinary journal publishing peer-reviewed research of outstanding significance across all fields of science and technology, alongside news and commentary.",
+    "keywords": [
+      "general",
+      "biology",
+      "medicine",
+      "physics"
+    ]
   },
   "nature_biotech": {
     "name": "Nature Biotechnology",
@@ -60,7 +94,13 @@
     "anonymous": false,
     "site_url": "https://www.nature.com/nbt",
     "submission_guide": "https://www.nature.com/nbt/submission-guidelines",
-    "description": "Publishes peer-reviewed research and analysis on the science and business of biotechnology, covering the application of biological systems to therapeutics, diagnostics, agriculture, and related areas."
+    "description": "Publishes peer-reviewed research and analysis on the science and business of biotechnology, covering the application of biological systems to therapeutics, diagnostics, agriculture, and related areas.",
+    "keywords": [
+      "biology",
+      "genetics",
+      "bioinformatics",
+      "medicine"
+    ]
   },
   "nature_methods": {
     "name": "Nature Methods",
@@ -69,7 +109,13 @@
     "anonymous": false,
     "site_url": "https://www.nature.com/nmeth",
     "submission_guide": "https://www.nature.com/nmeth/submission-guidelines",
-    "description": "Publishes peer-reviewed novel methods and significant improvements to techniques across the life sciences, including their development, validation, and application."
+    "description": "Publishes peer-reviewed novel methods and significant improvements to techniques across the life sciences, including their development, validation, and application.",
+    "keywords": [
+      "biology",
+      "bioinformatics",
+      "genetics",
+      "neuroscience"
+    ]
   },
   "cell": {
     "name": "Cell",
@@ -78,7 +124,13 @@
     "anonymous": false,
     "site_url": "https://www.cell.com/cell/home",
     "submission_guide": "https://www.cell.com/cell/authors",
-    "description": "Cell Press flagship journal publishing high-impact peer-reviewed research across the full breadth of the life sciences."
+    "description": "Cell Press flagship journal publishing high-impact peer-reviewed research across the full breadth of the life sciences.",
+    "keywords": [
+      "biology",
+      "genetics",
+      "neuroscience",
+      "immunology"
+    ]
   },
   "cell_systems": {
     "name": "Cell Systems",
@@ -87,7 +139,11 @@
     "anonymous": false,
     "site_url": "https://www.cell.com/cell-systems/home",
     "submission_guide": "https://www.cell.com/cell-systems/authors",
-    "description": "Cell Press journal publishing research in systems biology, including quantitative, computational, and theoretical approaches to understanding biological systems across scales."
+    "description": "Cell Press journal publishing research in systems biology, including quantitative, computational, and theoretical approaches to understanding biological systems across scales.",
+    "keywords": [
+      "biology",
+      "bioinformatics"
+    ]
   },
   "cell_genomics": {
     "name": "Cell Genomics",
@@ -96,7 +152,12 @@
     "anonymous": false,
     "site_url": "https://www.cell.com/cell-genomics/home",
     "submission_guide": "https://www.cell.com/cell-genomics/authors",
-    "description": "Open-access Cell Press journal publishing research across genetics and genomics, including functional, evolutionary, and computational genomics and their applications to health and disease."
+    "description": "Open-access Cell Press journal publishing research across genetics and genomics, including functional, evolutionary, and computational genomics and their applications to health and disease.",
+    "keywords": [
+      "genetics",
+      "biology",
+      "bioinformatics"
+    ]
   },
   "plos_compbio": {
     "name": "PLOS Computational Biology",
@@ -105,7 +166,12 @@
     "anonymous": false,
     "site_url": "https://journal.plos.org/ploscompbiol/",
     "submission_guide": "https://journal.plos.org/ploscompbiol/s/submission-guidelines",
-    "description": "Open-access journal publishing research that applies computational methods to understand living systems across all scales, from molecules to ecosystems."
+    "description": "Open-access journal publishing research that applies computational methods to understand living systems across all scales, from molecules to ecosystems.",
+    "keywords": [
+      "bioinformatics",
+      "biology",
+      "neuroscience"
+    ]
   },
   "genome_biology": {
     "name": "Genome Biology",
@@ -114,7 +180,12 @@
     "anonymous": false,
     "site_url": "https://genomebiology.biomedcentral.com",
     "submission_guide": "https://genomebiology.biomedcentral.com/submission-guidelines",
-    "description": "Open-access journal publishing peer-reviewed research and methods across all areas of biology and biomedicine studied from a genomic and post-genomic perspective."
+    "description": "Open-access journal publishing peer-reviewed research and methods across all areas of biology and biomedicine studied from a genomic and post-genomic perspective.",
+    "keywords": [
+      "genetics",
+      "bioinformatics",
+      "biology"
+    ]
   },
   "bmc_bioinformatics": {
     "name": "BMC Bioinformatics",
@@ -123,7 +194,11 @@
     "anonymous": false,
     "site_url": "https://link.springer.com/journal/12859",
     "submission_guide": "https://link.springer.com/journal/12859/submission-guidelines",
-    "description": "BMC Bioinformatics is an open access, peer-reviewed journal that considers articles describing novel computational algorithms and software, models and tools, including statistical methods, machine learning and artificial intelligence, for the modelling and analysis of all kinds of biological data, as well as systems biology."
+    "description": "BMC Bioinformatics is an open access, peer-reviewed journal that considers articles describing novel computational algorithms and software, models and tools, including statistical methods, machine learning and artificial intelligence, for the modelling and analysis of all kinds of biological data, as well as systems biology.",
+    "keywords": [
+      "bioinformatics",
+      "biology"
+    ]
   },
   "science": {
     "name": "Science",
@@ -132,7 +207,13 @@
     "anonymous": false,
     "site_url": "https://www.science.org/journal/science",
     "submission_guide": "https://www.science.org/content/page/science-information-authors",
-    "description": "Peer-reviewed flagship journal of the American Association for the Advancement of Science (AAAS), publishing significant original research across all scientific disciplines along with news and commentary."
+    "description": "Peer-reviewed flagship journal of the American Association for the Advancement of Science (AAAS), publishing significant original research across all scientific disciplines along with news and commentary.",
+    "keywords": [
+      "general",
+      "biology",
+      "medicine",
+      "physics"
+    ]
   },
   "science_advances": {
     "name": "Science Advances",
@@ -141,7 +222,13 @@
     "anonymous": false,
     "site_url": "https://www.science.org/journal/sciadv",
     "submission_guide": "https://www.science.org/content/page/science-information-authors",
-    "description": "AAAS open-access multidisciplinary journal publishing peer-reviewed original research across the physical, life, social, and computer sciences and engineering."
+    "description": "AAAS open-access multidisciplinary journal publishing peer-reviewed original research across the physical, life, social, and computer sciences and engineering.",
+    "keywords": [
+      "general",
+      "biology",
+      "medicine",
+      "physics"
+    ]
   },
   "science_immunology": {
     "name": "Science Immunology",
@@ -150,7 +237,12 @@
     "anonymous": false,
     "site_url": "https://www.science.org/journal/sciimmunol",
     "submission_guide": "https://www.science.org/content/page/science-information-authors",
-    "description": "AAAS journal publishing peer-reviewed original research across immunology in all organisms and model systems, spanning molecular, cellular, and translational immunology."
+    "description": "AAAS journal publishing peer-reviewed original research across immunology in all organisms and model systems, spanning molecular, cellular, and translational immunology.",
+    "keywords": [
+      "immunology",
+      "biology",
+      "medicine"
+    ]
   },
   "science_robotics": {
     "name": "Science Robotics",
@@ -159,7 +251,11 @@
     "anonymous": false,
     "site_url": "https://www.science.org/journal/scirobotics",
     "submission_guide": "https://www.science.org/content/page/science-information-authors",
-    "description": "AAAS journal publishing peer-reviewed original research on advances in robotics and related disciplines, including robot design, control, autonomy, and applications."
+    "description": "AAAS journal publishing peer-reviewed original research on advances in robotics and related disciplines, including robot design, control, autonomy, and applications.",
+    "keywords": [
+      "robotics",
+      "machine learning"
+    ]
   },
   "science_signaling": {
     "name": "Science Signaling",
@@ -168,7 +264,10 @@
     "anonymous": false,
     "site_url": "https://www.science.org/journal/signaling",
     "submission_guide": "https://www.science.org/content/page/science-information-authors",
-    "description": "AAAS journal publishing peer-reviewed original research on cellular signaling and regulatory networks, including signal transduction, systems biology, and relevance to disease."
+    "description": "AAAS journal publishing peer-reviewed original research on cellular signaling and regulatory networks, including signal transduction, systems biology, and relevance to disease.",
+    "keywords": [
+      "biology"
+    ]
   },
   "science_translational_medicine": {
     "name": "Science Translational Medicine",
@@ -177,7 +276,11 @@
     "anonymous": false,
     "site_url": "https://www.science.org/journal/stm",
     "submission_guide": "https://www.science.org/content/page/science-information-authors",
-    "description": "AAAS journal publishing peer-reviewed original research that bridges basic science and clinical medicine to advance human health."
+    "description": "AAAS journal publishing peer-reviewed original research that bridges basic science and clinical medicine to advance human health.",
+    "keywords": [
+      "medicine",
+      "biology"
+    ]
   },
   "aaai_2027": {
     "name": "AAAI 2027",
@@ -187,7 +290,11 @@
     "deprecated": true,
     "site_url": "https://aaai.org/conference/aaai/aaai-27/",
     "submission_guide": "https://aaai.org/conference/aaai/aaai-27/",
-    "description": "Promote research in Artificial Intelligence (AI) and foster scientific exchange between researchers, practitioners, scientists, students, and engineers across the entirety of AI and its affiliated disciplines."
+    "description": "Promote research in Artificial Intelligence (AI) and foster scientific exchange between researchers, practitioners, scientists, students, and engineers across the entirety of AI and its affiliated disciplines.",
+    "keywords": [
+      "machine learning",
+      "computer science"
+    ]
   },
   "iclr_2027": {
     "name": "ICLR 2027",
@@ -197,7 +304,10 @@
     "deprecated": true,
     "site_url": "https://iclr.cc/Conferences/2027",
     "submission_guide": "https://iclr.cc/Conferences/2027/AuthorGuidelines",
-    "description": "Conference on representation learning, deep learning, and their applications, covering machine learning theory, methods, and practice."
+    "description": "Conference on representation learning, deep learning, and their applications, covering machine learning theory, methods, and practice.",
+    "keywords": [
+      "machine learning"
+    ]
   },
   "discrete_mathematics": {
     "name": "Discrete Mathematics",
@@ -206,7 +316,10 @@
     "anonymous": false,
     "site_url": "https://www.sciencedirect.com/journal/discrete-mathematics",
     "submission_guide": "https://www.sciencedirect.com/journal/discrete-mathematics/publish/guide-for-authors",
-    "description": "Elsevier journal publishing original research and survey articles across combinatorics, graph theory, and the broader field of discrete mathematics."
+    "description": "Elsevier journal publishing original research and survey articles across combinatorics, graph theory, and the broader field of discrete mathematics.",
+    "keywords": [
+      "math"
+    ]
   },
   "combinatorica": {
     "name": "Combinatorica",
@@ -215,7 +328,11 @@
     "anonymous": false,
     "site_url": "https://link.springer.com/journal/493",
     "submission_guide": "https://combinatorica.hu/",
-    "description": "International journal publishing research in combinatorics and the theory of computing, including combinatorial structures, optimization, algorithms, complexity, geometry, and number theory."
+    "description": "International journal publishing research in combinatorics and the theory of computing, including combinatorial structures, optimization, algorithms, complexity, geometry, and number theory.",
+    "keywords": [
+      "math",
+      "computer science"
+    ]
   },
   "acl_arr": {
     "name": "ACL Rolling Review",
@@ -224,7 +341,11 @@
     "anonymous": true,
     "site_url": "https://aclrollingreview.org",
     "submission_guide": "https://aclrollingreview.org/cfp",
-    "description": "Centralized, rolling peer-review service for the ACL community, feeding reviewed NLP and computational linguistics papers to *ACL conferences."
+    "description": "Centralized, rolling peer-review service for the ACL community, feeding reviewed NLP and computational linguistics papers to *ACL conferences.",
+    "keywords": [
+      "natural language processing",
+      "machine learning"
+    ]
   },
   "aistats_2027": {
     "name": "AISTATS 2027",
@@ -234,6 +355,10 @@
     "site_url": "https://virtual.aistats.org/Conferences/2027",
     "submission_guide": "https://virtual.aistats.org/Conferences/2027/CallForPapers",
     "description": "Conference at the intersection of artificial intelligence, machine learning, and statistics.",
+    "keywords": [
+      "machine learning",
+      "statistics"
+    ],
     "deprecated": true
   },
   "ajhg": {
@@ -243,7 +368,11 @@
     "anonymous": false,
     "site_url": "https://www.cell.com/ajhg",
     "submission_guide": "https://www.cell.com/ajhg/authors",
-    "description": "Official journal of the American Society of Human Genetics, publishing research and perspectives across human genetics and genomics."
+    "description": "Official journal of the American Society of Human Genetics, publishing research and perspectives across human genetics and genomics.",
+    "keywords": [
+      "genetics",
+      "medicine"
+    ]
   },
   "bmj": {
     "name": "The BMJ",
@@ -252,7 +381,10 @@
     "anonymous": false,
     "site_url": "https://www.bmj.com",
     "submission_guide": "https://www.bmj.com/about-bmj/resources-authors/article-types",
-    "description": "Weekly general medical journal publishing original research, analysis, education and commentary for an international readership of clinicians and policy makers."
+    "description": "Weekly general medical journal publishing original research, analysis, education and commentary for an international readership of clinicians and policy makers.",
+    "keywords": [
+      "medicine"
+    ]
   },
   "cell_reports": {
     "name": "Cell Reports",
@@ -261,7 +393,13 @@
     "anonymous": false,
     "site_url": "https://www.cell.com/cell-reports",
     "submission_guide": "https://www.cell.com/cell-reports/information-for-authors",
-    "description": "Open-access Cell Press journal publishing high-quality life-science research across the full spectrum of biology, with a focus on shorter single-point Reports as well as longer Research Articles and Resources."
+    "description": "Open-access Cell Press journal publishing high-quality life-science research across the full spectrum of biology, with a focus on shorter single-point Reports as well as longer Research Articles and Resources.",
+    "keywords": [
+      "biology",
+      "genetics",
+      "neuroscience",
+      "immunology"
+    ]
   },
   "cvpr_2027": {
     "name": "CVPR 2027",
@@ -270,7 +408,11 @@
     "anonymous": true,
     "site_url": "https://cvpr.thecvf.com/Conferences/2027",
     "submission_guide": "https://cvpr.thecvf.com/Conferences/2027/AuthorGuidelines",
-    "description": "Premier conference on computer vision and pattern recognition, covering 3D vision, deep learning, generative models, embodied vision, autonomous driving, and medical and biological vision."
+    "description": "Premier conference on computer vision and pattern recognition, covering 3D vision, deep learning, generative models, embodied vision, autonomous driving, and medical and biological vision.",
+    "keywords": [
+      "computer vision",
+      "machine learning"
+    ]
   },
   "elife": {
     "name": "eLife",
@@ -279,7 +421,12 @@
     "anonymous": false,
     "site_url": "https://elifesciences.org",
     "submission_guide": "https://reviewer.elifesciences.org/author-guide/types",
-    "description": "Open-access journal publishing significant research across the life sciences and medicine as Reviewed Preprints with public reviews and an eLife assessment."
+    "description": "Open-access journal publishing significant research across the life sciences and medicine as Reviewed Preprints with public reviews and an eLife assessment.",
+    "keywords": [
+      "biology",
+      "neuroscience",
+      "medicine"
+    ]
   },
   "european_radiology": {
     "name": "European Radiology",
@@ -288,7 +435,11 @@
     "anonymous": false,
     "site_url": "https://link.springer.com/journal/330",
     "submission_guide": "https://journals.myesr.org/eur-radiol/for-authors/",
-    "description": "Official journal of the European Society of Radiology publishing original research, reviews, technical developments, and guidelines across all areas of diagnostic and interventional radiology."
+    "description": "Official journal of the European Society of Radiology publishing original research, reviews, technical developments, and guidelines across all areas of diagnostic and interventional radiology.",
+    "keywords": [
+      "radiology",
+      "medicine"
+    ]
   },
   "genome_medicine": {
     "name": "Genome Medicine",
@@ -297,7 +448,12 @@
     "anonymous": false,
     "site_url": "https://genomemedicine.biomedcentral.com",
     "submission_guide": "https://genomemedicine.biomedcentral.com/submission-guidelines",
-    "description": "Open access journal publishing research on the application of genetics, genomics and multi-omics to understand, diagnose and treat disease."
+    "description": "Open access journal publishing research on the application of genetics, genomics and multi-omics to understand, diagnose and treat disease.",
+    "keywords": [
+      "genetics",
+      "medicine",
+      "bioinformatics"
+    ]
   },
   "genome_research": {
     "name": "Genome Research",
@@ -306,7 +462,12 @@
     "anonymous": false,
     "site_url": "https://genome.cshlp.org",
     "submission_guide": "https://genome.cshlp.org/site/misc/ifora.xhtml",
-    "description": "Publishes research on genome structure and function, comparative genomics, molecular evolution, genome-scale quantitative and population genetics, epigenomics, systems biology, and computational and high-throughput methods."
+    "description": "Publishes research on genome structure and function, comparative genomics, molecular evolution, genome-scale quantitative and population genetics, epigenomics, systems biology, and computational and high-throughput methods.",
+    "keywords": [
+      "genetics",
+      "bioinformatics",
+      "biology"
+    ]
   },
   "ieee_tmi": {
     "name": "IEEE TMI",
@@ -315,7 +476,12 @@
     "anonymous": false,
     "site_url": "https://ieeetmi.org/",
     "submission_guide": "https://ieeetmi.org/authors-instructions/",
-    "description": "Publishes original research on the science and engineering of medical imaging, including image formation, reconstruction, analysis, and computational methods across imaging modalities."
+    "description": "Publishes original research on the science and engineering of medical imaging, including image formation, reconstruction, analysis, and computational methods across imaging modalities.",
+    "keywords": [
+      "radiology",
+      "machine learning",
+      "computer vision"
+    ]
   },
   "ieee_tnnls": {
     "name": "IEEE TNNLS",
@@ -324,7 +490,10 @@
     "anonymous": true,
     "site_url": "https://cis.ieee.org/publications/t-neural-networks-and-learning-systems",
     "submission_guide": "https://cis.ieee.org/publications/t-neural-networks-and-learning-systems/tnnls",
-    "description": "IEEE Computational Intelligence Society journal on the theory, design, and applications of neural networks and related learning systems, reviewed double-anonymously."
+    "description": "IEEE Computational Intelligence Society journal on the theory, design, and applications of neural networks and related learning systems, reviewed double-anonymously.",
+    "keywords": [
+      "machine learning"
+    ]
   },
   "ieee_tpami": {
     "name": "IEEE TPAMI",
@@ -333,7 +502,11 @@
     "anonymous": false,
     "site_url": "https://www.computer.org/csdl/journal/tp",
     "submission_guide": "https://www.computer.org/csdl/journal/tp/write-for-us/15083",
-    "description": "IEEE Computer Society journal covering computer vision, pattern analysis and recognition, and machine intelligence with an emphasis on machine learning for pattern analysis."
+    "description": "IEEE Computer Society journal covering computer vision, pattern analysis and recognition, and machine intelligence with an emphasis on machine learning for pattern analysis.",
+    "keywords": [
+      "computer vision",
+      "machine learning"
+    ]
   },
   "jama": {
     "name": "JAMA",
@@ -342,7 +515,10 @@
     "anonymous": false,
     "site_url": "https://jamanetwork.com/journals/jama",
     "submission_guide": "https://jamanetwork.com/journals/jama/pages/instructions-for-authors",
-    "description": "Weekly general medical journal of the American Medical Association publishing original investigations, research letters, reviews and commentary."
+    "description": "Weekly general medical journal of the American Medical Association publishing original investigations, research letters, reviews and commentary.",
+    "keywords": [
+      "medicine"
+    ]
   },
   "jmlr": {
     "name": "JMLR",
@@ -351,7 +527,11 @@
     "anonymous": false,
     "site_url": "https://www.jmlr.org",
     "submission_guide": "https://www.jmlr.org/author-info.html",
-    "description": "Open-access journal publishing theory and methods of machine learning; applications of ML to other domains are out of scope."
+    "description": "Open-access journal publishing theory and methods of machine learning; applications of ML to other domains are out of scope.",
+    "keywords": [
+      "machine learning",
+      "statistics"
+    ]
   },
   "jnm": {
     "name": "JNM",
@@ -360,7 +540,11 @@
     "anonymous": false,
     "site_url": "https://jnm.snmjournals.org",
     "submission_guide": "https://jnm.snmjournals.org/authors",
-    "description": "Official journal of the Society of Nuclear Medicine and Molecular Imaging publishing original laboratory and clinical investigations in nuclear medicine and molecular imaging."
+    "description": "Official journal of the Society of Nuclear Medicine and Molecular Imaging publishing original laboratory and clinical investigations in nuclear medicine and molecular imaging.",
+    "keywords": [
+      "radiology",
+      "medicine"
+    ]
   },
   "lancet": {
     "name": "The Lancet",
@@ -369,7 +553,10 @@
     "anonymous": false,
     "site_url": "https://www.thelancet.com/journals/lancet/home",
     "submission_guide": "https://www.thelancet.com/pb-assets/Lancet/authors/tl-info-for-authors-1740380189507.pdf",
-    "description": "Weekly international general medical journal publishing original research likely to change clinical practice, plus reviews, commentary and correspondence."
+    "description": "Weekly international general medical journal publishing original research likely to change clinical practice, plus reviews, commentary and correspondence.",
+    "keywords": [
+      "medicine"
+    ]
   },
   "lancet_digital_health": {
     "name": "Lancet Digital Health",
@@ -378,7 +565,11 @@
     "anonymous": false,
     "site_url": "https://www.thelancet.com/journals/landig/home",
     "submission_guide": "https://www.thelancet.com/pb-assets/Lancet/authors/tldh-info-for-authors.pdf",
-    "description": "Publishes original research, reviews, and commentary on digital health, including AI, mobile health, telemedicine, wearables, health informatics, and digital therapeutics."
+    "description": "Publishes original research, reviews, and commentary on digital health, including AI, mobile health, telemedicine, wearables, health informatics, and digital therapeutics.",
+    "keywords": [
+      "medicine",
+      "machine learning"
+    ]
   },
   "medical_image_analysis": {
     "name": "Medical Image Analysis",
@@ -387,7 +578,12 @@
     "anonymous": false,
     "site_url": "https://www.sciencedirect.com/journal/medical-image-analysis",
     "submission_guide": "https://www.sciencedirect.com/journal/medical-image-analysis/publish/guide-for-authors",
-    "description": "Official journal of the MICCAI Society publishing original research on the analysis and use of biomedical images, including segmentation, registration, computer-aided diagnosis, and image-guided intervention."
+    "description": "Official journal of the MICCAI Society publishing original research on the analysis and use of biomedical images, including segmentation, registration, computer-aided diagnosis, and image-guided intervention.",
+    "keywords": [
+      "radiology",
+      "computer vision",
+      "machine learning"
+    ]
   },
   "nature_biomedical_engineering": {
     "name": "Nature Biomedical Engineering",
@@ -396,7 +592,11 @@
     "anonymous": false,
     "site_url": "https://www.nature.com/natbiomedeng",
     "submission_guide": "https://www.nature.com/natbiomedeng/submission-guidelines",
-    "description": "Publishes original research and commissioned content at the interface of engineering and the biomedical and clinical sciences, including biomaterials, devices, imaging, computational methods and therapeutic technologies."
+    "description": "Publishes original research and commissioned content at the interface of engineering and the biomedical and clinical sciences, including biomaterials, devices, imaging, computational methods and therapeutic technologies.",
+    "keywords": [
+      "medicine",
+      "biology"
+    ]
   },
   "nature_communications": {
     "name": "Nature Communications",
@@ -405,7 +605,13 @@
     "anonymous": false,
     "site_url": "https://www.nature.com/ncomms",
     "submission_guide": "https://www.nature.com/ncomms/submit",
-    "description": "Open access journal publishing high-quality original research from all areas of the natural sciences, presenting important advances of significance to specialists within each field."
+    "description": "Open access journal publishing high-quality original research from all areas of the natural sciences, presenting important advances of significance to specialists within each field.",
+    "keywords": [
+      "general",
+      "biology",
+      "physics",
+      "medicine"
+    ]
   },
   "nature_genetics": {
     "name": "Nature Genetics",
@@ -414,7 +620,12 @@
     "anonymous": false,
     "site_url": "https://www.nature.com/ng",
     "submission_guide": "https://www.nature.com/ng/submission-guidelines",
-    "description": "Publishes research of broad interest across all areas of genetics and genomics, including human, model-organism, plant and cancer genetics, and functional and population genomics."
+    "description": "Publishes research of broad interest across all areas of genetics and genomics, including human, model-organism, plant and cancer genetics, and functional and population genomics.",
+    "keywords": [
+      "genetics",
+      "biology",
+      "medicine"
+    ]
   },
   "nature_machine_intelligence": {
     "name": "Nature Machine Intelligence",
@@ -423,7 +634,11 @@
     "anonymous": false,
     "site_url": "https://www.nature.com/natmachintell",
     "submission_guide": "https://www.nature.com/natmachintell/submission-guidelines",
-    "description": "Publishes original research and commentary on machine learning, robotics and AI and their applications across the sciences, including methods, analyses and reusability reports."
+    "description": "Publishes original research and commentary on machine learning, robotics and AI and their applications across the sciences, including methods, analyses and reusability reports.",
+    "keywords": [
+      "machine learning",
+      "robotics"
+    ]
   },
   "nature_medicine": {
     "name": "Nature Medicine",
@@ -432,7 +647,10 @@
     "anonymous": false,
     "site_url": "https://www.nature.com/nm",
     "submission_guide": "https://www.nature.com/nm/submission-guidelines",
-    "description": "Publishes original peer-reviewed research in all areas of medicine, with emphasis on translational and clinical research, on the basis of originality, timeliness, interdisciplinary interest and impact on human health."
+    "description": "Publishes original peer-reviewed research in all areas of medicine, with emphasis on translational and clinical research, on the basis of originality, timeliness, interdisciplinary interest and impact on human health.",
+    "keywords": [
+      "medicine"
+    ]
   },
   "nejm": {
     "name": "NEJM",
@@ -441,7 +659,10 @@
     "anonymous": false,
     "site_url": "https://www.nejm.org",
     "submission_guide": "https://www.nejm.org/author-center/new-manuscripts",
-    "description": "Weekly general medical journal publishing original clinical research, reviews, case reports and commentary of importance to clinical practice."
+    "description": "Weekly general medical journal publishing original clinical research, reviews, case reports and commentary of importance to clinical practice.",
+    "keywords": [
+      "medicine"
+    ]
   },
   "neuron": {
     "name": "Neuron",
@@ -450,7 +671,11 @@
     "anonymous": false,
     "site_url": "https://www.cell.com/neuron",
     "submission_guide": "https://www.cell.com/neuron/information-for-authors",
-    "description": "Cell Press journal publishing research across neuroscience, from molecular and cellular to systems, cognitive and disease-related studies."
+    "description": "Cell Press journal publishing research across neuroscience, from molecular and cellular to systems, cognitive and disease-related studies.",
+    "keywords": [
+      "neuroscience",
+      "biology"
+    ]
   },
   "npj_digital_medicine": {
     "name": "npj Digital Medicine",
@@ -459,7 +684,11 @@
     "anonymous": false,
     "site_url": "https://www.nature.com/npjdigitalmed",
     "submission_guide": "https://www.nature.com/npjdigitalmed/for-authors-and-referees/submission-guidelines",
-    "description": "Open access Nature Portfolio journal publishing research on digital medicine, including AI, wearables, telehealth, health data, and clinical informatics."
+    "description": "Open access Nature Portfolio journal publishing research on digital medicine, including AI, wearables, telehealth, health data, and clinical informatics.",
+    "keywords": [
+      "medicine",
+      "machine learning"
+    ]
   },
   "pnas": {
     "name": "PNAS",
@@ -468,7 +697,14 @@
     "anonymous": false,
     "site_url": "https://www.pnas.org",
     "submission_guide": "https://www.pnas.org/author-center/submitting-your-manuscript",
-    "description": "Multidisciplinary journal of the US National Academy of Sciences publishing original research of exceptional importance across the biological, physical, and social sciences."
+    "description": "Multidisciplinary journal of the US National Academy of Sciences publishing original research of exceptional importance across the biological, physical, and social sciences.",
+    "keywords": [
+      "general",
+      "biology",
+      "physics",
+      "math",
+      "medicine"
+    ]
   },
   "radiology": {
     "name": "Radiology",
@@ -477,7 +713,11 @@
     "anonymous": true,
     "site_url": "https://pubs.rsna.org/journal/radiology",
     "submission_guide": "https://pubs.rsna.org/page/radiology/author-instructions",
-    "description": "Peer-reviewed journal of the Radiological Society of North America publishing original research, reviews, and commentary across diagnostic radiology and imaging; uses double-anonymized review."
+    "description": "Peer-reviewed journal of the Radiological Society of North America publishing original research, reviews, and commentary across diagnostic radiology and imaging; uses double-anonymized review.",
+    "keywords": [
+      "radiology",
+      "medicine"
+    ]
   },
   "radiology_ai": {
     "name": "Radiology: Artificial Intelligence",
@@ -486,7 +726,12 @@
     "anonymous": true,
     "site_url": "https://pubs.rsna.org/journal/ai",
     "submission_guide": "https://pubs.rsna.org/page/ai/author-instructions",
-    "description": "RSNA journal on applications of machine learning and artificial intelligence in medical imaging, including original research, technical developments, data resources, and reviews; uses double-anonymized review."
+    "description": "RSNA journal on applications of machine learning and artificial intelligence in medical imaging, including original research, technical developments, data resources, and reviews; uses double-anonymized review.",
+    "keywords": [
+      "radiology",
+      "machine learning",
+      "medicine"
+    ]
   },
   "tmlr": {
     "name": "TMLR",
@@ -495,6 +740,210 @@
     "anonymous": true,
     "site_url": "https://jmlr.org/tmlr/",
     "submission_guide": "https://jmlr.org/tmlr/author-guide.html",
-    "description": "Open-access, double-blind journal for machine learning research reviewed on OpenReview, with acceptance based on correctness and claim support rather than novelty."
+    "description": "Open-access, double-blind journal for machine learning research reviewed on OpenReview, with acceptance based on correctness and claim support rather than novelty.",
+    "keywords": [
+      "machine learning"
+    ]
+  },
+  "plos_one": {
+    "name": "PLOS ONE",
+    "full_name": "PLOS ONE (PLOS)",
+    "venue_type": "journal",
+    "keywords": [
+      "general",
+      "biology",
+      "medicine"
+    ],
+    "anonymous": false,
+    "site_url": "https://journals.plos.org/plosone/",
+    "submission_guide": "https://journals.plos.org/plosone/s/submission-guidelines",
+    "description": "Open-access multidisciplinary journal publishing methodologically and ethically rigorous research in the natural sciences, medicine, and engineering, as well as the related social sciences and humanities."
+  },
+  "plos_biology": {
+    "name": "PLOS Biology",
+    "full_name": "PLOS Biology (PLOS)",
+    "venue_type": "journal",
+    "keywords": [
+      "biology"
+    ],
+    "anonymous": false,
+    "site_url": "https://journals.plos.org/plosbiology/",
+    "submission_guide": "https://journals.plos.org/plosbiology/s/submission-guidelines",
+    "description": "Selective open-access journal publishing research of exceptional significance, originality, and relevance across all areas of biological science, plus Magazine articles."
+  },
+  "plos_genetics": {
+    "name": "PLOS Genetics",
+    "full_name": "PLOS Genetics (PLOS)",
+    "venue_type": "journal",
+    "keywords": [
+      "genetics",
+      "biology"
+    ],
+    "anonymous": false,
+    "site_url": "https://journals.plos.org/plosgenetics/",
+    "submission_guide": "https://journals.plos.org/plosgenetics/s/submission-guidelines",
+    "description": "Open-access journal publishing original research in genetics and genomics that demonstrates novelty, importance to the field, and biological significance."
+  },
+  "plos_medicine": {
+    "name": "PLOS Medicine",
+    "full_name": "PLOS Medicine (PLOS)",
+    "venue_type": "journal",
+    "keywords": [
+      "medicine"
+    ],
+    "anonymous": false,
+    "site_url": "https://journals.plos.org/plosmedicine/",
+    "submission_guide": "https://journals.plos.org/plosmedicine/s/submission-guidelines",
+    "description": "Open-access general medical journal publishing original research of outstanding medical importance, plus front-section Perspectives, Reviews, Policy Forums and Guidelines and Guidance articles."
+  },
+  "bmc_genomics": {
+    "name": "BMC Genomics",
+    "full_name": "BMC Genomics (BMC)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://bmcgenomics.biomedcentral.com",
+    "submission_guide": "https://bmcgenomics.biomedcentral.com/submission-guidelines",
+    "description": "Open access BMC Series journal considering articles on all aspects of genetics, genomics, transcriptomics and proteomics.",
+    "keywords": [
+      "genetics",
+      "bioinformatics",
+      "biology"
+    ]
+  },
+  "bmc_biology": {
+    "name": "BMC Biology",
+    "full_name": "BMC Biology (BMC)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://bmcbiol.biomedcentral.com",
+    "submission_guide": "https://bmcbiol.biomedcentral.com/submission-guidelines",
+    "description": "Selective open access journal considering articles on all areas of fundamental and applied biology.",
+    "keywords": [
+      "biology"
+    ]
+  },
+  "bmc_medicine": {
+    "name": "BMC Medicine",
+    "full_name": "BMC Medicine (BMC)",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://bmcmedicine.biomedcentral.com",
+    "submission_guide": "https://bmcmedicine.biomedcentral.com/submission-guidelines",
+    "description": "Flagship open access general medical journal of the BMC series, publishing research in clinical practice, translational medicine, public and global health, and policy.",
+    "keywords": [
+      "medicine"
+    ]
+  },
+  "nature_computational_science": {
+    "name": "Nature Computational Science",
+    "full_name": "Nature Computational Science",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/natcomputsci",
+    "submission_guide": "https://www.nature.com/natcomputsci/submission-guidelines",
+    "description": "Nature Portfolio journal publishing research in computational science.",
+    "keywords": [
+      "computer science"
+    ]
+  },
+  "nature_cell_biology": {
+    "name": "Nature Cell Biology",
+    "full_name": "Nature Cell Biology",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/ncb",
+    "submission_guide": "https://www.nature.com/ncb/submission-guidelines",
+    "description": "Nature Portfolio journal publishing research across all areas of cell biology.",
+    "keywords": [
+      "biology"
+    ]
+  },
+  "nature_neuroscience": {
+    "name": "Nature Neuroscience",
+    "full_name": "Nature Neuroscience",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/neuro",
+    "submission_guide": "https://www.nature.com/neuro/submission-guidelines",
+    "description": "Nature Portfolio journal publishing research across all areas of neuroscience.",
+    "keywords": [
+      "neuroscience",
+      "biology"
+    ]
+  },
+  "nature_structural_molecular_biology": {
+    "name": "Nature Structural & Molecular Biology",
+    "full_name": "Nature Structural & Molecular Biology",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/nsmb",
+    "submission_guide": "https://www.nature.com/nsmb/submission-guidelines",
+    "description": "Nature Portfolio journal publishing research across structural and molecular biology.",
+    "keywords": [
+      "biology"
+    ]
+  },
+  "scientific_reports": {
+    "name": "Scientific Reports",
+    "full_name": "Scientific Reports",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/srep",
+    "submission_guide": "https://www.nature.com/srep/author-instructions/submission-guidelines",
+    "description": "Open-access multidisciplinary Nature Portfolio journal publishing original research.",
+    "keywords": [
+      "general"
+    ]
+  },
+  "communications_biology": {
+    "name": "Communications Biology",
+    "full_name": "Communications Biology",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.nature.com/commsbio",
+    "submission_guide": "https://www.nature.com/commsbio/submit/guide-to-authors",
+    "description": "Open access journal from Nature Portfolio publishing research, reviews and commentary in all areas of the biological sciences.",
+    "keywords": [
+      "biology"
+    ]
+  },
+  "frontiers_genetics": {
+    "name": "Frontiers in Genetics",
+    "full_name": "Frontiers in Genetics",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.frontiersin.org/journals/genetics",
+    "submission_guide": "https://www.frontiersin.org/guidelines/author-guidelines",
+    "description": "Open-access journal from Frontiers covering genetics and genomics.",
+    "keywords": [
+      "genetics",
+      "biology"
+    ]
+  },
+  "frontiers_bioinformatics": {
+    "name": "Frontiers in Bioinformatics",
+    "full_name": "Frontiers in Bioinformatics",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.frontiersin.org/journals/bioinformatics",
+    "submission_guide": "https://www.frontiersin.org/guidelines/author-guidelines",
+    "description": "Open-access journal from Frontiers covering bioinformatics and computational biology.",
+    "keywords": [
+      "bioinformatics",
+      "biology"
+    ]
+  },
+  "frontiers_immunology": {
+    "name": "Frontiers in Immunology",
+    "full_name": "Frontiers in Immunology",
+    "venue_type": "journal",
+    "anonymous": false,
+    "site_url": "https://www.frontiersin.org/journals/immunology",
+    "submission_guide": "https://www.frontiersin.org/guidelines/author-guidelines",
+    "description": "Open-access journal from Frontiers covering immunology.",
+    "keywords": [
+      "immunology",
+      "biology"
+    ]
   }
 }

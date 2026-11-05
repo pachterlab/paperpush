@@ -156,7 +156,7 @@ fields are laid out.
 
 These are the best reference for what a correctly filled file looks like: copy
 the one for your venue, swap in your own values, and adjust the file paths.
-Use ``paperpush --venues`` (or :doc:`../venues`) to find the slug — and the
+Use ``paperpush venues`` (or :doc:`../venues`) to find the slug — and the
 matching sample directory — for your target venue.
 
 Examples

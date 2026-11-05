@@ -43,8 +43,9 @@ from paperpush.database import list_venues  # noqa: E402
 # are skipped by default; everything else -- including submit logic that does
 # not touch a live portal -- runs as usual. So a bare ``pytest`` exercises all
 # offline behavior and skips only the network/portal tests. Opt in with
-# ``pytest --run-portal`` or by setting ``PAPERPUSH_RUN_PORTAL=1`` (the
-# monthly CI job does the latter). ``pytest --run-portal-only`` runs the portal
+# ``pytest --run-portal`` or by setting ``PAPERPUSH_RUN_PORTAL=1``. The monthly
+# drift check (scripts/scheduled_portal_drift.sh, a cron job on the maintainer's
+# machine, not CI) uses ``--run-portal-only``. ``pytest --run-portal-only`` runs the portal
 # tests and deselects everything else; ``pytest --run-submit-only`` runs only the
 # live submit walkthrough. Both take optional venue slug(s), e.g.
 # ``pytest --run-submit-only arxiv`` or ``--run-submit-only arxiv,biorxiv``.

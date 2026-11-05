@@ -8,7 +8,7 @@ This file covers the ``subfile`` command end to end and the ground-truth sample
   defaults unless told not to, respects ``-o/--output`` and ``--overwrite``
   (and its old name ``--force``), and rejects an
   unknown venue;
-* the ``--venues`` discovery listing, which is what points a user at the
+* the ``paperpush venues`` discovery listing, which is what points a user at the
   ``subfile`` command in the first place;
 * the committed samples in ``tests/sub_files/`` -- each is byte-for-byte what the
   subfile renderer (and therefore the ``subfile`` command) produces today, parses
@@ -121,12 +121,14 @@ def test_subfile_unknown_venue_errors(in_tmp, capsys):
 
 
 def test_venues_lists_supported_venues(capsys):
-    rc = main(["--venues"])
+    rc = main(["venues"])
     out = capsys.readouterr().out
 
     assert rc == 0
-    # Venues are listed under their venue_type group headings (see cli._VENUE_GROUPS).
-    assert "Preprint servers:" in out and "Journals:" in out
+    # One table with a column per attribute; venue types appear in the Type column.
+    header = out.splitlines()[0].split()
+    assert header == ["Slug", "Venue", "Keywords", "Type", "Link", "Validate", "Submit"]
+    assert "Preprint" in out and "Journal" in out
     # Every configured venue slug shows up in the listing.
     for venue in list_venues():
         assert venue.slug in out.lower()

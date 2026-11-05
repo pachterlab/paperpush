@@ -6,8 +6,8 @@ the submission workflow. This section documents every command in detail.
 
 .. code-block:: text
 
-   usage: paperpush [-h] [--version] [--venues [{all,submit}]]
-                    {subfile,options,autofill,validate,requirements,login,submit,codegen,recovery-report,web,add-venue,update-venues,install-skills} ...
+   usage: paperpush [-h] [--version] [--agent-guide]
+                    {venues,subfile,options,autofill,validate,requirements,login,submit,codegen,recovery-report,web,pick-venue,add-venue,update-venues,install-skills} ...
 
 Global options
 --------------
@@ -17,12 +17,10 @@ These apply to ``paperpush`` itself (before the subcommand):
 ``--version``
    Print the installed PaperPush version and exit.
 
-``--venues [{all,submit}]``
-   List every supported venue, grouped by type (preprint server, journal,
-   conference), with its slug, then exit. See :doc:`../venues`.
-   ``--venues submit`` lists only the venues ``paperpush submit`` can submit
-   to (validate-only venues are left out); ``--venues`` alone is the same as
-   ``--venues all``.
+``--agent-guide``
+   Print the guide for AI agents driving the CLI (``AGENTS.md``) and exit.
+
+To list the supported venues, use the :doc:`venues` command.
 
 Common options
 --------------
@@ -43,6 +41,7 @@ The commands, in workflow order
 .. toctree::
    :maxdepth: 1
 
+   venues
    subfile
    options
    autofill
@@ -53,6 +52,7 @@ The commands, in workflow order
    recovery-report
    codegen
    web
+   pick-venue
    add-venue
    update-venues
    install-skills

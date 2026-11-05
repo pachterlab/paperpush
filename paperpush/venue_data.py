@@ -123,7 +123,7 @@ class DataSource:
         return candidate if candidate.is_file() else PACKAGE_DIR / name
 
     def describe(self) -> str:
-        """One line naming the data in use, for ``paperpush --venues`` and logs."""
+        """One line naming the data in use, for ``paperpush venues`` and logs."""
         if self.kind == "bundled":
             return f"bundled with paperpush {__version__}"
         if self.kind == "override":

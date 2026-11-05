@@ -7,7 +7,7 @@ authoritative, always-current list is available on the command line:
 
 .. code-block:: bash
 
-   paperpush --venues
+   paperpush venues
 
 The venues supported at the time of writing are below; those marked *validate
 only* have author-guideline checks for ``paperpush validate`` but no ``submit``

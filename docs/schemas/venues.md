@@ -27,3 +27,4 @@ The keys of one venue entry (the value under a slug).
 | `site_url` | string | Public homepage URL. |
 | `submission_guide` | string | URL of the author/submission guide. |
 | `description` | string | Short description of the venue. |
+| `keywords` | list of `general` \| `biology` \| `genetics` \| `bioinformatics` \| `immunology` \| `neuroscience` \| `medicine` \| `radiology` \| `machine learning` \| `computer vision` \| `natural language processing` \| `robotics` \| `math` \| `statistics` \| `physics` \| `computer science` | Subject areas the venue covers, from a fixed vocabulary; 'paperpush venues --keywords' filters on them. |

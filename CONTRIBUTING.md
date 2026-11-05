@@ -16,10 +16,10 @@ As of the time of writing this (November 2026), AI agents are capable of autonom
 See the YouTube tutorial [PaperPush Contributor Tutorial](https://youtu.be/hn1RNcvHuYw)
 
 A venue has the following components:
-1. Venue listing: an entry in `paperpush/venues.json`, the master list, with the venue's general metadata (name, type, homepage, `anonymous`, etc.).
+1. Venue listing: an entry in `paperpush/venues.json`, the master list, with the venue's general metadata (name, type, homepage, `anonymous`, subject `keywords`, etc.).
 2. Submission form (for `subfile`, `autofill`, basic `validate`, `submit`): an entry in `paperpush/submission_forms.json` with the submission fields and constraints, in the order the portal asks for them. This is what becomes the .sub file. See [Field sections](DEVELOPMENT.md#field-sections-in-sub-templates).
 3. Manuscript requirements (for `validate`): an entry in `paperpush/manuscript_requirements.json` with what the venue's author guidelines require of the manuscript itself (formats, length limits, required sections and statements, title-page items, figure rules, references, etc.).
-4. Login and submit scripts (for `login`, `submit`): a `Venue` subclass in `paperpush/venues/<portal>/<venue>.py`. See `paperpush/venues/template/template.py` for a copy-ready starting point, or view any of the instances of supported journals (`paperpush --venues submit`). Each `Venue` subclass must implement the following:
+4. Login and submit scripts (for `login`, `submit`): a `Venue` subclass in `paperpush/venues/<portal>/<venue>.py`. See `paperpush/venues/template/template.py` for a copy-ready starting point, or view any of the instances of supported journals (`paperpush venues --submit`). Each `Venue` subclass must implement the following:
 - set `slug`: its key in `venues.json`
 - implement **`submit()`**: drive the submission wizard, stopping before the final submit.
 - for a portal that requires an account, set `logged_in_names` to accessible names of a signed-in-only control and implement **`login()`** to drive the login process.

@@ -55,7 +55,7 @@ Arguments
 
 ``venue``
    The venue slug, e.g. ``biorxiv``, ``arxiv``, ``nature``. Run
-   ``paperpush --venues`` to see every slug, or browse :doc:`../venues`.
+   ``paperpush venues`` to see every slug, or browse :doc:`../venues`.
 
 Options
 -------
