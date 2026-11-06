@@ -13,15 +13,17 @@ open the `SKILL.md` and follow it as written.
 
 | Skill | What it does | Call it when the user... |
 | --- | --- | --- |
-| `paperpush-prepare-submission` | The whole flow: checks the login, finds or creates the `.sub`, runs autofill, runs validate, then (once the user confirms) runs submit. | asks to prepare, get ready, or submit a manuscript to a venue, and has not named a single step. **Start here when in doubt.** |
+| `paperpush-prepare-submission` | The whole flow: checks the login, finds or creates the `.sub`, runs autofill, runs validate, then hands off to `paperpush-submit`. | asks to prepare, get ready, or submit a manuscript to a venue, and has not named a single step. **Start here when in doubt.** |
 | `paperpush-autofill` | Reads the manuscript directory, writes `values.json`, and applies it with `paperpush autofill --engine manual`. Leaves `never` fields for the author. | wants a `.sub` filled from their files, and nothing else yet. |
 | `paperpush-validate` | Runs `paperpush validate`, then does the checks that need a reader (lettering in raster figures, panel labels, free-text guideline rules, `.sub` vs manuscript) through `--ai-tasks` / `--ai-results`. Optionally saves the report. | asks whether a manuscript or `.sub` is ready, meets a venue's guidelines, or passes validation, or wants the AI checks or a saved report. |
+| `paperpush-submit` | Takes a filled `.sub` to the portal: re-checks the login (`paperpush login <venue> --check`), confirms with the user, runs `submit` (or `submit(skip_validate=true)` when asked to skip validation), and follows the run, handing a failed step to `paperpush-portal-debug`. Stops before the final submit. | has a `.sub` ready and wants the portal filled in, e.g. "fill out the submission portal to nature", optionally "skip validation". |
 | `paperpush-portal-debug` | Gets a stalled `paperpush submit` run past the failing step on the live page (`submit_page` / `submit_act` / `submit_resume`), logs every runner change it needs, and puts those changes into the runner with a test when working in a source checkout. Never sends the submission. | reports that `submit` is stuck, failed at a step, or hit a portal that changed. Also use it yourself whenever `submit_status` shows `recovery.paused`. |
 | `paperpush-add-venue-validate` | Reads a venue's author guidelines and records them in `manuscript_requirements.json`, and its basic submission fields in `submission_forms.json`, through a venue file and `paperpush add-venue`. For an existing venue, re-reads the pages and updates what changed. | wants a venue that `validate` can check against, or wants a venue's guidelines, limits, or rules added or refreshed. *Contributor skill: needs a clone of the repo.* |
 | `paperpush-add-venue` | Full `submit` support: a `Venue` class with Playwright `login()` / `submit()`, the portal's fields, a sample `.sub` with generated documents, unit tests, and a live run that stops before the final submit. For an existing runner, runs its tests and fixes what fails. Has the user create an account and run `paperpush login` rather than handing over a password. | wants to submit to a venue paperpush can't submit to yet, or reports that a venue's runner or tests are broken. Runs `paperpush-add-venue-validate` first if the venue has no guidelines entry yet. *Contributor skill: needs a clone of the repo.* |
 
 The skills call each other where the steps overlap: `prepare-submission` runs
-`autofill` and `validate`; `add-venue` runs `add-venue-validate`, and uses
+`autofill`, `validate`, and `submit`; `submit` uses `portal-debug` for a
+step that fails; `add-venue` runs `add-venue-validate`, and uses
 `portal-debug` for a live step that stalls. Don't run the same step twice.
 
 ### Installing the skills
@@ -284,9 +286,21 @@ cites no references (and is structured when the venue asks), the manuscript
 gives a contact e-mail, every reference is cited, and self-citations are not
 excessive; and proofreads the prose mechanically (double spaces, repeated
 words, punctuation spacing, unbalanced brackets and quotes, common
-misspellings, repetitive word choice). Warnings from this
+misspellings, repetitive word choice, numbers of 10 or more in digits,
+abbreviations written one way, acronyms spelled out at first use), queuing
+spelling, grammar, and tense as the AI check `ai.prose`. Warnings from this
 pass are heuristics over extracted text and images: relay them to the user as
 things to confirm, not as blockers. `--dont-check-manuscript` skips the pass.
+
+Files can be validated without a `.sub`: `paperpush validate --manuscript FILE
+[--title-page FILE] [--cover-letter FILE] [--figures FILE ...] [--tables FILE
+...] [--supplement FILE ...] [--venue VENUE]` (MCP: the same names as arguments
+to `validate_subfile` and `validation_ai_tasks`, with `subfile` left out).
+With `--venue` the files are checked against its author guidelines; without
+it only the general checks run (links, references, hidden text, citation
+order, prose, ...). The form checks are reported as not applicable either way,
+so this is a check of the files, not a verdict on the submission. With a
+`.sub`, a file flag replaces that file's path. See `paperpush.file_inputs`.
 
 ## The report, and the checks you run yourself
 

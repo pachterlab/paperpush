@@ -16,6 +16,9 @@ Implemented so far:
     paperpush autofill -p <dir|file> [<dir|file> ...] <subfile>
                                       fill a .sub from a manuscript directory
     paperpush validate <subfile>  run the pre-submission checks on a .sub
+    paperpush validate --manuscript FILE [--venue VENUE] ...
+                                      check files without a .sub (general checks
+                                      only when no venue is named)
     paperpush requirements <venue>  show what the venue's author guidelines require of the manuscript
                                       (scans referenced files for secrets, GPS
                                       metadata, LaTeX comments, broken links, and
@@ -55,7 +58,7 @@ from pydantic import ConfigDict, validate_call
 
 from . import __url__, __version__, credentials, venue_data
 from ._logging import configure_logging
-from .database import get_venue, list_venues
+from .database import generic_venue, get_venue, list_venues
 from .subfile import default_filename, is_subfile_name, subfile_stem, with_subfile_suffix, write_template
 from .venues.common import DEFAULT_TIMEOUT_SECONDS
 
@@ -1288,27 +1291,69 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     (PDF by default; .html, .md, or .txt by extension). Exits 0 when the file is
     ready to submit, 1 when it has errors, and 2 when the venue is unknown.
     """
+    from . import file_inputs
     from . import report as report_mod
-    from .subfile import load
+    from .subfile import SubFile, load
 
-    logger.debug("validate: subfile=%r", args.subfile)
-    try:
-        subfile = load(args.subfile)
-    except OSError as exc:
-        logger.error("validate: cannot read %s: %s", args.subfile, exc)
-        print(f"error: cannot read {args.subfile}: {exc}", file=sys.stderr)
+    # '--figures a.png b.png x.sub.txt' reads the .sub as a figure (nargs='+'
+    # is greedy); take it back as the positional .sub.
+    for key, _, multiple in file_inputs.FILE_ROLES:
+        value = getattr(args, key, None)
+        if multiple and value and not args.subfile:
+            subs = [v for v in value if v.endswith((".sub", ".sub.txt"))]
+            if len(subs) == 1:
+                args.subfile = subs[0]
+                setattr(args, key, [v for v in value if v != subs[0]])
+    files = {key: getattr(args, key, None) for key, _, _ in file_inputs.FILE_ROLES}
+    named_files = file_inputs.given(files)
+    files_only = not args.subfile
+    requested_venue = getattr(args, "venue", None)
+    logger.debug("validate: subfile=%r venue=%r files=%r", args.subfile, requested_venue, files)
+
+    if files_only and not named_files:
+        print("error: give a .sub file, or the files to check (--manuscript, --title-page, --cover-letter, --figures, --tables, --supplement)", file=sys.stderr)
         return 1
+    if files_only:
+        subfile = SubFile(venue=requested_venue or "", values={})
+        venue = requested_venue
+    else:
+        try:
+            subfile = load(args.subfile)
+        except OSError as exc:
+            logger.error("validate: cannot read %s: %s", args.subfile, exc)
+            print(f"error: cannot read {args.subfile}: {exc}", file=sys.stderr)
+            return 1
+        venue = subfile.venue or "biorxiv"
+        logger.info("validate: loaded %s targeting %s (%d values)", args.subfile, venue, len(subfile.values))
+        if requested_venue and requested_venue.lower() != venue.lower():
+            print(f"error: {args.subfile} is for {venue}, not {requested_venue}; drop --venue, or make a .sub for {requested_venue} with 'paperpush subfile {requested_venue}'", file=sys.stderr)
+            return 1
 
-    venue = subfile.venue or "biorxiv"
-    logger.info("validate: loaded %s targeting %s (%d values)", args.subfile, venue, len(subfile.values))
+    if venue:
+        try:
+            venue_def = get_venue(venue)
+        except KeyError:
+            logger.error("validate: unknown venue %r", venue)
+            print(f"error: unknown venue '{venue}'", file=sys.stderr)
+            print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
+            return 2
+    else:
+        venue_def = generic_venue()
+        venue = venue_def.slug
 
-    try:
-        venue_def = get_venue(venue)
-    except KeyError:
-        logger.error("validate: unknown venue %r in %s", venue, args.subfile)
-        print(f"error: unknown venue '{venue}'", file=sys.stderr)
-        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
-        return 2
+    notes: list[str] = []
+    if named_files:
+        try:
+            placed = file_inputs.apply_files(venue_def, subfile.values, files)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        venue_def, notes = placed.venue, placed.notes
+        subfile = SubFile(venue=subfile.venue, values=placed.values)
+    # Names the run in messages and anchors the default report path: the .sub,
+    # or else the first file named.
+    label = args.subfile or next(p for p in (subfile.values.get(f.id, "").split("\n")[0] for f in venue_def.fields if f.type in ("file", "filelist")) if p)
+    rerun = f"paperpush validate {args.subfile}" if args.subfile else file_inputs.validate_command(requested_venue, files)
 
     ai_only = getattr(args, "ai_only", False)
     if ai_only and not getattr(args, "check_manuscript", True):
@@ -1318,6 +1363,9 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         print("error: --ai-only is not supported with --web", file=sys.stderr)
         return 1
 
+    if getattr(args, "web", False) and files_only:
+        print("error: --web needs a .sub file; make one with 'paperpush subfile VENUE'", file=sys.stderr)
+        return 1
     if getattr(args, "web", False):
         action = "validate-ai" if getattr(args, "ai", False) else "validate"
         if getattr(args, "initial_submission", False):
@@ -1326,7 +1374,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
     report_out = None
     if getattr(args, "output", None) is not None:
-        report_out = report_mod.output_path(args.output, args.subfile)
+        report_out = report_mod.output_path(args.output, label)
         if report_out.exists() and not getattr(args, "overwrite", False):
             print(f"error: {report_out} already exists (use --overwrite to replace it)", file=sys.stderr)
             return 1
@@ -1355,9 +1403,11 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         result = validate_report_for(
             subfile,
             venue_def,
-            args.subfile,
+            args.subfile or "",
             ai=ai,
             progress=progress,
+            files_only=files_only,
+            notes=notes,
             check_sensitive=getattr(args, "check_sensitive", True),
             check_links=getattr(args, "check_links", True),
             check_references=getattr(args, "check_references", True),
@@ -1370,19 +1420,24 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             ai_only=ai_only,
         )
     alt = getattr(args, "alt_color", False)
-    report_mod.print_report(result, alt_color=alt)
+    hide = report_mod.hidden_statuses(
+        errors_only=getattr(args, "errors_only", False),
+        hide_warnings=getattr(args, "hide_warnings", False),
+        hide_unchecked=getattr(args, "hide_unchecked", False),
+    )
+    report_mod.print_report(result, alt_color=alt, hide=hide)
 
     if getattr(args, "ai_tasks", None):
         from .ai_validate import tasks_payload
 
         tasks_path = Path(args.ai_tasks).expanduser()
-        tasks_path.write_text(json.dumps(tasks_payload(result.ai_tasks, venue_def, args.subfile), indent=2) + "\n", encoding="utf-8")
         again = " --ai-only" if ai_only else ""
-        print(f"\nWrote {len(result.ai_tasks)} AI check(s) to {tasks_path}; have an agent answer them, then run 'paperpush validate {args.subfile}{again} --ai-results <results.json>'.")
+        tasks_path.write_text(json.dumps(tasks_payload(result.ai_tasks, venue_def, args.subfile or "", command=rerun + again), indent=2) + "\n", encoding="utf-8")
+        print(f"\nWrote {len(result.ai_tasks)} AI check(s) to {tasks_path}; have an agent answer them, then run '{rerun}{again} --ai-results <results.json>'.")
     if report_out is not None:
         out = report_out
         try:
-            report_mod.save(result, out, alt_color=alt)
+            report_mod.save(result, out, alt_color=alt, hide=hide)
         except OSError as exc:
             print(f"error: could not save the report to {out}: {exc}", file=sys.stderr)
             return 1
@@ -1392,7 +1447,11 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         print("\nFix the errors above, then run 'paperpush validate' again.", file=sys.stderr)
         return 1
     if ai_only:
-        print(f"\nRan only the AI checks on {args.subfile}; run 'paperpush validate' without --ai-only for the full pre-submission checks.")
+        print(f"\nRan only the AI checks on {Path(label).name}; run 'paperpush validate' without --ai-only for the full pre-submission checks.")
+        return 0
+    if files_only:
+        what = f"{venue}'s author guidelines" if not venue_def.is_generic else "the general checks (no venue given)"
+        print(f"\nThe files passed {what}. Make a .sub ('paperpush subfile VENUE') to check the whole submission.")
         return 0
     if result.downgraded:
         print(f"\n{args.subfile} passed validation for {venue} as an initial submission ({result.downgraded} error(s) shown as warnings); ready to submit.")
@@ -2361,7 +2420,15 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=_VALIDATE_CHECKS,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p_validate.add_argument("subfile", help="path to the .sub file to check, e.g. biorxiv.sub.txt")
+    p_validate.add_argument("subfile", nargs="?", help="path to the .sub file to check, e.g. biorxiv.sub.txt. Optional when files are named with --manuscript, --title-page, ...: they are then checked without a .sub")
+    p_validate.add_argument("--venue", metavar="VENUE", help="(no .sub) check the named files against this venue's author guidelines. Without it, only the checks that apply to any manuscript run: links, references, hidden text, sensitive data, figure/table citation order, front matter, the reference list, and prose")
+    files_group = p_validate.add_argument_group("files", "Check these files instead of, or in place of, the ones the .sub names. Each goes in the venue's upload for it; with no .sub, the form's fields are not checked.")
+    files_group.add_argument("--manuscript", metavar="FILE", help="the manuscript (PDF, Word, or LaTeX source)")
+    files_group.add_argument("--title-page", dest="title_page", metavar="FILE", help="a separate title page, for venues that ask for one")
+    files_group.add_argument("--cover-letter", dest="cover_letter", metavar="FILE", help="the cover letter")
+    files_group.add_argument("--figures", nargs="+", metavar="FILE", help="figure files")
+    files_group.add_argument("--tables", nargs="+", metavar="FILE", help="table files")
+    files_group.add_argument("--supplement", nargs="+", metavar="FILE", help="supplementary files")
     p_validate.add_argument("--web", action="store_true", help="show the checks in the paperpush web page on this computer instead of the terminal, where you can fix the fields and re-validate; edits are saved to the .sub (with --ai, the AI checks run too). Needs pip install 'paperpush[web]'")
     p_validate.add_argument(
         "--dont-check-links",
@@ -2379,7 +2446,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--dont-check-references",
         dest="check_references",
         action="store_false",
-        help="skip checking the references against the DOI registry. By " "default validate reads the submission's bibliography -- its .bib " "files, and the reference list in the manuscript itself -- resolves " "each DOI through doi.org, and warns when one is " "malformed, duplicated, unregistered, or registered to a different " "title, author, or year than the reference claims -- the usual sign of " "a DOI copied from the wrong reference. Requires network access.",
+        help="skip checking the references against the DOI registry. By " "default validate reads the submission's bibliography -- its .bib " "files, and the reference list in the manuscript itself -- resolves " "each DOI through doi.org, and warns when one is " "malformed, duplicated, unregistered, or registered to a different " "title, author, or year than the reference claims -- the usual sign of " "a DOI copied from the wrong reference. It also searches Crossref, " "OpenAlex, and arXiv for the references that have no DOI (a reference " "no registry knows may be fabricated) and checks that preprints are " "cited in their published or latest version. Requires network access.",
     )
     p_validate.add_argument(
         "--dont-check-manuscript",
@@ -2436,6 +2503,10 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="DAYS",
         help="warn when the date at the top of the cover letter is more than DAYS days old (default: 7). The cover letter is also checked for the name of a different venue, as left over from an earlier submission.",
     )
+    display_group = p_validate.add_argument_group("display", "Leave sections out of the report shown in the terminal and saved with -o (not --web). The summary line still counts every check, and the report says what was left out. The exit status is unchanged.")
+    display_group.add_argument("--show-errors-only", dest="errors_only", action="store_true", help="show only the failed checks and their errors; overrides --hide-warnings and --hide-unchecked")
+    display_group.add_argument("--hide-warnings", dest="hide_warnings", action="store_true", help="leave out the warnings section, and the warnings listed under failed checks")
+    display_group.add_argument("--hide-unchecked", dest="hide_unchecked", action="store_true", help="leave out the checks that were not run: could not run, needs AI, and not implemented")
     p_validate.add_argument("--colorblind", "--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours in the terminal and saved report: blue for passed, vermillion for failed, dark yellow for warnings, reddish purple for needs AI, grey for could not run / not implemented (the same palette as the web app's \"Colorblind-friendly colors\" setting). --alt-color is an older name for it")
     p_validate.add_argument(
         "--ai",

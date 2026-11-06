@@ -27,7 +27,12 @@
   :data:`MAX_SELF_CITATION_SHARE` of a list of at least
   :data:`MIN_REFERENCES_FOR_SHARE`, are self-citations.
 
-Both are WARNINGs: references are read from extracted text.
+* ``bibliography.entries`` -- the ``.bib`` files themselves: duplicate
+  citation keys, entries with no key or no closing brace, journal and
+  conference entries with no title or author, and one arXiv preprint under two
+  keys (see :func:`paperpush.references.bib_structure_findings`).
+
+All are WARNINGs: references are read from extracted text.
 """
 
 from __future__ import annotations
@@ -331,6 +336,7 @@ def is_self_citation(ref: Ref, authors: list[tuple[str, str, str]]) -> bool:
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("bibliography.uncited", "Every reference is cited, and every citation has a reference", REFERENCES, _uncited_check, venue, values)
     checks.run("bibliography.self_citations", "Self-citations not excessive", REFERENCES, _self_citation_check, venue, values)
+    checks.run("bibliography.entries", "BibTeX entries are complete, closed, and have unique keys", REFERENCES, _bib_entries_check, venue, values)
 
 
 def _manuscripts(venue: Venue, values: dict[str, str]) -> list[tuple[Field, Path]]:
@@ -375,6 +381,18 @@ def _uncited_check(venue: Venue, values: dict[str, str]) -> Outcome:
     if bib.printed_only_cited:
         return Outcome(issues, f"{len(bib.cited & set(defined))} cited keys, all in the .bib (BibTeX prints only cited entries)")
     return Outcome(issues, f"all {len(bib.refs)} references cited{via}")
+
+
+def _bib_entries_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    """Structural problems in the submission's ``.bib`` files (see :func:`paperpush.references.bib_structure_findings`)."""
+    from . import references
+    from .validate import _findings_to_issues, _iter_upload_paths
+
+    paths = list(_iter_upload_paths(venue, values))
+    findings, total = references.bib_structure_findings(paths)
+    if not total:
+        raise NotApplicable("no .bib file among the uploads")
+    return Outcome(_findings_to_issues(findings), f"{total} entries read")
 
 
 def _self_citation_check(venue: Venue, values: dict[str, str]) -> Outcome:

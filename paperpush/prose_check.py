@@ -24,6 +24,11 @@ pattern can find with few false alarms, and every finding is a WARNING.
   checking against a dictionary, so gene names, acronyms, and jargon are left
   alone. Needs the optional ``codespell`` package.
 
+Numbers, abbreviation conventions, and acronyms are checked by
+:mod:`paperpush.style_check` and reported here too (``prose.numbers``,
+``prose.conventions``, ``prose.acronyms``), and the AI task ``ai.prose``
+(spelling and typos beyond codespell's list, grammar, and tense) is queued.
+
 What can be checked depends on the file. A Word file, Markdown, or plain text
 is read as written, so every check runs. LaTeX source is read with its math,
 commands, citations, and URLs masked; double spaces are not checked there
@@ -733,3 +738,11 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     for name, (title, _, _) in _CHECKS.items():
         checks.run(f"prose.{name}", title, PROSE, _check, name, venue, values)
     checks.run(f"prose.{REPETITION}", "Varied word choice (no heavily repeated words)", PROSE, _repetition_check, venue, values)
+    from . import style_check
+
+    checks.run("prose.numbers", "Numbers of 10 or more in digits", PROSE, style_check._numbers_check, venue, values)
+    checks.run("prose.conventions", "Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)", PROSE, style_check._conventions_check, venue, values)
+    checks.run("prose.acronyms", "Acronyms spelled out at first use", PROSE, style_check._acronym_check, venue, values)
+    task = style_check.ai_prose_task(venue, values)
+    if task is not None:
+        checks.needs_ai(task)

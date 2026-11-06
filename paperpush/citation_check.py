@@ -15,7 +15,9 @@ item with a caption (or an attached figure file) that the text never cites,
 and a citation of an item that does not exist. Within each main figure it
 reports a panel first cited before a lower-lettered one ("Fig. 2c" before
 "Fig. 2b"), in every series ("Supplementary Fig. 3c", "Extended Data Fig. 1b",
-"Table 2b" too). A LaTeX source that cannot be
+"Table 2b" too), and a panel a main figure's legend names ("(a)", "a,
+Overview.", a LaTeX subfigure) that the text never cites, when the text
+cites that figure's panels one by one. A LaTeX source that cannot be
 compiled is read through its ``\\label``/``\\ref`` pairs instead: the order of
 the ``figure``/``table`` environments numbers the items, and the ``\\ref``
 calls outside them are the citations.
@@ -473,7 +475,7 @@ def _xref_files(venue: Venue, values: dict[str, str]) -> list[tuple[str, Path]]:
     files = [(f.id, p) for f, p in manuscript_files(venue, values)]
     for f in _fields_for(venue, "supplementary"):
         files += [(f.id, p) for p in _existing(_paths(f, values))]
-    readable = (".pdf", ".docx", ".txt", ".md") + document.TEX_SUFFIXES
+    readable = (".pdf", ".docx", ".txt", ".md", ".markdown") + document.TEX_SUFFIXES
     seen: set[Path] = set()
     out = []
     for field_id, path in files:
@@ -502,7 +504,7 @@ def _cross_reference_check(venue: Venue, values: dict[str, str]) -> Outcome:
                     shown = ", ".join(undefined[:MAX_XREF_EXAMPLES * 2]) + (f", and {len(undefined) - MAX_XREF_EXAMPLES * 2} more" if len(undefined) > MAX_XREF_EXAMPLES * 2 else "")
                     problems.append(f"{len(undefined)} reference(s) to a label that no \\label defines, which print as \u201c??\u201d: {shown}")
         pages = doc.page_texts
-        if pages is None and (doc.is_docx or doc.suffix in (".txt", ".md")):
+        if pages is None and (doc.is_docx or doc.is_markdown or doc.suffix == ".txt"):
             pages = [doc.text] if doc.text is not None else None
         if pages is not None and not (source_checked and problems):
             # A compiled LaTeX source's own \cite keys are bibliography.uncited's.
@@ -553,14 +555,120 @@ def _panel_check(venue: Venue, values: dict[str, str], field_id: str) -> Outcome
     from .requirements_check import manuscript_files
 
     path = manuscript_files(venue, values)[0][1]
-    text = document.get(path).text
+    doc = document.get(path)
+    text = doc.text
     if text is None:
         raise Unchecked(f"could not read {path.name} as text")
     cites = panel_mentions(text)
+    if doc.is_tex and doc.pdf is None and doc.tex_source is not None:
+        cites = sorted(cites + tex_panel_mentions(doc.tex_source), key=lambda c: c.pos)
+        named = tex_caption_panels(doc.tex_source)
+    else:
+        named = {number: caption_panels(legend) for number, _, legend in legends(text)}
     if not cites:
         raise NotApplicable("the text cites no figure or table panels (e.g. Fig. 2a, Supplementary Fig. 3b)")
     problems, detail = panel_order_problems(cites)
-    return Outcome([Issue(WARNING, field_id, p) for p in problems], detail)
+    problems += uncited_panel_problems(cites, named)
+    return Outcome([Issue(WARNING, field_id, p) for p in problems], detail if not problems else "")
+
+
+# --- panels a caption names -----------------------------------------------------------------
+
+# "(a)", "(A)"; and at the start of the caption or a sentence, "a," "a |" "a:" "a)" "**a**" ("a, Overview. b, Detail.").
+_CAPTION_PANEL = re.compile(r"\(([a-hA-H])\)|(?:^|[.;]\s+|\s)\*\*\(?([a-hA-H])\)?\*\*|(?:^|[.;]\s+|:\s+)\(?([a-hA-H])(?:,|\s\||:|\))\s")
+_TEX_CAPTION_PANEL = re.compile(r"\\textbf\s*\{\s*\(?([a-hA-H])\)?\s*\}")
+_TEX_SUBFIGURE = re.compile(r"\\begin\s*\{subfigure\}|\\subfloat\b|\\subfigure\b|\\subcaptionbox\b")
+
+
+def _panel_run(letters: set[str]) -> list[str]:
+    """The letters a, b, c, ... present without a gap, from a; fewer than two means no panels."""
+    lower = {c.lower() for c in letters}
+    run: list[str] = []
+    while chr(ord("a") + len(run)) in lower:
+        run.append(chr(ord("a") + len(run)))
+    return run if len(run) >= 2 else []
+
+
+def caption_panels(legend: str) -> list[str]:
+    """The panel letters a figure legend names, in order: "(a) ... (b) ..." or "a, Overview. b, Detail." -> ['a', 'b']."""
+    letters = {next(g for g in m.groups() if g) for m in _CAPTION_PANEL.finditer(legend)}
+    return _panel_run(letters)
+
+
+def tex_caption_panels(source: str) -> dict[int, list[str]]:
+    """Main figure number -> its panel letters, from each figure's caption and subfigures."""
+    out: dict[int, list[str]] = {}
+    number = 0
+    for env in _ENV.finditer(source):
+        if "table" in env.group(1):
+            continue
+        number += 1
+        body = env.group(2)
+        letters = {m.group(1) for m in _TEX_CAPTION_PANEL.finditer(body)}
+        caption = re.search(r"\\caption\s*(?:\[[^\]]*\])?\s*\{(.*)", body, re.DOTALL)
+        if caption:
+            letters |= {next(g for g in m.groups() if g) for m in _CAPTION_PANEL.finditer(caption.group(1))}
+        subfigures = len(_TEX_SUBFIGURE.findall(body))
+        letters |= {chr(ord("a") + i) for i in range(subfigures)}
+        run = _panel_run(letters)
+        if run:
+            out[number] = run
+    return out
+
+
+def tex_panel_mentions(source: str) -> list[PanelCite]:
+    """Panels cited through labels in LaTeX: ``\\ref{fig:x}b``, ``\\ref{fig:x}(b-c)``, or a ``\\ref`` to a subfigure's label."""
+    labels: dict[str, int] = {}
+    sub_labels: dict[str, tuple[int, str]] = {}
+    spans: list[tuple[int, int]] = []
+    number = 0
+    for env in _ENV.finditer(source):
+        spans.append((env.start(), env.end()))
+        if "table" in env.group(1):
+            continue
+        number += 1
+        body = env.group(2)
+        subs = [m.start() for m in _TEX_SUBFIGURE.finditer(body)]
+        found = list(_LABEL.finditer(body))
+        # The figure's own label follows its main \\caption (not a \\subcaption); failing that, it is the last one.
+        captions = [m.end() for m in re.finditer(r"(?<!sub)\\caption\b", body)]
+        own = next((m for m in found if captions and m.start() > captions[-1]), found[-1] if found else None)
+        for label in found:
+            before = [x for x in subs if x < label.start()]
+            if label is own or not before:
+                labels[label.group(1).strip()] = number
+            else:
+                sub_labels[label.group(1).strip()] = (number, chr(ord("a") + len(before) - 1))
+    out: list[PanelCite] = []
+    ref = re.compile(r"\\(?:ref|cref|Cref|autoref|subref)\*?\s*\{([^}]*)\}(?:\(?([a-hA-H])(?:" + _DASH + r"([a-hA-H]))?\)?(?![A-Za-z]))?")
+    for m in ref.finditer(source):
+        if any(a <= m.start() < b for a, b in spans):
+            continue
+        for key in (k.strip() for k in m.group(1).split(",")):
+            if key in sub_labels:
+                n, letter = sub_labels[key]
+                out.append(PanelCite("figure", n, letter, m.start()))
+            elif key in labels and m.group(2):
+                out += [PanelCite("figure", labels[key], c, m.start()) for c in _letters(m.group(2), m.group(3))]
+    return out
+
+
+def uncited_panel_problems(cites: list[PanelCite], named: dict[int, list[str]]) -> list[str]:
+    """Panels a main figure's legend names but the text never cites.
+
+    Only figures whose panels the text cites one by one are compared: a figure
+    cited only as a whole ("Fig. 2") has no uncited panels.
+    """
+    cited: dict[int, set[str]] = {}
+    for c in cites:
+        if c.series == "figure":
+            cited.setdefault(c.number, set()).add(c.letter.lower())
+    problems = []
+    for number in sorted(cited):
+        missing = [c for c in named.get(number, []) if c not in cited[number]]
+        if missing:
+            problems.append(f"Fig. {number} has panel{'s' if len(missing) > 1 else ''} {', '.join(missing)} in its legend that the text never cites (cited: {', '.join(sorted(cited[number]))})")
+    return problems
 
 
 # --- legends -------------------------------------------------------------------------------

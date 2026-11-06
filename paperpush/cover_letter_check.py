@@ -197,7 +197,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     )
     checks.run(
         "cover_letter.venue",
-        f"Cover letter addressed to {venue.name or venue.slug}",
+        "Cover letter addressed to the venue" if venue.is_generic else f"Cover letter addressed to {venue.name or venue.slug}",
         COVER_LETTER,
         _venue_check,
         checks,
@@ -331,6 +331,8 @@ def _venue_check(checks: Checks, venue: Venue, values: dict[str, str]) -> Outcom
     from .ai_validate import AiTask
     from .database import list_venues
 
+    if venue.is_generic:
+        raise NotApplicable("no venue given, so there is no venue the letter should name")
     target = venue.name or venue.slug
     others = list_venues()
     issues: list[Issue] = []

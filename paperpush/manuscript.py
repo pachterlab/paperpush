@@ -11,6 +11,9 @@ the formats venues accept for the main manuscript:
   text extracted (no third-party dependency). A total page count, when needed,
   comes from Word's cached statistic in ``docProps/app.xml`` -- a best-effort
   hint, since a Word file has no intrinsic pagination.
+* ``.md`` / ``.markdown``: reduced to the plain text a Word or PDF extraction
+  would give (see :func:`markdown_to_text`), so headings written as ``## Methods``
+  are found like any other; ``.txt`` is read as it is.
 * ``.pdf``: text and page boundaries are read with :mod:`pypdf` when it is
   installed, falling back to a dependency-free reader that decodes the page
   content streams (including ``FlateDecode``-compressed ones).
@@ -47,8 +50,14 @@ logger = logging.getLogger(__name__)
 # A line that is, on its own, the heading that starts the reference list. Allows
 # an optional leading section number (Arabic or Roman). Matched per line, so a
 # passing mention of "references" inside a sentence does not trigger it.
+# Markdown heading markup around a heading line ("## References", "**References**",
+# "References {#refs}"), so the matchers below also work on a raw Markdown file's
+# text; :func:`markdown_to_text` removes it from text the checks read.
+_MD_HEADING_OPEN = r"(?:#{1,6}[ \t]+)?(?:\*\*|__)?"
+_MD_HEADING_CLOSE = r"(?:\*\*|__)?(?:[ \t]+#+)?(?:[ \t]*\{[#.][^{}\n]*\})?"
+
 _REFERENCE_HEADING = re.compile(
-    r"^\s*(?:\d+\.?\s+|[ivxlcIVXLC]+\.?\s+)?" r"(references(?:\s+and\s+notes)?|bibliography|literature\s+cited|works\s+cited)" r"\s*:?\s*$",
+    r"^\s*" + _MD_HEADING_OPEN + r"(?:\d+\.?\s+|[ivxlcIVXLC]+\.?\s+)?" r"(references(?:\s+and\s+notes)?|bibliography|literature\s+cited|works\s+cited)" r"\s*:?" + _MD_HEADING_CLOSE + r"\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 
@@ -88,7 +97,7 @@ def _extra_heading_pattern(headings: tuple[str, ...]) -> re.Pattern[str] | None:
         return None
     alternatives = "|".join(re.escape(phrase) for phrase in phrases)
     return re.compile(
-        r"^\s*(?:\d+\.?\s+|[A-Za-z]\.?\s+|[ivxlcIVXLC]+\.?\s+)?" rf"(?:{alternatives})" r"(?:\s+[A-Za-z0-9]{1,3})?" r"\s*:?\s*$",
+        r"^\s*" + _MD_HEADING_OPEN + r"(?:\d+\.?\s+|[A-Za-z]\.?\s+|[ivxlcIVXLC]+\.?\s+)?" rf"(?:{alternatives})" r"(?:\s+[A-Za-z0-9]{1,3})?" r"\s*:?" + _MD_HEADING_CLOSE + r"\s*$",
         re.IGNORECASE | re.MULTILINE,
     )
 
@@ -352,12 +361,162 @@ def _pdf_pages(path: Path) -> list[str] | None:
     return _pdf_pages_pypdf(path) or _pdf_pages_stdlib(path)
 
 
+# --- Markdown --------------------------------------------------------------
+
+MARKDOWN_SUFFIXES = (".md", ".markdown")
+
+# Markdown markup a heading line can carry, and the pattern shared by every
+# heading matcher in the package: "## 2. Methods ##", "**Methods**", "Methods {#sec:methods}".
+_MD_ATX = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$", re.MULTILINE)
+_MD_ATX_EMPTY = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]*$", re.MULTILINE)
+_MD_SETEXT = re.compile(r"^([ \t]{0,3}\S[^\n]*)\n[ \t]{0,3}(?:=+|-+)[ \t]*$", re.MULTILINE)
+_MD_RULE = re.compile(r"^[ \t]{0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$", re.MULTILINE)
+_MD_HEADING_ATTRS = re.compile(r"[ \t]*\{[#.][^{}\n]*\}[ \t]*$", re.MULTILINE)
+_MD_FENCE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})[^\n]*\n.*?^[ \t]{0,3}\1[ \t]*$", re.MULTILINE | re.DOTALL)
+_MD_FRONT_MATTER = re.compile(r"\A---[ \t]*\n(.*?)\n(?:---|\.\.\.)[ \t]*(?:\n|\Z)", re.DOTALL)
+_MD_IMAGE = re.compile(r"!\[([^\]\n]*)\]\([^)\n]*\)")
+_MD_LINK = re.compile(r"(?<!\\)\[([^\]\n]+)\]\(\s*<?([^)\s>]*)>?(?:\s+\"[^\"]*\")?\s*\)")
+_MD_REF_LINK = re.compile(r"(?<!\\)\[([^\]\n]+)\]\[[^\]\n]*\]")
+_MD_LINK_DEF = re.compile(r"^[ \t]{0,3}\[[^\]\n]+\]:[ \t]*\S+.*$", re.MULTILINE)
+_MD_AUTOLINK = re.compile(r"<((?:https?|ftp|mailto):[^>\s]+)>")
+_MD_STRONG = re.compile(r"(\*\*|__)(?=\S)(.+?)(?<=\S)\1")
+_MD_EM = re.compile(r"(?<![\w*\\])([*_])(?=\S)([^*_\n]+?)(?<=\S)\1(?![\w*])")
+_MD_STRIKE = re.compile(r"~~(?=\S)(.+?)(?<=\S)~~")
+_MD_CODE = re.compile(r"(`+)(.+?)\1")
+_MD_QUOTE = re.compile(r"^[ \t]{0,3}>[ \t]?", re.MULTILINE)
+_MD_TABLE_RULE = re.compile(r"^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*(?:\n|\Z)", re.MULTILINE)
+_MD_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+_MD_HTML_TAG = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>")
+_MD_ESCAPE = re.compile(r"\\([\\`*_{}\[\]()#+\-.!|>~])")
+
+
+def _front_matter_lines(block: str) -> list[str]:
+    """The text a YAML front-matter block carries: its title, authors, abstract, and so on, as lines."""
+    lines: list[str] = []
+    for raw in block.splitlines():
+        m = re.match(r"^\s*(?:-\s+)?(?:(title|subtitle|author|authors|name|date|abstract|keywords|affiliation|institute)\s*:)?\s*(.*)$", raw, re.IGNORECASE)
+        if not m:
+            continue
+        key, value = (m.group(1) or "").lower(), m.group(2).strip().strip("'\"")
+        if value in ("|", ">", "|-", ">-"):
+            value = ""
+        if key == "abstract":
+            lines += ["", "Abstract"]
+        if value and (key or raw.startswith((" ", "\t"))):
+            lines.append(value)
+    return lines
+
+
+def _link_text(match: re.Match[str]) -> str:
+    """A link as a reader sees it: its text, plus the target when the text does not already show it."""
+    text, url = match.group(1), match.group(2)
+    if not url or url.startswith("#") or url.lower() in text.lower() or text.lower() in url.lower():
+        return text
+    return f"{text} ({url})"
+
+
+def markdown_to_text(source: str) -> str:
+    """Markdown reduced to the plain text a Word or PDF extraction would give.
+
+    Every heading -- ATX (``## Methods``, ``## 2. Methods ##``), setext (a line
+    underlined with ``===`` or ``---``), or a paragraph that is all bold
+    (``**Materials and methods**``) -- becomes a line of its own with the markup
+    and any Pandoc attributes (``{#sec:methods}``) removed, which is the shape
+    the heading matchers (references, sections, statements, abstract) expect.
+    Emphasis and code marks are dropped, links and images become their text
+    (a link keeps its target in brackets when the text does not show it, so a
+    DOI link still carries its DOI), and fenced code, HTML comments, tags, and
+    table rules are removed. YAML front matter is kept as its values (title,
+    authors, abstract under an "Abstract" heading). List markers stay, so a
+    numbered reference list still reads as one.
+    """
+    text = source.replace("\r\n", "\n").replace("\r", "\n")
+    front = _MD_FRONT_MATTER.match(text)
+    head = ""
+    if front:
+        head = "\n".join(_front_matter_lines(front.group(1))) + "\n\n"
+        text = text[front.end() :]
+    text = _MD_FENCE.sub("\n", text)
+    text = _MD_HTML_COMMENT.sub(" ", text)
+    text = _MD_LINK_DEF.sub("", text)
+    text = _MD_TABLE_RULE.sub("", text)
+    # Setext before rules: "Methods\n-------" is a heading, a lone "---" a rule.
+    text = _MD_SETEXT.sub(lambda m: "\n" + m.group(1).strip() + "\n", text)
+    text = _MD_RULE.sub("", text)
+    text = _MD_ATX.sub(lambda m: "\n" + m.group(1).strip() + "\n", text)
+    text = _MD_ATX_EMPTY.sub("", text)
+    text = _MD_HEADING_ATTRS.sub("", text)
+    text = _MD_QUOTE.sub("", text)
+    text = _MD_IMAGE.sub(lambda m: m.group(1), text)
+    text = _MD_LINK.sub(_link_text, text)
+    text = _MD_REF_LINK.sub(lambda m: m.group(1), text)
+    text = _MD_AUTOLINK.sub(lambda m: m.group(1), text)
+    text = _MD_CODE.sub(lambda m: m.group(2).strip(), text)
+    text = _MD_STRIKE.sub(lambda m: m.group(1), text)
+    text = _MD_STRONG.sub(lambda m: m.group(2), text)
+    text = _MD_EM.sub(lambda m: m.group(2), text)
+    text = _MD_HTML_TAG.sub("", text)
+    text = _MD_ESCAPE.sub(r"\1", text)
+    text = re.sub(r"[ \t]+\n", "\n", head + text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip() + "\n"
+
+
+_MD_BOLD_LINE = re.compile(r"^[ \t]{0,3}(?:\*\*|__)([^*_\n]{2,80}?)(?:\*\*|__)[ \t]*:?[ \t]*$", re.MULTILINE)
+_MD_RUN_IN = re.compile(r"^[ \t]{0,3}(?:\*\*|__)([^*_\n]{2,60}?)[.:]?(?:\*\*|__)[.:]?[ \t]+\S", re.MULTILINE)
+
+
+def markdown_headings(source: str) -> list[str]:
+    """The headings a Markdown source marks as headings, in order, normalized.
+
+    ATX (``## Methods``) and setext headings, paragraphs that are all bold
+    (``**Methods**``), and run-in bold labels that open a paragraph
+    (``**Data availability.** The data are ...``), which is how statements are
+    often written. Fenced code is skipped, so a ``# comment`` in a code block is
+    not a heading.
+    """
+    text = _MD_FENCE.sub("\n", source.replace("\r\n", "\n"))
+    text = _MD_HTML_COMMENT.sub(" ", text)
+    front = _MD_FRONT_MATTER.match(text)
+    found: list[tuple[int, str]] = []
+    if front:
+        if re.search(r"^abstract\s*:", front.group(1), re.IGNORECASE | re.MULTILINE):
+            found.append((0, "abstract"))
+        text = "\n" * front.end() + text[front.end() :]
+    for pattern in (_MD_ATX, _MD_SETEXT, _MD_BOLD_LINE, _MD_RUN_IN):
+        for m in pattern.finditer(text):
+            if pattern is _MD_SETEXT and _MD_RULE.fullmatch(m.group(1).strip()):
+                continue
+            found.append((m.start(), m.group(1)))
+    out = []
+    for _, raw in sorted(found):
+        plain = _MD_EM.sub(lambda m: m.group(2), _MD_STRONG.sub(lambda m: m.group(2), _MD_CODE.sub(lambda m: m.group(2), raw)))
+        heading = normalize_heading(plain)
+        if heading:
+            out.append(heading)
+    return out
+
+
+def read_markdown(path: Path) -> str | None:
+    """The plain text of a Markdown file (see :func:`markdown_to_text`), or None if unreadable."""
+    try:
+        return markdown_to_text(path.read_text("utf-8", "replace"))
+    except OSError:
+        return None
+
+
 # --- public API ------------------------------------------------------------
 
 
 def manuscript_text(path: Path) -> str | None:
     """Plain text of a manuscript file, or None if the format is unsupported."""
     suffix = path.suffix.lower()
+    if suffix in MARKDOWN_SUFFIXES:
+        return read_markdown(path)
+    if suffix == ".txt":
+        try:
+            return path.read_text("utf-8", "replace")
+        except OSError:
+            return None
     if suffix == ".tex":
         try:
             return _tex_to_text(path.read_text("utf-8", "replace"))
@@ -647,7 +806,7 @@ def _as_pdf(path: Path) -> Path | None:
 # A LaTeX sectioning command and its title argument (one level of nested braces).
 _TEX_SECTION = re.compile(r"\\(?:part|chapter|section|subsection|subsubsection|paragraph)\*?\s*(?:\[[^\]]*\])?\s*\{((?:[^{}]|\{[^{}]*\})*)\}")
 # Leading section designators a heading line may carry: "2.", "II.", "A.", "2.1".
-_HEADING_PREFIX = re.compile(r"^\s*(?:(?:\d+(?:\.\d+)*\.?|[ivxlcIVXLC]+\.|[A-Z]\.)\s+)?")
+_HEADING_PREFIX = re.compile(r"^\s*(?:#{1,6}\s+)?(?:(?:\d+(?:\.\d+)*\.?|[ivxlcIVXLC]+\.|[A-Z]\.)\s+)?")
 # Longest line that can still be a heading, in words.
 _HEADING_MAX_WORDS = 8
 
@@ -659,7 +818,9 @@ def normalize_heading(line: str) -> str:
     residual markup, so ``"2. Materials and Methods:"`` and ``"MATERIALS AND
     METHODS"`` both become ``"materials and methods"``.
     """
-    text = _HEADING_PREFIX.sub("", line.strip(), count=1)
+    text = _MD_HEADING_ATTRS.sub("", line.strip())
+    text = re.sub(r"^(\*\*|__)(.*)\1$", r"\2", text.strip())
+    text = re.sub(r"[ \t]+#+$", "", _HEADING_PREFIX.sub("", text, count=1))
     text = re.sub(r"\\[a-zA-Z@]+\*?", " ", text)
     text = re.sub(r"[{}]", "", text)
     text = text.rstrip(" .:;-\u2013\u2014")
@@ -686,7 +847,8 @@ def _raw_tex_source(path: Path) -> str | None:
 def headings(path: Path) -> list[str] | None:
     """Candidate section headings of a manuscript, normalised, in order.
 
-    For LaTeX source these are the sectioning commands' titles. For a PDF or
+    For LaTeX source these are the sectioning commands' titles; for Markdown,
+    the lines it marks as headings (see :func:`markdown_headings`). For a PDF or
     Word file -- where a heading is just a short line of its own -- every line
     of at most :data:`_HEADING_MAX_WORDS` words is a candidate; the caller
     matches them against the wordings it is looking for, so the over-inclusion
@@ -702,6 +864,14 @@ def headings(path: Path) -> list[str] | None:
         for m in re.finditer(r"\\(?:textbf|textit|emph|noindent\s*\\textbf)\s*\{([^{}]{3,60})\}", source):
             found.append(normalize_heading(m.group(1)))
         return [h for h in found if h]
+    if path.suffix.lower() in MARKDOWN_SUFFIXES:
+        try:
+            marked = markdown_headings(path.read_text("utf-8", "replace"))
+        except OSError:
+            return None
+        # A Markdown file that marks no headings at all is read like plain text.
+        if marked:
+            return marked
     text = manuscript_text(path)
     if text is None:
         return None
@@ -787,7 +957,7 @@ def reference_count(path: Path) -> int | None:
 
 # Where a reference list ends in extracted text: a figure/table caption or a
 # heading that commonly follows it.
-_AFTER_REFERENCES = re.compile(r"^\s*(?:(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?\.?|Table)\s+S?\d+\s*[.:|]|Figure\s+legends?\b|Tables?\s*$|Supplementary\s+(?:information|materials?)\b|Appendix\b|Methods\s*$)", re.IGNORECASE | re.MULTILINE)
+_AFTER_REFERENCES = re.compile(r"^\s*" + _MD_HEADING_OPEN + r"(?:(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?\.?|Table)\s+S?\d+\s*[.:|]|Figure\s+legends?\b|Tables?\s*$|Supplementary\s+(?:information|materials?)\b|Appendix\b|Methods\s*$)", re.IGNORECASE | re.MULTILINE)
 _BIB_ITEM = re.compile(r"\\bibitem\s*(?:\[[^\]]*\])?\s*\{[^}]*\}(.*?)(?=\\bibitem|\\end\s*\{\s*thebibliography|$)", re.DOTALL)
 
 

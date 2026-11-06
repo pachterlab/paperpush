@@ -404,9 +404,47 @@ def read_subfile(subfile: str, manuscript_dir: Optional[str] = None) -> dict[str
     }
 
 
+def _validation_inputs(subfile: Optional[str], manuscript_dir: Optional[str], venue: Optional[str], files: dict[str, Any]):
+    """The ``(path, SubFile, Venue, files_only, notes)`` to validate.
+
+    From the ``.sub`` when one is given, with any named files replacing its
+    paths; else from the named files alone, checked against ``venue`` or, with
+    none, the generic venue (general checks only). See :mod:`paperpush.file_inputs`.
+    """
+    from . import file_inputs
+    from .database import generic_venue
+    from .subfile import SubFile
+
+    named = file_inputs.given(files)
+    if subfile:
+        path, text, venue_def = _load_subfile(subfile, manuscript_dir)
+        if venue and _venue_or_error(venue).slug != venue_def.slug:
+            raise ValueError(f"{path.name} is for {venue_def.slug}, not {venue}; leave venue out, or make a .sub for {venue} with create_subfile")
+        sub = resolve_paths(parse_subfile(text), path.parent)
+    elif not named:
+        raise ValueError("pass a .sub file, or the files to check (manuscript, title_page, cover_letter, figures, tables, supplement)")
+    else:
+        path, venue_def = None, _venue_or_error(venue) if venue else generic_venue()
+        sub = SubFile(venue=venue_def.slug, values={})
+    notes: list[str] = []
+    if named:
+        base = Path(manuscript_dir).expanduser() if manuscript_dir else None
+        placed = file_inputs.apply_files(venue_def, sub.values, files, base=base)
+        venue_def, notes = placed.venue, placed.notes
+        sub = SubFile(venue=sub.venue, values=placed.values)
+    return path, sub, venue_def, not subfile, notes
+
+
 def validate_subfile(
-    subfile: str,
+    subfile: Optional[str] = None,
     manuscript_dir: Optional[str] = None,
+    venue: Optional[str] = None,
+    manuscript: Optional[str] = None,
+    title_page: Optional[str] = None,
+    cover_letter: Optional[str] = None,
+    figures: Optional[list[str]] = None,
+    tables: Optional[list[str]] = None,
+    supplement: Optional[list[str]] = None,
     check_links: bool = True,
     check_sensitive: bool = True,
     check_references: bool = True,
@@ -475,6 +513,17 @@ def validate_subfile(
     those checks and skips the deterministic ones (the manuscript is still read
     to find which apply; it cannot be combined with `check_manuscript=false`).
 
+    Files can be checked without a `.sub`: pass any of `manuscript`,
+    `title_page` (a separate title page), `cover_letter`, `figures`, `tables`,
+    and `supplement` and leave `subfile` out. With `venue` they are checked
+    against that venue's author guidelines; the form checks come back
+    not_applicable. Without `venue` only the checks that apply to any
+    manuscript run (links, references, hidden text, sensitive data, citation
+    order, front matter, the reference list, prose). With a `.sub`, a named
+    file replaces the path the `.sub` gives for it. `scope` is "" (a `.sub`),
+    "files" (files for a venue), or "general" (no venue); `notes` says how the
+    files were placed, e.g. a file the venue's portal has no upload for.
+
     `cover_letter_max_age_days` (default 7): the cover letter's date may be at
     most this old; the letter is also checked for the name of a different
     venue left over from an earlier submission.
@@ -495,12 +544,16 @@ def validate_subfile(
     from . import report as report_mod
     from .ai_validate import AiOptions, tasks_payload
 
-    path, text, venue = _load_subfile(subfile, manuscript_dir)
+    files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
+    path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
-    result = _run_validate_report(resolve_paths(parse_subfile(text), path.parent), venue, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path), ai_only=ai_only)
+    result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
     out: dict[str, Any] = {
-        "path": str(path),
-        "venue": venue.slug,
+        "path": str(path or ""),
+        "venue": venue_def.slug,
+        "scope": result.scope,
+        "files": result.files,
+        "notes": result.notes,
         "ok": result.ok,
         "initial_submission_rule": result.initial_submission_rule,
         "initial_submission": result.initial_submission,
@@ -510,15 +563,25 @@ def validate_subfile(
         "warnings": _issue_dicts(result.warnings),
         "counts": result.counts(),
         "checks": [r.to_dict() for r in result.results],
-        "ai_tasks": tasks_payload([t for t in result.ai_tasks if t.id in {r.id for r in result.by_status(report_mod.NEEDS_AI)}], venue, str(path))["tasks"],
+        "ai_tasks": tasks_payload([t for t in result.ai_tasks if t.id in {r.id for r in result.by_status(report_mod.NEEDS_AI)}], venue_def, str(path or ""))["tasks"],
     }
     if output:
-        saved = report_mod.save(result, report_mod.output_path(str(_resolve(output, manuscript_dir)), str(path)), alt_color=colorblind)
+        saved = report_mod.save(result, report_mod.output_path(str(_resolve(output, manuscript_dir)), str(path or (result.files or ["paperpush"])[0])), alt_color=colorblind)
         out["report"] = str(saved)
     return out
 
 
-def validation_ai_tasks(subfile: str, manuscript_dir: Optional[str] = None) -> dict[str, Any]:
+def validation_ai_tasks(
+    subfile: Optional[str] = None,
+    manuscript_dir: Optional[str] = None,
+    venue: Optional[str] = None,
+    manuscript: Optional[str] = None,
+    title_page: Optional[str] = None,
+    cover_letter: Optional[str] = None,
+    figures: Optional[list[str]] = None,
+    tables: Optional[list[str]] = None,
+    supplement: Optional[list[str]] = None,
+) -> dict[str, Any]:
     """The validation checks that need a reader's judgement, for you to do yourself.
 
     Runs the deterministic checks offline (no link, DOI, or OpenReview lookups)
@@ -529,12 +592,18 @@ def validation_ai_tasks(subfile: str, manuscript_dir: Optional[str] = None) -> d
     to `validate_subfile` as `ai_results` (`[{"id", "status": "pass"|"fail"|
     "unclear"|"not_applicable", "details", "evidence"}]`). No API key is
     needed: you are the reader.
+
+    As with `validate_subfile`, files can be named instead of (or on top of) a
+    `.sub`, with or without a `venue`.
     """
     from .ai_validate import tasks_payload
 
-    path, text, venue = _load_subfile(subfile, manuscript_dir)
-    result = _run_validate_report(resolve_paths(parse_subfile(text), path.parent), venue, check_links=False, check_references=False, check_openreview=False, subfile_path=str(path))
-    return tasks_payload(result.ai_tasks, venue, str(path))
+    files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
+    path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files)
+    result = _run_validate_report(sub, venue_def, check_links=False, check_references=False, check_openreview=False, subfile_path=str(path or ""), files_only=files_only, notes=notes)
+    from .file_inputs import validate_command
+
+    return tasks_payload(result.ai_tasks, venue_def, str(path or ""), command="" if path else validate_command(venue, files))
 
 
 def autofill_subfile(
@@ -1005,6 +1074,7 @@ def submit(
     close_on_failure: bool = False,
     recover: bool = True,
     expose_cdp: bool = False,
+    skip_validate: bool = False,
 ) -> dict[str, Any]:
     """Open the venue's portal and fill in the submission form from a `.sub` file.
 
@@ -1021,7 +1091,10 @@ def submit(
     Two preflights run first, and both stop before any browser opens:
 
     - The `.sub` file is validated. Errors come back as `blocked`, with the same
-      list `validate_subfile` gives.
+      list `validate_subfile` gives. `skip_validate` turns this off (the CLI's
+      `--skip-validate`): use it only when the author asked to skip
+      validation, since an empty required field or missing file is then likely
+      to break the run partway.
     - A venue that requires login must already have stored credentials. Without
       them the run would stall on a password prompt it has no terminal to ask on,
       so it comes back as `action_required` with the `paperpush login` command
@@ -1055,8 +1128,8 @@ def submit(
     except KeyError:
         raise ValueError(f"no submission runner is registered for {venue.slug!r}; " "this venue can be prepared but not driven") from None
 
-    checked = validate_subfile(str(path), check_links=False, check_sensitive=False, check_references=False, check_openreview=False)
-    if not checked["ok"]:
+    checked = None if skip_validate else validate_subfile(str(path), check_links=False, check_sensitive=False, check_references=False, check_openreview=False)
+    if checked is not None and not checked["ok"]:
         return {
             "status": "blocked",
             "venue": venue.slug,
@@ -1094,6 +1167,8 @@ def submit(
         command.append("--new-session")
     if close_on_failure:
         command.append("--close-on-failure")
+    if skip_validate:
+        command.append("--skip-validate")
 
     log_path = _submit_log_path(venue.slug)
     log_file = log_path.open("wb")
@@ -1372,7 +1447,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
     )
     for tool in TOOLS:
         server.tool()(tool)

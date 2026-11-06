@@ -37,6 +37,11 @@ the recovery part of `AGENTS.md` first.
 
 ## 1. Reproduce once, paused instead of failed
 
+**Handed a run that is already paused** (from `paperpush-submit`, with a
+`pid`): do not start a new one. Call `submit_status(pid)` to read
+`recovery.paused` and go straight to step 2. Once it reaches the review
+page, wait for the author: they review and send it themselves.
+
 Find the `.sub`, the venue, and where the run stopped (the user's output, or
 the last `step(...)` label in the runner). Read the runner around that step
 before you open anything.

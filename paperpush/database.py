@@ -574,6 +574,11 @@ class Venue(SubmissionForm, VenueInfo):
     has_form: bool = True
 
     @property
+    def is_generic(self) -> bool:
+        """Whether this is the placeholder for "no venue" (:func:`generic_venue`)."""
+        return self.slug == GENERIC_SLUG
+
+    @property
     def supports_validate(self) -> bool:
         """Whether ``manuscript_requirements.json`` has rules for this venue."""
         from .requirements import get_requirements
@@ -619,6 +624,20 @@ INFO_KEYS = frozenset(f.name for f in dataclass_fields(VenueInfo)) - {"slug"}
 FORM_KEYS = frozenset(f.name for f in dataclass_fields(SubmissionForm)) | {"removed_fields"}
 
 
+# The upload field a separate title page goes in, for forms that have none.
+TITLE_PAGE_FIELD: dict[str, Any] = {"id": "title_page_file", "autofill": "filemap", "label": "Title page", "type": "file", "help": "Optional. Path to the title page, when it is a separate file from the manuscript."}
+
+# The slug of the placeholder venue ``validate`` checks against when none is
+# named: no submission form beyond :func:`default_form` and no author-guideline
+# rules, so only the checks that apply to any manuscript run.
+GENERIC_SLUG = "generic"
+
+
+def generic_venue() -> "Venue":
+    """The placeholder venue for validating files without naming a venue."""
+    return Venue.from_dict(GENERIC_SLUG, {"name": "no venue (general checks)", **default_form(GENERIC_SLUG)}, has_form=False)
+
+
 def default_form(slug: str) -> dict[str, Any]:
     """The form a validate-only venue gets: just what ``validate`` reads.
 
@@ -659,6 +678,12 @@ def default_form(slug: str) -> dict[str, Any]:
         )
     fields += [
         {"id": "manuscript_file", "autofill": "filemap", "label": "Manuscript file", "type": "file", "required": True, "help": "Path to the manuscript (PDF, Word, or LaTeX source)."},
+    ]
+    # A separate title page only when the guidelines ask for one (or, for the
+    # generic venue, which has no guidelines, so any title page can be named).
+    if reqs is None or reqs.title_page.separate_file:
+        fields.append(dict(TITLE_PAGE_FIELD))
+    fields += [
         {"id": "figure_files", "autofill": "filemap", "label": "Figure files", "type": "filelist", "help": "Optional. One figure file per line as 'path | label' (label optional)."},
         {"id": "table_files", "autofill": "filemap", "label": "Table files", "type": "filelist", "help": "Optional. One table file per line as 'path | label' (label optional)."},
         {"id": "supplementary_files", "autofill": "filemap", "label": "Supplementary files", "type": "filelist", "help": "Optional. One supplementary file per line as 'path | label' (label optional)."},

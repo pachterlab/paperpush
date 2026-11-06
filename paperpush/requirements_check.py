@@ -75,6 +75,7 @@ _ROLE_FIELD_IDS: dict[str, tuple[str, ...]] = {
     "tables": ("table_files", "tables"),
     "supplementary": ("supplementary_files", "supplementary_file", "supplementary_material", "supplementary_tables", "supplement", "technical_supplement"),
     "cover_letter": ("cover_letter",),
+    "title_page": ("title_page_file", "title_page"),
     "title": ("title",),
     "abstract": ("abstract",),
     "keywords": ("keywords",),
@@ -705,7 +706,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     base = get_requirements(venue.slug)
     if base is None:
         logger.debug("No manuscript requirements recorded for %s", venue.slug)
-        checks.record("guidelines", "Manuscript checked against the author guidelines", GUIDELINES, NOT_APPLICABLE, detail=f"no author-guideline rules are recorded for {venue.slug}")
+        checks.record("guidelines", "Manuscript checked against the author guidelines", GUIDELINES, NOT_APPLICABLE, detail="no venue given (name one with --venue to check its author guidelines)" if venue.is_generic else f"no author-guideline rules are recorded for {venue.slug}")
         return
     reqs = resolve(base, values)
     logger.info("Checking %s against its manuscript requirements", venue.slug)

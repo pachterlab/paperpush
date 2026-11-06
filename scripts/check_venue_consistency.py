@@ -71,6 +71,7 @@ ROLE_FIELD_IDS: dict[str, tuple[str, ...]] = {
         "technical_supplement",
     ),
     "cover_letter": ("cover_letter",),
+    "title_page": ("title_page_file", "title_page"),
     "title": ("title",),
     "abstract": ("abstract",),
     "keywords": ("keywords",),

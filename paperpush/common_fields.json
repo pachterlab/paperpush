@@ -11,6 +11,7 @@
   "files": [
     "manuscript_file",
     "combined_pdf",
+    "title_page_file",
     "figure_files",
     "figures",
     "table_files",

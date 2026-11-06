@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 import urllib.parse
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional
 
@@ -681,7 +681,7 @@ def _link_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     return _findings_to_issues(sensitive.scan_links(paths))
 
 
-def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | None = None) -> list[Issue]:
+def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | None = None, resolved: dict | None = None) -> list[Issue]:
     """Flag references whose DOI does not match the work they cite.
 
     Reads the submission's bibliography whichever way it ships it -- the ``.bib``
@@ -693,12 +693,14 @@ def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | No
     ``--dont-check-references``) and makes network requests; anything
     inconclusive is left unreported. The retracted works it finds are not
     reported here: they go into ``retracted``, for :func:`_retraction_issues`.
+    ``resolved`` is filled with the registry records of the DOIs that check out,
+    for :func:`_reference_version_issues`.
     """
     from . import references
 
     paths = _upload_paths_or_skip(venue, values)
     logger.info("Checking %d upload file(s) for reference DOI problems (%s)", len(paths), venue.slug)
-    findings = references.scan_references(paths)
+    findings = references.scan_references(paths, resolved_out=resolved)
     if retracted is not None:
         retracted.extend(f for f in findings if f.category == references.RETRACTED)
     return _findings_to_issues([f for f in findings if f.category != references.RETRACTED])
@@ -715,6 +717,154 @@ def _retraction_issues(venue: Venue, values: dict[str, str], retracted: list | N
     if retracted is None:
         raise Unchecked("the reference DOI lookup did not finish")
     return _findings_to_issues(retracted)
+
+
+@dataclass
+class _ReferenceContext:
+    """What the reference checks share: the DOI lookups feed the search, and both feed the version check."""
+
+    resolved: dict = field(default_factory=dict)
+    refs: list | None = None
+    files: list[str] = field(default_factory=list)
+    search: object = None
+    ai_tasks: list = field(default_factory=list)
+
+
+# How many references a message lists by name.
+_MAX_LISTED_REFERENCES = 8
+
+
+def _listed(labels: list[str]) -> str:
+    shown = ", ".join(labels[:_MAX_LISTED_REFERENCES])
+    return shown + (f" and {len(labels) - _MAX_LISTED_REFERENCES} more" if len(labels) > _MAX_LISTED_REFERENCES else "")
+
+
+def _bibliography_refs(venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> list:
+    """The submission's references: its ``.bib`` entries, or else its manuscript's reference list."""
+    if ctx.refs is not None:
+        return ctx.refs
+    from . import reference_search, references
+
+    paths = _upload_paths_or_skip(venue, values)
+    entries = references.collect_entries(paths)
+    ctx.files = [str(p) for p in paths if p.suffix.lower() in references.BIB_EXTS]
+    from .requirements_check import manuscript_files
+
+    manuscripts = manuscript_files(venue, values)
+    ctx.files += [str(path) for _, path in manuscripts]
+    if entries:
+        ctx.refs = reference_search.references_from_entries(entries)
+    else:
+        ctx.refs = []
+        for _, path in manuscripts[:1]:
+            try:
+                ctx.refs = reference_search.references_from_text(path)
+            except Exception:  # noqa: BLE001 -- an unreadable manuscript leaves nothing to search
+                logger.debug("could not read the reference list of %s", path, exc_info=True)
+    return ctx.refs
+
+
+def _ai_files(paths: list[str]) -> list[str]:
+    """The files to show the AI: archives are not unpacked for it, so leave them out when anything else is there."""
+    from .sensitive import ARCHIVE_EXTS
+
+    unique = list(dict.fromkeys(paths))
+    readable = [p for p in unique if Path(p).suffix.lower() not in ARCHIVE_EXTS and "".join(Path(p).suffixes[-2:]).lower() not in ARCHIVE_EXTS]
+    return readable or unique
+
+
+def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> Outcome:
+    """Search the registries for every reference without a DOI (see :mod:`paperpush.reference_search`).
+
+    A ``.bib`` journal or conference entry no registry can match is reported,
+    as is one whose authors or year disagree with the work its title matches.
+    A matched entry with no DOI is told the DOI. Near misses, unindexed kinds of
+    work (books, software, ...), and reference-list entries read from a PDF or
+    Word file are listed as unverified and queued for ``ai.unverified_references``.
+    Makes network requests; runs with the DOI check (``--dont-check-references``).
+    """
+    from . import ai_validate, reference_search
+
+    refs = _bibliography_refs(venue, values, ctx)
+    if not refs:
+        raise NotApplicable("found no .bib file or reference list to read")
+    without_doi = [r for r in refs if not r.doi]
+    if not without_doi:
+        return Outcome([], f"all {len(refs)} references have a DOI (checked by the DOI check)")
+    result = reference_search.search_references(refs)
+    ctx.search = result
+    issues = _findings_to_issues(result.findings)
+
+    suggestions = result.suggestions
+    if suggestions:
+        listed = [f"{lk.ref.label} -> {lk.record['DOI'].lower()}" for lk in suggestions]
+        issues.append(Issue(WARNING, "", f"{len(suggestions)} reference(s) have no DOI but match a registered work; add the DOI so readers (and this check) can follow them: {_listed(listed)}"))
+
+    unverified = result.unverified
+    unknown = result.by_status(reference_search.UNKNOWN)
+    pending = [lk.ref for lk in unknown] + result.skipped
+    if unverified or pending:
+        labels = [lk.ref.label for lk in unverified] + [r.label for r in pending]
+        why = []
+        if unverified:
+            why.append(f"{len(unverified)} could not be matched with certainty (near misses, or kinds of work the registries often miss)")
+        if unknown:
+            why.append(f"{len(unknown)} could not be looked up (the registries did not answer)")
+        if result.skipped:
+            why.append(f"{len(result.skipped)} were not looked up ({result.skipped_reason})")
+        issues.append(unchecked("", f"{len(labels)} reference(s) without a DOI are unverified: {'; '.join(why)}. Check them by hand, or run the AI check: {_listed(labels)}"))
+        if ctx.files:
+            ctx.ai_tasks.append(
+                ai_validate.AiTask(
+                    id="ai.unverified_references",
+                    title="References that could not be verified are real",
+                    category="Integrity",
+                    instructions=reference_search.ai_task_instructions(unverified + unknown, result.skipped),
+                    files=_ai_files(ctx.files),
+                )
+            )
+    searched = len(result.lookups)
+    if searched and len(unknown) == searched and not result.findings:
+        raise Unchecked("the registries (Crossref, OpenAlex, arXiv) did not answer")
+    matched = len(result.by_status(reference_search.MATCHED))
+    return Outcome(issues, f"looked up {searched} of {len(without_doi)} reference(s) without a DOI: {matched} matched a registered work")
+
+
+def _reference_version_issues(venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> Outcome:
+    """Report preprints that have been published, preprints cited with their own article, and old arXiv versions."""
+    from . import reference_search
+
+    refs = _bibliography_refs(venue, values, ctx)
+    search = ctx.search
+    cited: list = []
+    labelled: set[str] = set()
+    for r in refs:
+        record = ctx.resolved.get(r.doi) if r.doi else None
+        if record is not None:
+            cited.append(reference_search.Cited(r.label, r.where, r.doi, record))
+            labelled.add(r.doi)
+    for doi, record in ctx.resolved.items():
+        if doi not in labelled:
+            cited.append(reference_search.Cited(f"the reference with DOI {doi}", "", doi, record))
+    matched_dois: set[str] = set()
+    if search is not None:
+        for lk in search.by_status(reference_search.MATCHED):
+            if lk.record and not lk.problems and lk.source != "arXiv" and lk.record.get("DOI"):
+                doi = str(lk.record["DOI"]).lower()
+                matched_dois.add(doi)
+                cited.append(reference_search.Cited(lk.ref.label, lk.ref.where, doi, lk.record))
+    arxiv_refs = [r for r in refs if r.arxiv_id]
+    if not cited and not arxiv_refs:
+        raise NotApplicable("no reference with a registry record or an arXiv identifier to check")
+    all_dois = {r.doi for r in refs if r.doi} | set(ctx.resolved) | matched_dois
+    findings = reference_search.version_findings(
+        cited,
+        arxiv_refs,
+        all_dois,
+        arxiv_records=getattr(search, "arxiv_records", None),
+        arxiv_checked=getattr(search, "arxiv_checked", ()),
+    )
+    return Outcome(_findings_to_issues(findings), f"checked {len(cited) + len(arxiv_refs)} cited work(s) for a newer version")
 
 
 def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
@@ -1120,6 +1270,8 @@ def validate_report(
     subfile_path: str = "",
     ai_only: bool = False,
     progress=None,
+    files_only: bool = False,
+    notes: Optional[list[str]] = None,
 ):
     """Run every check on ``subfile`` and return a :class:`~paperpush.report.ValidationReport`.
 
@@ -1192,6 +1344,14 @@ def validate_report(
     the form, link, DOI, sensitive-data, anonymity, hidden-text, and OpenReview
     checks are skipped. It needs ``check_manuscript``.
 
+    ``files_only`` is for files named without a ``.sub`` (see
+    :mod:`paperpush.file_inputs`): ``subfile`` then holds only upload paths, so
+    the form checks and the OpenReview lookup are reported as not applicable
+    instead of failing on every empty field. With the generic venue
+    (:func:`paperpush.database.generic_venue`) the author-guideline checks are
+    not applicable too, leaving the checks that apply to any manuscript.
+    ``notes`` are put at the top of the report (how the files were placed).
+
     ``progress``, if given, is called as ``progress(done, total, label)`` when
     each stage starts (``label`` names it) and once at the end with
     ``done == total``; the CLI's progress bar and the web page's use it.
@@ -1217,12 +1377,15 @@ def validate_report(
     if ai_only:
         if not check_manuscript:
             raise ValueError("ai_only needs check_manuscript: the manuscript checks decide which AI checks apply")
-        return _ai_only_report(checks, subfile, venue, ai=ai, subfile_path=subfile_path, initial_submission=initial_submission, progress=progress)
+        result = _ai_only_report(checks, subfile, venue, ai=ai, subfile_path=subfile_path, initial_submission=initial_submission, progress=progress)
+        _set_scope(result, venue, values, files_only, notes)
+        return result
 
     openreview_applies = openreview_profiles.applies(venue)
     optional = (
         (check_links, "Links"),
         (check_references, "Reference DOIs"),
+        (check_references, "Reference search"),
         (check_sensitive, "Sensitive information"),
         (check_anonymous, "Anonymity"),
         (check_hidden_text, "Hidden text"),
@@ -1236,8 +1399,15 @@ def validate_report(
     form = "Submission form"
 
     def _form_checks() -> None:
-        checks.run("form.schema", "Field values have the right type and known field ids", form, _schema_issues, venue, values)
-        _field_checks(checks, venue, values)
+        if files_only:
+            # No .sub: check just the named files, and say the form was not.
+            uploads = replace(venue, fields=[f for f in venue.fields if f.type in ("file", "filelist") and values.get(f.id, "").strip()])
+            _field_checks(checks, uploads, values)
+            checks.results = [r for r in checks.results if not r.id.startswith("form.")]
+            checks.record("form", "Submission form fields", form, report.NOT_APPLICABLE, detail="no .sub file, so the form's fields were not checked (only the files named)")
+        else:
+            checks.run("form.schema", "Field values have the right type and known field ids", form, _schema_issues, venue, values)
+            _field_checks(checks, venue, values)
         checks.run("files.total_size", "Combined upload size", "Files", _total_size_check, venue, values)
 
     bar.run("Submission form", _form_checks)
@@ -1248,13 +1418,20 @@ def validate_report(
     else:
         _record_switched_off(checks, "integrity.links", "Links cited in the files are reachable", integrity, venue, values, "switched off (--dont-check-links)")
     retractions_title = "No cited work has been retracted"
+    unmatched_title = "References without a DOI match a registered work"
+    versions_title = "References cite the journal article, or the latest preprint"
     if check_references:
         retracted: list = []
-        dois = bar.run("Reference DOIs", checks.run, "integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values, retracted)
+        ref_ctx = _ReferenceContext()
+        dois = bar.run("Reference DOIs", checks.run, "integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values, retracted, ref_ctx.resolved)
         checks.run("integrity.retractions", retractions_title, integrity, _retraction_issues, venue, values, None if dois.status == report.UNCHECKED else retracted)
+        bar.run("Reference search", checks.run, "integrity.unmatched_references", unmatched_title, integrity, _unmatched_reference_issues, venue, values, ref_ctx)
+        checks.run("integrity.reference_versions", versions_title, integrity, _reference_version_issues, venue, values, ref_ctx)
+        for task in ref_ctx.ai_tasks:
+            checks.needs_ai(task)
     else:
-        _record_switched_off(checks, "integrity.dois", "Reference DOIs match the works they cite", integrity, venue, values, "switched off (--dont-check-references)")
-        _record_switched_off(checks, "integrity.retractions", retractions_title, integrity, venue, values, "switched off (--dont-check-references)")
+        for check_id, title in (("integrity.dois", "Reference DOIs match the works they cite"), ("integrity.retractions", retractions_title), ("integrity.unmatched_references", unmatched_title), ("integrity.reference_versions", versions_title)):
+            _record_switched_off(checks, check_id, title, integrity, venue, values, "switched off (--dont-check-references)")
     if check_sensitive:
         bar.run("Sensitive information", checks.run, "integrity.sensitive", "No secrets or private information in the files", integrity, _sensitive_issues, venue, values)
     else:
@@ -1272,6 +1449,8 @@ def validate_report(
         checks.record("integrity.pdf_reader", "PDF glyph reader (pdfminer.six) available", integrity, report.UNCHECKED, issues=[replace_unchecked(i) for i in pdf_reader])
     if not openreview_applies:
         checks.record("integrity.openreview", "Authors' OpenReview profiles", integrity, report.NOT_APPLICABLE, detail="the venue is not submitted through OpenReview")
+    elif files_only:
+        checks.record("integrity.openreview", "Authors' OpenReview profiles", integrity, report.NOT_APPLICABLE, detail="no .sub file, so there is no author list to look up")
     elif check_openreview:
         bar.run("OpenReview profiles", checks.run, "integrity.openreview", "Authors' OpenReview profiles", integrity, _openreview_profile_issues, venue, values)
     else:
@@ -1293,6 +1472,7 @@ def validate_report(
     from .requirements import any_format_initial_rule
 
     result = report.ValidationReport(venue=venue.slug, subfile=subfile_path, results=checks.results, ai_tasks=tasks)
+    _set_scope(result, venue, values, files_only, notes)
     result.initial_submission_rule = any_format_initial_rule(venue.slug, values)
     if initial_submission:
         result.initial_submission = True
@@ -1309,6 +1489,17 @@ def validate_report(
         len(result.issues()) - errors,
     )
     return result
+
+
+def _set_scope(result, venue: Venue, values: dict[str, str], files_only: bool, notes: Optional[list[str]]) -> None:
+    """Record on ``result`` what was validated: a .sub, files for a venue, or files alone."""
+    result.notes = list(notes or [])
+    if venue.is_generic:
+        result.scope = "general"
+    elif files_only:
+        result.scope = "files"
+    if result.scope:
+        result.files = [str(p) for p in _iter_upload_paths(venue, values)]
 
 
 def downgrade_errors(results: list) -> int:

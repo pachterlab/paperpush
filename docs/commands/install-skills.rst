@@ -23,6 +23,7 @@ Skill                              Use it to
 ``paperpush-prepare-submission``   go from a manuscript directory to a filled-in portal
 ``paperpush-autofill``             fill a ``.sub`` from the manuscript files
 ``paperpush-validate``             run every check, including the ones that need a reader
+``paperpush-submit``               log in and fill in the portal from a ready ``.sub``
 ``paperpush-portal-debug``         get a stalled ``paperpush submit`` run unstuck
 ``paperpush-add-venue-validate``   add or refresh a venue's author guidelines (contributor)
 ``paperpush-add-venue``            add ``submit`` support for a venue, with tests (contributor)
@@ -89,6 +90,7 @@ Examples
    installed paperpush-autofill
    installed paperpush-portal-debug
    installed paperpush-prepare-submission
+   installed paperpush-submit
    installed paperpush-validate
    Skills directory: /home/me/.claude/skills
    Contributor skills not installed (paperpush-add-venue, paperpush-add-venue-validate); add --all if you work on paperpush itself.

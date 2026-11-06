@@ -5,6 +5,12 @@ This page lists every check that :doc:`commands/validate` runs on a ``.sub``
 file. ``paperpush submit`` runs the same checks before it opens a browser. The
 MCP tool ``validate_subfile`` runs them too.
 
+.. BEGIN VALIDATION CHECK COUNT
+
+PaperPush currently has **109 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
+
+.. END VALIDATION CHECK COUNT
+
 .. code-block:: bash
 
    paperpush validate biorxiv.sub.txt
@@ -99,6 +105,10 @@ The passes at a glance
      - ``--dont-check-links``
      - yes
    * - :ref:`Reference DOIs <vc-references>`
+     - yes
+     - ``--dont-check-references``
+     - yes
+   * - :ref:`References without a DOI, and versions <vc-reference-search>`
      - yes
      - ``--dont-check-references``
      - yes
@@ -354,7 +364,15 @@ rules for a venue.
   Methods, and Results, and statements such as data availability, competing
   interests, and author contributions. Each is searched for under its usual
   wordings. A missing one is a warning. When the guidelines prescribe a
-  **section order**, the headings found must come in that order.
+  **section order**, the headings found must come in that order. In LaTeX the
+  headings are the sectioning commands; in Markdown (``.md``, ``.markdown``)
+  the lines marked as headings: ``## Methods`` (with or without a number or a
+  Pandoc ``{#sec:methods}`` label), a setext heading underlined with ``===``
+  or ``---``, a paragraph that is all bold (``**Materials and methods**``), or
+  a bold label opening a paragraph (``**Data availability.** The data ...``).
+  Every other check reads a Markdown manuscript as plain text with that markup
+  removed, so its abstract, reference list, and statements are found as in a
+  Word file.
 - **Title page**: items that should leave a trace in the front matter, such as
   the title, the authors, a corresponding author and e-mail, an ORCID, a
   keywords line, a running title, a word, figure, or table count, a telephone
@@ -494,7 +512,17 @@ captions (a line that starts ``Figure 2.`` or ``Fig. 2 |``). Each series -- main
 supplementary, and Extended Data figures and tables -- is checked for an item
 first cited before a lower-numbered one, an item with a caption or attached
 file that is never cited, and a citation of an item that does not exist.
-Captions in the supplementary files count as supplementary items. A LaTeX
+Captions in the supplementary files count as supplementary items.
+
+Panels are checked too (``citations.panels``, every series): a panel first
+cited before a lower-lettered one ("Fig. 2c" before "Fig. 2b"; citing an
+earlier panel again later is fine), and a panel a main figure's legend names
+but the text never cites. A legend names its panels as "(a) ... (b) ...",
+"a, Overview. b, Detail.", "a | ...", or in bold; in LaTeX, also as
+``\textbf{a}`` or ``subfigure`` environments, and the text cites them as
+``\ref{fig:x}b`` or through a subfigure's own label. Uncited panels are
+reported only for a figure whose panels the text cites one by one: a figure
+cited only as a whole ("Fig. 2") is taken to cite all of them. A LaTeX
 source that cannot be compiled is read through its ``\label``/``\ref`` pairs.
 The citation pass ignores the reference list.
 
@@ -649,6 +677,10 @@ Reference list
   rarely counted. A warning is raised when more than 15 references, or more
   than 80% of a list of at least 5, are self-citations. The passing note gives
   the count either way. With a ``.bib``, only the cited entries count.
+- **BibTeX entries** (``bibliography.entries``). Two entries with the same
+  citation key (BibTeX keeps the first and drops the other; biber stops with
+  an error), an entry with no key or no closing brace, a journal or conference
+  entry with no title or author, and one arXiv preprint under two keys.
 
 Every finding is a warning: references are read from extracted text.
 
@@ -704,7 +736,44 @@ only the repeated-word, spelling, and repetitive-word-choice checks. The
 reference list is skipped.
 Every finding is a warning, quoting the first five examples in context with
 the problem marked (``␣␣`` for a double space, ``»,«`` around a mark).
-For a full proofread, use an editor or the ``/proofreading`` agent skill.
+
+Copy-editing conventions are checked in the same pass, in every format (a
+PDF's text included):
+
+- **Numbers** (``prose.numbers``): a number of 10 or more spelled out
+  ("twenty-five patients" for "25 patients"), and a sentence that opens with
+  digits ("... ended. 15 patients were ..."), which should be spelled out or
+  rephrased. A number that opens a sentence is meant to be spelled out, so it
+  is not reported; nor are ordinals ("twenty-first"), numbers below 10, or a
+  lone "hundred" or "million" ("a million cells").
+- **Abbreviations written one way** (``prose.conventions``): malformed "i.e."
+  and "e.g." ("ie", "i.e", "i. e.") and "et al." ("et. al", "et al" with no
+  full stop); "i.e."/"e.g." used both with and without a following comma;
+  "vs" and "vs."; "Fig. 2" and "Figure 2" both used mid-sentence (either may
+  open a sentence); and a word written both hyphenated and closed up
+  ("pre-processing" and "preprocessing"; not in a PDF, whose extracted text
+  rejoins words hyphenated across lines). The less-used form is quoted. Figure
+  legends are left out, since some venues write "Fig." there and "Figure" in
+  the text.
+- **Acronyms spelled out at first use** (``prose.acronyms``), as "full term
+  (ACR)": an acronym used before it is spelled out; spelled out more than once;
+  spelled out in the abstract but not again in the main text, or used in the
+  abstract without the definition the main text gives it; spelled out but
+  never used; or used three or more times and never spelled out. Headings,
+  figure and table legends, and the title and author block before the abstract
+  are not first use. Acronyms every reader knows (DNA, RNA, USA, GPU, MRI,
+  PCR, ...), Roman numerals, and tokens with digits (gene names such as TP53)
+  are skipped; a gene, unit, or name that is reported as never spelled out
+  can be ignored.
+
+What a pattern cannot judge is left to the AI check ``ai.prose`` (see
+:ref:`vc-ai`): misspellings beyond codespell's list and real words in the
+wrong place ("form" for "from"), grammar (agreement, missing words, articles,
+run-ons, comma splices, dangling modifiers), tense (past for what the study
+did and found, present for established facts, what a figure shows, and
+conclusions; a section that keeps another convention consistently is fine),
+and spelling that strays from the guidelines' English variant or mixes
+American and British forms.
 
 .. _vc-ai:
 
@@ -714,8 +783,12 @@ Checks that need AI
 Some rules can only be judged by reading the files the way a person does: the
 lettering inside raster figures, a postal address on the title page, whether a
 table is an image, the free-text rules each venue's guidelines carry (the
-``notes`` in ``manuscript_requirements.json``), and whether every ``.sub``
-field agrees with the manuscript in meaning. These are listed as **needs AI**
+``notes`` in ``manuscript_requirements.json``), spelling, grammar, and tense
+in the prose (``ai.prose``), whether every ``.sub``
+field agrees with the manuscript in meaning, and whether the references the
+registries could not confirm are real (``ai.unverified_references``; an agent
+that can search the web looks each one up, a model that cannot answers
+"unclear"). These are listed as **needs AI**
 unless one of these runs them:
 
 - ``--ai``: one request to an LLM provider, whichever of
@@ -788,6 +861,52 @@ points to a different work than the reference describes, only the mismatch is
 reported, because the retraction would belong to the other paper. Only
 references with a DOI can be checked. ``--dont-check-references`` turns this
 check off too.
+
+.. _vc-reference-search:
+
+References without a DOI, and publication versions
+--------------------------------------------------
+
+A fabricated reference rarely has a DOI, so the DOI check never sees it.
+**References without a DOI** (``integrity.unmatched_references``) are looked up
+instead:
+
+- a ``.bib`` entry by its title, first author, and year, in Crossref and, if
+  Crossref has no match, in OpenAlex (which also indexes conference papers and
+  arXiv). Set ``OPENALEX_API_KEY`` to use your own OpenAlex budget;
+- an entry that cites an arXiv identifier, in the arXiv API;
+- without a ``.bib``, each entry of the manuscript's reference list, by its
+  full text, in Crossref.
+
+A warning is raised for a ``.bib`` journal or conference entry that matches no
+registered work ("may be fabricated"), for one whose title matches a work but
+whose first author or year does not, and for an arXiv identifier that does not
+exist or belongs to another paper. An entry that matches a registered work but
+has no DOI is told the DOI to add. Some references are not reported but listed
+as unverified, and handed to the AI check ``ai.unverified_references``
+(see :ref:`vc-ai`), which looks them up when the agent can search:
+
+- books, software, theses, reports, and web pages, which registries often do
+  not index;
+- entries read from a PDF or Word file, whose text is too noisy to accuse;
+- near misses (a similar title, perhaps garbled).
+
+A registry that times out or does not answer leaves its references unverified,
+never accused. At most 60 references are searched per run.
+
+**Publication versions** (``integrity.reference_versions``) apply the rule
+"cite the journal article when one exists, otherwise the latest preprint":
+
+- a preprint whose record says it has been published (Crossref's
+  ``is-preprint-of`` relation, the bioRxiv/medRxiv API, or arXiv's journal DOI
+  or journal reference);
+- a preprint cited alongside its own published article, which lists one work
+  twice;
+- an arXiv identifier pinned to an old version (``v1`` when ``v3`` exists).
+
+Both checks are warnings, and ``--dont-check-references`` turns them off with
+the DOI check. The ``.bib`` file itself is checked offline under
+:ref:`vc-bibliography`.
 
 .. _vc-sensitive:
 

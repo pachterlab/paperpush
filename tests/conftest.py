@@ -129,6 +129,19 @@ def _no_network_doi_checks(monkeypatch):
     monkeypatch.setattr(references, "_resolve_doi", lambda *a, **k: (references.DOI_UNKNOWN, None))
 
 
+@pytest.fixture(autouse=True)
+def _no_network_reference_search(monkeypatch):
+    """Keep the suite offline: every Crossref/OpenAlex/arXiv/bioRxiv request "fails".
+
+    A failed request leaves a reference unverified, never accused, so tests that
+    do not exercise the search see no findings from it. Tests of the search
+    patch the query functions (or ``_Service.get``) themselves.
+    """
+    import paperpush.reference_search as reference_search
+
+    monkeypatch.setattr(reference_search._Service, "get", lambda self, *a, **k: None)
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--run-portal",

@@ -63,6 +63,12 @@ class Document:
         return self.suffix in TEX_SUFFIXES
 
     @property
+    def is_markdown(self) -> bool:
+        from .manuscript import MARKDOWN_SUFFIXES
+
+        return self.suffix in MARKDOWN_SUFFIXES
+
+    @property
     def is_pdf(self) -> bool:
         return self.suffix == ".pdf"
 
@@ -92,7 +98,8 @@ class Document:
 
         A PDF (or LaTeX compiled to one) is read page by page; a Word file
         paragraph by paragraph; LaTeX that could not be compiled is reduced to
-        its words (which drops what follows the bibliography).
+        its words (which drops what follows the bibliography); Markdown to the
+        same plain text, headings on lines of their own.
         """
         from . import manuscript
 
@@ -103,7 +110,10 @@ class Document:
             return None if text is None else normalize(text)
         if self.is_tex and self.tex_source is not None:
             return normalize(manuscript._tex_to_text(self.tex_source))
-        if self.suffix in (".txt", ".md"):
+        if self.is_markdown:
+            text = manuscript.read_markdown(self.path)
+            return None if text is None else normalize(text)
+        if self.suffix == ".txt":
             try:
                 return normalize(self.path.read_text("utf-8", "replace"))
             except OSError:

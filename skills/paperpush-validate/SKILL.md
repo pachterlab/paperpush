@@ -14,13 +14,15 @@ description: >-
 # paperpush validate (Claude skill)
 
 `paperpush validate` runs every deterministic check itself: form fields, files,
-links, DOIs, sensitive data, hidden text, the venue's author guidelines, page
+links, DOIs, registry searches for references without a DOI and for
+preprints that have since been published, the `.bib` file's structure,
+sensitive data, hidden text, the venue's author guidelines, page
 layout (margins, font, size, spacing, line/page numbers, template), figures
 (resolution, lettering size and typeface in vector figures, panel labels),
 figure/table citation order, whether the title, abstract, authors,
 keywords, and statements in the `.sub` match the manuscript, and mechanical
 prose checks (double spaces, repeated words, punctuation spacing, unbalanced
-brackets and quotes, common misspellings).
+brackets and quotes, common misspellings, numbers, abbreviations, acronyms).
 
 Some checks need someone to *look* at the files. Without an API key they come
 back as **needs AI**. You are that reader: the CLI writes those checks out as
@@ -30,7 +32,15 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
 ## Inputs
 
 - The `.sub` file (absolute path). If the user did not give one, look for a
-  `<venue>.sub.txt` in the manuscript directory they named; otherwise ask.
+  `<venue>.sub.txt` in the manuscript directory they named. If there is none,
+  don't make one just to validate: name the files instead, e.g.
+  `paperpush validate --venue <venue> --manuscript <abs> --title-page <abs>
+  --cover-letter <abs> --figures <abs> ... --supplement <abs>` (MCP: the same
+  arguments to `validate_subfile` / `validation_ai_tasks`). Without a venue,
+  leave `--venue` out: only the checks that apply to any manuscript run (links,
+  references, hidden text, citation order, prose, ...). The form checks come
+  back not applicable, so the report is about the files, not whether the
+  submission is ready. Re-run with the same flags to merge `--ai-results`.
 - Whether they want the report saved, and where (default: none; `-o` with no
   path writes `<sub stem>_validation.pdf` next to the `.sub`). Mention
   `--colorblind` if they ask for colour-blind-friendly colours.
@@ -66,6 +76,18 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
    - For `fail`, `details` must say exactly what is wrong and where (file,
      page, figure, panel, rule number) so the author can fix it; add a short
      quote or location as `evidence`.
+   - `ai.unverified_references` lists references that Crossref, OpenAlex,
+     and arXiv could not confirm. Look each one up rather than judging from
+     memory: search Crossref (`https://api.crossref.org/works?query.bibliographic=<title author year>`),
+     the publisher's or arXiv's page, or the web, and compare title, authors,
+     and year. `fail` names each reference that appears not to exist or that
+     describes a different work, with the correct details where you found
+     them; a book or web page the registries miss is not fabricated. If you
+     cannot search, answer `unclear`.
+   - `ai.prose` is a proofread of the whole manuscript: read all of it, not a
+     sample. List real errors (typos, grammar, tense that breaks the paper's
+     own convention) with a quote and the correction; style preferences and
+     defensible choices are not failures.
 
    Write the verdicts to `<scratch>/validate_results.json`:
 

@@ -58,7 +58,7 @@ import json
 import logging
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator
 
@@ -197,7 +197,10 @@ class Entry:
     (bare ``10.x/y``, lower-cased) while ``raw_doi`` preserves what the file
     actually said, so a message can quote the author's own text. The remaining
     fields are the entry's claims, still in BibTeX form -- normalization happens
-    at comparison time.
+    at comparison time. ``kind`` is the entry type (``article``, ``misc``),
+    ``fields`` every field the entry carries (lower-cased names), and
+    ``unclosed`` marks an entry whose closing brace is missing, which BibTeX
+    would read on into the next entry.
     """
 
     key: str
@@ -207,6 +210,9 @@ class Entry:
     title: str
     author: str
     year: str
+    kind: str = ""
+    fields: dict = field(default_factory=dict, compare=False, hash=False, repr=False)
+    unclosed: bool = False
 
 
 @dataclass(frozen=True)
@@ -390,6 +396,9 @@ def parse_bibtex(text: str, where: str = "") -> list[Entry]:
                 title=fields.get("title", ""),
                 author=fields.get("author", ""),
                 year=fields.get("year", "") or fields.get("date", ""),
+                kind=match.group(1).lower(),
+                fields=fields,
+                unclosed=end == -1,
             )
         )
     return entries
@@ -981,7 +990,7 @@ def _citation_findings(citation: Citation, status: str, record: dict | None, doi
     return []
 
 
-def scan_references(paths: Iterable[Path], *, check_registry: bool = True) -> list[Finding]:
+def scan_references(paths: Iterable[Path], *, check_registry: bool = True, resolved_out: dict | None = None) -> list[Finding]:
     """Report references whose DOI does not match the work they cite.
 
     Reads the submission's bibliography two ways, because most submissions ship
@@ -1006,6 +1015,11 @@ def scan_references(paths: Iterable[Path], *, check_registry: bool = True) -> li
     runtime. At most :data:`MAX_DOI_CHECKS` distinct DOIs are resolved per run,
     and hitting that limit is itself reported. Findings stay in the order the
     entries and citations were encountered.
+
+    ``resolved_out``, if given, is filled with ``{doi: csl_record}`` for every
+    DOI that resolved and whose record matches the reference citing it, so
+    :mod:`paperpush.reference_search` can check those works' publication
+    versions without asking doi.org again.
     """
     entries = collect_entries(paths)
     checkable = [e for e in entries if e.doi and _is_well_formed(e.doi)]
@@ -1048,6 +1062,63 @@ def scan_references(paths: Iterable[Path], *, check_registry: bool = True) -> li
         status, record, doi = resolved.get(citation.doi, (DOI_UNKNOWN, None, citation.doi))
         findings.extend(_citation_findings(citation, status, record, doi))
 
+    if resolved_out is not None:
+        for entry in checkable:
+            status, record, _ = resolved.get(entry.doi, (DOI_UNKNOWN, None, entry.doi))
+            if status == DOI_FOUND and record is not None and not _mismatches(entry, record):
+                resolved_out[entry.doi] = record
+        for citation in citations:
+            status, record, doi = resolved.get(citation.doi, (DOI_UNKNOWN, None, citation.doi))
+            if status == DOI_FOUND and record is not None and (not citation.in_reference_list or _context_supports(citation, record)):
+                resolved_out.setdefault(doi, record)
+
     if len(candidates) > len(budgeted):
         findings.append(_truncation_finding(len(candidates), len(budgeted)))
     return findings
+
+
+# --- BibTeX structure (offline) --------------------------------------------
+
+# Entry types that are expected to carry a title and an author.
+_NEEDS_TITLE_AND_AUTHOR = {"article", "inproceedings", "conference", "incollection", "inbook", "phdthesis", "mastersthesis", "techreport"}
+
+
+def bib_structure_findings(paths: Iterable[Path]) -> tuple[list[Finding], int]:
+    """BibTeX problems that make entries go missing or print wrongly; and how many entries were read.
+
+    * two entries with the same citation key (BibTeX keys are case-insensitive):
+      BibTeX keeps the first and drops the other, and biber stops with an error;
+    * an entry with no citation key, which nothing can cite;
+    * an entry whose closing brace is missing, which swallows the entries after it;
+    * a journal or conference entry with no title or no author;
+    * two keys citing the same arXiv preprint, which lists the work twice (the
+      same DOI on two keys is reported by the DOI check).
+    """
+    from .reference_search import arxiv_id_of
+
+    findings: list[Finding] = []
+    total = 0
+    keys: dict[str, Entry] = {}
+    arxiv: dict[str, Entry] = {}
+    for where, text in _iter_bib_blobs(paths):
+        for entry in parse_bibtex(text, where):
+            total += 1
+            if not entry.key:
+                findings.append(Finding(where, "entry without a key", f"an @{entry.kind} entry ({_cite(entry)}) has no citation key, so nothing can cite it"))
+            else:
+                first = keys.setdefault(entry.key.lower(), entry)
+                if first is not entry:
+                    same_file = first.where == entry.where
+                    findings.append(Finding(where, "duplicate citation key", f"citation key '{entry.key}' is used by two entries{'' if same_file else f' (the other is in {first.where})'}; BibTeX keeps only the first, and biber stops with an error"))
+            if entry.unclosed:
+                findings.append(Finding(where, "unclosed entry", f"{_cite(entry)} has no closing brace; BibTeX reads on into the entries after it, which then go missing"))
+            if entry.kind in _NEEDS_TITLE_AND_AUTHOR:
+                missing = [name for name, value in (("title", entry.title), ("author", entry.author or entry.fields.get("editor", ""))) if not value.strip()]
+                if missing:
+                    findings.append(Finding(where, "incomplete entry", f"{_cite(entry)} (@{entry.kind}) has no {' or '.join(missing)}"))
+            arxiv_id, _ = arxiv_id_of(entry)
+            if arxiv_id and entry.key:
+                other = arxiv.setdefault(arxiv_id, entry)
+                if other is not entry and other.key.lower() != entry.key.lower():
+                    findings.append(Finding(where, "duplicate arXiv preprint", f"{_cite(entry)} and '{other.key}' both cite arXiv:{arxiv_id}; the same work is in the bibliography twice"))
+    return findings, total

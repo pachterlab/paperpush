@@ -158,6 +158,13 @@ class ValidationReport:
     downgraded: int = 0
     # Validated with --ai-only: only the checks that need AI were reported.
     ai_only: bool = False
+    # What was validated: "" (a .sub), "files" (files named for a venue, no
+    # .sub), or "general" (files with no venue: only the general checks).
+    scope: str = ""
+    # The files checked, for a "files" or "general" scope.
+    files: list[str] = field(default_factory=list)
+    # Notes on how the named files were placed (see paperpush.file_inputs).
+    notes: list[str] = field(default_factory=list)
 
     def by_status(self, status: str) -> list[CheckResult]:
         return [r for r in self.results if r.status == status]
@@ -193,6 +200,9 @@ class ValidationReport:
             "initial_submission": self.initial_submission,
             "downgraded": self.downgraded,
             "ai_only": self.ai_only,
+            "scope": self.scope,
+            "files": self.files,
+            "notes": self.notes,
             "checks": [r.to_dict() for r in self.results],
         }
 
@@ -227,6 +237,25 @@ def _ai_hint(report: ValidationReport) -> str:
     return "AI checks: off. Run with --ai (and an ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY), or let an agent do them with the paperpush-validate skill (--ai-tasks / --ai-results)."
 
 
+def report_name(report: ValidationReport) -> str:
+    """What the report is about: the .sub's name, the files', or the venue."""
+    if report.subfile:
+        return Path(report.subfile).name
+    if report.files:
+        names = ", ".join(Path(p).name for p in report.files[:3])
+        return names + (f" (+{len(report.files) - 3} more)" if len(report.files) > 3 else "")
+    return report.venue
+
+
+def scope_notes(report: ValidationReport) -> list[str]:
+    """The notes saying a report covers files only, not a whole submission."""
+    if report.scope == "general":
+        return ["No venue given: only the checks that apply to any manuscript ran. Name one with --venue to check its author guidelines (paperpush pick-venue suggests venues)."]
+    if report.scope == "files":
+        return ["No .sub file: the files were checked against the venue's author guidelines, but not the submission form. This is not a verdict on whether the submission is ready."]
+    return []
+
+
 def initial_submission_notes(report: ValidationReport) -> list[str]:
     """The notes shown at the top of the report about initial-submission formatting."""
     notes = []
@@ -242,22 +271,60 @@ def initial_submission_notes(report: ValidationReport) -> list[str]:
     return notes
 
 
-def _layout(report: ValidationReport, *, show_passed_details: bool = True) -> list[_Line]:
-    lines: list[_Line] = [_Line("title", f"paperpush validation report: {Path(report.subfile).name if report.subfile else report.venue}")]
+# The "Not checked" sections: could not run, needs AI, not implemented.
+NOT_CHECKED = frozenset({UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED})
+
+
+def hidden_statuses(*, errors_only: bool = False, hide_warnings: bool = False, hide_unchecked: bool = False) -> frozenset[str]:
+    """The statuses to leave out of the report, from validate's display flags.
+
+    ``errors_only`` keeps only the failed checks; ``hide_warnings`` drops the
+    warnings; ``hide_unchecked`` drops every "Not checked" section (could not
+    run, needs AI, not implemented).
+    """
+    if errors_only:
+        return frozenset(s for s in STATUSES if s != FAILED)
+    hide: set[str] = set()
+    if hide_warnings:
+        hide.add(WARNING)
+    if hide_unchecked:
+        hide |= NOT_CHECKED
+    return frozenset(hide)
+
+
+def _hidden_note(report: ValidationReport, hide: frozenset[str]) -> str:
+    """Say which sections the display flags left out, and how many checks each held."""
+    parts = []
+    for status in STATUSES:
+        if status in hide:
+            n = len(report.by_status(status))
+            if n:
+                parts.append(f"{_HEADINGS[status]} ({n})")
+    return ("Not shown: " + "; ".join(parts) + ".") if parts else ""
+
+
+def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide: frozenset[str] = frozenset()) -> list[_Line]:
+    lines: list[_Line] = [_Line("title", f"paperpush validation report: {report_name(report)}")]
     if report.subfile:
         lines.append(_Line("meta", f"File: {report.subfile}"))
-    lines.append(_Line("meta", f"Venue: {report.venue}"))
+    lines += [_Line("meta", f"Checked: {path}") for path in report.files]
+    lines.append(_Line("meta", f"Venue: {'none (general checks only)' if report.scope == 'general' else report.venue}"))
     lines.append(_Line("meta", _ai_hint(report)))
-    lines += [_Line("notice", text, status=WARNING) for text in initial_submission_notes(report)]
+    lines += [_Line("notice", text, status=WARNING) for text in scope_notes(report) + report.notes + initial_submission_notes(report)]
     verdict = "Ready to submit: no blocking errors." if report.ok else f"Not ready: {len(report.errors)} error(s) must be fixed before submitting."
+    if report.scope:
+        verdict = "No errors in the files checked." if report.ok else f"{len(report.errors)} error(s) in the files checked."
     if report.initial_submission:
         verdict = f"Ready to submit as an initial submission: {report.downgraded} error(s) shown as warnings; fix them before the revision." if report.downgraded else "Ready to submit: no blocking errors."
     if report.ai_only:
         verdict = "AI checks only (--ai-only): the deterministic checks were not run, so this is not a verdict on whether the submission is ready."
     lines.append(_Line("summary", verdict, status=WARNING if report.ai_only else PASSED if report.ok else FAILED))
+    hidden = _hidden_note(report, hide)
+    if hidden:
+        lines.append(_Line("meta", hidden))
     for status in STATUSES:
         results = report.by_status(status)
-        if not results:
+        if not results or status in hide:
             continue
         lines.append(_Line("heading", f"{_HEADINGS[status]} ({len(results)})", status=status))
         # A note every check in the section shares (e.g. how to run the AI
@@ -279,6 +346,8 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True) -> li
                 item_status = FAILED if issue.is_error else (UNCHECKED if getattr(issue, "unchecked", False) else WARNING)
                 if status in (UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED):
                     item_status = status
+                if item_status in hide:
+                    continue
                 lines.append(_Line("item", f"{level}: {where}{issue.message}", indent=2, status=item_status))
     return lines
 
@@ -286,7 +355,7 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True) -> li
 # --- terminal ----------------------------------------------------------------
 
 
-def print_report(report: ValidationReport, *, alt_color: bool = False, console=None, show_passed_details: bool = True) -> None:
+def print_report(report: ValidationReport, *, alt_color: bool = False, console=None, show_passed_details: bool = True, hide: frozenset[str] = frozenset()) -> None:
     """Print ``report`` to the terminal with rich colours."""
     from rich.console import Console
     from rich.text import Text
@@ -296,7 +365,7 @@ def print_report(report: ValidationReport, *, alt_color: bool = False, console=N
     if not console.is_terminal:
         # Piped or captured: keep each message on one line, so it can be grepped.
         console.soft_wrap = True
-    for line in _layout(report, show_passed_details=show_passed_details):
+    for line in _layout(report, show_passed_details=show_passed_details, hide=hide):
         color = pal.for_status(line.status) if line.status else None
         pad = "  " * line.indent
         if line.role == "title":
@@ -354,9 +423,9 @@ def output_path(requested: str, subfile: str) -> Path:
     return path
 
 
-def to_text(report: ValidationReport) -> str:
+def to_text(report: ValidationReport, *, hide: frozenset[str] = frozenset()) -> str:
     out: list[str] = []
-    for line in _layout(report):
+    for line in _layout(report, hide=hide):
         pad = "  " * line.indent
         if line.role == "title":
             out += [line.text, "=" * len(line.text)]
@@ -379,9 +448,9 @@ def _md_escape(text: str) -> str:
     return text.replace("|", "\\|").replace("*", "\\*").replace("_", "\\_")
 
 
-def to_markdown(report: ValidationReport) -> str:
+def to_markdown(report: ValidationReport, *, hide: frozenset[str] = frozenset()) -> str:
     out: list[str] = []
-    for line in _layout(report):
+    for line in _layout(report, hide=hide):
         if line.role == "title":
             out += [f"# {_md_escape(line.text)}", ""]
         elif line.role == "meta":
@@ -403,7 +472,7 @@ def to_markdown(report: ValidationReport) -> str:
     return "\n".join(out) + "\n"
 
 
-def to_html(report: ValidationReport, *, alt_color: bool = False) -> str:
+def to_html(report: ValidationReport, *, alt_color: bool = False, hide: frozenset[str] = frozenset()) -> str:
     pal = palette(alt_color)
     body: list[str] = []
     open_list = False
@@ -414,7 +483,7 @@ def to_html(report: ValidationReport, *, alt_color: bool = False) -> str:
             body.append("</ul>")
             open_list = False
 
-    for line in _layout(report):
+    for line in _layout(report, hide=hide):
         text = html.escape(line.text)
         color = pal.for_status(line.status) if line.status else "inherit"
         if line.role == "title":
@@ -439,7 +508,7 @@ def to_html(report: ValidationReport, *, alt_color: bool = False) -> str:
             cls = "note" if line.indent >= 2 else "na"
             body.append(f'<li class="{cls}" style="color:{color}">{text}</li>')
     close()
-    title = html.escape(f"paperpush validation: {report.subfile or report.venue}")
+    title = html.escape(f"paperpush validation: {report.subfile or report_name(report)}")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
@@ -465,19 +534,19 @@ li.na {{ font-style: italic; }}
 """
 
 
-def save(report: ValidationReport, path: Path, *, alt_color: bool = False) -> Path:
+def save(report: ValidationReport, path: Path, *, alt_color: bool = False, hide: frozenset[str] = frozenset()) -> Path:
     """Write ``report`` to ``path`` in the format its extension names."""
     path.parent.mkdir(parents=True, exist_ok=True)
     suffix = path.suffix.lower()
     if suffix in (".html", ".htm"):
-        path.write_text(to_html(report, alt_color=alt_color), encoding="utf-8")
+        path.write_text(to_html(report, alt_color=alt_color, hide=hide), encoding="utf-8")
     elif suffix == ".md":
-        path.write_text(to_markdown(report), encoding="utf-8")
+        path.write_text(to_markdown(report, hide=hide), encoding="utf-8")
     elif suffix == ".txt":
-        path.write_text(to_text(report), encoding="utf-8")
+        path.write_text(to_text(report, hide=hide), encoding="utf-8")
     else:
         from .pdf_report import render_pdf
 
-        path.write_bytes(render_pdf(_layout(report), _summary_line(report), palette(alt_color), _ASCII_MARKS))
+        path.write_bytes(render_pdf(_layout(report, hide=hide), _summary_line(report), palette(alt_color), _ASCII_MARKS))
     logger.info("Saved the validation report to %s", path)
     return path

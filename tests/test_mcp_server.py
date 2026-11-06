@@ -536,6 +536,22 @@ def test_submit_refuses_a_subfile_that_does_not_validate(tmp_path, no_launch):
     assert result["errors"]
 
 
+def test_submit_skip_validate_launches_an_invalid_subfile(tmp_path, fake_launch):
+    """The author asked to skip validation: no preflight block, and the child skips it too."""
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    path = tmp_path / f"{VENUE}.sub"
+    mcp_server.create_subfile(VENUE, str(path))  # a blank template: required fields empty
+    result = mcp_server.submit(str(path), skip_validate=True)
+    assert result["status"] == "running"
+    assert "--skip-validate" in fake_launch.instances[0].command
+
+
+def test_submit_validates_the_child_by_default(fake_launch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    mcp_server.submit(str(VALID_SUB))
+    assert "--skip-validate" not in fake_launch.instances[0].command
+
+
 def test_submit_refuses_without_a_stored_login(no_launch):
     """Launching would stall on a password prompt with no terminal to answer it."""
     result = mcp_server.submit(str(VALID_SUB))
@@ -691,8 +707,9 @@ def test_build_server_exposes_typed_arguments():
     tool = by_name["validate_subfile"]
     # Renamed from inputSchema to input_schema in MCP SDK 2.0.
     schema = getattr(tool, "input_schema", None) or tool.inputSchema
-    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "check_links", "check_sensitive", "check_references", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "colorblind", "initial_submission", "ai_only", "cover_letter_max_age_days"}
-    assert schema["required"] == ["subfile"]
+    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "venue", "manuscript", "title_page", "cover_letter", "figures", "tables", "supplement", "check_links", "check_sensitive", "check_references", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "colorblind", "initial_submission", "ai_only", "cover_letter_max_age_days"}
+    # Files can be named instead of a .sub, so nothing is required.
+    assert not schema.get("required")
 
 
 # --- recovering a paused submission ------------------------------------------

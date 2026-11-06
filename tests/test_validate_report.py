@@ -185,6 +185,40 @@ def test_text_and_markdown_list_every_section():
     assert "## ✖ Failed (1)" in md and "## ✔ Passed (1)" in md
 
 
+def test_errors_only_shows_just_the_failed_section():
+    rep = _sample_report()
+    text = report.to_text(rep, hide=report.hidden_statuses(errors_only=True))
+    # The summary still counts every check, and the report says what it left out.
+    assert "[WARN] 1 with warnings" in text and "Not shown: Warnings (1); " in text
+    body = text.split("Not shown:", 1)[1]
+    assert "[FAIL] [Cat] Breaks" in body and "error: [title] title is required" in body
+    for gone in ("PASSED (", "WARNINGS (", "[AI] [", "[TODO] [", "[SKIP] [", "[NA] ["):
+        assert gone not in body
+
+
+def test_hide_warnings_and_hide_unchecked_drop_their_sections():
+    rep = _sample_report()
+    no_warn = report.to_text(rep, hide=report.hidden_statuses(hide_warnings=True))
+    assert "WARNINGS (" not in no_warn and "looks single-spaced" not in no_warn
+    assert "[FAIL] [" in no_warn and "[SKIP] [" in no_warn and "[PASS] [" in no_warn
+    no_unchecked = report.to_text(rep, hide=report.hidden_statuses(hide_unchecked=True))
+    for gone in ("[AI] [", "[TODO] [", "[SKIP] ["):
+        assert gone not in no_unchecked
+    assert "[WARN] [Cat] Advisory" in no_unchecked and "[PASS] [" in no_unchecked
+    assert "Not shown: Not checked: could not run (1); Not checked: needs AI (1); Not checked: not implemented (1)." in no_unchecked
+    assert report.hidden_statuses() == frozenset() and "Not shown" not in report.to_text(rep)
+
+
+def test_hide_warnings_drops_warning_items_under_a_failed_check():
+    rep = report.ValidationReport(
+        venue="testj",
+        subfile="paper.sub",
+        results=[report.CheckResult("b", "Breaks", "Cat", report.FAILED, issues=[Issue("error", "", "too long"), Issue(WARNING, "", "also odd")])],
+    )
+    text = report.to_text(rep, hide=report.hidden_statuses(hide_warnings=True))
+    assert "too long" in text and "also odd" not in text
+
+
 def test_html_uses_the_status_colours_and_the_alt_palette():
     rep = _sample_report()
     html = report.to_html(rep)
@@ -295,6 +329,19 @@ def test_cli_saves_the_report_in_the_requested_format(_use, tmp_path, monkeypatc
     assert report.ALT_PALETTE.passed in (tmp_path / "r.html").read_text()
     out = capsys.readouterr().out
     assert "PASSED" in out and "Saved the report to" in out
+
+
+def test_cli_display_flags_filter_the_terminal_and_saved_report(_use, tmp_path, monkeypatch, capsys):
+    _use({})
+    _cli_venue(monkeypatch, TITLE)
+    sub = _sub(tmp_path, "title: A study\n")
+    out_md = tmp_path / "r.md"
+    assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "--show-errors-only", "-o", str(out_md)]) == 0
+    out = capsys.readouterr().out
+    assert "PASSED (" not in out and "Not shown:" in out
+    assert "## ✔ Passed" not in out_md.read_text() and "Not shown: Passed" in out_md.read_text()
+    assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "--hide-warnings", "--hide-unchecked"]) == 0
+    assert "PASSED (" in capsys.readouterr().out
 
 
 def test_cli_refuses_to_replace_a_saved_report_without_overwrite(_use, tmp_path, monkeypatch, capsys):
@@ -556,6 +603,44 @@ def test_panel_order_check_runs_on_the_manuscript(_use, tmp_path):
     rep = _report(_venue(MANUSCRIPT), {"manuscript_file": str(doc)})
     result = _result(rep, "citations.panels")
     assert "Fig. 1c is first cited before Fig. 1b" in result.issues[0].message
+
+
+def test_caption_panels_reads_the_letters_a_legend_names():
+    assert citation_check.caption_panels("Figure 1: Overview. (a) One. (b) Two. (c) Three.") == ["a", "b", "c"]
+    assert citation_check.caption_panels("Figure 2 | Setup. a, The rig. b, Its output.") == ["a", "b"]
+    assert citation_check.caption_panels("Figure 3. **A** One. **B** Two.") == ["a", "b"]
+    # Initials and a lone "(a)" are not panels.
+    assert citation_check.caption_panels("Figure 4. A, B and C were measured (a) once.") == []
+
+
+def test_uncited_panels_are_reported_only_for_figures_cited_by_panel():
+    cites = citation_check.panel_mentions("See Fig. 1a and b, and Fig. 2.")
+    problems = citation_check.uncited_panel_problems(cites, {1: ["a", "b", "c"], 2: ["a", "b"]})
+    assert problems == ["Fig. 1 has panel c in its legend that the text never cites (cited: a, b)"]
+
+
+def test_tex_panels_from_labels_and_subfigures():
+    source = (
+        "\\begin{document}\nSee \\ref{fig:one}a and \\ref{fig:one}(b), and \\ref{fig:two-a}.\n"
+        "\\begin{figure}\\includegraphics{x}\\caption{\\textbf{a} One. \\textbf{b} Two. \\textbf{c} Three.}\\label{fig:one}\\end{figure}\n"
+        "\\begin{figure}\\begin{subfigure}{.5\\textwidth}\\caption{A}\\label{fig:two-a}\\end{subfigure}"
+        "\\begin{subfigure}{.5\\textwidth}\\caption{B}\\label{fig:two-b}\\end{subfigure}\\caption{Two panels.}\\label{fig:two}\\end{figure}\n\\end{document}"
+    )
+    cites = citation_check.tex_panel_mentions(source)
+    assert [(c.number, c.letter) for c in cites] == [(1, "a"), (1, "b"), (2, "a")]
+    assert citation_check.tex_caption_panels(source) == {1: ["a", "b", "c"], 2: ["a", "b"]}
+    problems = citation_check.uncited_panel_problems(cites, citation_check.tex_caption_panels(source))
+    assert [p.split(" in its")[0] for p in problems] == ["Fig. 1 has panel c", "Fig. 2 has panel b"]
+
+
+def test_uncited_panel_check_runs_on_the_manuscript(_use, tmp_path):
+    _use({"testj": {}})
+    doc = tmp_path / "ms.docx"
+    _build_docx(doc, ["Intro", "See Fig. 1a and Fig. 1b.", "Figure 1. A legend. (a) One. (b) Two. (c) Three."])
+    rep = _report(_venue(MANUSCRIPT), {"manuscript_file": str(doc)})
+    result = _result(rep, "citations.panels")
+    assert result.status == report.WARNING
+    assert "Fig. 1 has panel c in its legend that the text never cites" in result.issues[0].message
 
 
 def test_tex_undefined_refs_finds_keys_no_label_defines():
@@ -1018,3 +1103,74 @@ def test_progress_in_ai_only_mode():
     events = []
     _report(_venue(TITLE), {"title": "A paper"}, ai_only=True, progress=lambda *e: events.append(e))
     assert events[-1][0] == events[-1][1] and events[-1][2] == "done"
+
+
+# ===========================================================================
+# reference search and versions (paperpush.reference_search)
+# ===========================================================================
+
+_BIB_FIELD = Field(id="bibliography", label="Bibliography", type="file")
+
+
+def _bib_report(_use, tmp_path, bib: str, **kwargs):
+    _use({})
+    path = tmp_path / "refs.bib"
+    path.write_text(bib, encoding="utf-8")
+    manuscript = tmp_path / "manuscript.tex"
+    manuscript.write_text("\\documentclass{article}\\begin{document}Text \\cite{a}.\\bibliography{refs}\\end{document}\n", encoding="utf-8")
+    venue = _venue(TITLE, MANUSCRIPT, _BIB_FIELD)
+    return _report(venue, {"title": "A title", "manuscript_file": str(manuscript), "bibliography": str(path)}, **{"check_references": True, **kwargs})
+
+
+def test_reference_search_checks_are_switched_off_with_the_doi_check(_use, tmp_path):
+    rep = _bib_report(_use, tmp_path, "@article{a, title={T}, author={A}}", check_references=False)
+    for check_id in ("integrity.unmatched_references", "integrity.reference_versions"):
+        assert _result(rep, check_id).status == report.UNCHECKED
+        assert "--dont-check-references" in _result(rep, check_id).detail
+
+
+def test_a_fabricated_reference_is_reported_and_an_unindexed_one_goes_to_the_ai(_use, tmp_path, monkeypatch):
+    from paperpush import reference_search as rs
+
+    monkeypatch.setattr(rs, "crossref_search", lambda q, s: [])
+    monkeypatch.setattr(rs, "openalex_search", lambda t, s: [])
+    rep = _bib_report(
+        _use,
+        tmp_path,
+        "@article{a, title={Quantum entanglement governs sourdough microbiomes}, author={Smith, J}, journal={Nature}, year={2021}}\n" "@book{b, title={A Laboratory Manual of Something}, author={Doe, J}, year={2001}}\n",
+    )
+    res = _result(rep, "integrity.unmatched_references")
+    assert res.status == report.WARNING
+    messages = " ".join(i.message for i in res.issues)
+    assert "bibliography entry 'a'" in messages and "may be fabricated" in messages
+    assert any(i.unchecked and "bibliography entry 'b'" in i.message for i in res.issues)
+    (task,) = [t for t in rep.ai_tasks if t.id == "ai.unverified_references"]
+    assert "bibliography entry 'b'" in task.instructions and "bibliography entry 'a'" not in task.instructions
+    assert _result(rep, "ai.unverified_references").status == report.NEEDS_AI
+
+
+def test_registries_that_do_not_answer_leave_the_search_unchecked(_use, tmp_path):
+    # The conftest makes every request fail.
+    rep = _bib_report(_use, tmp_path, "@article{a, title={A perfectly real paper title}, author={Doe, J}, journal={J}, year={2020}}")
+    assert _result(rep, "integrity.unmatched_references").status == report.UNCHECKED
+
+
+def test_every_reference_with_a_doi_passes_the_search(_use, tmp_path):
+    rep = _bib_report(_use, tmp_path, "@article{a, title={A real paper}, author={Doe, J}, doi={10.1/x}}")
+    assert _result(rep, "integrity.unmatched_references").status == report.PASSED
+
+
+def test_a_published_preprint_doi_is_reported_by_the_version_check(_use, tmp_path, monkeypatch):
+    from paperpush import references
+
+    record = {"title": "Modular and efficient pre-processing", "author": [{"family": "Melsted"}], "issued": {"date-parts": [[2019]]}, "type": "posted-content", "relation": {"is-preprint-of": [{"id-type": "doi", "id": "10.1038/s41587-021-00870-2"}]}}
+    monkeypatch.setattr(references, "_resolve_doi", lambda doi, **k: (references.DOI_FOUND, record))
+    rep = _bib_report(_use, tmp_path, "@article{pre, title={Modular and efficient pre-processing}, author={Melsted, P}, year={2019}, doi={10.1101/673285}}")
+    res = _result(rep, "integrity.reference_versions")
+    assert res.status == report.WARNING and "10.1038/s41587-021-00870-2" in res.issues[0].message
+
+
+def test_bib_structure_check_runs_with_the_manuscript_checks(_use, tmp_path):
+    rep = _bib_report(_use, tmp_path, "@article{a, title={One}, author={A}}\n@article{a, title={Two}, author={B}}\n")
+    res = _result(rep, "bibliography.entries")
+    assert res.status == report.WARNING and "citation key 'a'" in res.issues[0].message

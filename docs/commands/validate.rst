@@ -2,7 +2,9 @@
 ======================
 
 Run the pre-submission checks on a filled ``.sub`` file. Run this before
-:doc:`submit` to catch problems while they are still cheap to fix.
+:doc:`submit` to catch problems while they are still cheap to fix. It can also
+check manuscript files without a ``.sub``, with or without a venue (see
+:ref:`validate-files`).
 
 .. code-block:: text
 
@@ -14,11 +16,16 @@ Run the pre-submission checks on a filled ``.sub`` file. Run this before
                              [--dont-check-openreview-profiles]
                              [--arxiv-latex-cleaner] [--initial-submission]
                              [-o [OUT]] [--overwrite] [--cover-letter-max-age DAYS]
-                             [--colorblind]
+                             [--show-errors-only] [--hide-warnings]
+                             [--hide-unchecked] [--colorblind]
                              [--ai] [--provider {anthropic,openai,google}]
                              [--model MODEL] [--ai-only] [--ai-tasks FILE]
-                             [--ai-results FILE]
-                             subfile
+                             [--ai-results FILE] [--venue VENUE]
+                             [--manuscript FILE] [--title-page FILE]
+                             [--cover-letter FILE] [--figures FILE [FILE ...]]
+                             [--tables FILE [FILE ...]]
+                             [--supplement FILE [FILE ...]]
+                             [subfile]
 
 Synopsis
 --------
@@ -29,6 +36,8 @@ Synopsis
    paperpush validate biorxiv.sub.txt -o              # also save biorxiv_validation.pdf
    paperpush validate biorxiv.sub.txt --ai            # also run the AI checks via an API
    paperpush validate nature.sub.txt --initial-submission  # errors become warnings
+   paperpush validate --manuscript main.tex --figures fig1.png fig2.png   # no .sub, no venue
+   paperpush validate --venue nature --manuscript main.pdf --cover-letter cover.docx
 
 ``validate`` prints a report of every check, grouped and coloured by what
 happened to it: **failed** (red), **warnings** (amber), **needs AI**
@@ -42,6 +51,47 @@ warnings are worth reviewing but don't block submission. See
 
 The command exits non-zero if any errors are found, so it fits cleanly into
 scripts and CI.
+
+.. _validate-files:
+
+Checking files without a ``.sub``
+---------------------------------
+
+Name the files with ``--manuscript``, ``--title-page``, ``--cover-letter``,
+``--figures``, ``--tables``, and ``--supplement`` (the last three take several
+files). What runs depends on what else is given:
+
+``.sub`` and file flags
+   Every check, as usual. Each flag replaces the path the ``.sub`` gives for
+   that file, which is handy for checking a new draft without editing the
+   ``.sub``. ``--venue``, if given, must match the ``.sub``'s venue.
+
+``--venue VENUE`` and file flags, no ``.sub``
+   The files are checked against the venue's author guidelines: formats,
+   length, sections, title-page items, layout, figures, and the rest. The
+   submission-form checks, the ``.sub``-versus-manuscript comparison, and the
+   OpenReview lookup are reported as not applicable, since there are no form
+   fields to read. The report says so at the top; it is not a verdict on
+   whether the submission is ready.
+
+File flags only
+   Only the checks that apply to any manuscript run: reachable links,
+   reference DOIs and registry searches (fabricated or mismatched
+   references), retractions, secrets and private data, hidden text, the order
+   figures and tables are cited in, citations in the abstract and a contact
+   e-mail, every reference cited, and the prose checks. Add ``--anonymous`` to
+   check for identifying information as well. ``paperpush pick-venue`` suggests
+   venues to check against next.
+
+Each file goes in the venue's upload field for it. If the venue's form has no
+such upload -- a separate title page for a portal that takes only the
+manuscript, say -- the file is still checked, and the report notes that the
+portal has nowhere to upload it. Venues whose guidelines ask for a separate
+title page (``title_page.separate_file``) warn when ``--title-page`` is not
+given.
+
+Relative paths are resolved against the working directory. ``-o`` with no path
+saves the report next to the first file named. ``--web`` needs a ``.sub``.
 
 What it checks
 --------------
@@ -74,6 +124,8 @@ Checks that run without AI
 
 - Reachable links (:ref:`vc-links`)
 - Reference DOIs point at the right paper (:ref:`vc-references`)
+- References without a DOI match a registered work; preprints that have been
+  published, and old arXiv versions (:ref:`vc-reference-search`)
 - Secrets and private data (:ref:`vc-sensitive`)
 - Hidden text and prompt injection (:ref:`vc-hidden-text`)
 - Anonymity, for double-blind venues (:ref:`vc-anonymity`)
@@ -144,6 +196,7 @@ embedded in the manuscript when none are attached)
 
 - Every reference cited; every citation in the reference list
 - Self-citations not excessive (more than 15, or more than 80% of the list)
+- BibTeX entries complete, closed, and with unique keys
 
 **Prose** (:ref:`vc-prose`; a mechanical proofread, not a grammar check)
 
@@ -154,6 +207,11 @@ embedded in the manuscript when none are attached)
 - Common misspellings (codespell)
 - Repetitive word choice (stock words, overused words, a word repeated within
   a sentence, runs of sentences opening the same way)
+- Numbers of 10 or more in digits; no sentence opening with digits
+- Abbreviations written one way: "i.e."/"e.g.", "et al.", "vs.", "Fig."/"Figure",
+  hyphenated or closed compounds
+- Acronyms spelled out once, at first use (in the abstract and again in the
+  main text)
 
 Checks that need AI
 ^^^^^^^^^^^^^^^^^^^
@@ -169,6 +227,7 @@ These run with ``--ai``, or through an agent with ``--ai-tasks`` /
 - Template used, for a PDF or Word manuscript
 - The venue's free-text guideline rules
 - Whether every ``.sub`` field agrees with the manuscript in meaning
+- Spelling, grammar, and tense in the prose
 
 Guideline rules no check reads are listed as **not implemented**.
 
@@ -180,7 +239,20 @@ Arguments
 ---------
 
 ``subfile``
-   Path to the ``.sub`` file to check, e.g. ``biorxiv.sub.txt``.
+   Path to the ``.sub`` file to check, e.g. ``biorxiv.sub.txt``. Optional when
+   files are named with the flags below (see :ref:`validate-files`).
+
+``--venue VENUE``
+   With no ``.sub``: check the named files against this venue's author
+   guidelines. Without it, only the general checks run.
+
+``--manuscript FILE``, ``--title-page FILE``, ``--cover-letter FILE``
+   The manuscript, a separate title page, and the cover letter. Each replaces
+   the ``.sub``'s path for that file, or with no ``.sub`` is checked on its
+   own.
+
+``--figures FILE ...``, ``--tables FILE ...``, ``--supplement FILE ...``
+   Figure, table, and supplementary files, as above.
 
 ``--web``
    Instead of printing the report, open the ``.sub`` in the paperpush web page
@@ -192,8 +264,9 @@ Arguments
    Skip probing the URLs cited in the uploaded files. Avoids network requests.
 
 ``--dont-check-references``
-   Skip resolving the references' DOIs through ``doi.org``. Avoids network
-   requests.
+   Skip resolving the references' DOIs through ``doi.org``, and the registry
+   searches for references without a DOI and for newer versions (Crossref,
+   OpenAlex, arXiv, bioRxiv). Avoids network requests.
 
 ``--dont-check-for-sensitive-info``
    Skip scanning the uploaded files for information not meant to be published.
@@ -259,6 +332,23 @@ Arguments
    Replace the report file named by ``-o`` if it already exists. (``--force``
    is accepted as an older name.)
 
+``--show-errors-only``
+   Show only the failed checks and their errors. Overrides
+   ``--hide-warnings`` and ``--hide-unchecked``.
+
+``--hide-warnings``
+   Leave out the *Warnings* section, and the warnings listed under failed
+   checks.
+
+``--hide-unchecked``
+   Leave out the checks that were not run: the *could not run*, *needs AI*,
+   and *not implemented* sections.
+
+   These three display flags filter both the terminal output and the report
+   saved with ``-o``. They do not apply with ``--web``. The summary line still
+   counts every check, a ``Not shown:`` line says which sections were left
+   out, and the exit status is the same.
+
 ``--colorblind``
    Use colour-blind-friendly colours (blue for passed, vermillion for failed,
    dark yellow for warnings, reddish purple for needs AI, grey for could not
@@ -320,6 +410,12 @@ Run the field and file checks alone, with no network access:
 .. code-block:: bash
 
    paperpush validate biorxiv.sub.txt --dont-check-links --dont-check-references
+
+List only what must be fixed:
+
+.. code-block:: bash
+
+   paperpush validate biorxiv.sub.txt --show-errors-only
 
 Save a colour-blind-friendly HTML report:
 
