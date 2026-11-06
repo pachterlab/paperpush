@@ -174,6 +174,28 @@ def with_subfile_suffix(path: str | Path) -> Path:
     return path if is_subfile_name(path) else path.with_name(path.name + SUFFIX)
 
 
+def find_subfile(path: str | Path) -> Path:
+    """``path``, or its other-suffix twin when only that one exists.
+
+    ``.sub.txt`` and ``.sub`` name the same submission file: asking for
+    ``biorxiv.sub`` finds ``biorxiv.sub.txt`` and vice versa. When both exist,
+    or neither does, ``path`` is returned as given.
+    """
+    path = Path(path)
+    if path.exists() or not is_subfile_name(path):
+        return path
+    name = path.name
+    if name.lower().endswith(SUFFIX):
+        twin = name[: -len(SUFFIX)] + LEGACY_SUFFIX
+    else:
+        twin = name + SUFFIX[len(LEGACY_SUFFIX) :]
+    other = path.with_name(twin)
+    if other.exists():
+        logger.info("%s not found; using %s", path, other)
+        return other
+    return path
+
+
 def default_filename(venue: Venue) -> str:
     """Conventional submission filename for a venue (e.g. ``biorxiv.sub.txt``)."""
     return f"{venue.slug}{SUFFIX}"
@@ -434,8 +456,8 @@ def load(path: str | Path) -> SubFile:
 
     Relative upload paths are resolved against the .sub file's own folder.
     """
+    path = find_subfile(path)
     logger.debug("Loading .sub file %s", path)
-    path = Path(path)
     return resolve_paths(parse(path.read_text(encoding="utf-8")), path.parent)
 
 

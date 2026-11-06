@@ -516,3 +516,50 @@ def test_subfile_writes_sub_txt_and_legacy_sub_still_validates(in_tmp):
     # A file under the old bare .sub suffix is read like any other, without a warning.
     (in_tmp / "biorxiv.sub.txt").rename(in_tmp / "biorxiv.sub")
     assert subfile.load(in_tmp / "biorxiv.sub").venue == "biorxiv"
+
+
+# --- .sub and .sub.txt are interchangeable ------------------------------------
+
+
+@pytest.mark.parametrize(("given", "on_disk"), [("biorxiv.sub", "biorxiv.sub.txt"), ("biorxiv.sub.txt", "biorxiv.sub")])
+def test_find_subfile_uses_the_other_suffix_when_only_it_exists(tmp_path, given, on_disk):
+    from paperpush.subfile import find_subfile
+
+    (tmp_path / on_disk).write_text("@venue: biorxiv\n", encoding="utf-8")
+    assert find_subfile(tmp_path / given) == tmp_path / on_disk
+
+
+def test_find_subfile_prefers_the_exact_name_when_both_exist(tmp_path):
+    from paperpush.subfile import find_subfile
+
+    for name in ("biorxiv.sub", "biorxiv.sub.txt"):
+        (tmp_path / name).write_text("@venue: biorxiv\n", encoding="utf-8")
+        assert find_subfile(tmp_path / name) == tmp_path / name
+
+
+def test_find_subfile_leaves_missing_and_non_sub_paths_alone(tmp_path):
+    from paperpush.subfile import find_subfile
+
+    assert find_subfile(tmp_path / "biorxiv.sub") == tmp_path / "biorxiv.sub"
+    (tmp_path / "notes.txt").write_text("x", encoding="utf-8")
+    assert find_subfile(tmp_path / "notes") == tmp_path / "notes"
+
+
+def test_validate_accepts_the_other_suffix(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert main(["subfile", "biorxiv"]) == 0
+    assert (tmp_path / "biorxiv.sub.txt").is_file()
+    main(["validate", "biorxiv.sub"])
+    err = capsys.readouterr().err
+    assert "cannot read" not in err
+
+
+def test_autofill_fills_the_existing_twin_instead_of_creating_a_new_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert main(["subfile", "biorxiv"]) == 0
+    ms = tmp_path / "ms"
+    ms.mkdir()
+    values = tmp_path / "values.json"
+    values.write_text(json.dumps({"fields": {}}), encoding="utf-8")
+    main(["autofill", "biorxiv.sub", "-p", str(ms), "--engine", "manual", "--values", str(values)])
+    assert not (tmp_path / "biorxiv.sub").exists()

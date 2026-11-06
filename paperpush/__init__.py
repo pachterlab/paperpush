@@ -2,7 +2,7 @@
 
 import logging
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 __url__ = "https://github.com/pachterlab/paperpush"
 
 # Standard-library convention: a library should not configure logging output.

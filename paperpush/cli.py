@@ -59,7 +59,7 @@ from pydantic import ConfigDict, validate_call
 from . import __url__, __version__, credentials, venue_data
 from ._logging import configure_logging
 from .database import generic_venue, get_venue, list_venues
-from .subfile import default_filename, is_subfile_name, subfile_stem, with_subfile_suffix, write_template
+from .subfile import default_filename, find_subfile, is_subfile_name, subfile_stem, with_subfile_suffix, write_template
 from .venues.common import DEFAULT_TIMEOUT_SECONDS
 
 logger = logging.getLogger(__name__)
@@ -1302,7 +1302,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         if multiple and value and not args.subfile:
             subs = [v for v in value if v.endswith((".sub", ".sub.txt"))]
             if len(subs) == 1:
-                args.subfile = subs[0]
+                args.subfile = str(find_subfile(subs[0]))
                 setattr(args, key, [v for v in value if v != subs[0]])
     files = {key: getattr(args, key, None) for key, _, _ in file_inputs.FILE_ROLES}
     named_files = file_inputs.given(files)
@@ -1846,6 +1846,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
         print(f"error: two .sub files given ({args.subfile}, {trailing_sub})", file=sys.stderr)
         return 2
     args.subfile = args.subfile or trailing_sub
+    _use_existing_subfile(args)
     if not args.subfile:
         print("error: no .sub file given, e.g. 'paperpush autofill -p MANUSCRIPT_DIR biorxiv.sub.txt'", file=sys.stderr)
         return 2
@@ -2515,7 +2516,7 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         const="",
         metavar="OUT",
-        help="also save the report. PDF by default (keeps the colours); give a path ending in .html, .md, or .txt for those formats. With no OUT, writes <subfile>_validation.pdf next to the .sub.",
+        help="also save the report. Give a path ending in .pdf, .html, .md, or .txt. Default: <subfile>_validation.pdf next to the .sub.",
     )
     p_validate.add_argument("--overwrite", action="store_true", help="replace the report saved with -o if the file already exists")
     p_validate.add_argument("--force", dest="overwrite", action="store_true", help=argparse.SUPPRESS)
@@ -2784,6 +2785,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _use_existing_subfile(args: argparse.Namespace) -> None:
+    """Point the .sub argument at the file that exists: ``x.sub`` and ``x.sub.txt`` are interchangeable.
+
+    Covers the positional/``--subfile`` argument and ``codegen --sub``. The
+    exact name given wins when both exist. Messages then name the real file.
+    """
+    for attr in ("subfile", "sub"):
+        value = getattr(args, attr, None)
+        if isinstance(value, str) and value:
+            setattr(args, attr, str(find_subfile(value)))
+
+
 @_validate
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
@@ -2799,6 +2812,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
+    _use_existing_subfile(args)
     return args.func(args)
 
 

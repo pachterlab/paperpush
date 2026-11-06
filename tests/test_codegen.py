@@ -689,3 +689,27 @@ def test_optional_toggle_wraps_section_in_comments():
     start = lines.index("# ---OPTIONAL---")
     assert "name=\"B\"" in lines[start + 1] and lines[start + 2] == "# ---END OPTIONAL---"
     assert s.undo() and s.optional_open()
+
+
+def test_codegen_sub_accepts_the_other_suffix(tmp_path, monkeypatch):
+    """`codegen --sub biorxiv.sub` reads biorxiv.sub.txt when only that exists."""
+    from types import SimpleNamespace
+
+    from paperpush.cli import main
+    from paperpush.codegen import session as session_mod
+
+    monkeypatch.chdir(tmp_path)
+    assert main(["subfile", "biorxiv"]) == 0
+    seen = {}
+
+    class FakeSession:
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
+
+        def run(self):
+            return SimpleNamespace(code="")
+
+    monkeypatch.setattr(session_mod, "CodegenSession", FakeSession)
+    assert main(["codegen", "--sub", "biorxiv.sub", "--new-session"]) == 0
+    assert "biorxiv" in seen["header"]
+    assert seen["fields"]

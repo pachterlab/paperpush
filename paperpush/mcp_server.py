@@ -61,7 +61,7 @@ from ._logging import configure_logging
 from .autofill import autofill as _apply_autofill
 from .autofill import field_schema, parse_extraction
 from .database import Venue, get_venue, list_venues
-from .subfile import default_filename, is_subfile_name, parse as parse_subfile, subfile_stem, render_template, resolve_paths, write_template
+from .subfile import default_filename, find_subfile, is_subfile_name, parse as parse_subfile, subfile_stem, render_template, resolve_paths, write_template
 from .validate import Issue
 from .validate import validate_report as _run_validate_report
 
@@ -155,7 +155,7 @@ def _load_subfile(subfile: str, base: Optional[str] = None) -> tuple[Path, str, 
     the venue comes from the file's own ``venue:`` line, falling back to the
     filename stem for a file that predates it or was hand-written.
     """
-    path = _resolve(subfile, base)
+    path = find_subfile(_resolve(subfile, base))
     if not path.is_file():
         raise ValueError(f"no .sub file at {path}")
     try:
@@ -652,7 +652,7 @@ def autofill_subfile(
     if not directory.is_dir():
         raise ValueError(f"manuscript directory not found: {directory}")
 
-    sub_path = _resolve(subfile, str(directory))
+    sub_path = find_subfile(_resolve(subfile, str(directory)))
     if sub_path.is_file():
         _, text, venue = _load_subfile(str(sub_path))
         created_from_template = False
