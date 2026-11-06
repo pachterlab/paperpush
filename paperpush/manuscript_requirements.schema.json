@@ -856,7 +856,7 @@
               "type": "null"
             }
           ],
-          "description": "Abstract must be structured into labelled subsections."
+          "description": "Abstract must be structured into labeled subsections."
         },
         "structured_headings": {
           "anyOf": [
@@ -1257,7 +1257,7 @@
               "type": "null"
             }
           ],
-          "description": "Accepted colour spaces (RGB, CMYK, grayscale)."
+          "description": "Accepted color spaces (RGB, CMYK, grayscale)."
         },
         "min_font_size_pt": {
           "anyOf": [
@@ -1339,7 +1339,7 @@
               "type": "null"
             }
           ],
-          "description": "Colour figures carry a charge."
+          "description": "Color figures carry a charge."
         },
         "placement": {
           "anyOf": [

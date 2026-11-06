@@ -102,7 +102,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `max_words` | integer or null | Maximum abstract length in words. |
 | `min_words` | integer or null | Minimum abstract length in words. |
 | `max_characters` | integer or null | Maximum abstract length in characters. |
-| `structured` | boolean or null | Abstract must be structured into labelled subsections. |
+| `structured` | boolean or null | Abstract must be structured into labeled subsections. |
 | `structured_headings` | list of string or null | The subsection labels a structured abstract must carry. |
 | `no_references` | boolean or null | Abstract must not cite references. |
 | `no_abbreviations` | boolean or null | Undefined abbreviations are banned in the abstract. |
@@ -149,14 +149,14 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `double_column_width_mm` | number or null | Double-column figure width in mm. |
 | `max_width_mm` | number or null | Maximum figure width in mm. |
 | `max_height_mm` | number or null | Maximum figure height in mm. |
-| `color_mode` | list of string or null | Accepted colour spaces (RGB, CMYK, grayscale). |
+| `color_mode` | list of string or null | Accepted color spaces (RGB, CMYK, grayscale). |
 | `min_font_size_pt` | number or null | Minimum font size for figure lettering, in points. |
 | `max_font_size_pt` | number or null | Maximum font size for figure lettering, in points. |
 | `font` | string or null | Mandated or recommended figure font. |
 | `legend_max_words` | integer or null | Maximum words per figure legend. |
 | `legends_location` | `end_of_manuscript` \| `with_figure` \| `after_references` or null | Where figure legends go. |
 | `multipanel_labels` | string or null | Required style of panel labels. |
-| `color_charge` | boolean or null | Colour figures carry a charge. |
+| `color_charge` | boolean or null | Color figures carry a charge. |
 | `placement` | `separate_files` \| `end_of_manuscript` \| `inline` \| `end_or_inline` or null | Where figures go for the initial submission. |
 | `notes` | list of string or null | Rules with no structured key. |
 

@@ -2,10 +2,10 @@
 name: paperpush-validate
 description: >-
   Run paperpush's full pre-submission validation on a .sub file, including the
-  checks that need a reader's judgement (lettering in raster figures, panel
+  checks that need a reader's judgment (lettering in raster figures, panel
   labels, the venue's free-text guideline rules, whether every .sub field says
   what the manuscript says), which you do yourself instead of through an API
-  key. Produces the colour-coded report of what passed, failed, and was not
+  key. Produces the color-coded report of what passed, failed, and was not
   checked, optionally saved as PDF/HTML/Markdown/text. Triggers: "validate my
   sub", "check my submission against the guidelines", "is my manuscript ready
   for <venue>", "run the AI checks for validate".
@@ -43,7 +43,7 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
   submission is ready. Re-run with the same flags to merge `--ai-results`.
 - Whether they want the report saved, and where (default: none; `-o` with no
   path writes `<sub stem>_validation.pdf` next to the `.sub`). Mention
-  `--colorblind` if they ask for colour-blind-friendly colours.
+  `--colorblind` if they ask for color-blind-friendly colors.
 - Whether this is an initial submission, if the venue accepts an initial
   submission in any format (the report's "Format for initial submission" note;
   `describe_venue` shows `manuscript.initial_submission_any_format`). If so,
@@ -118,7 +118,7 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
    no ready-to-submit verdict. Leave it off otherwise, so the summary covers
    the deterministic checks too.
 
-4. **Summarise for the user**, in this order: blocking errors (must fix),
+4. **Summarize for the user**, in this order: blocking errors (must fix),
    warnings (deterministic first, then AI), what could not be checked and why
    (could not run / not implemented), and where the saved report is. Relay
    heuristics as things to confirm, not as certainties.

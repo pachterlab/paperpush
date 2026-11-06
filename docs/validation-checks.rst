@@ -7,9 +7,186 @@ MCP tool ``validate_subfile`` runs them too.
 
 .. BEGIN VALIDATION CHECK COUNT
 
-PaperPush currently has **109 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
+PaperPush currently has **122 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
 
 .. END VALIDATION CHECK COUNT
+
+.. BEGIN VALIDATION CHECK LIST
+
+All validation check types
+--------------------------
+
+Each item below is a distinct report check ID. A check may be not applicable,
+unable to run, or require a reader; which ones run depends on the venue, files,
+and options. The two ``.*`` entries are families with one numbered check per
+cited reference when ``--reference-check-full`` is used. Venue rules marked
+*not implemented* are excluded.
+
+**Checks requiring a reader**
+
+- ``ai.consistency`` — Every .sub field agrees with the manuscript
+- ``ai.cover_letter_venue`` — Cover letter addressed to the target venue
+- ``ai.details.abstract_reporting`` — Abstract reporting structure
+- ``ai.details.author_details`` — Title-page author details
+- ``ai.details.declarations`` — Declarations and their positions
+- ``ai.details.ethics`` — Ethics approval and consent
+- ``ai.details.supplementary`` — Supplementary-material references
+- ``ai.details.trademarks`` — Registered trademarks
+- ``ai.figures.raster_lettering`` — Lettering in raster figures (size, typeface, panel labels)
+- ``ai.figures.raster_panels_cited`` — Every panel of the raster figures is cited
+- ``ai.notes.abstract`` — Free-text abstract rules
+- ``ai.notes.cover_letter`` — Free-text cover-letter rules
+- ``ai.notes.figures`` — Free-text figure rules
+- ``ai.notes.general`` — General rules in the author guidelines
+- ``ai.notes.keywords`` — Free-text keyword rules
+- ``ai.notes.manuscript`` — Free-text manuscript rules in the author guidelines
+- ``ai.notes.references`` — Free-text reference rules
+- ``ai.notes.sections`` — Free-text section rules
+- ``ai.notes.statements`` — Free-text rules for statements and declarations
+- ``ai.notes.supplementary`` — Free-text supplementary-material rules
+- ``ai.notes.tables`` — Free-text table rules
+- ``ai.notes.title_page`` — Free-text title-page rules
+- ``ai.prose`` — Spelling, grammar, and tense (read by AI)
+- ``ai.reference_format`` — Reference list follows the guidelines' style
+- ``ai.reference_journal.*`` — Each cited journal is correctly identified and indexed (full reference check)
+- ``ai.reference_source.*`` — Each cited source supports the claims that cite it (full reference check)
+- ``ai.tables_editable`` — Tables are editable text, not images
+- ``ai.template`` — Manuscript looks prepared with the venue's template
+- ``ai.title_page_items`` — Title-page items that need reading (address, footnotes, summary, classification)
+- ``ai.unverified_references`` — References that could not be verified are real
+
+**Bibliography**
+
+- ``bibliography.age`` — Reference publication ages
+- ``bibliography.density`` — Citation occurrences per 1,000 words
+- ``bibliography.entries`` — BibTeX entries are complete, closed, and have unique keys
+- ``bibliography.self_citations`` — Self-citations not excessive
+- ``bibliography.uncited`` — Every reference is cited, and every citation has a reference
+
+**Figure and table citations**
+
+- ``citations.cross_references`` — Cross-references resolve (no “??”)
+- ``citations.figure`` — Main figures cited in order
+- ``citations.panels`` — Figure and table panels cited in order
+- ``citations.supp_figure`` — Supplementary figures cited in order
+- ``citations.supp_table`` — Supplementary tables cited in order
+- ``citations.table`` — Main tables cited in order
+
+**Submission and manuscript consistency**
+
+- ``consistency.abstract`` — Abstract in the .sub matches the manuscript
+- ``consistency.authors`` — Authors in the .sub match the manuscript (names, order, emails, ORCIDs)
+- ``consistency.display_counts`` — Figure and table counts stated on the title page match the manuscript
+- ``consistency.keywords`` — Keywords in the .sub match the manuscript
+- ``consistency.statements`` — Statements in the .sub match the manuscript
+- ``consistency.title`` — Title in the .sub matches the manuscript
+- ``consistency.word_counts`` — Word counts stated on the title page match the manuscript
+
+**Cover letter**
+
+- ``cover_letter.date`` — Cover letter dated within the last 7 days
+- ``cover_letter.venue`` — Cover letter addressed to the target venue
+
+**Additional manuscript details**
+
+- ``details.reference_order`` — Reference list is alphabetical or follows first citation
+- ``details.word_cleanliness`` — Word files have no tracked changes or EndNote fields
+
+**Figures**
+
+- ``figures.color_mode`` — Figure color mode
+- ``figures.colorblind`` — Figure colors distinguishable with red-green color blindness
+- ``figures.dimensions`` — Figure print size
+- ``figures.dpi`` — Figure resolution (dpi)
+- ``figures.font`` — Figure lettering typeface
+- ``figures.legends`` — Figure legends (length and location)
+- ``figures.lettering`` — Figure panel labels
+- ``figures.placement`` — Figures placed where the guidelines ask
+- ``figures.text_size`` — Figure lettering size
+
+**Files**
+
+- ``files.manuscript_length`` — Manuscript within the portal's word/page limits
+- ``files.total_size`` — Combined upload size
+- ``files.uploads`` — Upload files exist and have accepted types and sizes
+
+**Submission form**
+
+- ``form`` — Submission form fields
+- ``form.authors`` — Author list is complete (names, corresponding author, emails)
+- ``form.counts`` — Item counts within the form's limits
+- ``form.lengths`` — Text within the form's word/character limits
+- ``form.options`` — Choices are valid options
+- ``form.required`` — Required fields are filled and confirmations given
+- ``form.schema`` — Field values have the right type and known field ids
+- ``form.subfields`` — Structured entries (funding, reviewers, ...) are complete
+- ``form.urls`` — Link fields hold http(s) URLs
+
+**Abstract and front matter**
+
+- ``front_matter.abstract_citations`` — Abstract cites no references
+- ``front_matter.contact_email`` — Manuscript gives a contact e-mail address
+- ``front_matter.structured_abstract`` — Abstract structured with the required headings
+
+**Venue guidelines**
+
+- ``guidelines`` — Manuscript checked against the author guidelines
+- ``guidelines.abstract_abbreviations`` — Abstract defines its abbreviations
+- ``guidelines.counts`` — Number of figures, tables, and supplementary files
+- ``guidelines.cover_letter`` — Cover letter provided and within length
+- ``guidelines.formats`` — Files are in formats the guidelines accept
+- ``guidelines.length`` — Manuscript within the guidelines' word/page limits
+- ``guidelines.reference_count`` — Reference count within the limit
+- ``guidelines.reference_list`` — Reference entries (DOIs, preprints, unpublished work)
+- ``guidelines.reference_style`` — Citation style (numbered or author-year, in order)
+- ``guidelines.section_order`` — Sections in the guidelines' order
+- ``guidelines.sections`` — Required section headings present
+- ``guidelines.sizes`` — Files within the guidelines' size limits
+- ``guidelines.statements`` — Required statements and declarations present
+- ``guidelines.supplementary`` — Supplementary material bundled as the guidelines ask
+- ``guidelines.template`` — Layout matches the venue's compiled template
+- ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
+- ``guidelines.title_page`` — Title page carries the required items
+- ``guidelines.title_page_file`` — Title page uploaded as a separate file
+
+**Integrity and external sources**
+
+- ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
+- ``integrity.dois`` — Reference DOIs match the works they cite
+- ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
+- ``integrity.links`` — Links cited in the files are reachable
+- ``integrity.openreview`` — Authors' OpenReview profiles
+- ``integrity.pdf_reader`` — PDF glyph reader (pdfminer.six) available
+- ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
+- ``integrity.retractions`` — No cited work has been retracted
+- ``integrity.sensitive`` — No secrets or private information in the files
+- ``integrity.unmatched_references`` — References without a DOI match a registered work
+
+**Page layout**
+
+- ``layout.font`` — Body font
+- ``layout.font_size`` — Body text size
+- ``layout.language`` — English spelling variant
+- ``layout.line_numbers`` — Continuous line numbers
+- ``layout.line_spacing`` — Double line spacing
+- ``layout.margins`` — Page margins
+- ``layout.page_numbers`` — Page numbers
+- ``layout.page_size`` — Page size
+- ``layout.template`` — Prepared with the venue's template or LaTeX class
+
+**Prose**
+
+- ``prose.acronyms`` — Acronyms spelled out at first use
+- ``prose.brackets`` — Brackets and quotes pair up
+- ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
+- ``prose.double_spaces`` — Double spaces between words
+- ``prose.numbers`` — Numbers of 10 or more in digits
+- ``prose.punctuation_spacing`` — Spacing around punctuation
+- ``prose.repeated_words`` — Repeated words
+- ``prose.repetition`` — Varied word choice (no heavily repeated words)
+- ``prose.spelling`` — Common misspellings (codespell)
+
+.. END VALIDATION CHECK LIST
 
 .. code-block:: bash
 
@@ -43,14 +220,14 @@ to it:
 - **Not applicable** -- the venue sets no such rule, or the submission has
   nothing for the check to look at. Listed at the end, one check per line.
 
-In the terminal the sections are coloured: green for passed, red for failed,
-amber for warnings, purple for needs AI, and grey for checks that could not
-run (each says why) or are not implemented. The web app uses the same colours.
-``--colorblind`` switches to a colour-blind-friendly palette (blue,
-vermillion, dark yellow, reddish purple, grey) -- the same one as the web
+In the terminal the sections are colored: green for passed, red for failed,
+amber for warnings, purple for needs AI, and gray for checks that could not
+run (each says why) or are not implemented. The web app uses the same colors.
+``--colorblind`` switches to a color-blind-friendly palette (blue,
+vermillion, dark yellow, reddish purple, gray) -- the same one as the web
 app's *Colorblind-friendly colors* setting -- and every line also
 carries a marker (``✔``, ``✖``, ``▲``, ``?``, ``–``), so the status never
-depends on colour alone. ``-o`` saves the same report as a PDF (colours kept),
+depends on color alone. ``-o`` saves the same report as a PDF (colors kept),
 or as HTML, Markdown, or plain text when the path ends in ``.html``, ``.md``,
 or ``.txt``.
 
@@ -152,6 +329,14 @@ The passes at a glance
      - yes
      - ``--dont-check-manuscript``
      - no
+   * - Reference age and citation density
+     - yes
+     - ``--dont-check-manuscript``
+     - no
+   * - Source support and journal indexing
+     - no
+     - ``--reference-check-full`` queues agent tasks
+     - yes (agent searches source papers and indexes)
    * - :ref:`Prose <vc-prose>`
      - yes
      - ``--dont-check-manuscript``
@@ -384,7 +569,7 @@ rules for a venue.
   limits, and undefined abbreviations in the abstract when the guidelines ban
   them.
 - **Figures**: format, file size, and the number of figures; resolution,
-  lettering, panel labels, colour mode, print dimensions, and placement are
+  lettering, panel labels, color mode, print dimensions, and placement are
   covered under :ref:`vc-figures`.
 - **Tables and display items**: the number of tables, and the combined number
   of figures plus tables.
@@ -459,7 +644,7 @@ drawing whose lettering can be read), or pictures in a Word file.
 - **Resolution** (``min_dpi``, ``min_dpi_line_art``): a raster figure's pixels
   over its printed width. An attached file's width comes from its resolution
   metadata, else the venue's maximum print width; an embedded image's from its
-  size on the page. An image with only a few flat colours is line art and is
+  size on the page. An image with only a few flat colors is line art and is
   held to the line-art minimum.
 - **Lettering size** (``min_font_size_pt``, ``max_font_size_pt``) and
   **typeface** (``font``): measured from the glyphs of PDF and SVG figures,
@@ -470,7 +655,7 @@ drawing whose lettering can be read), or pictures in a Word file.
   as large as the lettering. Their case and weight are compared with the rule,
   the text's panel citations ("Fig. 2a-c") are compared with the case, and a
   panel the text cites but the figure does not label is reported.
-- **Colour mode and print size** of attached raster files, and **placement**
+- **Color mode and print size** of attached raster files, and **placement**
   (``placement``, ``manuscript.figures_placement``, ``single_file``): figures
   as separate files, in the manuscript, or after the references.
 
@@ -478,26 +663,26 @@ The lettering of a raster figure is pixels, so its size, typeface, and panel
 labels go to an AI check, with the minimum size given as a fraction of the
 image width so it can be judged at any zoom.
 
-**Colour blindness** (``figures.colorblind``, every venue, a warning): pairs of
-figure colours that look clearly different with normal vision but nearly the
-same with red-green colour blindness. No AI is involved. paperpush collects
-the colours each figure is drawn in, simulates how they look with protanopia
+**Color blindness** (``figures.colorblind``, every venue, a warning): pairs of
+figure colors that look clearly different with normal vision but nearly the
+same with red-green color blindness. No AI is involved. paperpush collects
+the colors each figure is drawn in, simulates how they look with protanopia
 and deuteranopia (the Machado, Oliveira and Fernandes 2009 model), and compares
-them with the CIEDE2000 colour difference. A pair is reported when it is at
+them with the CIEDE2000 color difference. A pair is reported when it is at
 least 20 apart for normal vision and less than 7 apart for either form of
-colour blindness. The Okabe-Ito palette and viridis pass, and the
+color blindness. The Okabe-Ito palette and viridis pass, and the
 orange/green and red/green pairs of matplotlib's default palette are reported.
 
-- A raster figure's colours are its main flat colours. Antialiasing blends
+- A raster figure's colors are its main flat colors. Antialiasing blends
   between them and the background are left out. A photograph or micrograph
-  (an image not made of a few flat colours) is not compared, because its
-  colours do not stand for categories.
-- A PDF or SVG figure's colours are the fill and stroke colours it sets.
+  (an image not made of a few flat colors) is not compared, because its
+  colors do not stand for categories.
+- A PDF or SVG figure's colors are the fill and stroke colors it sets.
 - In a manuscript PDF, only the drawings and images placed as figures are read.
-  Coloured links and citations in the text are not figure colours, and a TikZ
+  Colored links and citations in the text are not figure colors, and a TikZ
   drawing typeset inline with the text is not read either.
 
-Greys, near-black and near-white are never compared, since colour blindness
+Grays, near-black and near-white are never compared, since color blindness
 does not change how they differ.
 
 .. _vc-citations:
@@ -557,7 +742,7 @@ compared word for word, ignoring case, punctuation, and line breaks:
 - the **title** against the manuscript's first pages (and a running title
   against a "Running title:" line);
 - the **abstract** and free-text **statements** (data and code availability,
-  competing interests, author contributions, funding, acknowledgements) are
+  competing interests, author contributions, funding, acknowledgments) are
   located in the manuscript by their wording and aligned with it;
 - each **author**'s surname, with a first name or initial, must appear in the
   front matter in the ``.sub``'s order; e-mail addresses and ORCID iDs printed
@@ -575,7 +760,7 @@ is one, otherwise the manuscript's first pages) are checked as well:
   against the manuscript, counted from the Introduction (or the venue's
   ``manuscript.main_text_start_headings``, or else the end of the abstract) to
   each place a venue's count usually stops: the first back-matter heading
-  (acknowledgements, declarations, figure legends), a Methods section after
+  (acknowledgments, declarations, figure legends), a Methods section after
   the results, or the reference list (or the venue's
   ``main_text_end_headings``). Word processors and venues count differently,
   so the stated count passes when any of these, or the whole document, is
@@ -637,7 +822,7 @@ These run for every venue:
   count as a Results heading. Singular and plural forms are interchangeable
   ("Conclusion" for "Conclusions"), and "Intervention(s) or Exposure(s)" is
   satisfied by any of its forms. With no headings listed, the abstract needs
-  some labelled section.
+  some labeled section.
 - **Contact e-mail.** The manuscript gives at least one e-mail address, so a
   reader can reach the corresponding author. The title page (a separate
   title-page upload, or the manuscript's first pages) is read first, then the
@@ -652,6 +837,30 @@ Every finding is a warning.
 
 Reference list
 --------------
+
+- **Author-year list order** (``details.reference_order``). An author-year
+  reference list passes when it is alphabetical by first author's surname or
+  follows the order of first citation. If neither holds, validation warns by
+  default, unless the venue specifies another ordering. A venue that calls for
+  alphabetical or citation order is checked against that order. Use
+  ``--references-alphabetical`` or ``--references-citation-order`` to require
+  one of these orders when the venue leaves the choice open. If citations
+  cannot be located reliably, the check says so instead of claiming that the
+  list follows citation order.
+  Numbered lists are checked against first-citation order; an explicit
+  alphabetical preference also checks their first-author surnames.
+- **Word file cleanliness** (``details.word_cleanliness``). Word ``.docx``
+  manuscript and title-page files are inspected for tracked changes and live
+  EndNote citation fields. Findings are warnings, since a revised manuscript
+  may be asked to show changes and some venues accept live citation fields.
+- **Reader checks** (``ai.details.*``). Ethics approval, named review board,
+  informed consent, declarations, title-page author details and institutional
+  email domains, PRISMA/CONSORT abstract reporting, supplementary-material
+  mentions, and registered trademarks are queued as AI tasks. Without ``--ai``
+  or ``--ai-results``, the report marks them **needs AI** rather than claiming
+  they passed. A reader judges applicability and compares section titles and
+  positions with venue rules; a heading by itself never proves that a required
+  statement is complete.
 
 - **Every reference cited, and every citation listed.** How a citation is
   matched to its entry depends on the manuscript:
@@ -681,6 +890,11 @@ Reference list
   citation key (BibTeX keeps the first and drops the other; biber stops with
   an error), an entry with no key or no closing brace, a journal or conference
   entry with no title or author, and one arXiv preprint under two keys.
+- **Reference age** (``bibliography.age``). Counts dated references over 10
+  and 15 years old and names examples. A warning invites the author to check
+  for newer work; age alone does not make a reference unsuitable.
+- **Citation density** (``bibliography.density``). Reports citation occurrences
+  per 1,000 body words, with no universal pass/fail threshold.
 
 Every finding is a warning: references are read from extracted text.
 
@@ -731,7 +945,7 @@ What is checked depends on the file. Word, Markdown, and plain-text files are
 read as written, so every check runs. LaTeX source is read with its math,
 commands, citations, and URLs masked; double spaces are not checked there,
 because LaTeX does not print them. Text extracted from a PDF has spacing
-artefacts of its own (justified lines, rejoined line breaks), so a PDF gets
+artifacts of its own (justified lines, rejoined line breaks), so a PDF gets
 only the repeated-word, spelling, and repetitive-word-choice checks. The
 reference list is skipped.
 Every finding is a warning, quoting the first five examples in context with
@@ -788,8 +1002,7 @@ in the prose (``ai.prose``), whether every ``.sub``
 field agrees with the manuscript in meaning, and whether the references the
 registries could not confirm are real (``ai.unverified_references``; an agent
 that can search the web looks each one up, a model that cannot answers
-"unclear"). These are listed as **needs AI**
-unless one of these runs them:
+"unclear"). These are listed as **needs AI** unless one of these runs them:
 
 - ``--ai``: one request to an LLM provider, whichever of
   ``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``, or ``GEMINI_API_KEY`` is set
@@ -802,11 +1015,19 @@ unless one of these runs them:
   skill does exactly this, and the MCP server offers ``validation_ai_tasks`` and
   ``validate_subfile(ai_results=...)``.
 
+``--reference-check-full`` additionally queues two tasks for each cited
+reference: whether its abstract or paper supports the claims citing it, and
+whether a journal article's journal is indexed. An agent must consult the
+source and an authoritative journal index; an inaccessible source is
+``unclear``. This can require reading every cited paper. Use
+``--reference-check-full --ai-tasks tasks.json`` to export the tasks, then
+repeat ``--reference-check-full`` when applying ``--ai-results``.
+
 Add ``--ai-only`` (MCP: ``validate_subfile(ai_only=True)``) to report just the
 AI checks and skip the deterministic ones.
 
 An AI verdict is marked "(AI)" in the report. A failed AI check is a warning:
-it is a judgement, not a measurement, so it never blocks submission.
+it is a judgment, not a measurement, so it never blocks submission.
 
 .. _vc-links:
 
@@ -1014,7 +1235,7 @@ example a hidden note left in a template. This pass runs for every venue.
 - **PDF**: paperpush reads how each character is painted. Text counts as hidden
   when it is:
 
-  - white or near-white and not drawn on a coloured shape or image, so a white
+  - white or near-white and not drawn on a colored shape or image, so a white
     label on a dark figure panel is fine;
   - in an invisible text render mode (3 or 7);
   - set smaller than 2pt;
@@ -1024,7 +1245,7 @@ example a hidden note left in a template. This pass runs for every venue.
   under 2pt, ``\pdfrender`` or ``3 Tr`` invisible text, ``\phantom``, and
   ``\transparent{0}``. Commented-out lines are ignored, and white text right
   after ``\colorbox``, ``\cellcolor``, or a TikZ ``fill=`` counts as visible.
-- **Word**: runs marked hidden (``w:vanish``), coloured white, or set under 2pt.
+- **Word**: runs marked hidden (``w:vanish``), colored white, or set under 2pt.
 
 The PDF part needs the optional ``pdf`` extra (``pip install
 "paperpush[validate]"``, see :doc:`installation`). Without it, PDFs are skipped and
@@ -1064,7 +1285,7 @@ check. The LaTeX source checks below run without it.
 
 Only body text counts: glyphs at the body font size outside figures. Running
 heads, footers, page numbers, and the line-number ruler are left out. Running
-heads and footers are recognised because they repeat at the same height on
+heads and footers are recognized because they repeat at the same height on
 every page, even when their text extracts garbled.
 
 LaTeX source attached anywhere in the submission is also read for the edits

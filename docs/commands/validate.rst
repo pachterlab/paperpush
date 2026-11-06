@@ -39,10 +39,10 @@ Synopsis
    paperpush validate --manuscript main.tex --figures fig1.png fig2.png   # no .sub, no venue
    paperpush validate --venue nature --manuscript main.pdf --cover-letter cover.docx
 
-``validate`` prints a report of every check, grouped and coloured by what
+``validate`` prints a report of every check, grouped and colored by what
 happened to it: **failed** (red), **warnings** (amber), **needs AI**
 (purple), **not checked** -- because it could not run here, with the reason
-on the line below, or because paperpush has no check for the rule yet (grey)
+on the line below, or because paperpush has no check for the rule yet (gray)
 -- and **passed** (green). Errors must be fixed before the file can be submitted
 (for example, a required field left blank, a referenced file that does not
 exist, or a choice value that isn't one of the venue's allowed options);
@@ -166,7 +166,7 @@ embedded in the manuscript when none are attached)
 - Resolution (dpi, line-art threshold)
 - Lettering size and typeface in vector figures
 - Panel labels (case, bold, cited panels present)
-- Colour mode
+- Color mode
 - Print size
 - Placement
 - Legend length and location
@@ -322,7 +322,7 @@ Arguments
    old (default 7) or lies in the future. See :ref:`vc-cover-letter`.
 
 ``-o [OUT]``, ``--output [OUT]``
-   Also save the report. PDF by default, which keeps the colours; a path ending
+   Also save the report. PDF by default, which keeps the colors; a path ending
    in ``.html``, ``.md``, or ``.txt`` saves that format instead. With no OUT,
    writes ``<subfile>_validation.pdf`` next to the ``.sub``. Refuses to replace
    an existing file (checked before any checks run) unless ``--overwrite`` is
@@ -350,15 +350,15 @@ Arguments
    out, and the exit status is the same.
 
 ``--colorblind``
-   Use colour-blind-friendly colours (blue for passed, vermillion for failed,
-   dark yellow for warnings, reddish purple for needs AI, grey for could not
+   Use color-blind-friendly colors (blue for passed, vermillion for failed,
+   dark yellow for warnings, reddish purple for needs AI, gray for could not
    run / not implemented) in the terminal and the saved report. The web app's
    *Colorblind-friendly colors* setting uses the same palette, and with
    ``--web`` the page opens with that setting on. ``--alt-color`` is an older
    name for this flag.
 
 ``--ai``
-   Also run the checks that need a reader's judgement through an LLM API, with
+   Also run the checks that need a reader's judgment through an LLM API, with
    the manuscript, figures, and other files attached. Uses whichever of
    ``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``, or ``GEMINI_API_KEY`` is set and
    the provider's SDK (``pip install "paperpush[ai]"``). If the request
@@ -417,7 +417,7 @@ List only what must be fixed:
 
    paperpush validate biorxiv.sub.txt --show-errors-only
 
-Save a colour-blind-friendly HTML report:
+Save a color-blind-friendly HTML report:
 
 .. code-block:: bash
 

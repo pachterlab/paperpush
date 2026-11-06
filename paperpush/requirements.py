@@ -185,7 +185,7 @@ class AbstractRules:
     max_words: Annotated[Optional[int], PField(description="Maximum abstract length in words.")] = None
     min_words: Annotated[Optional[int], PField(description="Minimum abstract length in words.")] = None
     max_characters: Annotated[Optional[int], PField(description="Maximum abstract length in characters.")] = None
-    structured: Annotated[Optional[bool], PField(description="Abstract must be structured into labelled subsections.")] = None
+    structured: Annotated[Optional[bool], PField(description="Abstract must be structured into labeled subsections.")] = None
     structured_headings: Annotated[Optional[list[str]], PField(description="The subsection labels a structured abstract must carry.")] = None
     no_references: Annotated[Optional[bool], PField(description="Abstract must not cite references.")] = None
     no_abbreviations: Annotated[Optional[bool], PField(description="Undefined abbreviations are banned in the abstract.")] = None
@@ -236,14 +236,14 @@ class FigureRules:
     double_column_width_mm: Annotated[Optional[float], PField(description="Double-column figure width in mm.")] = None
     max_width_mm: Annotated[Optional[float], PField(description="Maximum figure width in mm.")] = None
     max_height_mm: Annotated[Optional[float], PField(description="Maximum figure height in mm.")] = None
-    color_mode: Annotated[Optional[list[str]], PField(description="Accepted colour spaces (RGB, CMYK, grayscale).")] = None
+    color_mode: Annotated[Optional[list[str]], PField(description="Accepted color spaces (RGB, CMYK, grayscale).")] = None
     min_font_size_pt: Annotated[Optional[float], PField(description="Minimum font size for figure lettering, in points.")] = None
     max_font_size_pt: Annotated[Optional[float], PField(description="Maximum font size for figure lettering, in points.")] = None
     font: Annotated[Optional[str], PField(description="Mandated or recommended figure font.")] = None
     legend_max_words: Annotated[Optional[int], PField(description="Maximum words per figure legend.")] = None
     legends_location: Annotated[Optional[LegendsLocation], PField(description="Where figure legends go.")] = None
     multipanel_labels: Annotated[Optional[str], PField(description="Required style of panel labels.")] = None
-    color_charge: Annotated[Optional[bool], PField(description="Colour figures carry a charge.")] = None
+    color_charge: Annotated[Optional[bool], PField(description="Color figures carry a charge.")] = None
     placement: Annotated[Optional[Placement], PField(description="Where figures go for the initial submission.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()
 

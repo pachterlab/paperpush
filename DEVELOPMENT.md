@@ -85,7 +85,7 @@ For iterating on the script, the VS Code debugger is recommended:
 
 `paperpush/venues/recovery.py` lets a run continue after one browser action
 fails, instead of the whole run failing. A runner opts in by wrapping its page
-once sign-in is done, then labelling each part of the wizard as it goes (see
+once sign-in is done, then labeling each part of the wizard as it goes (see
 `paperpush/venues/openrxiv/main.py`):
 
 ```python
@@ -142,7 +142,7 @@ repeated widget would get the previous entry's data.
 Each recovery is a bug report waiting to happen: the portal changed, and every
 other install will hit the same step. `paperpush recovery-report [DIR]` (MCP:
 `recovery_report`) drafts a GitHub issue from a run's `recoveries.jsonl`,
-labelled `venue-recovery`. It is redacted in `paperpush/venues/recovery_report.py`:
+labeled `venue-recovery`. It is redacted in `paperpush/venues/recovery_report.py`:
 typed values, `.sub` values, e-mails, paths, URL query strings. The author files it;
 nothing is sent automatically. Fixes from these reports ship in a release. Keep the
 selectors most likely to break (custom-field ids, button names, widget CSS) as named
@@ -263,7 +263,7 @@ every venue (no `-s`, so each runner's `hold_open` returns at the final page and
 the venues run back to back), and sorts each venue into failed (all three
 attempts), skipped, or walked to the final page. The report goes to
 `.submit_walkthrough/report.md` and `report.json` (gitignored). When a venue
-failed, it opens a GitHub issue labelled `submit-walkthrough`, or adds the report
+failed, it opens a GitHub issue labeled `submit-walkthrough`, or adds the report
 as a comment if one is already open. It never closes the issue: close it once
 the runner fix is merged. A run that takes longer than four hours
 (`--timeout-hours`) is interrupted, and the venues it finished are still reported.

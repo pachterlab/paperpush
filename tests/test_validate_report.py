@@ -339,7 +339,7 @@ def test_cli_display_flags_filter_the_terminal_and_saved_report(_use, tmp_path, 
     assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "--show-errors-only", "-o", str(out_md)]) == 0
     out = capsys.readouterr().out
     assert "PASSED (" not in out and "Not shown:" in out
-    assert "## ✔ Passed" not in out_md.read_text() and "Not shown: Passed" in out_md.read_text()
+    assert "## ✔ Passed" not in out_md.read_text() and "Passed (" in out_md.read_text()
     assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "--hide-warnings", "--hide-unchecked"]) == 0
     assert "PASSED (" in capsys.readouterr().out
 

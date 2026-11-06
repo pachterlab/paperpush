@@ -72,7 +72,7 @@ time, and resume it rather than restarting from the beginning.
    leaves the page as the failed step should have left it. Target controls by
    role and name where you can (`{"role": "button", "name": "Next"}`).
 4. `submit_resume(pid, "resolved" | "retry", note)`. In `note`, give the old
-   selector or behaviour, the new one, and what you did. The note goes into
+   selector or behavior, the new one, and what you did. The note goes into
    `recoveries.jsonl` and is how the fix gets into the runner.
 
 Repeat for each pause until the run reaches the review page. For a

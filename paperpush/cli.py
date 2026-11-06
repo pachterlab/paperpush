@@ -1354,10 +1354,15 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     # or else the first file named.
     label = args.subfile or next(p for p in (subfile.values.get(f.id, "").split("\n")[0] for f in venue_def.fields if f.type in ("file", "filelist")) if p)
     rerun = f"paperpush validate {args.subfile}" if args.subfile else file_inputs.validate_command(requested_venue, files)
+    if getattr(args, "reference_check_full", False):
+        rerun += " --reference-check-full"
 
     ai_only = getattr(args, "ai_only", False)
     if ai_only and not getattr(args, "check_manuscript", True):
         print("error: --ai-only cannot be combined with --dont-check-manuscript: the manuscript checks decide which AI checks apply", file=sys.stderr)
+        return 1
+    if getattr(args, "reference_check_full", False) and not getattr(args, "check_manuscript", True):
+        print("error: --reference-check-full needs manuscript checks; remove --dont-check-manuscript", file=sys.stderr)
         return 1
     if ai_only and getattr(args, "web", False):
         print("error: --ai-only is not supported with --web", file=sys.stderr)
@@ -1411,6 +1416,9 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             check_sensitive=getattr(args, "check_sensitive", True),
             check_links=getattr(args, "check_links", True),
             check_references=getattr(args, "check_references", True),
+            reference_check_full=getattr(args, "reference_check_full", False),
+            references_alphabetical=getattr(args, "references_alphabetical", False),
+            references_citation_order=getattr(args, "references_citation_order", False),
             check_manuscript=getattr(args, "check_manuscript", True),
             check_anonymous=getattr(args, "check_anonymous", None),
             check_hidden_text=getattr(args, "check_hidden_text", True),
@@ -2416,7 +2424,7 @@ def build_parser() -> argparse.ArgumentParser:
         "validate",
         parents=[verbosity],
         help="run the pre-submission checks on a .sub file",
-        description="Run the pre-submission checks on a .sub file and print a report of every check:\npassed (green), failed (red), warnings (amber), needs AI (purple), and could not run\nor not implemented (grey; a check that could not run says why). --colorblind\nswitches to a colour-blind-friendly palette.",
+        description="Run the pre-submission checks on a .sub file and print a report of every check:\npassed (green), failed (red), warnings (amber), needs AI (purple), and could not run\nor not implemented (grey; a check that could not run says why). See the full list of checks at https://paperpush.readthedocs.io/en/latest/validation-checks.html",
         epilog=_VALIDATE_CHECKS,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -2448,6 +2456,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_false",
         help="skip checking the references against the DOI registry. By " "default validate reads the submission's bibliography -- its .bib " "files, and the reference list in the manuscript itself -- resolves " "each DOI through doi.org, and warns when one is " "malformed, duplicated, unregistered, or registered to a different " "title, author, or year than the reference claims -- the usual sign of " "a DOI copied from the wrong reference. It also searches Crossref, " "OpenAlex, and arXiv for the references that have no DOI (a reference " "no registry knows may be fabricated) and checks that preprints are " "cited in their published or latest version. Requires network access.",
     )
+    p_validate.add_argument(
+        "--reference-check-full",
+        action="store_true",
+        help="queue agent reviews of journal indexing and whether each cited source supports the nearby claims; use --ai-tasks to hand these reviews to an agent (can require reading every cited paper)",
+    )
+    p_validate.add_argument("--references-alphabetical", action="store_true", help="require references to be alphabetized by first-author surname when the venue leaves ordering open")
+    p_validate.add_argument("--references-citation-order", action="store_true", help="require references to follow first-citation order when the venue leaves ordering open")
     p_validate.add_argument(
         "--dont-check-manuscript",
         dest="check_manuscript",

@@ -2,16 +2,16 @@
 =================
 
 Open the paperpush web page on this computer. With a ``.sub`` file, the page
-opens with that file filled in: every field as a card, coloured by status, with
+opens with that file filled in: every field as a card, colored by status, with
 the side menu, totals, and checks. Each edit you make there is saved back to
 the file.
 
-The checks use the same colours as ``paperpush validate``: green for passed,
-red for failed, amber for warnings, purple for needs AI, and grey for checks
+The checks use the same colors as ``paperpush validate``: green for passed,
+red for failed, amber for warnings, purple for needs AI, and gray for checks
 that could not run (with the reason) or that paperpush has not implemented.
 *Colorblind-friendly colors* in the settings menu switches to the palette of
 ``paperpush validate --colorblind`` (blue, vermillion, dark yellow, reddish
-purple, grey).
+purple, gray).
 
 The page runs locally from the installed package, not from the hosted
 website. It opens at once (the hosted site can take a while to wake), your

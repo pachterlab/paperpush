@@ -307,14 +307,14 @@ so this is a check of the files, not a verdict on the submission. With a
 `validate` reports every check as passed, failed, warning, could not run, needs
 AI, not implemented, or not applicable (MCP: `checks` in the `validate_subfile`
 result). `-o` saves the report (PDF by default; `.html`/`.md`/`.txt` by
-extension); `--colorblind` is the colour-blind-friendly palette.
+extension); `--colorblind` is the color-blind-friendly palette.
 When the venue lets the initial submission be in any format
 (`manuscript.initial_submission_any_format`), the report opens with that rule
 (MCP: `initial_submission_rule`); `--initial-submission` (MCP:
 `initial_submission=true`) reports every error as a warning for a first
 submission. Use it only when the author says this is an initial submission.
 
-Checks that need a reader's judgement -- lettering in raster figures, a postal
+Checks that need a reader's judgment -- lettering in raster figures, a postal
 address on the title page, tables pasted as images, the venue's free-text
 guideline rules, whether each `.sub` field means what the manuscript says --
 come back as **needs AI**. Do them yourself rather than asking the user for an

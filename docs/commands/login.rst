@@ -123,7 +123,7 @@ Manage stored credentials
 ``--logout``
    Remove the stored credentials for the venue.
 
-Verification behaviour
+Verification behavior
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``--no-verify``

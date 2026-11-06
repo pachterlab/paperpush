@@ -38,7 +38,7 @@ Some features need extra dependencies, declared as optional extras:
 ``validate``
    Optional extras for ``validate``:
 
-   - ``pdfminer.six``, which reads PDFs glyph by glyph (colour, render mode,
+   - ``pdfminer.six``, which reads PDFs glyph by glyph (color, render mode,
      position) for two checks: hidden text / prompt injection and the
      modified-template check. Without it those checks skip PDFs and
      ``validate`` prints a warning saying so. Recommended if you submit to

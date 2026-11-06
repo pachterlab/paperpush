@@ -1173,6 +1173,8 @@ _MANUSCRIPT_STAGES = (
     ("consistency", "Form against the manuscript"),
     ("front_matter_check", "Abstract and front matter"),
     ("bibliography_check", "Reference list"),
+    ("feature_check", "Additional manuscript checks"),
+    ("reference_review", "Reference age and density"),
     ("cover_letter_check", "Cover letter"),
     ("prose_check", "Spelling and prose"),
 )
@@ -1222,12 +1224,15 @@ def validate(
     check_sensitive: bool = True,
     check_links: bool = True,
     check_references: bool = True,
+    reference_check_full: bool = False,
     check_manuscript: bool = True,
     check_anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
     check_openreview: bool = True,
     initial_submission: bool = False,
     cover_letter_max_age_days: int = 7,
+    references_alphabetical: bool = False,
+    references_citation_order: bool = False,
 ) -> list[Issue]:
     """Return all issues found in ``subfile`` against ``venue``.
 
@@ -1244,12 +1249,15 @@ def validate(
         check_sensitive=check_sensitive,
         check_links=check_links,
         check_references=check_references,
+        reference_check_full=reference_check_full,
         check_manuscript=check_manuscript,
         check_anonymous=check_anonymous,
         check_hidden_text=check_hidden_text,
         check_openreview=check_openreview,
         initial_submission=initial_submission,
         cover_letter_max_age_days=cover_letter_max_age_days,
+        references_alphabetical=references_alphabetical,
+        references_citation_order=references_citation_order,
     ).issues()
 
 
@@ -1260,12 +1268,15 @@ def validate_report(
     check_sensitive: bool = True,
     check_links: bool = True,
     check_references: bool = True,
+    reference_check_full: bool = False,
     check_manuscript: bool = True,
     check_anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
     check_openreview: bool = True,
     initial_submission: bool = False,
     cover_letter_max_age_days: int = 7,
+    references_alphabetical: bool = False,
+    references_citation_order: bool = False,
     ai=None,
     subfile_path: str = "",
     ai_only: bool = False,
@@ -1373,7 +1384,9 @@ def validate_report(
         check_openreview,
     )
     values = subfile.values
-    checks = Checks(options={"cover_letter_max_age_days": cover_letter_max_age_days})
+    if reference_check_full and not check_manuscript:
+        raise ValueError("reference_check_full needs check_manuscript to read citation contexts")
+    checks = Checks(options={"cover_letter_max_age_days": cover_letter_max_age_days, "reference_check_full": reference_check_full, "references_alphabetical": references_alphabetical, "references_citation_order": references_citation_order})
     if ai_only:
         if not check_manuscript:
             raise ValueError("ai_only needs check_manuscript: the manuscript checks decide which AI checks apply")

@@ -120,7 +120,7 @@ ScholarOne portal up to (but not including) the final submit click.
   with funding acquisition but no grant/source is stated). Add one if
   applicable.
   - ai_disclosure — declare any generative-AI use (cover letter +
-  Methods/Acknowledgements).
+  Methods/Acknowledgments).
   - software_tested / test_dataset_provided — reproducibility-checklist
   attestations only you can confirm.
   - Optional/N-A, safely left empty: figures, tables, supplementary_file (all

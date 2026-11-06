@@ -1,7 +1,7 @@
 Commands
 ========
 
-The ``paperpush`` CLI is organised into subcommands, each covering one step of
+The ``paperpush`` CLI is organized into subcommands, each covering one step of
 the submission workflow. This section documents every command in detail.
 
 .. code-block:: text

@@ -448,6 +448,9 @@ def validate_subfile(
     check_links: bool = True,
     check_sensitive: bool = True,
     check_references: bool = True,
+    reference_check_full: bool = False,
+    references_alphabetical: bool = False,
+    references_citation_order: bool = False,
     check_manuscript: bool = True,
     anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
@@ -490,6 +493,10 @@ def validate_subfile(
     many are self-citations, and the prose (double spaces, repeated words,
     punctuation spacing, unbalanced brackets and quotes, common misspellings,
     repetitive word choice).
+    `reference_check_full` (default false) adds one agent task per cited
+    source to verify claim support from its abstract or paper and one to
+    verify journal indexing. The regular manuscript pass measures reference
+    age and citation occurrences per 1,000 words without this flag.
     `anonymous` checks a double-blind submission for information identifying
     its authors -- their names, emails, IDs and affiliations from the author
     list, author metadata, home-directory paths, acknowledgments -- in the
@@ -547,7 +554,7 @@ def validate_subfile(
     files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
     path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
-    result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
+    result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_full=reference_check_full, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
     out: dict[str, Any] = {
         "path": str(path or ""),
         "venue": venue_def.slug,
@@ -581,6 +588,7 @@ def validation_ai_tasks(
     figures: Optional[list[str]] = None,
     tables: Optional[list[str]] = None,
     supplement: Optional[list[str]] = None,
+    reference_check_full: bool = False,
 ) -> dict[str, Any]:
     """The validation checks that need a reader's judgement, for you to do yourself.
 
@@ -592,6 +600,9 @@ def validation_ai_tasks(
     to `validate_subfile` as `ai_results` (`[{"id", "status": "pass"|"fail"|
     "unclear"|"not_applicable", "details", "evidence"}]`). No API key is
     needed: you are the reader.
+    Set `reference_check_full=true` to add per-source claim-support and
+    journal-indexing tasks; these may require reading external papers and
+    authoritative journal indexes.
 
     As with `validate_subfile`, files can be named instead of (or on top of) a
     `.sub`, with or without a `venue`.
@@ -600,7 +611,7 @@ def validation_ai_tasks(
 
     files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
     path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files)
-    result = _run_validate_report(sub, venue_def, check_links=False, check_references=False, check_openreview=False, subfile_path=str(path or ""), files_only=files_only, notes=notes)
+    result = _run_validate_report(sub, venue_def, check_links=False, check_references=False, reference_check_full=reference_check_full, check_openreview=False, subfile_path=str(path or ""), files_only=files_only, notes=notes)
     from .file_inputs import validate_command
 
     return tasks_payload(result.ai_tasks, venue_def, str(path or ""), command="" if path else validate_command(venue, files))
