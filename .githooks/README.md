@@ -17,6 +17,9 @@ git config core.hooksPath .githooks
 
 Runs two best-effort scanners on staged content. Each is skipped (with a
 notice) when its tool is not installed, so neither is a hard dependency.
+It also regenerates and stages the validation check count and list in
+`README.md` and `docs/validation-checks.rst` when validator code or venue data
+is staged. CI checks that these files are current.
 
 ### gitleaks — secret detection
 

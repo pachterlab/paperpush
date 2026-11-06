@@ -7,7 +7,7 @@ Prepare manuscripts for submission to preprint servers, journals, and conference
 PaperPush provides the following services:
 - A standardized system to share all data submitted to a journal/conference
 <!-- BEGIN VALIDATION CHECK COUNT -->
-- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — up to 122 distinct checks! See the full list at https://paperpush.readthedocs.io/en/latest/validation-checks.html
+- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 122 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
 <!-- END VALIDATION CHECK COUNT -->
 - A central database of journal/conference manuscript requirements
 - Automated and fast submission portal filling with deterministic scripts

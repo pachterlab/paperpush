@@ -125,6 +125,23 @@ if git diff --cached --name-only --diff-filter=ACM -z \
 fi
 
 # ---------------------------------------------------------------------------
+# Keep the documented validation check count and catalog in sync with the
+# validator. The generator reads top-level paperpush modules and venue data.
+# ---------------------------------------------------------------------------
+if git diff --cached --name-only --diff-filter=ACMDR -z \
+    | tr '\0' '\n' | grep -qE '^(paperpush/[^/]+\.py|paperpush/(venues|submission_forms|manuscript_requirements|common_fields)\.json|scripts/gen_validation_check_count\.py)$'; then
+    if python scripts/gen_validation_check_count.py; then
+        if ! git diff --quiet -- README.md docs/validation-checks.rst; then
+            git add README.md docs/validation-checks.rst
+            echo "pre-commit: regenerated validation check docs and re-staged them."
+        fi
+    else
+        echo "pre-commit: failed to regenerate validation check docs." >&2
+        status=1
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Warn about limits submission_forms.json and manuscript_requirements.json
 # record differently (e.g. the abstract word limit). Only runs when one of the
 # venue databases is part of this commit. Never blocks the commit: a venue's

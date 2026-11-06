@@ -49,5 +49,8 @@ jobs:
       - name: Check .sub templates are in sync with the venue databases
         run: python scripts/gen_subfile_templates.py --check
 
+      - name: Check documented validation checks are in sync with the validator
+        run: python scripts/gen_validation_check_count.py --check
+
       - name: Run tests (real-portal tests skipped by default)
         run: pytest -v
