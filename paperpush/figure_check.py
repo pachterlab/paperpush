@@ -424,6 +424,8 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     run("figures.lettering", "Figure panel labels", True, "", _lettering_check, checks, venue, values, inv, rules)
     run("figures.color_mode", "Figure colour mode", rules.color_mode and inv.attached, "the guidelines set no colour mode (or no figure files are attached)", _color_mode_check, inv, rules)
     run("figures.dimensions", "Figure print size", (rules.max_width_mm or rules.max_height_mm) and inv.attached, "the guidelines set no maximum figure size (or no figure files are attached)", _dimensions_check, inv, rules)
+    if inv.figures:
+        _content_task(checks, venue, values, inv)
     # Reads the colours itself (pypdf and Pillow), so it does not need the inventory's figures.
     checks.run("figures.colorblind", COLORBLIND_TITLE, FIGURES, _colorblind_check, venue, values, inv)
     placement = rules.placement or reqs.manuscript.figures_placement or ("inline" if reqs.manuscript.single_file else None)
@@ -511,6 +513,136 @@ def _raster_panels_task(checks: Checks, inv: _Inventory, cites: dict[int, set[st
             category=FIGURES,
             instructions="Read the panel labels (a, b, c... or A, B, C...) drawn in each figure below and compare them with the panels the text cites.\n" + "\n".join(lines) + "\nReport 'fail' naming each figure with a labelled panel the text never cites (e.g. 'Figure 2 has panel e, which the text never cites'), else 'pass'. A panel the text cites but the figure does not label is also a 'fail'.",
             files=list(dict.fromkeys(str(f.image_path or f.path) for f in rasters)),
+        )
+    )
+
+
+# A sentence ends at . ! or ? followed by a capital, except after "Fig.", "et al.", "e.g." and the like.
+_SENTENCE_END = re.compile(r"(?<!\bFig)(?<!\bFigs)(?<!\bal)(?<!e\.g)(?<!i\.e)(?<!\bvs)(?<!\bref)(?<!\brefs)(?<!\bSuppl)(?<!\bSupp)(?<!\bno)(?<!\bEq)[.!?](?=\s+[A-Z(\[])")
+_MAX_SENTENCE_CHARS = 400
+_MAX_SENTENCES_PER_FIGURE = 8
+_MAX_LEGEND_CHARS = 1500
+
+
+def _sentence_around(text: str, ends: list[int], start: int, end: int) -> tuple[int, int]:
+    """The span of the sentence holding ``text[start:end]``, capped at a few hundred characters."""
+    import bisect
+
+    i = bisect.bisect_left(ends, start)
+    left = ends[i - 1] + 1 if i else 0
+    right = next((e + 1 for e in ends[i:] if e >= end), len(text))
+    left = max(left, start - _MAX_SENTENCE_CHARS // 2)
+    right = min(right, end + _MAX_SENTENCE_CHARS // 2)
+    return left, right
+
+
+def figure_descriptions(text: str) -> tuple[dict[int, str], dict[int, list[tuple[str, set[str]]]]]:
+    """What ``text`` says about each main figure.
+
+    Returns the legends (figure number -> legend text) and, per figure, the
+    sentences that cite it with the panel letters each one cites:
+    ``{2: [("Survival fell (Fig. 2b).", {"b"}), ...]}``.
+    """
+    from .citation_check import legends, mentions, panel_mentions
+
+    found_legends = {number: legend for number, _, legend in legends(text)}
+    ends = [m.start() for m in _SENTENCE_END.finditer(text)]
+    panels = panel_mentions(text, "figure")
+    sentences: dict[int, list[tuple[str, set[str]]]] = {}
+    seen: set[tuple[int, int]] = set()
+    for m in mentions(text):
+        if m.series != "figure" or m.caption:
+            continue
+        span = _sentence_around(text, ends, m.pos, m.pos + len(m.text))
+        if (m.number, span[0]) in seen:
+            continue
+        seen.add((m.number, span[0]))
+        letters = {p.letter for p in panels if p.number == m.number and span[0] <= p.pos < span[1]}
+        sentence = " ".join(text[span[0] : span[1]].split())
+        sentences.setdefault(m.number, []).append((sentence, letters))
+    return found_legends, sentences
+
+
+def _content_task(checks: Checks, venue: Venue, values: dict[str, str], inv: _Inventory) -> None:
+    """Queue the AI check that each figure, and each of its panels, shows what its legend and the text say."""
+    from .ai_validate import AiTask
+    from .citation_check import tex_legends
+    from .requirements_check import manuscript_files
+
+    manuscripts = manuscript_files(venue, values)
+    found_legends: dict[int, str] = {}
+    sentences: dict[int, list[tuple[str, set[str]]]] = {}
+    for _, path in manuscripts:
+        doc = document.get(path)
+        text = doc.text
+        if text:
+            got_legends, got_sentences = figure_descriptions(text)
+            for number, legend in got_legends.items():
+                found_legends.setdefault(number, legend)
+            for number, items in got_sentences.items():
+                sentences.setdefault(number, []).extend(items)
+        if doc.is_tex and doc.pdf is None and doc.tex_source:
+            for number, _, legend in tex_legends(doc.tex_source):
+                found_legends.setdefault(number, legend)
+    numbers = sorted(set(found_legends) | set(sentences))
+    if not numbers:
+        return
+
+    def described(number: int) -> list[str]:
+        out = []
+        if number in found_legends:
+            legend = found_legends[number]
+            out.append(f"  Legend: {legend[:_MAX_LEGEND_CHARS]}{' [...]' if len(legend) > _MAX_LEGEND_CHARS else ''}")
+        cited = sentences.get(number, [])
+        for sentence, letters in cited[:_MAX_SENTENCES_PER_FIGURE]:
+            which = f"panel(s) {', '.join(sorted(letters, key=str.lower))}" if letters else "the whole figure"
+            out.append(f"  Text, on {which}: \"{sentence}\"")
+        if len(cited) > _MAX_SENTENCES_PER_FIGURE:
+            out.append(f"  ... and {len(cited) - _MAX_SENTENCES_PER_FIGURE} more citing sentence(s) in the manuscript")
+        panel_letters = sorted({c for _, letters in cited for c in letters}, key=str.lower)
+        if panel_letters:
+            out.append(f"  Panels the text cites: {', '.join(panel_letters)}")
+        return out or ["  (no legend or citing sentence found; judge it from the manuscript)"]
+
+    lines: list[str] = []
+    files: list[str] = []
+    numbered = {f.number: f for f in inv.figures if f.number is not None}
+    if inv.attached and numbered:
+        for number in sorted(set(numbers) | set(numbered)):
+            fig = numbered.get(number)
+            if fig is None:
+                lines.append(f"Figure {number}: no attached file has this number")
+            else:
+                lines.append(f"Figure {number}: {fig.name}")
+                files.append(str(fig.image_path or fig.path))
+            lines.extend(described(number))
+        where = "Each figure below is an attached file."
+    else:
+        for number in numbers:
+            lines.append(f"Figure {number}:")
+            lines.extend(described(number))
+        files.extend(str(p) for _, p in manuscripts)
+        files.extend(str(f.image_path) for f in inv.figures if f.image_path)
+        where = "The figures are embedded in the manuscript; find each one by its caption or position."
+    if not files:
+        return
+    checks.needs_ai(
+        AiTask(
+            id="ai.figures.content_matches_text",
+            title="Each figure and panel shows what its legend and the text say",
+            category=FIGURES,
+            instructions=(
+                f"{where} Look at each figure and compare what it shows with its legend and with the sentences that cite it.\n"
+                "- Whole figure: it is the figure the legend describes (the kind of plot or image, the variables and axes, the conditions or groups, the number of panels), "
+                "and not another figure's file; what the text says the figure shows (a trend, a difference between groups, a value, a structure) is visible in it.\n"
+                "- Each panel: every panel the legend or the text names by letter shows what they say it shows. A sentence citing 'Fig. 2b' for a survival curve fails "
+                "if panel b is a bar chart and the survival curve is panel c. A legend describing panels a-d fails if the figure has only three.\n"
+                + "\n".join(lines)
+                + "\nJudge only whether the content matches the description, not the figure's style, lettering, or statistics. Report 'fail' naming each figure and panel "
+                "that does not match and how (e.g. 'Figure 3b is a heatmap of expression, but the text cites it for the Kaplan-Meier curve, which is Figure 3c'; "
+                "'the file attached as Figure 2 shows what the legend of Figure 3 describes'), else 'pass'."
+            ),
+            files=list(dict.fromkeys(files)),
         )
     )
 

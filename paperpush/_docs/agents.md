@@ -18,7 +18,7 @@ open the `SKILL.md` and follow it as written.
 | --- | --- | --- |
 | `paperpush-prepare-submission` | The whole flow: checks the login, finds or creates the `.sub`, runs autofill, runs validate (stopping on errors or more than 5 warnings and offering `paperpush-fix`), then hands off to `paperpush-submit`. | asks to prepare, get ready, or submit a manuscript to a venue, and has not named a single step. **Start here when in doubt.** |
 | `paperpush-autofill` | Reads the manuscript directory, writes `values.json`, and applies it with `paperpush autofill --engine manual`. Leaves `never` fields for the author. | wants a `.sub` filled from their files, and nothing else yet. |
-| `paperpush-validate` | Runs `paperpush validate`, then does the checks that need a reader (lettering in raster figures, panel labels, free-text guideline rules, `.sub` vs manuscript) through `--ai-tasks` / `--ai-results`. Optionally saves the report. | asks whether a manuscript or `.sub` is ready, meets a venue's guidelines, or passes validation, or wants the AI checks or a saved report. |
+| `paperpush-validate` | Runs `paperpush validate`, then does the checks that need a reader (lettering in raster figures, panel labels, figure and panel content vs. legends and text, free-text guideline rules, `.sub` vs manuscript) through `--ai-tasks` / `--ai-results`. Optionally saves the report. | asks whether a manuscript or `.sub` is ready, meets a venue's guidelines, or passes validation, or wants the AI checks or a saved report. |
 | `paperpush-fix` | Backs up the files, runs `paperpush validate --json`, finds the editable source behind each file (the `.tex`/`.docx` behind a PDF), fixes the mechanical issues and trims text over a limit by at most 100 words and 50% of the limit, rebuilds the PDF, and validates again, for up to three rounds. Reports what it fixed, what needs the author's decision, and what it can't fix. Never ticks a confirmation or invents content. | asks to fix what validate found, to make a `.sub` pass validation, or to clean up the errors and warnings. |
 | `paperpush-submit` | Takes a filled `.sub` to the portal: re-checks the login (`paperpush login <venue> --check`), confirms with the user, runs `submit` (or `submit(skip_validate=true)` when asked to skip validation), and follows the run, handing a failed step to `paperpush-portal-debug`. Stops before the final submit. | has a `.sub` ready and wants the portal filled in, e.g. "fill out the submission portal to nature", optionally "skip validation". |
 | `paperpush-portal-debug` | Gets a stalled `paperpush submit` run past the failing step on the live page (`submit_page` / `submit_act` / `submit_resume`), logs every runner change it needs, and puts those changes into the runner with a test when working in a source checkout. Never sends the submission. | reports that `submit` is stuck, failed at a step, or hit a portal that changed. Also use it yourself whenever `submit_status` shows `recovery.paused`. |
@@ -319,7 +319,8 @@ When the venue lets the initial submission be in any format
 `initial_submission=true`) reports every error as a warning for a first
 submission. Use it only when the author says this is an initial submission.
 
-Checks that need a reader's judgment -- lettering in raster figures, a postal
+Checks that need a reader's judgment -- lettering in raster figures, whether
+each figure and panel shows what its legend and the text say, a postal
 address on the title page, tables pasted as images, the venue's free-text
 guideline rules, whether each `.sub` field means what the manuscript says --
 come back as **needs AI**. Do them yourself rather than asking the user for an

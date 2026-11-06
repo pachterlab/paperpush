@@ -7,6 +7,10 @@
 # To fill this in through a form instead, open it in the paperpush web page:
 #   - run:  paperpush web cell_reports_methods.sub.txt   (use this file's path)
 #   - or visit https://paperpush.onrender.com and drag this file onto the page
+#
+# To fill this out with AI from your manuscript files:
+#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill cell_reports_methods.sub.txt
+#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR cell_reports_methods.sub.txt
 
 @venue: cell_reports_methods
 # submission guide: https://www.cell.com/cell-reports-methods/information-for-authors

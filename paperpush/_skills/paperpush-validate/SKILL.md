@@ -3,7 +3,8 @@ name: paperpush-validate
 description: >-
   Run paperpush's full pre-submission validation on a .sub file, including the
   checks that need a reader's judgment (lettering in raster figures, panel
-  labels, the venue's free-text guideline rules, whether every .sub field says
+  labels, whether each figure and panel shows what its legend and the text
+  say, the venue's free-text guideline rules, whether every .sub field says
   what the manuscript says), which you do yourself instead of through an API
   key. Produces the color-coded report of what passed, failed, and was not
   checked, optionally saved as PDF/HTML/Markdown/text. Triggers: "validate my
@@ -84,6 +85,15 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
      describes a different work, with the correct details where you found
      them; a book or web page the registries miss is not fabricated. If you
      cannot search, answer `unclear`.
+   - `ai.figures.content_matches_text` lists each figure's legend and the
+     sentences that cite it, tagged with the panels they cite. Look at every
+     figure and every named panel and check that it shows what is said about
+     it: the right kind of plot or image, variables, groups, and panel count,
+     and the claimed trend or difference actually visible. `fail` names the
+     figure and panel and the mismatch (e.g. the text cites Fig. 2b for the
+     survival curve, which is panel c; the file attached as Figure 2 is the
+     one Figure 3's legend describes). Do not fail it for style or lettering;
+     other checks cover those.
    - `ai.prose` is a proofread of the whole manuscript: read all of it, not a
      sample. List real errors (typos, grammar, tense that breaks the paper's
      own convention) with a quote and the correction; style preferences and

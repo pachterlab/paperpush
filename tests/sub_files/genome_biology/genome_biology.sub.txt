@@ -7,6 +7,10 @@
 # To fill this in through a form instead, open it in the paperpush web page:
 #   - run:  paperpush web genome_biology.sub.txt   (use this file's path)
 #   - or visit https://paperpush.onrender.com and drag this file onto the page
+#
+# To fill this out with AI from your manuscript files:
+#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill genome_biology.sub.txt
+#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR genome_biology.sub.txt
 
 @venue: genome_biology
 # submission guide: https://genomebiology.biomedcentral.com/submission-guidelines

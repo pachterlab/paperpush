@@ -7,6 +7,10 @@
 # To fill this in through a form instead, open it in the paperpush web page:
 #   - run:  paperpush web nature_computational_science.sub.txt   (use this file's path)
 #   - or visit https://paperpush.onrender.com and drag this file onto the page
+#
+# To fill this out with AI from your manuscript files:
+#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill nature_computational_science.sub.txt
+#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR nature_computational_science.sub.txt
 
 @venue: nature_computational_science
 # submission guide: https://www.nature.com/natcomputsci/submission-guidelines

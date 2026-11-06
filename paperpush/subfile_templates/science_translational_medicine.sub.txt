@@ -7,6 +7,10 @@
 # To fill this in through a form instead, open it in the paperpush web page:
 #   - run:  paperpush web science_translational_medicine.sub.txt   (use this file's path)
 #   - or visit https://paperpush.onrender.com and drag this file onto the page
+#
+# To fill this out with AI from your manuscript files:
+#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill science_translational_medicine.sub.txt
+#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR science_translational_medicine.sub.txt
 
 @venue: science_translational_medicine
 # submission guide: https://www.science.org/content/page/science-information-authors

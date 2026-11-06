@@ -98,7 +98,8 @@ fly. See step 1.
    paperpush validate <resolved-sub-path>
    ```
 
-   The report lists checks that **need AI** (lettering in raster figures, the
+   The report lists checks that **need AI** (lettering in raster figures,
+   whether each figure and panel shows what its legend and the text say, the
    guidelines' free-text rules, whether each field matches the manuscript).
    Run them by invoking the `paperpush-validate` skill (via the Skill tool) on
    the same `.sub`; it does them itself, with no API key, and merges the

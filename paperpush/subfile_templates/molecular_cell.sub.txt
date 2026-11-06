@@ -7,6 +7,10 @@
 # To fill this in through a form instead, open it in the paperpush web page:
 #   - run:  paperpush web molecular_cell.sub.txt   (use this file's path)
 #   - or visit https://paperpush.onrender.com and drag this file onto the page
+#
+# To fill this out with AI from your manuscript files:
+#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill molecular_cell.sub.txt
+#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR molecular_cell.sub.txt
 
 @venue: molecular_cell
 # submission guide: https://www.cell.com/molecular-cell/information-for-authors

@@ -775,6 +775,40 @@ def test_raster_panels_cited_goes_to_an_ai_task(_use, tmp_path):
     assert "cites panel(s) a, b" in task.instructions and str(png) in task.files
 
 
+def test_figure_content_match_goes_to_an_ai_task(_use, tmp_path):
+    from PIL import Image
+
+    _use({"testj": {"figures": {"min_font_size_pt": 5}}})
+    pngs = []
+    for n in (1, 2):
+        png = tmp_path / f"fig{n}.png"
+        Image.new("RGB", (600, 400), "white").save(png, dpi=(300, 300))
+        pngs.append(png)
+    doc = tmp_path / "ms.docx"
+    _build_docx(doc, [
+        "Survival fell in treated mice (Fig. 1b). Expression rose over time (Fig. 1a).",
+        "The pathway is summarized in Figure 2.",
+        "Figure 1. Treatment response. a, Expression over time. b, Kaplan-Meier survival curve.",
+    ])
+    rep = _report(_venue(MANUSCRIPT, FIGURES), {"manuscript_file": str(doc), "figure_files": f"{pngs[0]} | Figure 1\n{pngs[1]} | Figure 2"})
+    task = next(t for t in rep.ai_tasks if t.id == "ai.figures.content_matches_text")
+    assert set(task.files) == {str(p) for p in pngs}
+    text = task.instructions
+    assert "Figure 1: fig1.png" in text and "Figure 2: fig2.png" in text
+    assert "Legend: Figure 1. Treatment response." in text
+    assert 'on panel(s) b: "Survival fell in treated mice (Fig. 1b)."' in text
+    assert 'on panel(s) a: "Expression rose over time (Fig. 1a)."' in text
+    assert 'on the whole figure: "The pathway is summarized in Figure 2."' in text
+
+
+def test_figure_descriptions_keep_sentences_whole_across_abbreviations():
+    from paperpush.figure_check import figure_descriptions
+
+    text = "As Smith et al. found, the effect held (Figs. 3a, c). Next we looked elsewhere."
+    _, sentences = figure_descriptions(text)
+    assert sentences[3] == [("As Smith et al. found, the effect held (Figs. 3a, c).", {"a", "c"})]
+
+
 def test_figures_are_found_in_the_manuscript_when_none_are_attached(_use, tmp_path):
     _pdfminer()
     _use({"testj": {"figures": {"min_font_size_pt": 5}}})

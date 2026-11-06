@@ -243,6 +243,10 @@ def render_template(
         "# To fill this in through a form instead, open it in the paperpush web page:",
         f"#   - run:  paperpush web {default_filename(venue)}   (use this file's path)",
         f"#   - or visit {WEB_URL} and drag this file onto the page",
+        "#",
+        "# To fill this out with AI from your manuscript files:",
+        f"#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill {default_filename(venue)}",
+        f"#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR {default_filename(venue)}",
         "",
         f"@venue: {venue.slug}",
     ]
