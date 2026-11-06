@@ -990,6 +990,29 @@ def test_authorlist_split_name_columns():
     assert any("missing a name" in i.message for i in _errors(_validate(j, {"authors": bad})))
 
 
+_OPENREVIEW_COLUMNS = ["open_review_id?", "name", "email_suffixes?", "reciprocal_reviewer?"]
+
+
+def test_authorlist_missing_open_review_id_is_warning():
+    # OpenReview venues (ICLR, AAAI): an author without an ID is added by a
+    # name search, so warn -- but not for the conflicts list, nor as an error.
+    j = _venue(
+        Field(id="authors", label="Authors", type="authorlist", fields=_OPENREVIEW_COLUMNS),
+        Field(id="conflicts", label="Conflicts", type="authorlist", fields=_OPENREVIEW_COLUMNS),
+    )
+    block = "~Ada_Lovelace1 | Ada Lovelace | | yes\n | Alan Turing | cam.ac.uk | no"
+    issues = _validate(j, {"authors": block, "conflicts": " | Grace Hopper | | "})
+    warned = [i for i in issues if i.level == WARNING and "no Open Review ID" in i.message]
+    assert [(i.field, "Alan Turing" in i.message) for i in warned] == [("authors", True)]
+    assert not any("Open Review ID" in i.message for i in _errors(issues))
+
+
+def test_authorlist_without_open_review_column_no_id_warning():
+    j = _venue(_AUTHOR_FIELD)
+    block = "Ada Lovelace | ada@x.org | U | | yes"
+    assert not any("Open Review ID" in i.message for i in _validate(j, {"authors": block}))
+
+
 # --- required / optional sub-fields ('?' marker) ---------------------------
 
 

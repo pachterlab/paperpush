@@ -382,7 +382,10 @@ since a leak can get a paper desk-rejected.
   current position, and reviewers without DBLP or expertise. Messages start
   with `openreview:`. Without a stored login the check is skipped with a note;
   that is another reason to have the user log in first. Profile fixes happen on
-  openreview.net and are the user's to make.
+  openreview.net and are the user's to make. Separately, and without network
+  access or a login, the author-list form check warns about every author line
+  with no Open Review ID (conflict lines excluded): the portal then adds that
+  author by a name search, which can match no profile or several.
 
 ## After it runs, tell the user what's left
 

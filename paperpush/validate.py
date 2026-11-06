@@ -1784,6 +1784,11 @@ def _check_authors(field: Field, raw: str) -> list[Issue]:
         if not name_present:
             issues.append(Issue(ERROR, field.id, "an author line is missing a name"))
         who = _author_name(a) or "an author"
+        # OpenReview venues (ICLR, AAAI): without an ID the portal finds the
+        # author by a name search, which can match no profile or several.
+        # Conflict lists are excluded -- a conflict with no profile is skipped.
+        if "open_review_id" in columns and "author" in field.id.lower() and name_present and not a.get("open_review_id", "").strip():
+            issues.append(Issue(WARNING, field.id, f"author '{who}' has no Open Review ID; every author needs an OpenReview profile, and without the ID the portal adds them by a name search that can match no profile or several (IDs look like ~Ada_Lovelace1)"))
         for col in required_cols:
             if not str(a.get(col, "")).strip():
                 issues.append(Issue(ERROR, field.id, f"author '{who}' is missing {col.replace('_', ' ')}"))
