@@ -180,7 +180,7 @@ cited reference when ``--reference-check-full`` is used. Venue rules marked
 115. ``prose.brackets`` — Brackets and quotes pair up
 116. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
 117. ``prose.double_spaces`` — Double spaces between words
-118. ``prose.numbers`` — Numbers of 10 or more in digits
+118. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
 119. ``prose.punctuation_spacing`` — Spacing around punctuation
 120. ``prose.repeated_words`` — Repeated words
 121. ``prose.repetition`` — Varied word choice (no heavily repeated words)
@@ -960,6 +960,17 @@ PDF's text included):
   rephrased. A number that opens a sentence is meant to be spelled out, so it
   is not reported; nor are ordinals ("twenty-first"), numbers below 10, or a
   lone "hundred" or "million" ("a million cells").
+  Thousands are checked for grouping too: a number of 10,000 or more with no
+  separator ("12000 cells"); four-digit numbers written both grouped and not
+  ("1,500" and "2000"); and commas in some numbers but spaces ("12 000") in
+  others. Venues differ on whether "1000" takes a comma, so four-digit numbers
+  are only checked for consistency, and the less-used form is quoted,
+  unless the venue's guidelines set ``manuscript.thousands_separator``
+  (``comma`` or ``space``) or ``manuscript.group_four_digit_numbers``; then
+  numbers that break those rules are reported instead. Years
+  (1900–2099), labels ("Fig. 1000", "accession 123456", "p. 1200"), IDs and
+  coordinates ("GSE12345", "chr1:123456"), and numbers with a leading zero
+  are not counted.
 - **Abbreviations written one way** (``prose.conventions``): malformed "i.e."
   and "e.g." ("ie", "i.e", "i. e.") and "et al." ("et. al", "et al" with no
   full stop); "i.e."/"e.g." used both with and without a following comma;

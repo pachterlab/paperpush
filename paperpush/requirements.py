@@ -56,6 +56,8 @@ Placement = Literal["separate_files", "end_of_manuscript", "inline", "end_or_inl
 # manuscript's point of view.
 ManuscriptPlacement = Literal["end", "inline", "separate", "end_or_inline"]
 LegendsLocation = Literal["end_of_manuscript", "with_figure", "after_references"]
+# How the thousands in a number are grouped (manuscript.thousands_separator).
+ThousandsSeparator = Literal["comma", "space"]
 
 # Canonical ids for the items a title page may have to carry.
 TitlePageItem = Literal[
@@ -162,6 +164,8 @@ class ManuscriptRules:
     latex_class: Annotated[Optional[str], PField(description="Required LaTeX document class or style file.")] = None
     template_layout: Annotated[Optional[TemplateLayout], PField(description="Geometry of the compiled template, checked against the manuscript PDF to catch shrunken margins, font, or line spacing.")] = None
     language: Annotated[Optional[str], PField(description="Mandated language variant, if any.")] = None
+    thousands_separator: Annotated[Optional[ThousandsSeparator], PField(description="How numbers of 10,000 and over group their thousands: comma (10,000) or space (10 000, often a thin space). Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent.")] = None
+    group_four_digit_numbers: Annotated[Optional[bool], PField(description="Whether four-digit numbers take the thousands separator too: yes for 1,000, no for 1000 (SI and some house styles). Empty when the guidelines do not say.")] = None
     initial_submission_any_format: Annotated[Optional[str], PField(description="Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key, one per string.")] = _notes()
 

@@ -81,6 +81,8 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `latex_class` | string or null | Required LaTeX document class or style file. |
 | `template_layout` | [TemplateLayout](#templatelayout) or null | Geometry of the compiled template, checked against the manuscript PDF to catch shrunken margins, font, or line spacing. |
 | `language` | string or null | Mandated language variant, if any. |
+| `thousands_separator` | `comma` \| `space` or null | How numbers of 10,000 and over group their thousands: comma (10,000) or space (10 000, often a thin space). Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent. |
+| `group_four_digit_numbers` | boolean or null | Whether four-digit numbers take the thousands separator too: yes for 1,000, no for 1000 (SI and some house styles). Empty when the guidelines do not say. |
 | `initial_submission_any_format` | string or null | Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings. |
 | `notes` | list of string or null | Rules with no structured key, one per string. |
 

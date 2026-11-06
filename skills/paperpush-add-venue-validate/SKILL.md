@@ -88,6 +88,10 @@ Read the whole file first. Every key has a comment describing it.
   that differ. NAME must match an option of the article-type field exactly.
 - If the guidelines let the initial submission be in any format, put that rule
   in one sentence in `manuscript.initial_submission_any_format`.
+- If the guidelines (or their style or language page) say how to write large
+  numbers ("1,000" or "1000", "10,000" or "10 000"), set
+  `manuscript.thousands_separator` and `manuscript.group_four_digit_numbers`.
+  Otherwise leave them empty; `validate` then checks only for consistency.
 - If a template is mandatory and the official LaTeX template is public, compile
   it unmodified in review mode and run
   `python scripts/measure_template.py <pdf> --running-head "<head>"`. Paste the

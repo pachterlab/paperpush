@@ -54,6 +54,67 @@ def test_digit_sentence_starts():
     assert sc.digit_sentence_starts("15 patients opened the paragraph.") == []  # a heading or list item may open with digits
 
 
+
+def test_numbers_in_skips_years_labels_and_ids():
+    text = "In 2019 (Fig. 1000, accession 123456, p. 1200) GSE12345, chr1:123456, 10.1000/abc, v2.10000, 0012345 and 1000\u20132000 [12,345]."
+    assert [(n.digits, n.style) for n in sc.numbers_in(text)] == [(4, "none")]  # only the range's 1000
+    assert sc.numbers_in("Table 2 100 mice") == []  # a plain space between a label and a count is not grouping
+    assert [(n.digits, n.style) for n in sc.numbers_in("12\u2009000 and 1\u202f500 and 12 000 and 12,000.5")] == [(5, "space"), (4, "space"), (5, "space"), (5, "comma")]
+
+
+def test_thousands_grouping_flags_long_ungrouped_numbers():
+    [(desc, hits)] = sc.thousands_grouping(["We sequenced 12000 cells and 1,500 genes."])
+    assert "10,000 or more" in desc and "commas" in desc and hits == ["We sequenced \u00bb12000\u00ab cells and 1,500 genes."]
+    [(desc, _)] = sc.thousands_grouping(["We had 12345 cells and 15 000 genes."])
+    assert "spaces (1 000)" in desc  # the manuscript's own separator is suggested
+
+
+def test_thousands_grouping_four_digits_written_one_way():
+    [(desc, hits)] = sc.thousands_grouping(["From 1000 reads to 1,500 and 2,500 and 3,500 samples."])
+    assert "no separator" in desc and len(hits) == 1 and "\u00bb1000\u00ab" in hits[0]
+    [(desc, hits)] = sc.thousands_grouping(["We kept 1500, 2500, and 1,200 cells."])
+    assert "grouped" in desc.split(",")[0] and len(hits) == 1 and "\u00bb1,200\u00ab" in hits[0]
+    # One style throughout is fine, either way.
+    assert sc.thousands_grouping(["We kept 1500 and 2500 cells in 2020."]) == []
+    assert sc.thousands_grouping(["We kept 1,500 and 12,500 cells."]) == []
+
+
+def test_thousands_grouping_mixed_separators():
+    [(desc, hits)] = sc.thousands_grouping(["We had 12 000 and 13,000 and 14,000 cells."])
+    assert "spaces" in desc and "2 other(s) use commas" in desc and len(hits) == 1
+
+
+
+def test_thousands_grouping_enforces_the_venues_separator():
+    # Consistent spaces pass on their own, but not when the venue writes commas.
+    assert sc.thousands_grouping(["We had 12 000 and 15 000 cells."]) == []
+    [(desc, hits)] = sc.thousands_grouping(["We had 12 000 and 15 000 cells."], separator="comma")
+    assert "venue's guidelines group thousands with commas" in desc and len(hits) == 2
+    [(desc, _)] = sc.thousands_grouping(["We had 12000 cells."], separator="space")
+    assert "spaces (1 000) (the venue's guidelines)" in desc
+
+
+def test_thousands_grouping_enforces_four_digit_rule():
+    # One way throughout passes the consistency check, but not the venue's rule.
+    [(desc, hits)] = sc.thousands_grouping(["We kept 1500 and 2500 cells."], group_four=True)
+    assert "no separator" in desc and len(hits) == 2
+    [(desc, hits)] = sc.thousands_grouping(["We kept 1,500 and 12,500 cells."], group_four=False)
+    assert "write 1000" in desc and len(hits) == 1 and "\u00bb1,500\u00ab" in hits[0]
+    assert sc.thousands_grouping(["We kept 1500 and 12,500 cells."], separator="comma", group_four=False) == []
+
+
+def test_numbers_check_reads_the_venues_rules(monkeypatch, tmp_path):
+    from paperpush import requirements as r
+
+    doc = tmp_path / "ms.md"
+    doc.write_text("# Title\n\n## Introduction\n\nWe sequenced 1,500 cells and 12,000 reads.\n")
+    assert _run(doc)[0]["prose.numbers"][0] == report.PASSED
+    base = r.ManuscriptRequirements(slug="testj", manuscript=r.ManuscriptRules(thousands_separator="space", group_four_digit_numbers=False))
+    monkeypatch.setattr(r, "get_requirements", lambda slug: base)
+    status, message, _ = _run(doc)[0]["prose.numbers"]
+    assert status == report.WARNING and "write 1000" in message and "group thousands with spaces" in message
+
+
 # --- conventions ---------------------------------------------------------------------------
 
 
@@ -145,6 +206,7 @@ def test_checks_run_on_a_docx(tmp_path):
     results, checks = _run(doc)
     status, message, _ = results["prose.numbers"]
     assert status == report.WARNING and "twenty" in message and "twenty-five" not in message  # the reference list is skipped
+    assert "separator" not in message
     status, message, _ = results["prose.conventions"]
     assert status == report.WARNING and "with a comma" in message and "Fig." in message and "et al." not in message
     status, message, _ = results["prose.acronyms"]

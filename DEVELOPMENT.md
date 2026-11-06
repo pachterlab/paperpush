@@ -314,7 +314,7 @@ section's `notes` list (one factual sentence each):
 
 | section         | what it holds                                                                   |
 |-----------------|---------------------------------------------------------------------------------|
-| `manuscript`    | `formats`, `max_file_size_mb`, `max_words[_before_refs]`, `max_pages[_before_refs]`, `count_excludes`, `max_display_items`, `line_numbers`, `double_spacing`, `single_file`, `figures_placement`, `anonymized`, `template_required`, `template_layout`, `initial_submission_any_format`, ... |
+| `manuscript`    | `formats`, `max_file_size_mb`, `max_words[_before_refs]`, `max_pages[_before_refs]`, `count_excludes`, `max_display_items`, `line_numbers`, `double_spacing`, `single_file`, `figures_placement`, `anonymized`, `template_required`, `template_layout`, `language`, `thousands_separator`, `group_four_digit_numbers`, `initial_submission_any_format`, ... |
 | `title_page`    | `required_items` (canonical ids: `title`, `authors`, `affiliations`, `corresponding_email`, `orcid`, `keywords`, `running_title`, `word_count`, ...), `title_max_characters`, `running_title_max_characters` |
 | `abstract`      | `max_words`, `min_words`, `max_characters`, `structured`, `structured_headings`, `no_references` |
 | `keywords`      | `min`, `max`                                                                    |

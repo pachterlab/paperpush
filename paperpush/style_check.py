@@ -7,8 +7,14 @@ reference list are already left out.
 
 * ``prose.numbers`` -- a number of 10 or more spelled out ("twenty-five
   patients" for "25 patients"), except at the start of a sentence, where a
-  number is spelled out; and a sentence that starts with digits ("15 patients
-  were ...").
+  number is spelled out; a sentence that starts with digits ("15 patients
+  were ..."); and thousands grouped inconsistently: a number of 10,000 or more
+  with no separator ("12000 cells"), four-digit numbers written both "1,500"
+  and "2000", or commas in some numbers and spaces ("12 000") in others.
+  When the venue's guidelines set ``manuscript.thousands_separator`` or
+  ``manuscript.group_four_digit_numbers``, those rules are enforced instead of
+  consistency. Years (1900-2099), labels ("Fig. 1000", "accession 123456"), and IDs
+  ("GSE12345", "chr1:12345") are not counted.
 * ``prose.conventions`` -- abbreviations written two ways, or wrongly: "i.e." and
   "e.g." with and without the comma, "ie"/"i.e"/"i. e."; "et. al" and "et al"
   with no full stop; "vs" and "vs."; "Fig." and "Figure" both used mid-sentence;
@@ -31,6 +37,7 @@ import logging
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from typing import Optional
 
 from .database import Venue
 from .validate import WARNING, Issue, Outcome, Unchecked
@@ -134,6 +141,126 @@ def digit_sentence_starts(paragraph: str) -> list[str]:
                 continue  # "Fig. 3", an initial, "Section 2. 3 ..." in a numbered list
         found.append(f"{_snippet(paragraph, m.start(4), m.end(4), _mark)} (spell it out or rephrase so the sentence does not open with digits)")
     return found
+
+
+# A number in the prose, with its thousands grouped by commas ("12,000"), by
+# spaces ("12 000", "12 000"), or not at all ("12000"); a decimal part may
+# follow. Numbers glued to letters, digits, or ID punctuation ("GSE12345",
+# "chr1:12345", "v2.1000", "10.1000/xyz") are not quantities and are skipped.
+_THIN = "   "
+_NUMBER = re.compile(
+    rf"(?<![\w.,:/#\-–−{_THIN}])"
+    rf"(?P<int>\d{{1,3}}(?:,\d{{3}})+|\d{{1,3}}(?:[ {_THIN}]\d{{3}})+|\d+)"
+    rf"(?P<dec>\.\d+)?"
+    rf"(?![\w/]|[.,:]\d|[ {_THIN}]\d)"
+)
+# A word right before the number that makes it a label, not a quantity: "Fig. 1000", "accession 123456".
+_LABEL_BEFORE = re.compile(
+    r"(?:\b(?:figs?|figures?|tables?|eqs?|equations?|refs?|sections?|pp?|pages?|no|nos|numbers?|ids?|accession|"
+    r"zip|pmid|pmcid|doi|isbn|issn|codes?|versions?|v|chr|chromosome|positions?|pos|grant|award|protocol|lot|catalog|cat)\.?"
+    r"|[#\[])\s*$",
+    re.IGNORECASE,
+)
+
+
+@dataclass
+class _Num:
+    snippet: str
+    digits: int  # digits before the decimal point
+    style: str  # "comma", "space", or "none"
+
+
+def _grouping_style(text: str) -> str:
+    if "," in text:
+        return "comma"
+    return "space" if re.search(rf"[ {_THIN}]", text) else "none"
+
+
+def numbers_in(paragraph: str) -> list[_Num]:
+    """Numbers of 1000 or more written as quantities, with how their thousands are grouped.
+
+    Year-like four-digit numbers (1900-2099) and numbers with a leading zero
+    are left out; so is a space-grouped number of four digits ("Fig. 2 100
+    cells" is not 2,100), unless the space is a thin or no-break one.
+    """
+    from .prose_check import _mark, _snippet
+
+    found = []
+    for m in _NUMBER.finditer(paragraph):
+        whole = m.group("int")
+        digits = re.sub(r"\D", "", whole)
+        if len(digits) < 4 or digits.startswith("0"):
+            continue
+        style = _grouping_style(whole)
+        if style == "space" and len(digits) < 5 and not re.search(f"[{_THIN}]", whole):
+            continue
+        if style == "none" and len(digits) == 4 and 1900 <= int(digits) <= 2099:
+            continue  # a year
+        if _LABEL_BEFORE.search(paragraph[max(0, m.start() - 15) : m.start()]):
+            continue
+        found.append(_Num(_snippet(paragraph, m.start(), m.end(), _mark), len(digits), style))
+    return found
+
+
+_STYLE_NAME = {"comma": "commas (1,000)", "space": "spaces (1 000)", "none": "no separator (1000)"}
+
+
+def thousands_grouping(paragraphs: list[str], separator: Optional[str] = None, group_four: Optional[bool] = None) -> list[tuple[str, list[str]]]:
+    """Problems with how the thousands are grouped, as ``(description, examples)``.
+
+    ``separator`` (``"comma"`` or ``"space"``) and ``group_four`` are the
+    venue's rules (``manuscript.thousands_separator`` and
+    ``manuscript.group_four_digit_numbers``); where the guidelines say nothing
+    the manuscript is only checked against itself:
+
+    * a number of five or more digits with no separator ("12000 cells");
+    * numbers grouped with the wrong separator, or (no rule) with commas in some
+      and spaces in others, the less-used way quoted;
+    * four-digit numbers grouped when the venue writes "1000", ungrouped when it
+      writes "1,000", or (no rule) written both ways, the less-used way quoted
+      (when tied, the ungrouped ones).
+    """
+    nums = [n for p in paragraphs for n in numbers_in(p)]
+    grouped = Counter(n.style for n in nums if n.style != "none")
+    use = separator or ("comma" if grouped["comma"] >= grouped["space"] else "space")
+    rule = " (the venue's guidelines)" if separator else ""
+    problems: list[tuple[str, list[str]]] = []
+
+    long_plain = [n.snippet for n in nums if n.style == "none" and n.digits >= 5]
+    if long_plain:
+        problems.append((f"number(s) of 10,000 or more with no thousands separator; group the digits with {_STYLE_NAME[use]}{rule}", long_plain))
+
+    if separator:
+        other = "space" if separator == "comma" else "comma"
+        wrong = [n.snippet for n in nums if n.style == other]
+        if wrong:
+            problems.append((f"number(s) grouped with {_STYLE_NAME[other]}; the venue's guidelines group thousands with {_STYLE_NAME[separator]}", wrong))
+    elif grouped["comma"] and grouped["space"]:
+        minority = "space" if grouped["space"] <= grouped["comma"] else "comma"
+        other = "comma" if minority == "space" else "space"
+        hits = [n.snippet for n in nums if n.style == minority]
+        problems.append((f"number(s) grouped with {_STYLE_NAME[minority]}, while {grouped[other]} other(s) use {_STYLE_NAME[other]}; use one separator", hits))
+
+    four = [n for n in nums if n.digits == 4]
+    if group_four is True:
+        hits = [n.snippet for n in four if n.style == "none"]
+        if hits:
+            problems.append((f"four-digit number(s) with no separator; the venue's guidelines write {'1,000' if use == 'comma' else '1 000'}", hits))
+    elif group_four is False:
+        hits = [n.snippet for n in four if n.style != "none"]
+        if hits:
+            problems.append(("four-digit number(s) grouped; the venue's guidelines write 1000, with a separator only from 10,000", hits))
+    else:
+        four_styles = Counter("none" if n.style == "none" else "grouped" for n in four)
+        if four_styles["none"] and four_styles["grouped"]:
+            minority = "grouped" if four_styles["grouped"] < four_styles["none"] else "none"
+            hits = [n.snippet for n in four if (n.style == "none") == (minority == "none")]
+            if minority == "none":
+                desc = f"four-digit number(s) with no separator, while {four_styles['grouped']} other(s) are grouped (1,000); write them one way"
+            else:
+                desc = f"four-digit number(s) grouped, while {four_styles['none']} other(s) have no separator (1000); write them one way"
+            problems.append((desc, hits))
+    return problems
 
 
 # --- conventions --------------------------------------------------------------------------
@@ -395,11 +522,23 @@ def _report(hits: list[str], noun: str, field_id: str, name: str, advice: str = 
     return Issue(WARNING, field_id, f"{name}: {len(hits)} {noun}: {shown}{more}" + (f"; {advice}" if advice else ""))
 
 
+def _number_rules(venue: Venue, values: dict[str, str]) -> tuple[Optional[str], Optional[bool]]:
+    """The venue's ``manuscript.thousands_separator`` and ``group_four_digit_numbers`` for the selected article type."""
+    from .requirements import get_requirements, resolve
+
+    base = get_requirements(venue.slug)
+    if base is None:
+        return None, None
+    rules = resolve(base, values).manuscript
+    return rules.thousands_separator, rules.group_four_digit_numbers
+
+
 def _numbers_check(venue: Venue, values: dict[str, str]) -> Outcome:
     from .prose_check import _main_paragraphs, _manuscripts
 
     issues: list[Issue] = []
     details: list[str] = []
+    separator, group_four = _number_rules(venue, values)
     for fld, text in _manuscripts(venue, values):
         if text.why:
             issues.append(Issue(WARNING, fld.id, text.why, unchecked=True))
@@ -411,7 +550,10 @@ def _numbers_check(venue: Venue, values: dict[str, str]) -> Outcome:
             issues.append(_report(spelled, "number(s) of 10 or more spelled out", fld.id, text.path.name, "write numbers of 10 and over in digits"))
         if opening:
             issues.append(_report(opening, "sentence(s) opening with digits", fld.id, text.path.name))
-        if not spelled and not opening:
+        grouping = thousands_grouping(paragraphs, separator, group_four)
+        for desc, hits in grouping:
+            issues.append(_report(hits, desc, fld.id, text.path.name))
+        if not spelled and not opening and not grouping:
             details.append(f"none in {text.path.name}")
     return Outcome(issues, "; ".join(details))
 

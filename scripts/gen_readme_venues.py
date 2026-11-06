@@ -14,12 +14,18 @@ Two artifacts are kept in sync with the database:
       <!-- BEGIN SUPPORTED VENUES -->
       <!-- END SUPPORTED VENUES -->
 
-In both files the surrounding prose is left untouched. Run it after editing
+* the same per-type tables, as reStructuredText, in the Sphinx page
+  ``docs/venues.rst``, between
+
+      .. BEGIN SUPPORTED VENUES
+      .. END SUPPORTED VENUES
+
+In every file the surrounding prose is left untouched. Run it after editing
 ``paperpush/venues.json`` (the master list), ``submission_forms.json``, or
 which venues ``manuscript_requirements.json`` covers:
 
-    python scripts/gen_readme_venues.py        # rewrite both files in place
-    python scripts/gen_readme_venues.py --check # exit 1 if either is out of date
+    python scripts/gen_readme_venues.py        # rewrite the files in place
+    python scripts/gen_readme_venues.py --check # exit 1 if any is out of date
 
 The ``--check`` form is suitable for CI or a pre-commit hook.
 """
@@ -44,6 +50,9 @@ from tests.submit_walkthrough_status import load_status
 
 README_PATH = REPO_ROOT / "README.md"
 VENUES_PATH = REPO_ROOT / "venues.md"
+DOCS_VENUES_PATH = REPO_ROOT / "docs" / "venues.rst"
+BEGIN_RST = ".. BEGIN SUPPORTED VENUES"
+END_RST = ".. END SUPPORTED VENUES"
 BEGIN = "<!-- BEGIN SUPPORTED VENUES -->"
 END = "<!-- END SUPPORTED VENUES -->"
 BEGIN_VENUES = "<!-- BEGIN SUPPORTED VENUES -->"
@@ -194,6 +203,45 @@ def build_venue_groups() -> str:
     return "\n\n".join(sections)
 
 
+def build_venue_groups_rst() -> str:
+    """Render the Sphinx "Supported venues" table (``docs/venues.rst``).
+
+    One table with the same columns as ``paperpush venues`` (Slug, Venue,
+    Keywords, Type, Link, Validate, Submit), in the database's display order,
+    so the docs list matches the CLI without being edited by hand.
+    """
+    labels = {venue_type: heading.removesuffix("s").removesuffix(" server") for venue_type, heading in VENUE_GROUPS}
+    order = {venue_type: i for i, (venue_type, _) in enumerate(VENUE_GROUPS)}
+    venues = sorted(list_venues(), key=lambda v: order.get(v.venue_type, len(order)))
+    lines = [
+        f"*{len(venues)} supported venue" + ("s" if len(venues) != 1 else "") + ".*",
+        "",
+        ".. list-table::",
+        "   :header-rows: 1",
+        "   :widths: 18 22 30 10 20 8 8",
+        "",
+        "   * - Slug",
+        "     - Venue",
+        "     - Keywords",
+        "     - Type",
+        "     - Link",
+        "     - Validate",
+        "     - Submit",
+    ]
+    for j in venues:
+        link = j.site_url or j.submission_url
+        lines += [
+            f"   * - ``{j.slug}``",
+            f"     - {j.name}",
+            f"     - {', '.join(j.keywords)}".rstrip(),
+            f"     - {labels.get(j.venue_type, j.venue_type.capitalize())}",
+            f"     - {link}".rstrip() if link else "     -",
+            f"     - {'✅' if j.supports_validate else ''}".rstrip(),
+            f"     - {'✅' if j.supports_submit else ''}".rstrip(),
+        ]
+    return "\n".join(lines)
+
+
 def _replace_section(text: str, begin: str, end: str, body: str, where: str) -> str:
     """Return ``text`` with the content between ``begin``/``end`` replaced by ``body``."""
     if begin not in text or end not in text:
@@ -229,17 +277,18 @@ def main() -> int:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="exit non-zero if either file is out of date instead of rewriting it",
+        help="exit non-zero if any file is out of date instead of rewriting it",
     )
     args = parser.parse_args()
 
     # Evaluate both so --check reports every stale file, not just the first.
     venues_ok = _sync(VENUES_PATH, BEGIN, END, build_table(), check=args.check)
     readme_ok = _sync(README_PATH, BEGIN_VENUES, END_VENUES, build_venue_groups(), check=args.check)
+    docs_ok = _sync(DOCS_VENUES_PATH, BEGIN_RST, END_RST, "\n" + build_venue_groups_rst() + "\n", check=args.check)
 
     if args.check:
-        return 0 if venues_ok and readme_ok else 1
-    if venues_ok and readme_ok:
+        return 0 if venues_ok and readme_ok and docs_ok else 1
+    if venues_ok and readme_ok and docs_ok:
         print("All venue listings already up to date")
     return 0
 

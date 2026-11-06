@@ -740,7 +740,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run(f"prose.{REPETITION}", "Varied word choice (no heavily repeated words)", PROSE, _repetition_check, venue, values)
     from . import style_check
 
-    checks.run("prose.numbers", "Numbers of 10 or more in digits", PROSE, style_check._numbers_check, venue, values)
+    checks.run("prose.numbers", "Numbers of 10 or more in digits, thousands grouped one way", PROSE, style_check._numbers_check, venue, values)
     checks.run("prose.conventions", "Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)", PROSE, style_check._conventions_check, venue, values)
     checks.run("prose.acronyms", "Acronyms spelled out at first use", PROSE, style_check._acronym_check, venue, values)
     task = style_check.ai_prose_task(venue, values)

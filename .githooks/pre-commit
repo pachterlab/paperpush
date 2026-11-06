@@ -101,8 +101,8 @@ if git diff --cached --name-only --diff-filter=ACM -z \
     | tr '\0' '\n' | grep -qE '^paperpush/(venues|submission_forms|manuscript_requirements|common_fields)\.json$'; then
     # README.md's supported-venues table (and venues.md).
     if python scripts/gen_readme_venues.py; then
-        if ! git diff --quiet -- README.md venues.md; then
-            git add README.md venues.md
+        if ! git diff --quiet -- README.md venues.md docs/venues.rst; then
+            git add README.md venues.md docs/venues.rst
             echo "pre-commit: regenerated the venues tables and re-staged them."
         fi
     else

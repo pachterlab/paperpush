@@ -1433,7 +1433,22 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         hide_warnings=getattr(args, "hide_warnings", False),
         hide_unchecked=getattr(args, "hide_unchecked", False),
     )
-    report_mod.print_report(result, alt_color=alt, hide=hide)
+    json_out = getattr(args, "json_out", None)
+    # With the JSON on stdout, the notes below go to stderr so stdout stays parseable.
+    note_stream = sys.stderr if json_out == "-" else sys.stdout
+    if json_out == "-":
+        # Machine-readable report on stdout instead of the coloured one.
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        report_mod.print_report(result, alt_color=alt, hide=hide)
+    if json_out and json_out != "-":
+        json_path = Path(json_out).expanduser()
+        try:
+            json_path.write_text(json.dumps(result.to_dict(), indent=2) + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"error: could not write the JSON report to {json_path}: {exc}", file=sys.stderr)
+            return 1
+        print(f"\nWrote the report as JSON to {json_path}", file=note_stream)
 
     if getattr(args, "ai_tasks", None):
         from .ai_validate import tasks_payload
@@ -1441,7 +1456,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         tasks_path = Path(args.ai_tasks).expanduser()
         again = " --ai-only" if ai_only else ""
         tasks_path.write_text(json.dumps(tasks_payload(result.ai_tasks, venue_def, args.subfile or "", command=rerun + again), indent=2) + "\n", encoding="utf-8")
-        print(f"\nWrote {len(result.ai_tasks)} AI check(s) to {tasks_path}; have an agent answer them, then run '{rerun}{again} --ai-results <results.json>'.")
+        print(f"\nWrote {len(result.ai_tasks)} AI check(s) to {tasks_path}; have an agent answer them, then run '{rerun}{again} --ai-results <results.json>'.", file=note_stream)
     if report_out is not None:
         out = report_out
         try:
@@ -1449,22 +1464,22 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         except OSError as exc:
             print(f"error: could not save the report to {out}: {exc}", file=sys.stderr)
             return 1
-        print(f"\nSaved the report to {out}")
+        print(f"\nSaved the report to {out}", file=note_stream)
 
     if result.errors:
         print("\nFix the errors above, then run 'paperpush validate' again.", file=sys.stderr)
         return 1
     if ai_only:
-        print(f"\nRan only the AI checks on {Path(label).name}; run 'paperpush validate' without --ai-only for the full pre-submission checks.")
+        print(f"\nRan only the AI checks on {Path(label).name}; run 'paperpush validate' without --ai-only for the full pre-submission checks.", file=note_stream)
         return 0
     if files_only:
         what = f"{venue}'s author guidelines" if not venue_def.is_generic else "the general checks (no venue given)"
-        print(f"\nThe files passed {what}. Make a .sub ('paperpush subfile VENUE') to check the whole submission.")
+        print(f"\nThe files passed {what}. Make a .sub ('paperpush subfile VENUE') to check the whole submission.", file=note_stream)
         return 0
     if result.downgraded:
-        print(f"\n{args.subfile} passed validation for {venue} as an initial submission ({result.downgraded} error(s) shown as warnings); ready to submit.")
+        print(f"\n{args.subfile} passed validation for {venue} as an initial submission ({result.downgraded} error(s) shown as warnings); ready to submit.", file=note_stream)
     else:
-        print(f"\n{args.subfile} passed validation for {venue}; ready to submit.")
+        print(f"\n{args.subfile} passed validation for {venue}; ready to submit.", file=note_stream)
     return 0
 
 
@@ -2535,6 +2550,14 @@ def build_parser() -> argparse.ArgumentParser:
         dest="ai_only",
         action="store_true",
         help="report only the checks that need AI, skipping the deterministic checks (form, links, DOIs, sensitive data, hidden text, ...). Combine with --ai, --ai-tasks, or --ai-results; on its own it lists the AI checks that apply. The manuscript is still read to find which AI checks apply.",
+    )
+    p_validate.add_argument(
+        "--json",
+        dest="json_out",
+        nargs="?",
+        const="-",
+        metavar="FILE",
+        help="print the report as JSON instead of the coloured report, or with FILE also write it there. (each check's id, status, and issues with level, field, and message). Used by the paperpush-fix skill",
     )
     p_validate.add_argument("--ai-tasks", dest="ai_tasks", metavar="FILE", help="write the AI checks to FILE as JSON, for an agent (Claude Code, Codex, ...) to run with its own subscription; see the paperpush-validate skill")
     p_validate.add_argument("--ai-results", dest="ai_results", metavar="FILE", help='merge an agent\'s verdicts on the AI checks (JSON: {"results": [{"id", "status": pass|fail|unclear|not_applicable, "details"}]}) into the report instead of calling an API')

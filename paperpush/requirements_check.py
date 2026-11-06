@@ -645,6 +645,7 @@ HANDLED_RULES = frozenset(
         "manuscript.font", "manuscript.font_size_pt", "manuscript.margins_mm", "manuscript.page_size",
         "manuscript.single_file", "manuscript.figures_placement", "manuscript.tables_placement", "manuscript.anonymized",
         "manuscript.template_required", "manuscript.latex_class", "manuscript.template_layout", "manuscript.language",
+        "manuscript.thousands_separator", "manuscript.group_four_digit_numbers",
         "title_page.required_items", "title_page.separate_file", "title_page.title_max_characters",
         "title_page.title_max_words", "title_page.running_title_max_characters",
         "abstract.max_words", "abstract.min_words", "abstract.max_characters", "abstract.structured",

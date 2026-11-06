@@ -186,6 +186,19 @@ def pytest_addoption(parser):
     )
 
 
+def pytest_sessionstart(session):
+    # Re-sync paperpush/_docs and paperpush/_skills from AGENTS.md and skills/
+    # before a local run, as the pre-commit hook does at commit time, so an
+    # uncommitted edit to AGENTS.md or a skill does not fail
+    # test_packaged_agent_guide_matches_root_agents_md. CI (which sets CI=true)
+    # skips this, so a stale copy that was committed still fails there.
+    if os.environ.get("CI"):
+        return
+    from scripts.sync_agent_docs import main as sync_agent_docs
+
+    sync_agent_docs([])
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",

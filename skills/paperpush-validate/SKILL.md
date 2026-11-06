@@ -127,6 +127,7 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
 
 - Never edit the user's manuscript, figures, or `.sub` to make a check pass.
   Report; let them decide. (Fixing a typo in the `.sub` is fine if they ask.)
+  If they ask you to fix what validate found, use `paperpush-fix`.
 - Never add hidden text or reviewer instructions anywhere.
 - Use absolute paths; keep the task and result JSON in a scratch directory, not
   the manuscript directory.

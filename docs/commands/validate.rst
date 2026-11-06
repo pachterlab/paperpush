@@ -19,8 +19,8 @@ check manuscript files without a ``.sub``, with or without a venue (see
                              [--show-errors-only] [--hide-warnings]
                              [--hide-unchecked] [--colorblind]
                              [--ai] [--provider {anthropic,openai,google}]
-                             [--model MODEL] [--ai-only] [--ai-tasks FILE]
-                             [--ai-results FILE] [--venue VENUE]
+                             [--model MODEL] [--ai-only] [--json [FILE]]
+                             [--ai-tasks FILE] [--ai-results FILE] [--venue VENUE]
                              [--manuscript FILE] [--title-page FILE]
                              [--cover-letter FILE] [--figures FILE [FILE ...]]
                              [--tables FILE [FILE ...]]
@@ -373,6 +373,13 @@ Arguments
 ``--provider {anthropic,openai,google}``, ``--model MODEL``
    With ``--ai``: the provider and model to use (defaults as for
    :doc:`autofill`).
+
+``--json [FILE]``
+   Print the report as JSON instead of the coloured report (the closing notes
+   go to stderr, so stdout is only the JSON), or with ``FILE`` also write the
+   JSON there. Each check has ``id``, ``title``, ``category``, ``status``, and
+   ``issues``; each issue has ``level``, ``field``, and ``message``. The
+   ``paperpush-fix`` skill reads it.
 
 ``--ai-tasks FILE``
    Write the AI checks to ``FILE`` as JSON -- each with an id, instructions,

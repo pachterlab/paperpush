@@ -114,7 +114,8 @@ paperpush submit <abs .sub>
 done, so without MCP have the user run it with `!`.) Both validate the `.sub` first and refuse to open a browser if it has errors
 (MCP returns `blocked` with the list). If that happens, report the exact
 errors and stop. Offer to run the `paperpush-validate` skill for the full
-report, or `paperpush-autofill` to fill missing fields. Do not quietly retry
+report, `paperpush-fix` to fix what it can in the files and the `.sub`, or
+`paperpush-autofill` to fill missing fields. Do not quietly retry
 with validation skipped.
 
 **When the user asked to skip validation**, pass it through:

@@ -3,7 +3,8 @@ name: paperpush-prepare-submission
 description: >-
   End-to-end paperpush submission flow from a manuscript directory: resolve
   the .sub (user-provided, else an existing one in the manuscript directory, else
-  created on the fly), autofill it, validate, then hand off to
+  created on the fly), autofill it, validate (offering paperpush-fix when
+  validate finds errors or more than 5 warnings), then hand off to
   paperpush-submit to log in and fill the portal. Use for a
   general "prepare/submit my manuscript" request. Triggers: "prepare my
   manuscript for submission to <venue>", "submit my manuscript to <venue>",
@@ -103,11 +104,25 @@ fly. See step 1.
    the same `.sub`; it does them itself, with no API key, and merges the
    verdicts into the report.
 
-   If validation reports errors, **stop here.** Report the exact errors and the
-   review-flagged / `never` fields the autofill skill left for the user, and do
-   not go on to step 4 until they are resolved. A file with validation errors
-   will not submit. Relay warnings (including failed AI checks) as things for
-   the user to confirm.
+   Then decide whether to go on, from the counts in the merged report (failed
+   AI checks count as warnings):
+
+   - **Errors, or more than 5 warnings: stop here.** Summarize them in three
+     groups: must fix (errors), worth checking (warnings, deterministic first,
+     then AI), and could not be checked. Add the review-flagged / `never`
+     fields the autofill skill left for the user. Then ask whether to run the
+     `paperpush-fix` skill on the `.sub`: it backs up the files, fixes what it
+     safely can in the manuscript sources and the `.sub`, validates again, and
+     reports what needs the user. Ask rather than run it, because it edits the
+     manuscript. If they say yes, invoke `paperpush-fix` (via the Skill tool)
+     and relay its report, then apply this same rule to its final validation.
+     If they say no, leave the fixes to them. Either way, do not go on to step
+     4 while any error remains: a file with validation errors will not submit.
+     With no errors left and more than 5 warnings, go on only if the user says
+     to continue anyway.
+   - **No errors and 5 warnings or fewer:** list the warnings as things for
+     the user to confirm, and ask whether to continue to the portal anyway
+     before step 4. With no warnings at all, go straight on.
 
    **If the user asked to skip validation** ("skip validation", "submit
    anyway"), do not run this step. Go straight to step 4 and pass the request
@@ -131,8 +146,11 @@ fly. See step 1.
   you do the rest of the work.
 - Never run `paperpush login` yourself — it is interactive and belongs in the
   user's terminal.
-- Never go on to `paperpush-submit` past a failed `validate`, unless the user
-  asked to skip validation.
+- Never go on to `paperpush-submit` past a failed `validate`, or past warnings
+  the user has not seen and agreed to continue with, unless the user asked to
+  skip validation.
+- Offer `paperpush-fix` before running it; never edit the manuscript without
+  the user's go-ahead.
 - Delegate field extraction to `paperpush-autofill`, the reader checks to
-  `paperpush-validate`, and login + submit to `paperpush-submit`; do not
-  duplicate their logic here.
+  `paperpush-validate`, fixing to `paperpush-fix`, and login + submit to
+  `paperpush-submit`; do not duplicate their logic here.
