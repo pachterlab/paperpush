@@ -24,167 +24,167 @@ cited reference when ``--reference-check-full`` is used. Venue rules marked
 
 **Checks requiring a reader**
 
-- ``ai.consistency`` — Every .sub field agrees with the manuscript
-- ``ai.cover_letter_venue`` — Cover letter addressed to the target venue
-- ``ai.details.abstract_reporting`` — Abstract reporting structure
-- ``ai.details.author_details`` — Title-page author details
-- ``ai.details.declarations`` — Declarations and their positions
-- ``ai.details.ethics`` — Ethics approval and consent
-- ``ai.details.supplementary`` — Supplementary-material references
-- ``ai.details.trademarks`` — Registered trademarks
-- ``ai.figures.raster_lettering`` — Lettering in raster figures (size, typeface, panel labels)
-- ``ai.figures.raster_panels_cited`` — Every panel of the raster figures is cited
-- ``ai.notes.abstract`` — Free-text abstract rules
-- ``ai.notes.cover_letter`` — Free-text cover-letter rules
-- ``ai.notes.figures`` — Free-text figure rules
-- ``ai.notes.general`` — General rules in the author guidelines
-- ``ai.notes.keywords`` — Free-text keyword rules
-- ``ai.notes.manuscript`` — Free-text manuscript rules in the author guidelines
-- ``ai.notes.references`` — Free-text reference rules
-- ``ai.notes.sections`` — Free-text section rules
-- ``ai.notes.statements`` — Free-text rules for statements and declarations
-- ``ai.notes.supplementary`` — Free-text supplementary-material rules
-- ``ai.notes.tables`` — Free-text table rules
-- ``ai.notes.title_page`` — Free-text title-page rules
-- ``ai.prose`` — Spelling, grammar, and tense (read by AI)
-- ``ai.reference_format`` — Reference list follows the guidelines' style
-- ``ai.reference_journal.*`` — Each cited journal is correctly identified and indexed (full reference check)
-- ``ai.reference_source.*`` — Each cited source supports the claims that cite it (full reference check)
-- ``ai.tables_editable`` — Tables are editable text, not images
-- ``ai.template`` — Manuscript looks prepared with the venue's template
-- ``ai.title_page_items`` — Title-page items that need reading (address, footnotes, summary, classification)
-- ``ai.unverified_references`` — References that could not be verified are real
+1. ``ai.consistency`` — Every .sub field agrees with the manuscript
+2. ``ai.cover_letter_venue`` — Cover letter addressed to the target venue
+3. ``ai.details.abstract_reporting`` — Abstract reporting structure
+4. ``ai.details.author_details`` — Title-page author details
+5. ``ai.details.declarations`` — Declarations and their positions
+6. ``ai.details.ethics`` — Ethics approval and consent
+7. ``ai.details.supplementary`` — Supplementary-material references
+8. ``ai.details.trademarks`` — Registered trademarks
+9. ``ai.figures.raster_lettering`` — Lettering in raster figures (size, typeface, panel labels)
+10. ``ai.figures.raster_panels_cited`` — Every panel of the raster figures is cited
+11. ``ai.notes.abstract`` — Free-text abstract rules
+12. ``ai.notes.cover_letter`` — Free-text cover-letter rules
+13. ``ai.notes.figures`` — Free-text figure rules
+14. ``ai.notes.general`` — General rules in the author guidelines
+15. ``ai.notes.keywords`` — Free-text keyword rules
+16. ``ai.notes.manuscript`` — Free-text manuscript rules in the author guidelines
+17. ``ai.notes.references`` — Free-text reference rules
+18. ``ai.notes.sections`` — Free-text section rules
+19. ``ai.notes.statements`` — Free-text rules for statements and declarations
+20. ``ai.notes.supplementary`` — Free-text supplementary-material rules
+21. ``ai.notes.tables`` — Free-text table rules
+22. ``ai.notes.title_page`` — Free-text title-page rules
+23. ``ai.prose`` — Spelling, grammar, and tense (read by AI)
+24. ``ai.reference_format`` — Reference list follows the guidelines' style
+25. ``ai.reference_journal.*`` — Each cited journal is correctly identified and indexed (full reference check)
+26. ``ai.reference_source.*`` — Each cited source supports the claims that cite it (full reference check)
+27. ``ai.tables_editable`` — Tables are editable text, not images
+28. ``ai.template`` — Manuscript looks prepared with the venue's template
+29. ``ai.title_page_items`` — Title-page items that need reading (address, footnotes, summary, classification)
+30. ``ai.unverified_references`` — References that could not be verified are real
 
 **Bibliography**
 
-- ``bibliography.age`` — Reference publication ages
-- ``bibliography.density`` — Citation occurrences per 1,000 words
-- ``bibliography.entries`` — BibTeX entries are complete, closed, and have unique keys
-- ``bibliography.self_citations`` — Self-citations not excessive
-- ``bibliography.uncited`` — Every reference is cited, and every citation has a reference
+31. ``bibliography.age`` — Reference publication ages
+32. ``bibliography.density`` — Citation occurrences per 1,000 words
+33. ``bibliography.entries`` — BibTeX entries are complete, closed, and have unique keys
+34. ``bibliography.self_citations`` — Self-citations not excessive
+35. ``bibliography.uncited`` — Every reference is cited, and every citation has a reference
 
 **Figure and table citations**
 
-- ``citations.cross_references`` — Cross-references resolve (no “??”)
-- ``citations.figure`` — Main figures cited in order
-- ``citations.panels`` — Figure and table panels cited in order
-- ``citations.supp_figure`` — Supplementary figures cited in order
-- ``citations.supp_table`` — Supplementary tables cited in order
-- ``citations.table`` — Main tables cited in order
+36. ``citations.cross_references`` — Cross-references resolve (no “??”)
+37. ``citations.figure`` — Main figures cited in order
+38. ``citations.panels`` — Figure and table panels cited in order
+39. ``citations.supp_figure`` — Supplementary figures cited in order
+40. ``citations.supp_table`` — Supplementary tables cited in order
+41. ``citations.table`` — Main tables cited in order
 
 **Submission and manuscript consistency**
 
-- ``consistency.abstract`` — Abstract in the .sub matches the manuscript
-- ``consistency.authors`` — Authors in the .sub match the manuscript (names, order, emails, ORCIDs)
-- ``consistency.display_counts`` — Figure and table counts stated on the title page match the manuscript
-- ``consistency.keywords`` — Keywords in the .sub match the manuscript
-- ``consistency.statements`` — Statements in the .sub match the manuscript
-- ``consistency.title`` — Title in the .sub matches the manuscript
-- ``consistency.word_counts`` — Word counts stated on the title page match the manuscript
+42. ``consistency.abstract`` — Abstract in the .sub matches the manuscript
+43. ``consistency.authors`` — Authors in the .sub match the manuscript (names, order, emails, ORCIDs)
+44. ``consistency.display_counts`` — Figure and table counts stated on the title page match the manuscript
+45. ``consistency.keywords`` — Keywords in the .sub match the manuscript
+46. ``consistency.statements`` — Statements in the .sub match the manuscript
+47. ``consistency.title`` — Title in the .sub matches the manuscript
+48. ``consistency.word_counts`` — Word counts stated on the title page match the manuscript
 
 **Cover letter**
 
-- ``cover_letter.date`` — Cover letter dated within the last 7 days
-- ``cover_letter.venue`` — Cover letter addressed to the target venue
+49. ``cover_letter.date`` — Cover letter dated within the last 7 days
+50. ``cover_letter.venue`` — Cover letter addressed to the target venue
 
 **Additional manuscript details**
 
-- ``details.reference_order`` — Reference list is alphabetical or follows first citation
-- ``details.word_cleanliness`` — Word files have no tracked changes or EndNote fields
+51. ``details.reference_order`` — Reference list is alphabetical or follows first citation
+52. ``details.word_cleanliness`` — Word files have no tracked changes or EndNote fields
 
 **Figures**
 
-- ``figures.color_mode`` — Figure color mode
-- ``figures.colorblind`` — Figure colors distinguishable with red-green color blindness
-- ``figures.dimensions`` — Figure print size
-- ``figures.dpi`` — Figure resolution (dpi)
-- ``figures.font`` — Figure lettering typeface
-- ``figures.legends`` — Figure legends (length and location)
-- ``figures.lettering`` — Figure panel labels
-- ``figures.placement`` — Figures placed where the guidelines ask
-- ``figures.text_size`` — Figure lettering size
+53. ``figures.color_mode`` — Figure color mode
+54. ``figures.colorblind`` — Figure colors distinguishable with red-green color blindness
+55. ``figures.dimensions`` — Figure print size
+56. ``figures.dpi`` — Figure resolution (dpi)
+57. ``figures.font`` — Figure lettering typeface
+58. ``figures.legends`` — Figure legends (length and location)
+59. ``figures.lettering`` — Figure panel labels
+60. ``figures.placement`` — Figures placed where the guidelines ask
+61. ``figures.text_size`` — Figure lettering size
 
 **Files**
 
-- ``files.manuscript_length`` — Manuscript within the portal's word/page limits
-- ``files.total_size`` — Combined upload size
-- ``files.uploads`` — Upload files exist and have accepted types and sizes
+62. ``files.manuscript_length`` — Manuscript within the portal's word/page limits
+63. ``files.total_size`` — Combined upload size
+64. ``files.uploads`` — Upload files exist and have accepted types and sizes
 
 **Submission form**
 
-- ``form`` — Submission form fields
-- ``form.authors`` — Author list is complete (names, corresponding author, emails)
-- ``form.counts`` — Item counts within the form's limits
-- ``form.lengths`` — Text within the form's word/character limits
-- ``form.options`` — Choices are valid options
-- ``form.required`` — Required fields are filled and confirmations given
-- ``form.schema`` — Field values have the right type and known field ids
-- ``form.subfields`` — Structured entries (funding, reviewers, ...) are complete
-- ``form.urls`` — Link fields hold http(s) URLs
+65. ``form`` — Submission form fields
+66. ``form.authors`` — Author list is complete (names, corresponding author, emails)
+67. ``form.counts`` — Item counts within the form's limits
+68. ``form.lengths`` — Text within the form's word/character limits
+69. ``form.options`` — Choices are valid options
+70. ``form.required`` — Required fields are filled and confirmations given
+71. ``form.schema`` — Field values have the right type and known field ids
+72. ``form.subfields`` — Structured entries (funding, reviewers, ...) are complete
+73. ``form.urls`` — Link fields hold http(s) URLs
 
 **Abstract and front matter**
 
-- ``front_matter.abstract_citations`` — Abstract cites no references
-- ``front_matter.contact_email`` — Manuscript gives a contact e-mail address
-- ``front_matter.structured_abstract`` — Abstract structured with the required headings
+74. ``front_matter.abstract_citations`` — Abstract cites no references
+75. ``front_matter.contact_email`` — Manuscript gives a contact e-mail address
+76. ``front_matter.structured_abstract`` — Abstract structured with the required headings
 
 **Venue guidelines**
 
-- ``guidelines`` — Manuscript checked against the author guidelines
-- ``guidelines.abstract_abbreviations`` — Abstract defines its abbreviations
-- ``guidelines.counts`` — Number of figures, tables, and supplementary files
-- ``guidelines.cover_letter`` — Cover letter provided and within length
-- ``guidelines.formats`` — Files are in formats the guidelines accept
-- ``guidelines.length`` — Manuscript within the guidelines' word/page limits
-- ``guidelines.reference_count`` — Reference count within the limit
-- ``guidelines.reference_list`` — Reference entries (DOIs, preprints, unpublished work)
-- ``guidelines.reference_style`` — Citation style (numbered or author-year, in order)
-- ``guidelines.section_order`` — Sections in the guidelines' order
-- ``guidelines.sections`` — Required section headings present
-- ``guidelines.sizes`` — Files within the guidelines' size limits
-- ``guidelines.statements`` — Required statements and declarations present
-- ``guidelines.supplementary`` — Supplementary material bundled as the guidelines ask
-- ``guidelines.template`` — Layout matches the venue's compiled template
-- ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
-- ``guidelines.title_page`` — Title page carries the required items
-- ``guidelines.title_page_file`` — Title page uploaded as a separate file
+77. ``guidelines`` — Manuscript checked against the author guidelines
+78. ``guidelines.abstract_abbreviations`` — Abstract defines its abbreviations
+79. ``guidelines.counts`` — Number of figures, tables, and supplementary files
+80. ``guidelines.cover_letter`` — Cover letter provided and within length
+81. ``guidelines.formats`` — Files are in formats the guidelines accept
+82. ``guidelines.length`` — Manuscript within the guidelines' word/page limits
+83. ``guidelines.reference_count`` — Reference count within the limit
+84. ``guidelines.reference_list`` — Reference entries (DOIs, preprints, unpublished work)
+85. ``guidelines.reference_style`` — Citation style (numbered or author-year, in order)
+86. ``guidelines.section_order`` — Sections in the guidelines' order
+87. ``guidelines.sections`` — Required section headings present
+88. ``guidelines.sizes`` — Files within the guidelines' size limits
+89. ``guidelines.statements`` — Required statements and declarations present
+90. ``guidelines.supplementary`` — Supplementary material bundled as the guidelines ask
+91. ``guidelines.template`` — Layout matches the venue's compiled template
+92. ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
+93. ``guidelines.title_page`` — Title page carries the required items
+94. ``guidelines.title_page_file`` — Title page uploaded as a separate file
 
 **Integrity and external sources**
 
-- ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
-- ``integrity.dois`` — Reference DOIs match the works they cite
-- ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
-- ``integrity.links`` — Links cited in the files are reachable
-- ``integrity.openreview`` — Authors' OpenReview profiles
-- ``integrity.pdf_reader`` — PDF glyph reader (pdfminer.six) available
-- ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
-- ``integrity.retractions`` — No cited work has been retracted
-- ``integrity.sensitive`` — No secrets or private information in the files
-- ``integrity.unmatched_references`` — References without a DOI match a registered work
+95. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
+96. ``integrity.dois`` — Reference DOIs match the works they cite
+97. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
+98. ``integrity.links`` — Links cited in the files are reachable
+99. ``integrity.openreview`` — Authors' OpenReview profiles
+100. ``integrity.pdf_reader`` — PDF glyph reader (pdfminer.six) available
+101. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
+102. ``integrity.retractions`` — No cited work has been retracted
+103. ``integrity.sensitive`` — No secrets or private information in the files
+104. ``integrity.unmatched_references`` — References without a DOI match a registered work
 
 **Page layout**
 
-- ``layout.font`` — Body font
-- ``layout.font_size`` — Body text size
-- ``layout.language`` — English spelling variant
-- ``layout.line_numbers`` — Continuous line numbers
-- ``layout.line_spacing`` — Double line spacing
-- ``layout.margins`` — Page margins
-- ``layout.page_numbers`` — Page numbers
-- ``layout.page_size`` — Page size
-- ``layout.template`` — Prepared with the venue's template or LaTeX class
+105. ``layout.font`` — Body font
+106. ``layout.font_size`` — Body text size
+107. ``layout.language`` — English spelling variant
+108. ``layout.line_numbers`` — Continuous line numbers
+109. ``layout.line_spacing`` — Double line spacing
+110. ``layout.margins`` — Page margins
+111. ``layout.page_numbers`` — Page numbers
+112. ``layout.page_size`` — Page size
+113. ``layout.template`` — Prepared with the venue's template or LaTeX class
 
 **Prose**
 
-- ``prose.acronyms`` — Acronyms spelled out at first use
-- ``prose.brackets`` — Brackets and quotes pair up
-- ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
-- ``prose.double_spaces`` — Double spaces between words
-- ``prose.numbers`` — Numbers of 10 or more in digits
-- ``prose.punctuation_spacing`` — Spacing around punctuation
-- ``prose.repeated_words`` — Repeated words
-- ``prose.repetition`` — Varied word choice (no heavily repeated words)
-- ``prose.spelling`` — Common misspellings (codespell)
+114. ``prose.acronyms`` — Acronyms spelled out at first use
+115. ``prose.brackets`` — Brackets and quotes pair up
+116. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
+117. ``prose.double_spaces`` — Double spaces between words
+118. ``prose.numbers`` — Numbers of 10 or more in digits
+119. ``prose.punctuation_spacing`` — Spacing around punctuation
+120. ``prose.repeated_words`` — Repeated words
+121. ``prose.repetition`` — Varied word choice (no heavily repeated words)
+122. ``prose.spelling`` — Common misspellings (codespell)
 
 .. END VALIDATION CHECK LIST
 

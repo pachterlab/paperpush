@@ -115,6 +115,7 @@ def check_list(catalog: dict[str, str]) -> str:
     by_group: dict[str, list[str]] = {}
     for check_id in sorted(catalog):
         by_group.setdefault(check_id.split(".")[0], []).append(check_id)
+    number = 0
     lines = ["All validation check types", "--------------------------", "",
              "Each item below is a distinct report check ID. A check may be not applicable,",
              "unable to run, or require a reader; which ones run depends on the venue, files,",
@@ -124,6 +125,7 @@ def check_list(catalog: dict[str, str]) -> str:
     for prefix, ids in by_group.items():
         lines.extend([f"**{groups.get(prefix, prefix.replace('_', ' ').title())}**", ""])
         for check_id in ids:
+            number += 1
             # Report titles may quote venue wording; keep generated docs in US English.
             title = re.sub(
                 r"\bcolour(s)?\b",
@@ -131,7 +133,7 @@ def check_list(catalog: dict[str, str]) -> str:
                 catalog[check_id],
                 flags=re.I,
             )
-            lines.append(f"- ``{check_id}`` — {title}")
+            lines.append(f"{number}. ``{check_id}`` — {title}")
         lines.append("")
     return "\n".join(lines).rstrip()
 
