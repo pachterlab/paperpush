@@ -129,7 +129,13 @@ Checks that run without AI
 - Secrets and private data (:ref:`vc-sensitive`)
 - Hidden text and prompt injection (:ref:`vc-hidden-text`)
 - Anonymity, for double-blind venues (:ref:`vc-anonymity`)
-- OpenReview profiles, for OpenReview venues (:ref:`vc-openreview`)
+- OpenReview IDs and profiles, for OpenReview venues (:ref:`vc-openreview`):
+  every author has an Open Review ID (a warning for each one that doesn't,
+  even if their name matches a single profile); the ID exists and its
+  profile is active (errors); the name in the ``.sub`` matches the profile;
+  and the profile lists a current position, carries the author's email
+  suffixes, and has DBLP and expertise for reciprocal reviewers. Needs the
+  login stored by ``paperpush login VENUE``.
 
 **Guidelines** (:ref:`vc-guidelines`, measured against
 ``manuscript_requirements.json``; see :doc:`requirements`)

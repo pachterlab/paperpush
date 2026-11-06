@@ -378,14 +378,12 @@ since a leak can get a paper desk-rejected.
 - **OpenReview profiles** (OpenReview venues: ICLR, AAAI;
   `--dont-check-openreview-profiles` skips it). Each author is looked up
   through the OpenReview API using the stored `paperpush login`. Reported:
-  missing, ambiguous, or inactive profiles, name or email-suffix mismatches, no
+  a missing Open Review ID (always a warning, even when the name matches one
+  profile), missing, ambiguous, or inactive profiles, name or email-suffix mismatches, no
   current position, and reviewers without DBLP or expertise. Messages start
   with `openreview:`. Without a stored login the check is skipped with a note;
   that is another reason to have the user log in first. Profile fixes happen on
-  openreview.net and are the user's to make. Separately, and without network
-  access or a login, the author-list form check warns about every author line
-  with no Open Review ID (conflict lines excluded): the portal then adds that
-  author by a name search, which can match no profile or several.
+  openreview.net and are the user's to make.
 
 ## After it runs, tell the user what's left
 

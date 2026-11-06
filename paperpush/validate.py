@@ -1461,13 +1461,13 @@ def validate_report(
     if pdf_reader:
         checks.record("integrity.pdf_reader", "PDF glyph reader (pdfminer.six) available", integrity, report.UNCHECKED, issues=[replace_unchecked(i) for i in pdf_reader])
     if not openreview_applies:
-        checks.record("integrity.openreview", "Authors' OpenReview profiles", integrity, report.NOT_APPLICABLE, detail="the venue is not submitted through OpenReview")
+        checks.record("integrity.openreview", "Authors' OpenReview IDs and profiles", integrity, report.NOT_APPLICABLE, detail="the venue is not submitted through OpenReview")
     elif files_only:
-        checks.record("integrity.openreview", "Authors' OpenReview profiles", integrity, report.NOT_APPLICABLE, detail="no .sub file, so there is no author list to look up")
+        checks.record("integrity.openreview", "Authors' OpenReview IDs and profiles", integrity, report.NOT_APPLICABLE, detail="no .sub file, so there is no author list to look up")
     elif check_openreview:
-        bar.run("OpenReview profiles", checks.run, "integrity.openreview", "Authors' OpenReview profiles", integrity, _openreview_profile_issues, venue, values)
+        bar.run("OpenReview profiles", checks.run, "integrity.openreview", "Authors' OpenReview IDs and profiles", integrity, _openreview_profile_issues, venue, values)
     else:
-        checks.record("integrity.openreview", "Authors' OpenReview profiles", integrity, report.UNCHECKED, detail="switched off (--dont-check-openreview-profiles)")
+        checks.record("integrity.openreview", "Authors' OpenReview IDs and profiles", integrity, report.UNCHECKED, detail="switched off (--dont-check-openreview-profiles)")
 
     if check_manuscript:
         from . import requirements_check

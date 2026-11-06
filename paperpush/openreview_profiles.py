@@ -13,6 +13,8 @@ name) and reports:
 * no profile (an error when the ID was given; a warning when only the name
   was searched, since the name search is not exhaustive);
 * several profiles with the same name and no ID to pick one;
+* no Open Review ID, even when the name matches a single profile (a namesake
+  could be picked), so every name-only line is flagged;
 * a profile that is not active yet (still in moderation);
 * a name that does not match the profile, when both are given;
 * no current position in the profile's career history;
@@ -219,8 +221,10 @@ def check(venue, values: dict[str, str], *, today: _dt.date | None = None) -> li
                 continue
             exact, total = result
             suffixes = [s for s in re.split(r"[,\s]+", str(author.get("email_suffixes", ""))) if s]
+            narrowed_by_suffix = False
             if suffixes and len(exact) > 1:
                 narrowed = [p for p in exact if any(_suffix_matches(s, _domains(p)) for s in suffixes)]
+                narrowed_by_suffix = bool(narrowed) and len(narrowed) < len(exact)
                 exact = narrowed or exact
             if not exact:
                 problems.append(Problem(False, field.id, f"{who}: no OpenReview profile is named exactly '{name}'" + ("; every author needs a profile, and the portal adds authors by this name -- add their Open Review ID" if is_author else "; OpenReview will skip this conflict")))
@@ -230,6 +234,10 @@ def check(venue, values: dict[str, str], *, today: _dt.date | None = None) -> li
                 problems.append(Problem(False, field.id, f"{who}: {len(exact)} OpenReview profiles share this name ({shown}{', ...' if len(exact) > 5 else ''}); add the Open Review ID so the right one is used"))
                 continue
             profile = exact[0]
+            # A lone exact-name match can still be a namesake (or the person may
+            # have no profile yet), so a name-only row is always flagged.
+            how = "the only profile named exactly '" + name + "'" + (" with a matching email suffix" if narrowed_by_suffix else "")
+            problems.append(Problem(False, field.id, f"{who}: no Open Review ID; matched by name to {profile.get('id', '')}, {how} -- confirm it is theirs and add the ID"))
         else:
             continue
 

@@ -81,8 +81,8 @@ def test_complete_profiles_pass(fake_api):
     assert _check("~Ada_Lovelace1 | Ada Lovelace | caltech.edu | yes") == []
 
 
-def test_profiles_found_by_exact_name(fake_api):
-    assert _check(" | Ada Lovelace | caltech.edu | yes") == []
+def test_name_only_match_still_warns_about_the_missing_id(fake_api):
+    assert _check(" | Ada Lovelace | caltech.edu | yes") == [(False, "Ada Lovelace: no Open Review ID; matched by name to ~Ada_Lovelace1, the only profile named exactly 'Ada Lovelace' -- confirm it is theirs and add the ID")]
 
 
 def test_unknown_id_is_an_error(fake_api):
@@ -98,7 +98,8 @@ def test_unknown_name_is_a_warning(fake_api):
 def test_ambiguous_name_needs_an_id_unless_suffix_disambiguates(fake_api):
     ((error, message),) = _check(" | Alan Turing | | yes")
     assert not error and "2 OpenReview profiles share this name" in message
-    assert _check(" | Alan Turing | princeton.edu | yes") == []
+    ((error, message),) = _check(" | Alan Turing | princeton.edu | yes")
+    assert not error and "matched by name to ~Alan_Turing2" in message and "with a matching email suffix" in message
 
 
 def test_profile_state_history_suffix_and_reviewer_details(fake_api):

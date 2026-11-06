@@ -155,7 +155,7 @@ cited reference when ``--reference-check-full`` is used. Venue rules marked
 96. ``integrity.dois`` — Reference DOIs match the works they cite
 97. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
 98. ``integrity.links`` — Links cited in the files are reachable
-99. ``integrity.openreview`` — Authors' OpenReview profiles
+99. ``integrity.openreview`` — Authors' OpenReview IDs and profiles
 100. ``integrity.pdf_reader`` — PDF glyph reader (pdfminer.six) available
 101. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
 102. ``integrity.retractions`` — No cited work has been retracted
@@ -1315,7 +1315,9 @@ profile, or several, stalls the form.
 
 For a venue whose author list has an Open Review ID column, each author is
 looked up through the OpenReview API. The ID is used when given; otherwise the
-lookup searches for the exact name. OpenReview blocks anonymous API clients, so
+lookup searches for the exact name. A name-only row is always flagged, even
+when exactly one profile has that name, because the match may be a namesake.
+OpenReview blocks anonymous API clients, so
 paperpush signs in with the login stored by ``paperpush login VENUE``. Without
 one, the pass is skipped with a note. Reported, with messages starting
 ``openreview:``:
@@ -1325,10 +1327,16 @@ one, the pass is skipped with a note. Reported, with messages starting
   moderation, which can take up to two weeks.
 - **warning**:
 
-  - no profile found under the author's exact name;
-  - several profiles share the name and no ID picks one (email suffixes are
-    used to narrow the matches first);
-  - a name that doesn't match the profile given by ID;
+  - no Open Review ID given. The message depends on what the name search finds:
+
+    - no profile has the author's exact name;
+    - several profiles share the name (email suffixes are used to narrow the
+      matches first);
+    - exactly one profile has the name. It is used for the checks below, and
+      the warning names it so you can confirm it and add its ID;
+
+  - a name in the ``.sub`` that doesn't match the names on the profile given
+    by ID;
   - no current position in the profile's career history;
   - email suffixes that appear nowhere on the profile;
   - the same profile listed twice;
@@ -1337,8 +1345,8 @@ one, the pass is skipped with a note. Reported, with messages starting
 
 - **warning** (ICLR): no author is marked as a reciprocal reviewer.
 
-AAAI's conflicts list is checked only for profiles that don't exist, since
-OpenReview skips those. Pass ``--dont-check-openreview-profiles`` to skip this
+AAAI's conflicts list is checked for missing IDs and for profiles that don't
+exist, since OpenReview skips those. Pass ``--dont-check-openreview-profiles`` to skip this
 pass.
 
 See also
