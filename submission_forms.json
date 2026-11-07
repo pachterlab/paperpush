@@ -1765,6 +1765,11 @@
           "Matters Arising",
           "Down to Business"
         ]
+      },
+      {
+        "id": "cover_letter",
+        "required": true,
+        "help": "Required. Path to the cover letter, uploaded as the 'Author Cover Letter' on the eJournalPress upload step."
       }
     ]
   },
@@ -1781,6 +1786,11 @@
           "Analysis",
           "Reusability Report"
         ]
+      },
+      {
+        "id": "cover_letter",
+        "required": true,
+        "help": "Required. Path to the cover letter, uploaded as the 'Author Cover Letter' on the eJournalPress upload step."
       }
     ]
   },

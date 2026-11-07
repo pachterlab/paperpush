@@ -1,7 +1,7 @@
 {
   "data_format": 2,
-  "commit": "e43fbb456bc73fcad3a8f302b0d3a84afdee7833",
-  "published_at": "2026-11-07T00:14:15-08:00",
+  "commit": "fae2d3b9412e32d3c844a2a9a6491c4710114ea8",
+  "published_at": "2026-11-07T02:34:19-08:00",
   "files": {
     "_assets/aaai_2027_countries.txt": "1d4f026a58ba8487655950050e6083e901527f7bbd52d66e458fd4dbe8adcbb0",
     "_assets/aaai_2027_topics.txt": "5590bec01e7be137d7f5bd8bb07aeb155499de071d33bc356da88e1bb38baf9a",
@@ -20,9 +20,9 @@
     "_assets/science_signaling_subjects.txt": "5842a971be87377ff86ffb77e1fffa1eae6b392d3718d71af3ea72b51ea21c79",
     "_assets/science_subjects.txt": "c40afa2c15ce65164f43216c80ed26cef3c040017036e456322734d3dfbcb670",
     "_assets/science_translational_medicine_subjects.txt": "b13c4d61625c528587c85baf8b25cbe81501dd9d55f1ae92e3cf0333e5b29760",
-    "manuscript_requirements.json": "41399d5203c5263210bba73e29d9074cf46a15064ce5b0602e2478cca1cbedf2",
+    "manuscript_requirements.json": "5f0a8c38cc407eeda1bd7b80b2c33733d303dc66535028b9391692aac3b28bda",
     "manuscript_requirements.schema.json": "c07c4e5b87187928f14ead5eb3bb58f90c00d7d006a2436051e063e64c739e2a",
-    "submission_forms.json": "9209590abb4e6e4caab31177d41e6ad3ddbea99fef3a03361fa09891b8fae10d",
+    "submission_forms.json": "8ad4a6d104624fd7858b20cb42b5474ec4dea82558a7af6d2a4a918af04cac5e",
     "submission_forms.schema.json": "f938987758e03532effd5bf118f03b747d9ddfaff042237ec7e2ec4f651aa9ad",
     "venues.json": "19d9b0d099def51307dd13c3976fc43f2bdf9bffabd39b07a55d0faff601b953",
     "venues.schema.json": "3055a32589d19141a3211a8954072e2302e37ce7716465d53c6e96bbbe36e7a7"
