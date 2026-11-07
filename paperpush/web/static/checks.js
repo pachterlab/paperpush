@@ -22,7 +22,7 @@
     "form.schema": ["Field values have the right type and known field ids", "Submission form"],
     "form.required": ["Required fields are filled and confirmations given", "Submission form"],
     "form.options": ["Choices are valid options", "Submission form"],
-    "form.counts": ["Item counts within the form's limits", "Submission form"],
+    "form.counts": ["Number of entries in list fields (keywords, authors, suggested reviewers, …) within the form's limits", "Submission form"],
     "form.lengths": ["Text within the form's word/character limits", "Submission form"],
     "form.urls": ["Link fields hold http(s) URLs", "Submission form"],
     "form.authors": ["Author list is complete (names, corresponding author, emails)", "Submission form"],

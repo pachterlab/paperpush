@@ -746,7 +746,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     base = get_requirements(venue.slug)
     if base is None:
         logger.debug("No manuscript requirements recorded for %s", venue.slug)
-        checks.record("guidelines", "Manuscript checked against the author guidelines", GUIDELINES, NOT_APPLICABLE, detail="no venue given (name one with --venue to check its author guidelines)" if venue.is_generic else f"no author-guideline rules are recorded for {venue.slug}")
+        checks.record("guidelines", "Author-guideline checks ran (needs a venue with recorded guidelines)", GUIDELINES, NOT_APPLICABLE, detail="no venue given (name one with --venue to check its author guidelines)" if venue.is_generic else f"no author-guideline rules are recorded for {venue.slug}")
         return
     reqs = resolve(base, values)
     logger.info("Checking %s against its manuscript requirements", venue.slug)
@@ -764,12 +764,12 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     run("guidelines.title_page", "Title page carries the required items", _title_page_check, checks, venue, reqs, values)
     run("guidelines.title_page_file", "Title page uploaded as a separate file", _title_page_file_check, venue, reqs, values)
     run("guidelines.reference_count", "Reference count within the limit", _reference_count_check, venue, reqs, values)
-    run("guidelines.reference_style", "Citation style (numbered or author-year, in order)", _reference_style_check, venue, reqs, values)
-    run("guidelines.reference_list", "Reference entries (DOIs, preprints, unpublished work)", _reference_list_check, venue, reqs, values)
-    run("guidelines.counts", "Number of figures, tables, and supplementary files", _counts_check, venue, reqs, values)
+    run("guidelines.reference_style", "Citation style matches the guidelines (numbered or author-year)", _reference_style_check, venue, reqs, values)
+    run("guidelines.reference_list", "Reference entries follow the guidelines' rules on DOIs, preprints, and unpublished work", _reference_list_check, venue, reqs, values)
+    run("guidelines.counts", "Number of figures, tables, and supplementary files within the guidelines' limits", _counts_check, venue, reqs, values)
     run("guidelines.supplementary", "Supplementary material bundled and within length as the guidelines ask", _supplementary_check, venue, reqs, values)
     run("guidelines.cover_letter", "Cover letter provided and within length", _cover_letter_check, venue, reqs, values)
-    run("guidelines.template", "Layout matches the venue's compiled template", _template_check, venue, reqs, values)
+    run("guidelines.template", "Page layout matches a compiled copy of the venue's template", _template_check, venue, reqs, values)
 
 
 def _formats_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:

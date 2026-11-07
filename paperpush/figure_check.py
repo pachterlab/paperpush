@@ -426,12 +426,12 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         else:
             checks.run(check_id, title, FIGURES, fn, *args)
 
-    run("figures.dpi", "Figure resolution (dpi)", rules.min_dpi or rules.min_dpi_line_art, "the guidelines set no minimum resolution", _dpi_check, inv, rules, where)
-    run("figures.text_size", "Figure lettering size", rules.min_font_size_pt or rules.max_font_size_pt, "the guidelines set no figure lettering size", _text_size_check, checks, inv, rules, where)
-    run("figures.font", "Figure lettering typeface", rules.font, "the guidelines name no figure font", _font_check, checks, inv, rules, where)
-    run("figures.lettering", "Figure panel labels", True, "", _lettering_check, checks, venue, values, inv, rules)
-    run("figures.color_mode", "Figure colour mode", rules.color_mode and inv.attached, "the guidelines set no colour mode (or no figure files are attached)", _color_mode_check, inv, rules)
-    run("figures.dimensions", "Figure print size", (rules.max_width_mm or rules.max_height_mm) and inv.attached, "the guidelines set no maximum figure size (or no figure files are attached)", _dimensions_check, inv, rules)
+    run("figures.dpi", "Figures meet the minimum resolution (dpi)", rules.min_dpi or rules.min_dpi_line_art, "the guidelines set no minimum resolution", _dpi_check, inv, rules, where)
+    run("figures.text_size", "Figure lettering within the guidelines' size range", rules.min_font_size_pt or rules.max_font_size_pt, "the guidelines set no figure lettering size", _text_size_check, checks, inv, rules, where)
+    run("figures.font", "Figure lettering uses the required typeface", rules.font, "the guidelines name no figure font", _font_check, checks, inv, rules, where)
+    run("figures.lettering", "Figure panels labeled in the required style (e.g., a, b, c)", True, "", _lettering_check, checks, venue, values, inv, rules)
+    run("figures.color_mode", "Figure colour mode (RGB, CMYK, grayscale) matches the guidelines", rules.color_mode and inv.attached, "the guidelines set no colour mode (or no figure files are attached)", _color_mode_check, inv, rules)
+    run("figures.dimensions", "Figures within the guidelines' maximum width and height", (rules.max_width_mm or rules.max_height_mm) and inv.attached, "the guidelines set no maximum figure size (or no figure files are attached)", _dimensions_check, inv, rules)
     if inv.figures:
         _content_task(checks, venue, values, inv)
     # Reads the colours itself (pypdf and Pillow), so it does not need the inventory's figures.

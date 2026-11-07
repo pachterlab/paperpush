@@ -668,20 +668,20 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
             return
         checks.run(check_id, title, LAYOUT, _run_per_file, venue, values, fn)
 
-    run("layout.template", "Prepared with the venue's template or LaTeX class", rules.template_required or rules.latex_class, "the guidelines require no template", lambda f, m: _template(checks, f, m, reqs))
-    run("layout.page_size", "Page size", rules.page_size, "the guidelines set no page size", lambda f, m: _page_size(f, m, rules.page_size))
-    run("layout.margins", "Page margins", rules.margins_mm, "the guidelines set no margins", lambda f, m: _margins(f, m, rules.margins_mm))
-    run("layout.font_size", "Body text size", rules.font_size_pt, "the guidelines set no body font size", lambda f, m: _font_size(f, m, rules.font_size_pt))
-    run("layout.font", "Body font", rules.font, "the guidelines name no body font", lambda f, m: _font(f, m, rules.font))
-    run("layout.line_spacing", "Double line spacing", rules.double_spacing, "the guidelines do not ask for double spacing", lambda f, m: _spacing(f, m))
-    run("layout.line_numbers", "Continuous line numbers", rules.line_numbers, "the guidelines do not ask for line numbers", lambda f, m: _line_numbers(f, m))
-    run("layout.page_numbers", "Page numbers", rules.page_numbers, "the guidelines do not ask for page numbers", lambda f, m: _page_numbers(f, m))
+    run("layout.template", "Uses the venue's Word template or LaTeX class (detected from the file)", rules.template_required or rules.latex_class, "the guidelines require no template", lambda f, m: _template(checks, f, m, reqs))
+    run("layout.page_size", "Page size matches the guidelines (e.g., A4 or Letter)", rules.page_size, "the guidelines set no page size", lambda f, m: _page_size(f, m, rules.page_size))
+    run("layout.margins", "Page margins match the guidelines", rules.margins_mm, "the guidelines set no margins", lambda f, m: _margins(f, m, rules.margins_mm))
+    run("layout.font_size", "Body text size matches the guidelines", rules.font_size_pt, "the guidelines set no body font size", lambda f, m: _font_size(f, m, rules.font_size_pt))
+    run("layout.font", "Body font matches the guidelines", rules.font, "the guidelines name no body font", lambda f, m: _font(f, m, rules.font))
+    run("layout.line_spacing", "Text is double-spaced", rules.double_spacing, "the guidelines do not ask for double spacing", lambda f, m: _spacing(f, m))
+    run("layout.line_numbers", "Lines numbered continuously", rules.line_numbers, "the guidelines do not ask for line numbers", lambda f, m: _line_numbers(f, m))
+    run("layout.page_numbers", "Pages are numbered", rules.page_numbers, "the guidelines do not ask for page numbers", lambda f, m: _page_numbers(f, m))
     language = (rules.language or "").strip()
     applies = bool(language) and language.lower() not in ("english",)
     if applies:
-        checks.run("layout.language", "English spelling variant", LAYOUT, _language_check, venue, values, language)
+        checks.run("layout.language", "Spelling follows the required English variant (US or UK)", LAYOUT, _language_check, venue, values, language)
     else:
-        checks.record("layout.language", "English spelling variant", LAYOUT, _na(), detail="the guidelines name no spelling variant")
+        checks.record("layout.language", "Spelling follows the required English variant (US or UK)", LAYOUT, _na(), detail="the guidelines name no spelling variant")
 
 
 def _na() -> str:
@@ -704,13 +704,13 @@ def _template(checks: Checks, field: Field, m: _Measured, reqs: ManuscriptRequir
             return [], f"uses {wanted}"
         return [_issue(field, f"{m.path.name} does not load the '{wanted}' class or style (it uses \\documentclass{{{', '.join(m.tex.classes) or '?'}}}); the author guidelines require the venue's template{url}")], ""
     if m.docx is not None:
-        task = AiTask(id="ai.template", title="Manuscript looks prepared with the venue's template", category=LAYOUT, instructions=f"The author guidelines require the venue's template{url}. Judge from the manuscript's layout, styles, and front matter whether it was prepared with that template. 'fail' if it plainly was not.", files=[str(m.path)])
+        task = AiTask(id="ai.template", title="Looks prepared with the venue's template (judged from the layout when the file can't tell)", category=LAYOUT, instructions=f"The author guidelines require the venue's template{url}. Judge from the manuscript's layout, styles, and front matter whether it was prepared with that template. 'fail' if it plainly was not.", files=[str(m.path)])
         checks.needs_ai(task)
         if m.docx.template:
             return [], f"Word file attached to template '{m.docx.template}'"
         return [], "no attached Word template recorded in the file"
     if m.pdf is not None:
-        checks.needs_ai(AiTask(id="ai.template", title="Manuscript looks prepared with the venue's template", category=LAYOUT, instructions=f"The author guidelines require the venue's {'LaTeX class ' + repr(rules.latex_class) if rules.latex_class else 'template'}{url}. Judge from the PDF's layout, fonts, headings, and front matter whether it was prepared with it. 'fail' if it plainly was not.", files=[str(m.path)]))
+        checks.needs_ai(AiTask(id="ai.template", title="Looks prepared with the venue's template (judged from the layout when the file can't tell)", category=LAYOUT, instructions=f"The author guidelines require the venue's {'LaTeX class ' + repr(rules.latex_class) if rules.latex_class else 'template'}{url}. Judge from the PDF's layout, fonts, headings, and front matter whether it was prepared with it. 'fail' if it plainly was not.", files=[str(m.path)]))
         raise Unchecked(f"{m.path.name} is a PDF: which template made it can only be judged by eye (an AI check is queued); upload the LaTeX source or Word file to check it directly")
     return None, ""
 

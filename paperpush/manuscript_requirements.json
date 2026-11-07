@@ -10869,12 +10869,19 @@
             "Key Results (up to 3 results, max 75 words, on the abbreviated title page) and a one-sentence Summary Statement (max 30 words) are required.",
             "Structured abstract in five sections: Background, Purpose, Materials and Methods, Results, Conclusion.",
             "For human participants Table 1 should be the demographics table and Figure 1 a flow diagram of participants and exclusions.",
-            "A STARD, CONSORT, PRISMA-DTA, or STROBE checklist is required at first submission for studies with human subjects."
+            "A STARD, CONSORT, PRISMA-DTA, or STROBE checklist is required at first submission for studies with human subjects.",
+            "Introduction states the hypothesis (prospective studies only) and purpose in its final paragraph; no hypothesis for retrospective studies, meta-analyses/systematic reviews, or technical development papers.",
+            "Materials and Methods states prospective or retrospective design, the study date range, sample selection and size derivation, and readers' number, training and years of experience (with initials of author-readers); its last paragraph gives statistical methods, software with version and manufacturer, and the significance threshold.",
+            "Results opens with participant demographics (number, mean age ± SD or median and IQR, men vs women) citing Table 1, and the number excluded per criterion; give numerators and denominators for all percentages and comparison values for every P value.",
+            "P values to 2 decimal places, or 3 when P < .01 (or when rounding to 2 would make P appear non-significant, e.g. P = .046); smallest reported P < .001, largest P > .99; avoid hedge terms such as 'trend' or 'marginal'."
           ]
         },
         "abstract": {
           "max_words": 300,
-          "structured": true
+          "structured": true,
+          "notes": [
+            "Results section of the abstract opens with the number, sex and mean age ± SD (or median and IQR, whole numbers) of participants; the Conclusion must derive directly from the results and address the study purpose."
+          ]
         },
         "references": {
           "max_count": 35
@@ -10884,6 +10891,14 @@
         },
         "tables": {
           "max_count": 4
+        },
+        "sections": {
+          "max_words": {
+            "Introduction": 400,
+            "Methods": 800,
+            "Results": 1000,
+            "Discussion": 800
+          }
         }
       },
       "Technical Developments": {
@@ -10934,7 +10949,8 @@
         },
         "abstract": {
           "max_words": 200,
-          "structured": false
+          "structured": false,
+          "min_words": 100
         },
         "references": {
           "max_count": 100
@@ -11302,7 +11318,7 @@
         "Radiology uses double-anonymized peer review; the manuscript file (abbreviated title page, abstract, main body, references, figure legends, embedded tables) must not identify authors, institution, or funding, and prior work must not be self-identified.",
         "Submit separately: cover letter, full title page, response letter (revisions only), checklist (Original Research and Technical Developments), figures, acknowledgments, supplemental materials.",
         "The manuscript file holds, in order: abbreviated title page (anonymized), abstract, main body, references, figure legends (revisions), and tables embedded one per page.",
-        "Main-text limits shown at the top level are those of Original Research (3,000 words, 6 figures, 4 tables); other article types override them.",
+        "Main-text limits shown at the top level are those of Original Research (3,000 words, 6 figures, 4 tables); its per-section word limits are set under Original Research only; other article types override them.",
         "Double space all text with adequate margins, do not right justify, do not number pages; maximum of 10 abbreviations, each used at least five times.",
         "Manuscript submissions go through ScholarOne; the submitting author must link an ORCID iD, and no multiple corresponding authors are allowed (at most two first authors and two senior authors).",
         "Top-level display-item cap is the Original Research total of 6 figures plus 4 tables."
@@ -11417,7 +11433,9 @@
       ],
       "notes": [
         "Supplemental text, tables and figures are compiled in one Word document uploaded as a 'Supplemental File for Review'; movies (mp4 preferred, under 30 MB) and audio (mp3) are uploaded separately as 'Multimedia'.",
-        "Supplemental material is not copyedited."
+        "Supplemental material is not copyedited.",
+        "Supplemental Materials hold background information, mathematical derivations and statistical analyses essential to understanding the study; summarize and cite them in the relevant main-text section.",
+        "Authors are encouraged to post anonymized raw data or spreadsheets online."
       ]
     },
     "references": {

@@ -453,11 +453,11 @@ def spelling(paragraph: str, table: dict[str, list[str]]) -> list[str]:
 
 _CHECKS = {
     DOUBLE_SPACES: (
-        "Double spaces between words",
+        "No double spaces between words",
         "double space(s) mid-sentence",
         double_spaces,
     ),
-    REPEATED: ("Repeated words", "repeated word(s)", repeated_words),
+    REPEATED: ("No accidentally doubled words (e.g., 'the the')", "repeated word(s)", repeated_words),
     PUNCTUATION: (
         "Spacing around punctuation",
         "spacing problem(s) around punctuation",

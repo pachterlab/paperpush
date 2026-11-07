@@ -131,19 +131,19 @@ _NOTES_FILES = {
     "upload": (),
 }
 _NOTES_TITLES = {
-    "": "General rules in the author guidelines",
-    "manuscript": "Free-text manuscript rules in the author guidelines",
-    "title_page": "Free-text title-page rules",
-    "abstract": "Free-text abstract rules",
-    "keywords": "Free-text keyword rules",
-    "sections": "Free-text section rules",
-    "statements": "Free-text rules for statements and declarations",
-    "figures": "Free-text figure rules",
-    "tables": "Free-text table rules",
-    "supplementary": "Free-text supplementary-material rules",
-    "references": "Free-text reference rules",
-    "cover_letter": "Free-text cover-letter rules",
-    "upload": "Free-text upload rules",
+    "": "Follows the guidelines' other general rules (not checked automatically)",
+    "manuscript": "Follows the guidelines' other manuscript rules (not checked automatically)",
+    "title_page": "Follows the guidelines' other title-page rules (not checked automatically)",
+    "abstract": "Follows the guidelines' other abstract rules (not checked automatically)",
+    "keywords": "Follows the guidelines' other keyword rules (not checked automatically)",
+    "sections": "Follows the guidelines' other section rules (not checked automatically)",
+    "statements": "Follows the guidelines' other rules for statements and declarations (not checked automatically)",
+    "figures": "Follows the guidelines' other figure rules (not checked automatically)",
+    "tables": "Follows the guidelines' other table rules (not checked automatically)",
+    "supplementary": "Follows the guidelines' other supplementary-material rules (not checked automatically)",
+    "references": "Follows the guidelines' other reference rules (not checked automatically)",
+    "cover_letter": "Follows the guidelines' other cover-letter rules (not checked automatically)",
+    "upload": "Follows the guidelines' other upload rules (not checked automatically)",
 }
 # Free-text sub fields compared against the manuscript in the consistency task.
 _CONSISTENCY_SKIP_TYPES = {"file", "filelist", "boolean"}
@@ -180,7 +180,7 @@ def guideline_tasks(venue: Venue, values: dict[str, str]) -> list[AiTask]:
             tasks.append(
                 AiTask(
                     id=f"ai.notes.{section or 'general'}",
-                    title=_NOTES_TITLES.get(section, f"Free-text {section} rules"),
+                    title=_NOTES_TITLES.get(section, f"Follows the guidelines' other {section.replace('_', ' ')} rules (not checked automatically)"),
                     category="Guidelines",
                     instructions=(f"The author guidelines of {venue.full_name or venue.name} state these rules{f' about the {section.replace(chr(95), chr(32))}' if section else ''}:\n{rules}\n" "Check the submission files against every rule that can be judged from them. Rules about the portal, fees, or what happens after submission are not_applicable. " "Report 'fail' and list each rule (by number) the files break, or 'pass' if they meet all that apply."),
                     files=files,

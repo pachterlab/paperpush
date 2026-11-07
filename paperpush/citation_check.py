@@ -728,9 +728,9 @@ def _legend_checks(checks: Checks, venue: Venue, values: dict[str, str], found, 
     base = get_requirements(venue.slug)
     rules = resolve(base, values).figures if base is not None else None
     if rules is None or (not rules.legend_max_words and not rules.legends_location):
-        checks.record("figures.legends", "Figure legends (length and location)", "Figures", NOT_APPLICABLE, detail="the guidelines set no legend length or location")
+        checks.record("figures.legends", "Figure legends within the length limit and placed where the guidelines ask", "Figures", NOT_APPLICABLE, detail="the guidelines set no legend length or location")
         return
-    checks.run("figures.legends", "Figure legends (length and location)", "Figures", _legend_check, venue, values, rules)
+    checks.run("figures.legends", "Figure legends within the length limit and placed where the guidelines ask", "Figures", _legend_check, venue, values, rules)
 
 
 def _legend_check(venue: Venue, values: dict[str, str], rules) -> Outcome:

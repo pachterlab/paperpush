@@ -1417,11 +1417,11 @@ def validate_report(
             uploads = replace(venue, fields=[f for f in venue.fields if f.type in ("file", "filelist") and values.get(f.id, "").strip()])
             _field_checks(checks, uploads, values)
             checks.results = [r for r in checks.results if not r.id.startswith("form.")]
-            checks.record("form", "Submission form fields", form, report.NOT_APPLICABLE, detail="no .sub file, so the form's fields were not checked (only the files named)")
+            checks.record("form", "Submission form checked (needs a .sub file)", form, report.NOT_APPLICABLE, detail="no .sub file, so the form's fields were not checked (only the files named)")
         else:
             checks.run("form.schema", "Field values have the right type and known field ids", form, _schema_issues, venue, values)
             _field_checks(checks, venue, values)
-        checks.run("files.total_size", "Combined upload size", "Files", _total_size_check, venue, values)
+        checks.run("files.total_size", "Combined upload size within the portal's limit", "Files", _total_size_check, venue, values)
 
     bar.run("Submission form", _form_checks)
 
@@ -1459,15 +1459,15 @@ def validate_report(
         checks.record("integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, report.UNCHECKED, detail="switched off (--dont-check-hidden-text)")
     pdf_reader = _pdf_reader_issues(venue, values, check_hidden_text=check_hidden_text, check_manuscript=check_manuscript)
     if pdf_reader:
-        checks.record("integrity.pdf_reader", "PDF glyph reader (pdfminer.six) available", integrity, report.UNCHECKED, issues=[replace_unchecked(i) for i in pdf_reader])
+        checks.record("integrity.pdf_reader", "PDF text extractor (pdfminer.six) installed, which the PDF-based checks need", integrity, report.UNCHECKED, issues=[replace_unchecked(i) for i in pdf_reader])
     if not openreview_applies:
-        checks.record("integrity.openreview", "Authors' OpenReview IDs and profiles", integrity, report.NOT_APPLICABLE, detail="the venue is not submitted through OpenReview")
+        checks.record("integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, report.NOT_APPLICABLE, detail="the venue is not submitted through OpenReview")
     elif files_only:
-        checks.record("integrity.openreview", "Authors' OpenReview IDs and profiles", integrity, report.NOT_APPLICABLE, detail="no .sub file, so there is no author list to look up")
+        checks.record("integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, report.NOT_APPLICABLE, detail="no .sub file, so there is no author list to look up")
     elif check_openreview:
-        bar.run("OpenReview profiles", checks.run, "integrity.openreview", "Authors' OpenReview IDs and profiles", integrity, _openreview_profile_issues, venue, values)
+        bar.run("OpenReview profiles", checks.run, "integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, _openreview_profile_issues, venue, values)
     else:
-        checks.record("integrity.openreview", "Authors' OpenReview IDs and profiles", integrity, report.UNCHECKED, detail="switched off (--dont-check-openreview-profiles)")
+        checks.record("integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, report.UNCHECKED, detail="switched off (--dont-check-openreview-profiles)")
 
     if check_manuscript:
         from . import requirements_check
@@ -1475,7 +1475,7 @@ def validate_report(
         _run_manuscript_stages(bar, checks, venue, values)
         requirements_check.not_implemented(checks, venue, values)
     else:
-        checks.record("guidelines", "Manuscript checked against the author guidelines", "Guidelines", report.UNCHECKED, detail="switched off (--dont-check-manuscript)")
+        checks.record("guidelines", "Author-guideline checks ran (needs a venue with recorded guidelines)", "Guidelines", report.UNCHECKED, detail="switched off (--dont-check-manuscript)")
 
     from . import ai_validate
 
@@ -1702,7 +1702,7 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     titles = {
         "required": ("form.required", "Required fields are filled and confirmations given", form),
         "options": ("form.options", "Choices are valid options", form),
-        "counts": ("form.counts", "Item counts within the form's limits", form),
+        "counts": ("form.counts", "Number of entries in list fields (keywords, authors, suggested reviewers, …) within the form's limits", form),
         "lengths": ("form.lengths", "Text within the form's word/character limits", form),
         "urls": ("form.urls", "Link fields hold http(s) URLs", form),
         "authors": ("form.authors", "Author list is complete (names, corresponding author, emails)", form),

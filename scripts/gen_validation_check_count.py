@@ -91,7 +91,7 @@ def check_catalog() -> dict[str, str]:
                 if check_id:
                     catalog.setdefault(check_id, title or check_id.replace(".", ": ").replace("_", " ").capitalize())
     catalog.update({
-        "ai.cover_letter_venue": "Cover letter addressed to the target venue",
+        "ai.cover_letter_venue": "Cover letter addressed to the target venue (when the automatic check can't decide)",
         "cover_letter.venue": "Cover letter addressed to the target venue",
         "ai.reference_source.*": "Each cited source supports the claims that cite it (full reference check)",
         "ai.reference_journal.*": "Each cited journal is correctly identified and indexed (full reference check)",

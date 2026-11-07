@@ -108,7 +108,8 @@ Checks that run without AI
 - Required fields and confirmations
 - Valid options, including nested drill-down fields
 - Field types
-- Item counts
+- Number of entries in list fields (keywords, authors, suggested reviewers, ...)
+  within the form's limits
 - Word and character limits
 - URLs
 - Author list (parses, with exactly one corresponding author)
@@ -117,8 +118,8 @@ Checks that run without AI
 
 - Files exist
 - Accepted types and sizes
-- Total upload size
-- Portal word and page limits
+- Combined upload size within the portal's limit
+- Manuscript within the portal's word and page limits
 
 **Integrity**
 
@@ -129,7 +130,8 @@ Checks that run without AI
 - Secrets and private data (:ref:`vc-sensitive`)
 - Hidden text and prompt injection (:ref:`vc-hidden-text`)
 - Anonymity, for double-blind venues (:ref:`vc-anonymity`)
-- OpenReview IDs and profiles, for OpenReview venues (:ref:`vc-openreview`):
+- Each author has an active OpenReview profile matching their name and email
+  domain, for OpenReview venues (:ref:`vc-openreview`):
   every author has an Open Review ID (a warning for each one that doesn't,
   even if their name matches a single profile); the ID exists and its
   profile is active (errors); the name in the ``.sub`` matches the profile;
@@ -148,34 +150,39 @@ Checks that run without AI
 - Required statements (data availability, competing interests, ...)
 - Title-page items
 - Separate title page
-- Reference count
-- Citation style (numbered or author-year; numbered in order)
+- Reference count within the limit
+- Citation style matches the guidelines (numbered or author-year; numbered in
+  order)
 - DOIs on every reference
 - Preprints and unpublished work
-- Figure, table, and supplementary counts
+- Number of figures, tables, and supplementary files within the guidelines'
+  limits
 - Combined supplementary PDF
 - Cover letter
-- Edits to a mandatory template (:ref:`vc-template`)
+- Page layout matches a compiled copy of the venue's template
+  (:ref:`vc-template`)
 
 **Layout** (:ref:`vc-layout`)
 
-- Template or LaTeX class
-- Page size and margins
-- Body font and size
-- Double spacing
-- Line numbers and page numbers
-- English spelling variant
+- Uses the venue's Word template or LaTeX class (detected from the file)
+- Page size and margins match the guidelines
+- Body font and text size match the guidelines
+- Text is double-spaced
+- Lines numbered continuously; pages numbered
+- Spelling follows the required English variant (US or UK)
 
 **Figures** (:ref:`vc-figures`; the attached figure files, or the figures
 embedded in the manuscript when none are attached)
 
-- Resolution (dpi, line-art threshold)
-- Lettering size and typeface in vector figures
-- Panel labels (case, bold, cited panels present)
-- Color mode
-- Print size
-- Placement
-- Legend length and location
+- Minimum resolution (dpi, with a separate line-art threshold)
+- Lettering within the size range and in the required typeface, in vector
+  figures
+- Panels labeled in the required style (case, bold) and every cited panel
+  present
+- Color mode (RGB, CMYK, grayscale) matches the guidelines
+- Within the guidelines' maximum width and height
+- Placed where the guidelines ask
+- Legends within the length limit and placed where the guidelines ask
 
 **Citation order** (:ref:`vc-citations`)
 
@@ -201,17 +208,18 @@ embedded in the manuscript when none are attached)
 **Reference list** (:ref:`vc-bibliography`)
 
 - Every reference cited; every citation in the reference list
-- Self-citations not excessive (more than 15, or more than 80% of the list)
+- Self-citations within limits (at most 15, and at most 80% of a list of 5 or
+  more)
 - BibTeX entries complete, closed, and with unique keys
 
 **Prose** (:ref:`vc-prose`; a mechanical proofread, not a grammar check)
 
-- Double spaces between words (not after a sentence)
-- Repeated words ("the the")
+- No double spaces between words (after a sentence is fine)
+- No accidentally doubled words ("the the")
 - Spacing around punctuation ("word ,", "word,word")
-- Unbalanced brackets and quotes
+- Brackets and quotes pair up
 - Common misspellings (codespell)
-- Repetitive word choice (stock words, overused words, a word repeated within
+- Varied word choice (no stock words, overused words, a word repeated within
   a sentence, runs of sentences opening the same way)
 - Numbers of 10 or more in digits; no sentence opening with digits
 - Abbreviations written one way: "i.e."/"e.g.", "et al.", "vs.", "Fig."/"Figure",
@@ -228,10 +236,11 @@ These run with ``--ai``, or through an agent with ``--ai-tasks`` /
 - Lettering size, typeface, and panel labels in raster figures
 - Title-page items found only by reading (postal address, author footnotes,
   one-sentence summary, classification, affiliations)
-- Tables pasted as images
-- Reference formatting in the venue's style
-- Template used, for a PDF or Word manuscript
-- The venue's free-text guideline rules
+- Tables are editable text, not pasted images
+- Reference list follows the guidelines' style
+- Looks prepared with the venue's template, for a PDF or Word manuscript
+- Follows the guidelines' other free-text rules (those not checked
+  automatically)
 - Whether every ``.sub`` field agrees with the manuscript in meaning
 - Spelling, grammar, and tense in the prose
 

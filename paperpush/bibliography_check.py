@@ -335,7 +335,7 @@ def is_self_citation(ref: Ref, authors: list[tuple[str, str, str]]) -> bool:
 
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("bibliography.uncited", "Every reference is cited, and every citation has a reference", REFERENCES, _uncited_check, venue, values)
-    checks.run("bibliography.self_citations", "Self-citations not excessive", REFERENCES, _self_citation_check, venue, values)
+    checks.run("bibliography.self_citations", "Self-citations within limits (at most 15, and at most 80% of references)", REFERENCES, _self_citation_check, venue, values)
     checks.run("bibliography.entries", "BibTeX entries are complete, closed, and have unique keys", REFERENCES, _bib_entries_check, venue, values)
 
 

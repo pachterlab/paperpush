@@ -392,7 +392,7 @@ def test_cli_writes_ai_tasks_and_merges_agent_results(_use, tmp_path, monkeypatc
     results.write_text(json.dumps({"results": [{"id": "ai.notes.general", "status": "fail", "details": "pages are not numbered", "evidence": "p.1"}]}))
     assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "--ai-results", str(results)]) == 0
     out = capsys.readouterr().out
-    assert "General rules in the author guidelines (AI)" in out and "pages are not numbered" in out
+    assert "Follows the guidelines' other general rules (not checked automatically) (AI)" in out and "pages are not numbered" in out
 
 
 def test_cli_ai_without_a_key_says_so_and_still_reports(_use, tmp_path, monkeypatch, capsys):

@@ -25,43 +25,43 @@ cited reference when ``--reference-check-full`` is used. Venue rules marked
 **Checks requiring a reader**
 
 1. ``ai.consistency`` — Every .sub field agrees with the manuscript
-2. ``ai.cover_letter_venue`` — Cover letter addressed to the target venue
-3. ``ai.details.abstract_reporting`` — Abstract reporting structure
-4. ``ai.details.author_details`` — Title-page author details
-5. ``ai.details.declarations`` — Declarations and their positions
+2. ``ai.cover_letter_venue`` — Cover letter addressed to the target venue (when the automatic check can't decide)
+3. ``ai.details.abstract_reporting`` — Abstract has the required form and subheadings (plus PRISMA/CONSORT items for reviews and trials)
+4. ``ai.details.author_details`` — Title page lists authors, affiliations, corresponding author, and contact emails
+5. ``ai.details.declarations`` — Required declarations (conflicts, data, contributions, funding) present and in the right place
 6. ``ai.details.ethics`` — Ethics approval and consent
-7. ``ai.details.supplementary`` — Supplementary-material references
-8. ``ai.details.trademarks`` — Registered trademarks
+7. ``ai.details.supplementary`` — Every mention of supplementary material has a matching uploaded item
+8. ``ai.details.trademarks`` — Trademarked product names and ™/® symbols flagged
 9. ``ai.figures.content_matches_text`` — Each figure and panel shows what its legend and the text say
 10. ``ai.figures.raster_lettering`` — Lettering in raster figures (size, typeface, panel labels)
 11. ``ai.figures.raster_panels_cited`` — Every panel of the raster figures is cited
-12. ``ai.notes.abstract`` — Free-text abstract rules
-13. ``ai.notes.cover_letter`` — Free-text cover-letter rules
-14. ``ai.notes.figures`` — Free-text figure rules
-15. ``ai.notes.general`` — General rules in the author guidelines
-16. ``ai.notes.keywords`` — Free-text keyword rules
-17. ``ai.notes.manuscript`` — Free-text manuscript rules in the author guidelines
-18. ``ai.notes.references`` — Free-text reference rules
-19. ``ai.notes.sections`` — Free-text section rules
-20. ``ai.notes.statements`` — Free-text rules for statements and declarations
-21. ``ai.notes.supplementary`` — Free-text supplementary-material rules
-22. ``ai.notes.tables`` — Free-text table rules
-23. ``ai.notes.title_page`` — Free-text title-page rules
+12. ``ai.notes.abstract`` — Follows the guidelines' other abstract rules (not checked automatically)
+13. ``ai.notes.cover_letter`` — Follows the guidelines' other cover-letter rules (not checked automatically)
+14. ``ai.notes.figures`` — Follows the guidelines' other figure rules (not checked automatically)
+15. ``ai.notes.general`` — Follows the guidelines' other general rules (not checked automatically)
+16. ``ai.notes.keywords`` — Follows the guidelines' other keyword rules (not checked automatically)
+17. ``ai.notes.manuscript`` — Follows the guidelines' other manuscript rules (not checked automatically)
+18. ``ai.notes.references`` — Follows the guidelines' other reference rules (not checked automatically)
+19. ``ai.notes.sections`` — Follows the guidelines' other section rules (not checked automatically)
+20. ``ai.notes.statements`` — Follows the guidelines' other rules for statements and declarations (not checked automatically)
+21. ``ai.notes.supplementary`` — Follows the guidelines' other supplementary-material rules (not checked automatically)
+22. ``ai.notes.tables`` — Follows the guidelines' other table rules (not checked automatically)
+23. ``ai.notes.title_page`` — Follows the guidelines' other title-page rules (not checked automatically)
 24. ``ai.prose`` — Spelling, grammar, and tense (read by AI)
 25. ``ai.reference_format`` — Reference list follows the guidelines' style
 26. ``ai.reference_journal.*`` — Each cited journal is correctly identified and indexed (full reference check)
 27. ``ai.reference_source.*`` — Each cited source supports the claims that cite it (full reference check)
 28. ``ai.tables_editable`` — Tables are editable text, not images
-29. ``ai.template`` — Manuscript looks prepared with the venue's template
+29. ``ai.template`` — Looks prepared with the venue's template (judged from the layout when the file can't tell)
 30. ``ai.title_page_items`` — Title-page items that need reading (address, footnotes, summary, classification)
 31. ``ai.unverified_references`` — References that could not be verified are real
 
 **Bibliography**
 
-32. ``bibliography.age`` — Reference publication ages
-33. ``bibliography.density`` — Citation occurrences per 1,000 words
+32. ``bibliography.age`` — Share of references more than 10 years old
+33. ``bibliography.density`` — Citation density (citations per 1,000 words), reported for information
 34. ``bibliography.entries`` — BibTeX entries are complete, closed, and have unique keys
-35. ``bibliography.self_citations`` — Self-citations not excessive
+35. ``bibliography.self_citations`` — Self-citations within limits (at most 15, and at most 80% of references)
 36. ``bibliography.uncited`` — Every reference is cited, and every citation has a reference
 
 **Figure and table citations**
@@ -95,27 +95,27 @@ cited reference when ``--reference-check-full`` is used. Venue rules marked
 
 **Figures**
 
-54. ``figures.color_mode`` — Figure color mode
+54. ``figures.color_mode`` — Figure color mode (RGB, CMYK, grayscale) matches the guidelines
 55. ``figures.colorblind`` — Figure colors distinguishable with red-green color blindness
-56. ``figures.dimensions`` — Figure print size
-57. ``figures.dpi`` — Figure resolution (dpi)
-58. ``figures.font`` — Figure lettering typeface
-59. ``figures.legends`` — Figure legends (length and location)
-60. ``figures.lettering`` — Figure panel labels
+56. ``figures.dimensions`` — Figures within the guidelines' maximum width and height
+57. ``figures.dpi`` — Figures meet the minimum resolution (dpi)
+58. ``figures.font`` — Figure lettering uses the required typeface
+59. ``figures.legends`` — Figure legends within the length limit and placed where the guidelines ask
+60. ``figures.lettering`` — Figure panels labeled in the required style (e.g., a, b, c)
 61. ``figures.placement`` — Figures placed where the guidelines ask
-62. ``figures.text_size`` — Figure lettering size
+62. ``figures.text_size`` — Figure lettering within the guidelines' size range
 
 **Files**
 
 63. ``files.manuscript_length`` — Manuscript within the portal's word/page limits
-64. ``files.total_size`` — Combined upload size
+64. ``files.total_size`` — Combined upload size within the portal's limit
 65. ``files.uploads`` — Upload files exist and have accepted types and sizes
 
 **Submission form**
 
-66. ``form`` — Submission form fields
+66. ``form`` — Submission form checked (needs a .sub file)
 67. ``form.authors`` — Author list is complete (names, corresponding author, emails)
-68. ``form.counts`` — Item counts within the form's limits
+68. ``form.counts`` — Number of entries in list fields (keywords, authors, suggested reviewers, …) within the form's limits
 69. ``form.lengths`` — Text within the form's word/character limits
 70. ``form.options`` — Choices are valid options
 71. ``form.required`` — Required fields are filled and confirmations given
@@ -131,22 +131,22 @@ cited reference when ``--reference-check-full`` is used. Venue rules marked
 
 **Venue guidelines**
 
-78. ``guidelines`` — Manuscript checked against the author guidelines
+78. ``guidelines`` — Author-guideline checks ran (needs a venue with recorded guidelines)
 79. ``guidelines.abstract_abbreviations`` — Abstract defines its abbreviations
-80. ``guidelines.counts`` — Number of figures, tables, and supplementary files
+80. ``guidelines.counts`` — Number of figures, tables, and supplementary files within the guidelines' limits
 81. ``guidelines.cover_letter`` — Cover letter provided and within length
 82. ``guidelines.formats`` — Files are in formats the guidelines accept
 83. ``guidelines.length`` — Manuscript within the guidelines' word/page limits
 84. ``guidelines.reference_count`` — Reference count within the limit
-85. ``guidelines.reference_list`` — Reference entries (DOIs, preprints, unpublished work)
-86. ``guidelines.reference_style`` — Citation style (numbered or author-year, in order)
+85. ``guidelines.reference_list`` — Reference entries follow the guidelines' rules on DOIs, preprints, and unpublished work
+86. ``guidelines.reference_style`` — Citation style matches the guidelines (numbered or author-year)
 87. ``guidelines.section_length`` — Sections within the guidelines' word limits
 88. ``guidelines.section_order`` — Sections in the guidelines' order
 89. ``guidelines.sections`` — Required section headings present
 90. ``guidelines.sizes`` — Files within the guidelines' size limits
 91. ``guidelines.statements`` — Required statements and declarations present
 92. ``guidelines.supplementary`` — Supplementary material bundled and within length as the guidelines ask
-93. ``guidelines.template`` — Layout matches the venue's compiled template
+93. ``guidelines.template`` — Page layout matches a compiled copy of the venue's template
 94. ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
 95. ``guidelines.title_page`` — Title page carries the required items
 96. ``guidelines.title_page_file`` — Title page uploaded as a separate file
@@ -157,8 +157,8 @@ cited reference when ``--reference-check-full`` is used. Venue rules marked
 98. ``integrity.dois`` — Reference DOIs match the works they cite
 99. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
 100. ``integrity.links`` — Links cited in the files are reachable
-101. ``integrity.openreview`` — Authors' OpenReview IDs and profiles
-102. ``integrity.pdf_reader`` — PDF glyph reader (pdfminer.six) available
+101. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
+102. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
 103. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
 104. ``integrity.retractions`` — No cited work has been retracted
 105. ``integrity.sensitive`` — No secrets or private information in the files
@@ -166,25 +166,25 @@ cited reference when ``--reference-check-full`` is used. Venue rules marked
 
 **Page layout**
 
-107. ``layout.font`` — Body font
-108. ``layout.font_size`` — Body text size
-109. ``layout.language`` — English spelling variant
-110. ``layout.line_numbers`` — Continuous line numbers
-111. ``layout.line_spacing`` — Double line spacing
-112. ``layout.margins`` — Page margins
-113. ``layout.page_numbers`` — Page numbers
-114. ``layout.page_size`` — Page size
-115. ``layout.template`` — Prepared with the venue's template or LaTeX class
+107. ``layout.font`` — Body font matches the guidelines
+108. ``layout.font_size`` — Body text size matches the guidelines
+109. ``layout.language`` — Spelling follows the required English variant (US or UK)
+110. ``layout.line_numbers`` — Lines numbered continuously
+111. ``layout.line_spacing`` — Text is double-spaced
+112. ``layout.margins`` — Page margins match the guidelines
+113. ``layout.page_numbers`` — Pages are numbered
+114. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
+115. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
 
 **Prose**
 
 116. ``prose.acronyms`` — Acronyms spelled out at first use
 117. ``prose.brackets`` — Brackets and quotes pair up
 118. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
-119. ``prose.double_spaces`` — Double spaces between words
+119. ``prose.double_spaces`` — No double spaces between words
 120. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
 121. ``prose.punctuation_spacing`` — Spacing around punctuation
-122. ``prose.repeated_words`` — Repeated words
+122. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
 123. ``prose.repetition`` — Varied word choice (no heavily repeated words)
 124. ``prose.spelling`` — Common misspellings (codespell)
 

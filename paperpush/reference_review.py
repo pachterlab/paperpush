@@ -128,7 +128,7 @@ def _full_tasks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
 
 
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
-    checks.run("bibliography.age", "Reference publication ages", "References", _age, venue, values)
-    checks.run("bibliography.density", "Citation occurrences per 1,000 words", "References", _density, venue, values)
+    checks.run("bibliography.age", "Share of references more than 10 years old", "References", _age, venue, values)
+    checks.run("bibliography.density", "Citation density (citations per 1,000 words), reported for information", "References", _density, venue, values)
     if checks.options.get("reference_check_full"):
         _full_tasks(checks, venue, values)

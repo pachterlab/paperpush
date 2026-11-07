@@ -37,7 +37,7 @@ manuscript_file:
 title_page_file: 
 
 # Figure files (filelist, optional)
-#   Optional. One figure file per line as 'path | label' (label optional).
+#   Optional. One document (e.g. a Word .docx) combining all the figures in citation order, each legend after its figure, as 'path | label' (label optional). Accepted formats: .docx, .tif, .tiff, .eps, .ai, .psd.
 figure_files: |
   
 
