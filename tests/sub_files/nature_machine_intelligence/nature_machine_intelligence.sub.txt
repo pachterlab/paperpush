@@ -56,7 +56,7 @@ supplementary_tables: |
 
 # Cover letter (file, optional)
 #   Optional. Path to the cover letter, uploaded as the 'Author Cover Letter' on the eJournalPress upload step.
-cover_letter: 
+cover_letter: tests/manuscript_files/nature_machine_intelligence/cover_letter.pdf
 
 # Other files (filelist, optional)
 #   Optional. Any further eJournalPress files that are not main figures, main tables, supplementary information, or supplementary tables (use the dedicated fields above for those). One per line as 'path | type | title | extra'; every column after the path is optional. The type must be one of the listed file types; when omitted the eJournalPress default is left in place. The title names a figure or supplementary object on the per-object metadata step; the extra column is a figure's color ('color' or 'bw') or a supplementary file's description. Example: 'data/source_fig1.zip | Source Data |  | Raw gels'.

@@ -53,8 +53,8 @@ supplementary_files: |
 supplementary_tables: |
   
 
-# Cover letter (file, optional)
-#   Optional. Path to the cover letter, uploaded as the 'Author Cover Letter' on the eJournalPress upload step.
+# Cover letter (file, REQUIRED)
+#   Required. Path to the cover letter, uploaded as the 'Author Cover Letter' on the eJournalPress upload step.
 cover_letter: 
 
 # Other files (filelist, optional)

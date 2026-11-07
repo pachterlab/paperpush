@@ -8900,8 +8900,7 @@
       "formats": [
         ".pdf",
         ".docx",
-        ".doc",
-        ".tex"
+        ".doc"
       ],
       "max_words_before_refs": 3500,
       "count_excludes": [
@@ -8912,7 +8911,7 @@
       ],
       "max_display_items": 8,
       "single_file": false,
-      "initial_submission_any_format": "Initial submissions need no special formatting and may be a PDF, Word, or TeX/LaTeX file (TeX compiled to a PDF); the formatting rules apply from acceptance in principle.",
+      "initial_submission_any_format": "Initial submissions need no special formatting and may be a PDF or Word file (TeX/LaTeX source is not accepted); the formatting rules apply from acceptance in principle.",
       "notes": [
         "Article: main text up to 3,500 words excluding abstract, Methods, references and figure/table legends; up to 8 figures/tables.",
         "Article structure: Introduction (without heading), Results, Discussion, Online Methods, Acknowledgements, Author contributions, Competing interests; Results and Methods use one-level subheadings only (no nested subheadings).",
@@ -9327,6 +9326,7 @@
       "max_display_items": 8,
       "single_file": false,
       "tables_placement": "end",
+      "initial_submission_any_format": "Initial submissions need no special formatting; the formatting rules apply from acceptance in principle.",
       "notes": [
         "Article main text up to 4,000 words, excluding abstract, Methods, references and figure legends; up to 8 display items (figures and/or tables).",
         "Article structure: Introduction (without heading), Results, Discussion, Online Methods; Results and Methods use topical subheadings, Discussion does not.",
@@ -9467,8 +9467,7 @@
       "formats": [
         ".pdf",
         ".docx",
-        ".doc",
-        ".tex"
+        ".doc"
       ],
       "max_words_before_refs": 3500,
       "count_excludes": [
@@ -9479,7 +9478,7 @@
       ],
       "max_display_items": 6,
       "single_file": false,
-      "initial_submission_any_format": "Initial submissions need no special formatting and may be a PDF, Word, or TeX/LaTeX file (TeX compiled to a PDF); the formatting rules apply from acceptance in principle.",
+      "initial_submission_any_format": "Initial submissions need no special formatting and may be a PDF or Word file (TeX/LaTeX source is not accepted); the formatting rules apply from acceptance in principle.",
       "notes": [
         "Article: main text up to 3,500 words excluding abstract, Methods, references and figure legends; up to 6 figures/tables.",
         "Article structure: Introduction (without heading), Results, Discussion, Methods; Results and Methods use topical subheadings and the Discussion has none.",
