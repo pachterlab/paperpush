@@ -45,12 +45,17 @@ check the files statically.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from paperpush.database import get_venue
-from paperpush.subfile import render_template
+# Generate from the checkout's own venue data, never the published copy, so the
+# committed files match what the tests (conftest sets the same) regenerate.
+os.environ["PAPERPUSH_VENUE_DATA"] = "bundled"
+
+from paperpush.database import get_venue  # noqa: E402
+from paperpush.subfile import render_template  # noqa: E402
 
 # The tests/ directory holds the input assets; the committed sample .sub files
 # live in tests/sub_files/. REPO_ROOT is where repo-relative input paths resolve.
