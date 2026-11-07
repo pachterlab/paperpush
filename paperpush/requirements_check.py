@@ -58,7 +58,7 @@ from pathlib import Path
 
 from .database import Field, Venue
 from .manuscript import headings as manuscript_headings
-from .manuscript import normalize_heading, pages_before_references, reference_count, title_page_text, total_pages, total_words, words_before_references
+from .manuscript import normalize_heading, pages_before_references, reference_count, section_word_counts, title_page_text, total_pages, total_words, words_before_references
 from .report import NOT_APPLICABLE, NOT_IMPLEMENTED
 from .requirements import ManuscriptRequirements, get_requirements, heading_aliases, resolve
 from .validate import BYTES_PER_MB, ERROR, WARNING, Checks, Issue, NotApplicable, Outcome, unchecked
@@ -271,6 +271,37 @@ def _length_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> li
     return issues
 
 
+# Wording that makes a statement in running text, without a heading of its own:
+# "Institutional review board approval was not required", "Reporting followed
+# the PRISMA-ScR checklist", "the requirement for informed consent was waived".
+_ETHICS_BODY = r"(?:institutional\s+review\s+board|\bIRBs?\b|research\s+ethics\s+(?:board|committee)|ethics\s+(?:committee|board|review)|ethic(?:al|s)\s+(?:approval|clearance)|helsinki)"
+_EXEMPT = r"(?:not\s+(?:required|needed|applicable)|exempt(?:ed|ion)?|waived|waiver|unnecessary)"
+STATEMENT_IN_TEXT: dict[str, re.Pattern[str]] = {
+    "ethics_approval": re.compile(_ETHICS_BODY, re.IGNORECASE),
+    "consent_to_participate": re.compile(
+        rf"\b(?:informed|written|verbal|parental|patient)\s+(?:\w+\s+){{0,2}}consent\b|\bconsent\b[^.]{{0,80}}\b(?:waived|obtained|exempt|not\s+required)|\bassent\b"
+        # A review of published work or public records needs neither approval nor consent.
+        rf"|{_ETHICS_BODY}[^.]{{0,80}}{_EXEMPT}|{_EXEMPT}[^.]{{0,80}}{_ETHICS_BODY}",
+        re.IGNORECASE,
+    ),
+    "reporting_guidelines": re.compile(
+        r"\b(?:PRISMA(?:-\w+)?|STROBE|CONSORT(?:-AI)?|STARD(?:-AI)?|TRIPOD(?:\+AI|-AI)?|CLAIM|ARRIVE|MOOSE|SPIRIT(?:-AI)?|CHEERS|SRQR|COREQ|SQUIRE|CARE|MI-CLEAR-LLM|DECIDE-AI|METRICS|CLEAR)\b"
+        # Acronyms are matched case-sensitively ("CARE", not "care"); the wording is not.
+        r"|(?i:\breport(?:ing|ed)?\b[^.]{0,80}\b(?:guidelines?|checklists?|statement|extension)\b|\b(?:guidelines?|checklists?)\b[^.]{0,40}\breporting\b)",
+    ),
+}
+
+
+def _body_text(path: Path) -> str:
+    """The manuscript's text before its reference list."""
+    from . import document
+    from .manuscript import _REFERENCE_HEADING
+
+    text = document.get(path).text or ""
+    heading = _REFERENCE_HEADING.search(text)
+    return text[: heading.start()] if heading else text
+
+
 def _heading_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> list[Issue]:
     """WARN on a required section or declaration whose heading is not found."""
     required_sections = list(reqs.sections.required or [])
@@ -300,8 +331,16 @@ def _heading_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> l
         if not _has(name, section_aliases):
             issues.append(Issue(WARNING, field.id, f"no '{name}' section heading found in {path.name}; the author guidelines require one"))
     statement_aliases = heading_aliases("statements")
+    body: str | None = None
     for name in required_statements:
         if not _has(name, statement_aliases):
+            # Some journals (RSNA, AMA) put these in the first paragraph of the
+            # Methods rather than under a heading of their own.
+            if name in STATEMENT_IN_TEXT:
+                if body is None:
+                    body = _body_text(path)
+                if body and STATEMENT_IN_TEXT[name].search(body):
+                    continue
             label = _STATEMENT_LABELS.get(name, name.replace("_", " "))
             issues.append(Issue(WARNING, field.id, f"no {label} statement found in {path.name}; the author guidelines require one"))
     return issues
@@ -645,13 +684,13 @@ HANDLED_RULES = frozenset(
         "manuscript.font", "manuscript.font_size_pt", "manuscript.margins_mm", "manuscript.page_size",
         "manuscript.single_file", "manuscript.figures_placement", "manuscript.tables_placement", "manuscript.anonymized",
         "manuscript.template_required", "manuscript.latex_class", "manuscript.template_layout", "manuscript.language",
-        "manuscript.thousands_separator", "manuscript.group_four_digit_numbers",
+        "manuscript.thousands_separator", "manuscript.group_four_digit_numbers", "manuscript.et_al_period",
         "title_page.required_items", "title_page.separate_file", "title_page.title_max_characters",
         "title_page.title_max_words", "title_page.running_title_max_characters",
         "abstract.max_words", "abstract.min_words", "abstract.max_characters", "abstract.structured",
         "abstract.structured_headings", "abstract.no_references", "abstract.no_abbreviations",
         "keywords.min", "keywords.max",
-        "sections.required", "sections.order", "sections.combined_allowed",
+        "sections.required", "sections.order", "sections.combined_allowed", "sections.max_words",
         "statements.required",
         "figures.formats", "figures.min_dpi", "figures.min_dpi_line_art", "figures.min_dpi_combination",
         "figures.max_file_size_mb", "figures.max_count", "figures.single_column_width_mm", "figures.double_column_width_mm",
@@ -659,7 +698,7 @@ HANDLED_RULES = frozenset(
         "figures.max_font_size_pt", "figures.font", "figures.legend_max_words", "figures.legends_location",
         "figures.multipanel_labels", "figures.placement",
         "tables.formats", "tables.editable", "tables.max_count", "tables.placement",
-        "supplementary.formats", "supplementary.max_file_size_mb", "supplementary.max_count", "supplementary.combined_single_pdf",
+        "supplementary.formats", "supplementary.max_file_size_mb", "supplementary.max_count", "supplementary.combined_single_pdf", "supplementary.max_pages",
         "references.style", "references.numbered", "references.max_count", "references.include_titles",
         "references.doi_required", "references.unpublished_allowed", "references.preprints_allowed",
         "cover_letter.required", "cover_letter.formats", "cover_letter.max_words",
@@ -720,6 +759,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     run("guidelines.abstract_abbreviations", "Abstract defines its abbreviations", _abbreviations_check, venue, reqs, values)
     run("guidelines.sections", "Required section headings present", _sections_check, venue, reqs, values)
     run("guidelines.section_order", "Sections in the guidelines' order", _section_order_check, venue, reqs, values)
+    run("guidelines.section_length", "Sections within the guidelines' word limits", _section_length_check, venue, reqs, values)
     run("guidelines.statements", "Required statements and declarations present", _statements_check, venue, reqs, values)
     run("guidelines.title_page", "Title page carries the required items", _title_page_check, checks, venue, reqs, values)
     run("guidelines.title_page_file", "Title page uploaded as a separate file", _title_page_file_check, venue, reqs, values)
@@ -727,7 +767,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     run("guidelines.reference_style", "Citation style (numbered or author-year, in order)", _reference_style_check, venue, reqs, values)
     run("guidelines.reference_list", "Reference entries (DOIs, preprints, unpublished work)", _reference_list_check, venue, reqs, values)
     run("guidelines.counts", "Number of figures, tables, and supplementary files", _counts_check, venue, reqs, values)
-    run("guidelines.supplementary", "Supplementary material bundled as the guidelines ask", _supplementary_check, venue, reqs, values)
+    run("guidelines.supplementary", "Supplementary material bundled and within length as the guidelines ask", _supplementary_check, venue, reqs, values)
     run("guidelines.cover_letter", "Cover letter provided and within length", _cover_letter_check, venue, reqs, values)
     run("guidelines.template", "Layout matches the venue's compiled template", _template_check, venue, reqs, values)
 
@@ -826,6 +866,44 @@ def _section_order_check(venue: Venue, reqs: ManuscriptRequirements, values: dic
     return _per_manuscript(venue, values, _section_order_issues, reqs)
 
 
+def _section_length_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]):
+    _need(reqs.sections.max_words, "the guidelines set no per-section word limit")
+    return _per_manuscript(venue, values, _section_length_issues, reqs)
+
+
+def _section_length_issues(field: Field, path: Path, reqs: ManuscriptRequirements):
+    """WARN on a section over its word limit; sections are found by their headings."""
+    limits = dict(reqs.sections.max_words or {})
+    wordings: dict[str, str] = {}
+    for kind in ("statements", "sections"):
+        for canonical, names in heading_aliases(kind).items():
+            for name in names:
+                wordings.setdefault(name, canonical)
+    # The limited sections' own names win over an alias another section shares
+    # ("Results and Discussion" is listed under both Results and Discussion).
+    for canonical in limits:
+        wordings[canonical.lower()] = canonical
+        for name in heading_aliases("sections").get(canonical, []):
+            if name not in wordings or wordings[name] not in limits:
+                wordings[name] = canonical
+    for name in ("abstract", "summary", "acknowledgments", "acknowledgements", "conclusion", "conclusions", "references"):
+        wordings.setdefault(name, name.title())
+    counts = section_word_counts(path, wordings)
+    if counts is None:
+        return [unchecked(field.id, f"could not read {path.name} as text; its section word limits were not checked")]
+    issues: list[Issue] = []
+    measured: list[str] = []
+    for name, limit in limits.items():
+        words = counts.get(name)
+        if words is None:
+            issues.append(unchecked(field.id, f"no '{name}' heading found in {path.name}; its {limit}-word limit was not checked"))
+            continue
+        measured.append(f"{name} {words}/{limit}")
+        if words > limit:
+            issues.append(Issue(WARNING, field.id, f"{field.label}: the {name} section has about {words} words, over the {limit}-word limit in the author guidelines"))
+    return Outcome(issues, detail="; ".join(measured)) if measured else issues
+
+
 def _title_page_check(checks: Checks, venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
     _need(reqs.title_page.required_items, "the guidelines list no required title-page items")
     files = _manuscript_paths(venue, values)
@@ -861,11 +939,14 @@ def _reference_list_check(venue: Venue, reqs: ManuscriptRequirements, values: di
 
 
 def _counts_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
+    from .figure_check import figure_file_count
+
     _need(any(v is not None for v in (reqs.figures.max_count, reqs.tables.max_count, reqs.manuscript.max_display_items, reqs.supplementary.max_count)), "the guidelines cap no figure, table, or supplementary-file count")
     issues: list[Issue] = []
     figure_total = 0
     for field in _fields_for(venue, "figures"):
-        listed = len(_paths(field, values))
+        # A Word file of figures counts each picture in it.
+        listed = sum(figure_file_count(Path(p)) for p in _paths(field, values))
         figure_total += listed
         issues.extend(_count_issue(field, listed, reqs.figures.max_count, "figures"))
     table_total = 0
@@ -882,7 +963,8 @@ def _counts_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, 
 
 
 def _supplementary_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
-    _need(reqs.supplementary.combined_single_pdf, "the guidelines do not ask for one combined supplementary PDF")
+    rules = reqs.supplementary
+    _need(rules.combined_single_pdf or rules.max_pages is not None, "the guidelines neither ask for one combined supplementary PDF nor limit its pages")
     issues: list[Issue] = []
     applied = False
     for field in _fields_for(venue, "supplementary"):
@@ -890,6 +972,15 @@ def _supplementary_check(venue: Venue, reqs: ManuscriptRequirements, values: dic
         if not paths:
             continue
         applied = True
+        if rules.max_pages is not None:
+            for path in paths:
+                pages = total_pages(path)
+                if pages is None:
+                    issues.append(unchecked(field.id, f"could not count pages in {path.name} (a Word file needs a saved page count; export a PDF to check it); the {rules.max_pages}-page supplementary limit in the author guidelines was not checked"))
+                elif pages > rules.max_pages:
+                    issues.append(Issue(ERROR, field.id, f"{path.name}: {pages} pages exceeds the {rules.max_pages}-page supplementary limit in the author guidelines"))
+        if not rules.combined_single_pdf:
+            continue
         non_pdf = [p for p in paths if p.suffix.lower() != ".pdf"]
         if field.type == "file" and non_pdf:
             issues.append(Issue(WARNING, field.id, f"{paths[0].name}: the author guidelines ask for supplementary text, figures, and tables combined into a single PDF"))

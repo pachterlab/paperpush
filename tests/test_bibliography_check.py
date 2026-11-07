@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import zipfile
 from pathlib import Path
 
 from paperpush import bibliography_check as bc
 from paperpush import report
+from paperpush.manuscript import docx_to_text
 from paperpush.database import Field, Venue
 from paperpush.validate import Checks
 from tests.conftest import _build_docx
@@ -164,3 +166,43 @@ def test_self_citation_count(tmp_path):
 def test_self_citations_need_authors(tmp_path):
     status, _, _ = _run(_md(tmp_path, NUMBERED), authors="")["bibliography.self_citations"]
     assert status == report.NOT_APPLICABLE
+
+
+_W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+_NUMBERING = (
+    f'<?xml version="1.0"?><w:numbering {_W}>'
+    '<w:abstractNum w:abstractNumId="7"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl></w:abstractNum>'
+    '<w:abstractNum w:abstractNumId="8"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/><w:lvlText w:val="o"/></w:lvl></w:abstractNum>'
+    '<w:num w:numId="1"><w:abstractNumId w:val="7"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="8"/></w:num>'
+    "</w:numbering>"
+)
+
+
+def _para(text: str, num_id: str | None = None) -> str:
+    ppr = f'<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="{num_id}"/></w:numPr></w:pPr>' if num_id else ""
+    return f"<w:p>{ppr}<w:r><w:t>{text}</w:t></w:r></w:p>"
+
+
+def _numbered_docx(path: Path, body: str, numbering: str | None = _NUMBERING) -> Path:
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("word/document.xml", f'<?xml version="1.0"?><w:document {_W}><w:body>{body}</w:body></w:document>')
+        if numbering:
+            z.writestr("word/numbering.xml", numbering)
+    return path
+
+
+def test_docx_numbered_list_keeps_its_numbers(tmp_path):
+    """A reference list typed as a Word numbered list is read as numbered references."""
+    refs = [f"Author{i} A, Other B, et al. A title {i}. J Test 2024;{i}:1-2." for i in range(1, 8)]
+    body = _para("Intro cites [1-3] and [4], [5, 6], then [7].") + _para("References") + "".join(_para(r, "1") for r in refs) + _para("a bullet", "2")
+    path = _numbered_docx(tmp_path / "m.docx", body)
+    text = docx_to_text(path)
+    assert "1. Author1 A" in text and "7. Author7 A" in text
+    assert ". a bullet" not in text and "o a bullet" not in text
+    bib = bc.read_bibliography(path)
+    assert bib.mode == "numbered" and len(bib.refs) == 7 and bib.cited == {str(i) for i in range(1, 8)}
+
+
+def test_docx_without_numbering_part_is_unchanged(tmp_path):
+    path = _numbered_docx(tmp_path / "m.docx", _para("Hello", "1"), numbering=None)
+    assert docx_to_text(path).strip() == "Hello"

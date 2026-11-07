@@ -16,8 +16,9 @@ reference list are already left out.
   consistency. Years (1900-2099), labels ("Fig. 1000", "accession 123456"), and IDs
   ("GSE12345", "chr1:12345") are not counted.
 * ``prose.conventions`` -- abbreviations written two ways, or wrongly: "i.e." and
-  "e.g." with and without the comma, "ie"/"i.e"/"i. e."; "et. al" and "et al"
-  with no full stop; "vs" and "vs."; "Fig." and "Figure" both used mid-sentence;
+  "e.g." with and without the comma, "ie"/"i.e"/"i. e."; "et. al", and "et al"
+  with no full stop (unless the venue's ``manuscript.et_al_period`` is false,
+  as in AMA and RSNA house style); "vs" and "vs."; "Fig." and "Figure" both used mid-sentence;
   and a word written both hyphenated and closed up ("pre-processing" and
   "preprocessing").
 * ``prose.acronyms`` -- acronyms not introduced as "full term (ACR)" at first
@@ -268,6 +269,8 @@ def thousands_grouping(paragraphs: list[str], separator: Optional[str] = None, g
 # Every spelling of "i.e."/"e.g.", well-formed or not, and what follows it.
 _IE_EG = re.compile(r"(?<![\w.])(i\.?\s?e|e\.?\s?g)(\.?)(?![\w])(,?)")
 _ET_AL_BAD = re.compile(r"\bet\.\s?al\b\.?|\bet al(?![.\w])|\bet\.al\b\.?")
+# The same, for a venue that writes "et al" with no full stop: only the misplaced stops.
+_ET_AL_BAD_NO_PERIOD = re.compile(r"\bet\.\s?al\b\.?|\bet\.al\b\.?")
 _VS = re.compile(r"(?<![\w.])vs(\.?)(?![\w])")
 # "Fig. 2" / "Figure 2" / "Figs. 2-3" / "Figures 2 and 3", not prefixed by Supplementary (that series has its own form).
 _FIG_WORD = re.compile(r"(?<![\w.])(Figs?\.|Figures?)(?=\s*S?\d)")
@@ -291,8 +294,12 @@ def _minority(forms: Counter, examples: dict[str, list[str]], what: str) -> str 
     return f"{what} written two ways: '{major}' {n}x, but {others}; pick one"
 
 
-def conventions(paragraphs: list[str], *, hyphens: bool = True) -> Conventions:
-    """Abbreviations and compounds written inconsistently or wrongly across ``paragraphs``."""
+def conventions(paragraphs: list[str], *, hyphens: bool = True, et_al_period: Optional[bool] = None) -> Conventions:
+    """Abbreviations and compounds written inconsistently or wrongly across ``paragraphs``.
+
+    ``et_al_period`` is the venue's ``manuscript.et_al_period``: when false,
+    "et al" without a full stop is the house style and is not reported.
+    """
     from .prose_check import _mark, _snippet
 
     out = Conventions()
@@ -321,8 +328,8 @@ def conventions(paragraphs: list[str], *, hyphens: bool = True) -> Conventions:
             key = "with a comma" if comma else "without a comma"
             ie_forms[key] += 1
             ie_examples.setdefault(key, []).append(snippet)
-        for m in _ET_AL_BAD.finditer(p):
-            et_al_bad.append(f"{_snippet(p, m.start(), m.end(), _mark)} (write 'et al.')")
+        for m in (_ET_AL_BAD_NO_PERIOD if et_al_period is False else _ET_AL_BAD).finditer(p):
+            et_al_bad.append(f"{_snippet(p, m.start(), m.end(), _mark)} (write '{'et al' if et_al_period is False else 'et al.'}')")
         for m in _VS.finditer(p):
             key = "vs." if m.group(1) else "vs"
             vs_forms[key] += 1
@@ -346,7 +353,7 @@ def conventions(paragraphs: list[str], *, hyphens: bool = True) -> Conventions:
     if ie:
         out.problems.append(ie)
     if et_al_bad:
-        out.problems.append(f"{len(et_al_bad)} malformed 'et al.': " + "; ".join(et_al_bad[:MAX_EXAMPLES]))
+        out.problems.append(f"{len(et_al_bad)} malformed '{'et al' if et_al_period is False else 'et al.'}': " + "; ".join(et_al_bad[:MAX_EXAMPLES]))
     for problem in (_minority(vs_forms, vs_examples, "'vs.'"), _minority(fig_forms, fig_examples, "Figure citations mid-sentence")):
         if problem:
             out.problems.append(problem)
@@ -355,7 +362,7 @@ def conventions(paragraphs: list[str], *, hyphens: bool = True) -> Conventions:
         shown = "; ".join(f"'{form}' (e.g. {snippet}) and '{form.replace('-', '')}' {n}x" for form, snippet, n in both[:MAX_EXAMPLES])
         more = f" (and {len(both) - MAX_EXAMPLES} more)" if len(both) > MAX_EXAMPLES else ""
         out.problems.append(f"{len(both)} word(s) both hyphenated and closed up: {shown}{more}; pick one form")
-    out.checked = ["i.e./e.g.", "et al.", "vs."] + (["Fig./Figure"] if fig_forms else []) + (["hyphenation"] if hyphens else [])
+    out.checked = ["i.e./e.g.", "et al" if et_al_period is False else "et al.", "vs."] + (["Fig./Figure"] if fig_forms else []) + (["hyphenation"] if hyphens else [])
     return out
 
 
@@ -533,6 +540,14 @@ def _number_rules(venue: Venue, values: dict[str, str]) -> tuple[Optional[str], 
     return rules.thousands_separator, rules.group_four_digit_numbers
 
 
+def _et_al_period(venue: Venue, values: dict[str, str]) -> Optional[bool]:
+    """The venue's ``manuscript.et_al_period`` for the selected article type."""
+    from .requirements import get_requirements, resolve
+
+    base = get_requirements(venue.slug)
+    return None if base is None else resolve(base, values).manuscript.et_al_period
+
+
 def _numbers_check(venue: Venue, values: dict[str, str]) -> Outcome:
     from .prose_check import _main_paragraphs, _manuscripts
 
@@ -570,7 +585,7 @@ def _conventions_check(venue: Venue, values: dict[str, str]) -> Outcome:
         # Text extracted from a PDF rejoins words hyphenated across lines, so hyphenation is not compared there.
         # Legends are left out: a venue may write "Fig." in legends and "Figure" in the text.
         body = [p for p in _body_paragraphs(text) if not _CAPTION_START.match(p)]
-        found = conventions(body, hyphens=text.checks != PDF_CHECKS)
+        found = conventions(body, hyphens=text.checks != PDF_CHECKS, et_al_period=_et_al_period(venue, values))
         issues += [Issue(WARNING, fld.id, f"{text.path.name}: {p}") for p in found.problems]
         if not found.problems:
             details.append(f"{text.path.name}: consistent ({', '.join(found.checked)})")

@@ -11462,12 +11462,13 @@
           "notes": [
             "Main text limit is 3,000 words, Introduction to Discussion.",
             "Key Points (up to 3, on the abbreviated title page) and a 1 to 2 sentence Summary Statement are required.",
-            "Structured abstract of 250 words or less in four sections: Purpose, Materials and Methods, Results, Conclusion.",
-            "CLAIM checklist for AI studies (or STARD, CONSORT, PRISMA-DTA, STROBE) required at first submission for human-subject studies."
+            "Structured abstract of 200 words or less in four sections: Purpose, Materials and Methods, Results, Conclusion.",
+            "CLAIM checklist for AI studies (or STARD, CONSORT, PRISMA-DTA, STROBE) required at first submission for human-subject studies.",
+            "Section limits: Introduction 400 words, Materials and Methods 800, Results 1,000, Discussion 800."
           ]
         },
         "abstract": {
-          "max_words": 250,
+          "max_words": 200,
           "structured": true
         },
         "references": {
@@ -11478,6 +11479,14 @@
         },
         "tables": {
           "max_count": 4
+        },
+        "sections": {
+          "max_words": {
+            "Introduction": 400,
+            "Methods": 800,
+            "Results": 1000,
+            "Discussion": 800
+          }
         }
       },
       "Technical Developments": {
@@ -11702,10 +11711,12 @@
         "Double-anonymized peer review: the abbreviated title page and acknowledgments must be anonymized; do not mention authors' institution or funding in the manuscript.",
         "Submit separately: cover letter, full title page, response letter (revisions only), checklist (Original Research and Technical Developments), figures, supplemental materials.",
         "The manuscript file holds, in order: abbreviated title page (anonymized), abstract, main body, acknowledgments (anonymized), references, figure legends, tables embedded one per page.",
-        "Main-text limits shown at the top level are those of Original Research (3,000 words, 6 figures, 4 tables); other article types override them.",
+        "Main-text limits shown at the top level are those of Original Research (3,000 words, 200-word abstract, 6 figures, 4 tables); its per-section word limits are set under Original Research only; other article types override them.",
         "Maximum of 10 abbreviations; double space, do not right justify, do not number pages.",
-        "Authors must disclose where and when earlier versions (conference papers, preprints) were presented and how the present work differs; preprints on arXiv are allowed and are not prior publication."
-      ]
+        "Authors must disclose where and when earlier versions (conference papers, preprints) were presented and how the present work differs; preprints on arXiv are allowed and are not prior publication.",
+        "References and text follow AMA/RSNA style: 'et al' takes no full stop."
+      ],
+      "et_al_period": false
     },
     "title_page": {
       "required_items": [
@@ -11726,7 +11737,7 @@
       ]
     },
     "abstract": {
-      "max_words": 250,
+      "max_words": 200,
       "structured": true,
       "structured_headings": [
         "Purpose",
@@ -11735,7 +11746,7 @@
         "Conclusion"
       ],
       "notes": [
-        "Structured abstract for Original Research and Technical Developments (250 words or less, four sections); review-type articles use an unstructured abstract of 100 to 200 words."
+        "Structured abstract for Original Research (200 words or less) and Technical Developments (250 words or less), in four sections; review-type articles use an unstructured abstract of 100 to 200 words."
       ]
     },
     "sections": {
@@ -11774,6 +11785,7 @@
     },
     "figures": {
       "formats": [
+        ".docx",
         ".tif",
         ".tiff",
         ".eps",
@@ -11786,8 +11798,8 @@
       ],
       "min_dpi": 300,
       "max_count": 6,
-      "legends_location": "with_figure",
-      "placement": "end_or_inline",
+      "legends_location": "after_references",
+      "placement": "combined_file",
       "min_font_size_pt": 12,
       "notes": [
         "New submissions: figures combined into one text document in citation order with each legend after its figure. Revisions: figures uploaded individually as PSD, TIF, AI, or EPS (PNG not accepted), 300 dpi, 3 to 7 inches wide; graphs and illustrations 1200 dpi.",
@@ -11809,7 +11821,8 @@
       ],
       "notes": [
         "Supplemental text, tables and figures compiled in one Word document uploaded as a 'Supplemental File for Review', limited to 12 pages; movies (under 30 MB) and audio uploaded separately as 'Multimedia'."
-      ]
+      ],
+      "max_pages": 12
     },
     "references": {
       "style": "Numbered list in order of first citation, NLM journal abbreviations, with DOI",

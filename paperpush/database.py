@@ -683,8 +683,18 @@ def default_form(slug: str) -> dict[str, Any]:
     # generic venue, which has no guidelines, so any title page can be named).
     if reqs is None or reqs.title_page.separate_file:
         fields.append(dict(TITLE_PAGE_FIELD))
+    figure_field: dict[str, Any] = {"id": "figure_files", "autofill": "filemap", "label": "Figure files", "type": "filelist", "help": "Optional. One figure file per line as 'path | label' (label optional)."}
+    if reqs is not None and reqs.figures.placement == "combined_file":
+        # The guidelines want every figure in one document, each legend after its figure.
+        figure_field["help"] = (
+            "Optional. One document (e.g. a Word .docx) combining all the figures in citation order, each legend after its figure, "
+            "as 'path | label' (label optional)."
+            + (f" Accepted formats: {', '.join(reqs.figures.formats)}." if reqs.figures.formats else "")
+        )
+        if reqs.figures.formats:
+            figure_field["accept"] = list(reqs.figures.formats)
     fields += [
-        {"id": "figure_files", "autofill": "filemap", "label": "Figure files", "type": "filelist", "help": "Optional. One figure file per line as 'path | label' (label optional)."},
+        figure_field,
         {"id": "table_files", "autofill": "filemap", "label": "Table files", "type": "filelist", "help": "Optional. One table file per line as 'path | label' (label optional)."},
         {"id": "supplementary_files", "autofill": "filemap", "label": "Supplementary files", "type": "filelist", "help": "Optional. One supplementary file per line as 'path | label' (label optional)."},
         {"id": "cover_letter", "autofill": "filemap", "label": "Cover letter", "type": "file", "help": "Optional. Path to the cover letter."},

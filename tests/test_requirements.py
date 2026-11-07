@@ -30,7 +30,7 @@ from jsonschema import Draft202012Validator
 from paperpush import manuscript as m
 from paperpush import requirements as r
 from paperpush.database import Field, Venue
-from paperpush.requirements_check import check_manuscript_requirements
+from paperpush.requirements_check import STATEMENT_IN_TEXT, check_manuscript_requirements
 from paperpush.schema_models import build_requirements_schema
 from paperpush.validate import ERROR, WARNING, validate
 from paperpush.subfile import SubFile
@@ -515,3 +515,50 @@ def test_alias_tables_cover_the_shipped_canonical_names():
             assert name in aliases["sections"], f"{slug}: section {name!r} has no $aliases entry"
         for name in (entry.get("statements") or {}).get("required") or []:
             assert name in aliases["statements"], f"{slug}: statement {name!r} has no $aliases entry"
+
+
+def test_statements_found_in_running_text():
+    """Ethics, consent, and reporting-guideline statements count when written in the Methods text, not only under a heading."""
+    text = "Institutional review board approval was not required. Reporting followed the scoping review checklist of Tricco et al [14]."
+    assert all(STATEMENT_IN_TEXT[k].search(text) for k in ("ethics_approval", "consent_to_participate", "reporting_guidelines"))
+    assert STATEMENT_IN_TEXT["consent_to_participate"].search("Written informed consent was obtained from all parents.")
+    assert STATEMENT_IN_TEXT["reporting_guidelines"].search("This study follows the CLAIM 2024 update.")
+    plain = "We took good care to report results in a table."
+    assert not any(p.search(plain) for p in STATEMENT_IN_TEXT.values())
+
+
+def test_section_word_limits(tmp_path):
+    """``sections.max_words``: each section counted from its heading to the next known heading."""
+    from paperpush.requirements_check import _section_length_issues
+
+    words = lambda n: " ".join(["word"] * n)  # noqa: E731
+    text = "\n".join([
+        "Abstract", "Purpose", words(20), "Results", words(30),
+        "Introduction", words(50),
+        "Materials and Methods", words(80), "Study Sample", words(30),
+        "Results", words(90),
+        "Discussion", words(40),
+        "References", "1. Doe J. A paper. J Test 2024;1:1-2.",
+    ])
+    path = tmp_path / "ms.txt"
+    path.write_text(text, encoding="utf-8")
+    field = Field(id="manuscript_file", label="Manuscript", type="file")
+    reqs = r.ManuscriptRequirements(slug="x", sections=r.SectionRules(max_words={"Introduction": 60, "Methods": 100, "Results": 100, "Discussion": 30}))
+    out = _section_length_issues(field, path, reqs)
+    # Methods takes in its unrecognised subsection; the body's Results, not the abstract's, is counted.
+    assert "Methods 112/100" in out.detail and "Results 90/100" in out.detail and "Introduction 50/60" in out.detail
+    assert sorted(i.message.split(" section")[0] for i in out.issues) == ["Manuscript: the Discussion", "Manuscript: the Methods"]
+
+
+def test_section_word_limits_in_latex(tmp_path):
+    from paperpush.manuscript import section_word_counts
+
+    path = tmp_path / "ms.tex"
+    path.write_text(
+        "\\documentclass{article}\\begin{document}\\section{Introduction} one two three\n"
+        "\\section{Materials and Methods} four five \\subsection{Data} six\n"
+        "\\section{Results} seven\\bibliography{refs}\\end{document}",
+        encoding="utf-8",
+    )
+    counts = section_word_counts(path, {"introduction": "Introduction", "materials and methods": "Methods", "results": "Results"})
+    assert counts == {"Introduction": 3, "Methods": 4, "Results": 1}  # the subsection title counts too

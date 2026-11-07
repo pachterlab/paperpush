@@ -257,7 +257,15 @@ def attached_figures(venue: Venue, values: dict[str, str], rules: FigureRules) -
             label = parts[1] if len(parts) > 1 else ""
             number = _figure_number(path, label, index)
             suffix = path.suffix.lower()
-            if suffix in RASTER:
+            if suffix == ".docx":
+                # One Word file holding several figures (a journal that asks for them combined).
+                pictures = _embedded_docx(document.get(path), fld.id)
+                for n, fig in enumerate(pictures):
+                    fig.attached = True
+                    fig.number = index + n
+                index += max(len(pictures) - 1, 0)
+                figures.extend(pictures or [Figure(path.name, path, fld.id, True, "other", number=number)])
+            elif suffix in RASTER:
                 figures.append(_raster_figure(path, fld.id, rules, number))
             elif suffix == ".pdf":
                 figures.append(_pdf_figure(path, fld.id, rules, number))
@@ -850,6 +858,8 @@ def _figure_drawings(venue: Venue, values: dict[str, str], inv: _Inventory) -> l
                 add(pdf, fig.path, fig.name, fig.field_id, False)
             elif suffix == ".svg":
                 add(svg, fig.path, fig.name, fig.field_id)
+            elif fig.image_path is not None:  # a picture inside a Word file of figures
+                add(raster, fig.image_path, fig.name, fig.field_id)
         return drawings
     for fld, path in manuscript_files(venue, values):
         doc = document.get(path)
@@ -935,6 +945,8 @@ def _placement_check(venue: Venue, values: dict[str, str], inv: _Inventory, plac
     attached = any(f.attached for f in inv.figures)
     embedded = inv.figures if not inv.attached else embedded_figures(venue, values)
     issues: list[Issue] = []
+    if placement == "combined_file":
+        return _combined_placement(venue, values, inv, embedded)
     if placement in ("separate", "separate_files"):
         if has_fields and not attached and embedded:
             issues.append(Issue(WARNING, "", "the figures are only embedded in the manuscript; the author guidelines ask for each figure as a separate file"))
@@ -954,6 +966,38 @@ def _placement_check(venue: Venue, values: dict[str, str], inv: _Inventory, plac
             issues.append(Issue(WARNING, "", f"a figure appears on page {min(pages)} of {files[0][1].name}, before the references (page {refs_page}); the author guidelines ask for figures at the end of the manuscript"))
         return Outcome(issues, f"{len(embedded)} figure(s) in the manuscript")
     return Outcome(issues, f"{len(embedded)} figure(s) in the manuscript")
+
+
+COMBINED_FORMATS = (".docx", ".pdf")
+
+
+def _combined_placement(venue: Venue, values: dict[str, str], inv: _Inventory, embedded: list[Figure]) -> Outcome:
+    """``placement: combined_file``: every figure in one document, not one file per figure."""
+    from .requirements_check import _fields_for, _paths
+
+    files = [Path(p) for fld in _fields_for(venue, "figures") for p in _paths(fld, values)]
+    files = [p for p in files if p.is_file()]
+    combined = [p for p in files if p.suffix.lower() in COMBINED_FORMATS]
+    ask = "the author guidelines ask for all figures combined into one document (e.g. a Word file), in citation order, each legend after its figure"
+    if not files:
+        if embedded:
+            return Outcome([Issue(WARNING, "", f"the figures are only embedded in the manuscript; {ask}")])
+        raise NotApplicable("no figure files attached")
+    if len(files) > 1:
+        field_id = next((f.field_id for f in inv.figures if f.attached), "")
+        return Outcome([Issue(WARNING, field_id, f"{len(files)} figure files attached; {ask}")])
+    if not combined:
+        field_id = next((f.field_id for f in inv.figures if f.attached), "")
+        return Outcome([Issue(WARNING, field_id, f"{files[0].name} is a single image; {ask}")])
+    count = sum(1 for f in inv.figures if f.attached and f.path == combined[0])
+    return Outcome([], f"{combined[0].name} combines the figures" + (f" ({count} picture(s))" if combined[0].suffix.lower() == ".docx" else ""))
+
+
+def figure_file_count(path: Path) -> int:
+    """How many figures one figure file holds: the pictures in a Word file, else 1."""
+    if path.suffix.lower() == ".docx" and path.is_file():
+        return max(len(_embedded_docx(document.get(path), "")), 1)
+    return 1
 
 
 def _references_page(doc: document.Document) -> int | None:

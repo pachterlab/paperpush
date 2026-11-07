@@ -50,8 +50,9 @@ logger = logging.getLogger(__name__)
 # published copy (see paperpush.venue_data).
 REQUIREMENTS_PATH = Path(__file__).with_name("manuscript_requirements.json")
 
-# Where figures/tables sit for the initial submission.
-Placement = Literal["separate_files", "end_of_manuscript", "inline", "end_or_inline"]
+# Where figures/tables sit for the initial submission. ``combined_file``: one
+# document (a Word file or PDF) holding all of them, each legend after its figure.
+Placement = Literal["separate_files", "end_of_manuscript", "inline", "end_or_inline", "combined_file"]
 # Where figures/tables sit relative to the main manuscript file, from the
 # manuscript's point of view.
 ManuscriptPlacement = Literal["end", "inline", "separate", "end_or_inline"]
@@ -166,6 +167,7 @@ class ManuscriptRules:
     language: Annotated[Optional[str], PField(description="Mandated language variant, if any.")] = None
     thousands_separator: Annotated[Optional[ThousandsSeparator], PField(description="How numbers of 10,000 and over group their thousands: comma (10,000) or space (10 000, often a thin space). Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent.")] = None
     group_four_digit_numbers: Annotated[Optional[bool], PField(description="Whether four-digit numbers take the thousands separator too: yes for 1,000, no for 1000 (SI and some house styles). Empty when the guidelines do not say.")] = None
+    et_al_period: Annotated[Optional[bool], PField(description="Whether 'et al' takes a full stop: yes for 'et al.', no for 'et al' (AMA and RSNA house style). Empty when the guidelines do not say; `validate` then asks for 'et al.'.")] = None
     initial_submission_any_format: Annotated[Optional[str], PField(description="Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key, one per string.")] = _notes()
 
@@ -213,6 +215,7 @@ class SectionRules:
     optional: Annotated[Optional[list[str]], PField(description="Canonical section names the venue allows but does not require.")] = None
     order: Annotated[Optional[list[str]], PField(description="Prescribed section order, if the venue states one.")] = None
     combined_allowed: Annotated[Optional[list[str]], PField(description="Combined headings the venue accepts (e.g. Results and Discussion).")] = None
+    max_words: Annotated[Optional[dict[str, int]], PField(description="Word limit per section, keyed by canonical section name (matched via $aliases); a section runs from its heading to the next recognised heading.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()
 
 
@@ -248,7 +251,7 @@ class FigureRules:
     legends_location: Annotated[Optional[LegendsLocation], PField(description="Where figure legends go.")] = None
     multipanel_labels: Annotated[Optional[str], PField(description="Required style of panel labels.")] = None
     color_charge: Annotated[Optional[bool], PField(description="Color figures carry a charge.")] = None
-    placement: Annotated[Optional[Placement], PField(description="Where figures go for the initial submission.")] = None
+    placement: Annotated[Optional[Placement], PField(description="Where figures go for the initial submission. combined_file: every figure in one document (Word or PDF), in citation order, each legend after its figure.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()
 
 
@@ -271,6 +274,7 @@ class SupplementaryRules:
     max_file_size_mb: Annotated[Optional[float], PField(description="Maximum size of each supplementary file in MB.")] = None
     max_count: Annotated[Optional[int], PField(description="Maximum number of supplementary files.")] = None
     combined_single_pdf: Annotated[Optional[bool], PField(description="Supplementary text, figures, and tables must be combined into one PDF.")] = None
+    max_pages: Annotated[Optional[int], PField(description="Maximum pages of each supplementary file (a PDF, or a Word file's saved page count).")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()
 
 

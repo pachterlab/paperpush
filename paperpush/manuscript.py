@@ -223,19 +223,98 @@ def _unescape_xml(text: str) -> str:
     return text
 
 
+_W_PPR = re.compile(r"<w:pPr\b[^>]*>(.*?)</w:pPr>", re.DOTALL)
+_W_NUM_PR = re.compile(r"<w:numPr\b[^>]*>(.*?)</w:numPr>", re.DOTALL)
+_W_ILVL = re.compile(r'<w:ilvl\b[^>]*w:val="(\d+)"')
+_W_NUM_ID = re.compile(r'<w:numId\b[^>]*w:val="(\d+)"')
+_W_ABSTRACT = re.compile(r'<w:abstractNum\b[^>]*w:abstractNumId="(\d+)"[^>]*>(.*?)</w:abstractNum>', re.DOTALL)
+_W_NUM = re.compile(r'<w:num\b[^>]*w:numId="(\d+)"[^>]*>(.*?)</w:num>', re.DOTALL)
+_W_LVL = re.compile(r'<w:lvl\b[^>]*w:ilvl="(\d+)"[^>]*>(.*?)</w:lvl>', re.DOTALL)
+_W_OVERRIDE = re.compile(r'<w:lvlOverride\b[^>]*w:ilvl="(\d+)"[^>]*>(.*?)</w:lvlOverride>', re.DOTALL)
+
+
+def _docx_val(tag: str, xml: str) -> str | None:
+    m = re.search(rf'<w:{tag}\b[^>]*w:val="([^"]*)"', xml)
+    return m.group(1) if m else None
+
+
+def _docx_numbering(numbering_xml: str) -> dict[str, dict[int, tuple[str, str, int]]]:
+    """``numId -> {level: (numFmt, lvlText, start)}`` from ``word/numbering.xml``."""
+    abstract: dict[str, dict[int, tuple[str, str, int]]] = {}
+    for aid, body in _W_ABSTRACT.findall(numbering_xml):
+        levels = {}
+        for ilvl, lvl in _W_LVL.findall(body):
+            levels[int(ilvl)] = (_docx_val("numFmt", lvl) or "decimal", _docx_val("lvlText", lvl) or "", int(_docx_val("start", lvl) or 1))
+        abstract[aid] = levels
+    out: dict[str, dict[int, tuple[str, str, int]]] = {}
+    for num_id, body in _W_NUM.findall(numbering_xml):
+        aid = _docx_val("abstractNumId", body)
+        levels = dict(abstract.get(aid or "", {}))
+        for ilvl, override in _W_OVERRIDE.findall(body):
+            start = _docx_val("startOverride", override)
+            if start is not None and int(ilvl) in levels:
+                fmt, text, _ = levels[int(ilvl)]
+                levels[int(ilvl)] = (fmt, text, int(start))
+        out[num_id] = levels
+    return out
+
+
+def _number_list_paragraphs(xml: str, numbering_xml: str | None) -> str:
+    """``xml`` with the number Word draws before each numbered-list paragraph written out.
+
+    Word stores "1." of an automatically numbered list in ``numbering.xml``, not
+    in the paragraph's text, so a reference list typed as a numbered list would
+    otherwise lose its numbers. Only decimal lists are written out ("1.",
+    "[1]", whatever the level's ``lvlText`` says); bullets are left alone.
+    """
+    if not numbering_xml or "<w:numPr" not in xml:
+        return xml
+    numbering = _docx_numbering(numbering_xml)
+    counters: dict[str, dict[int, int]] = {}
+
+    def number(m: re.Match[str]) -> str:
+        num_pr = _W_NUM_PR.search(m.group(1))
+        if num_pr is None:
+            return m.group(0)
+        num_id = _W_NUM_ID.search(num_pr.group(1))
+        ilvl = _W_ILVL.search(num_pr.group(1))
+        level = int(ilvl.group(1)) if ilvl else 0
+        levels = numbering.get(num_id.group(1)) if num_id else None
+        if not levels or level not in levels:
+            return m.group(0)
+        seen = counters.setdefault(num_id.group(1), {})
+        fmt, text, start = levels[level]
+        seen[level] = seen[level] + 1 if level in seen else start
+        for deeper in [k for k in seen if k > level]:
+            del seen[deeper]
+        if fmt != "decimal":
+            return m.group(0)
+        label = re.sub(r"%(\d)", lambda g: str(seen.get(int(g.group(1)) - 1, levels.get(int(g.group(1)) - 1, ("", "", 1))[2])), text).strip()
+        return m.group(0) + (f"<w:t>{label} </w:t>" if label else "")
+
+    return _W_PPR.sub(number, xml)
+
+
 def docx_to_text(path: Path) -> str | None:
     """Extract paragraph text from a ``.docx`` file with the standard library.
 
     A ``.docx`` is a zip whose ``word/document.xml`` holds the body. Each
     paragraph (``</w:p>``) becomes a line and each run of text (``<w:t>``) its
     content, so a references heading on its own paragraph stays on its own line.
+    A paragraph of an automatically numbered list starts with its number
+    ("1. "), as Word shows it.
     """
     try:
         with zipfile.ZipFile(path) as zf:
             xml = zf.read("word/document.xml").decode("utf-8", "replace")
+            try:
+                numbering = zf.read("word/numbering.xml").decode("utf-8", "replace")
+            except KeyError:
+                numbering = None
     except (zipfile.BadZipFile, KeyError, OSError) as exc:
         logger.debug("Could not read DOCX %s: %s", path, exc)
         return None
+    xml = _number_list_paragraphs(xml, numbering)
     xml = xml.replace("</w:p>", "\n")
     xml = _W_TAB.sub(" ", xml)
     xml = _W_BREAK.sub("\n", xml)
@@ -891,6 +970,56 @@ def headings(path: Path) -> list[str] | None:
             if first and first != head:
                 found.append(first)
     return found
+
+
+
+def section_word_counts(path: Path, wordings: dict[str, str]) -> dict[str, int] | None:
+    """Words under each known section heading of a manuscript's main text.
+
+    ``wordings`` maps each heading wording (lower-cased, as
+    :func:`normalize_heading` leaves it) to the canonical section it stands for.
+    Only those headings divide the text, so a section runs from its heading to
+    the next known heading or the reference list, subsections included. When a
+    section's heading appears more than once (a structured abstract's
+    "Results" before the body's), the last one is the section. Returns None
+    when the file cannot be read as text.
+    """
+    def _canonical(heading: str) -> str | None:
+        heading = re.sub(r"^\d+\W*", "", heading)
+        return wordings.get(heading)
+
+    marks: list[tuple[int, int, str | None]] = []  # (heading start, body start, canonical)
+    if path.suffix.lower() in (".tex", ".zip"):
+        source = _raw_tex_source(path)
+        if source is None:
+            return None
+        cut = min((m.start() for p in (_TEX_BIBLIOGRAPHY, _TEX_REFERENCE_SECTION) if (m := p.search(source))), default=len(source))
+        source = source[:cut]
+        for m in _TEX_SECTION.finditer(source):
+            name = _canonical(normalize_heading(m.group(1)))
+            if name:
+                marks.append((m.start(), m.end(), name))
+        count = lambda a, b: _word_count(_tex_to_text(source[a:b]))  # noqa: E731
+    else:
+        text = manuscript_text(path)
+        if text is None:
+            return None
+        text = truncate_at_references(text)
+        offset = 0
+        for line in text.splitlines(keepends=True):
+            stripped = line.strip()
+            if stripped and len(stripped.split()) <= _HEADING_MAX_WORDS:
+                name = _canonical(normalize_heading(stripped))
+                if name:
+                    marks.append((offset, offset + len(line), name))
+            offset += len(line)
+        source = text
+        count = lambda a, b: _word_count(source[a:b])  # noqa: E731
+    counts: dict[str, int] = {}
+    for i, (_, body, name) in enumerate(marks):
+        end = marks[i + 1][0] if i + 1 < len(marks) else len(source)
+        counts[name] = count(body, end)
+    return counts
 
 
 # One reference entry in an extracted reference list: "1. ", "[1] ", "1) ".

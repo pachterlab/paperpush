@@ -10,6 +10,7 @@ layout, figures, citation order, and .sub-versus-manuscript consistency.
 from __future__ import annotations
 
 import importlib
+import io
 import json
 import zipfile
 from pathlib import Path
@@ -1208,3 +1209,41 @@ def test_bib_structure_check_runs_with_the_manuscript_checks(_use, tmp_path):
     rep = _bib_report(_use, tmp_path, "@article{a, title={One}, author={A}}\n@article{a, title={Two}, author={B}}\n")
     res = _result(rep, "bibliography.entries")
     assert res.status == report.WARNING and "citation key 'a'" in res.issues[0].message
+
+
+def _figure_docx(path: Path, n: int) -> Path:
+    from PIL import Image
+
+    w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    rels, body = [], []
+    with zipfile.ZipFile(path, "w") as z:
+        for i in range(1, n + 1):
+            buf = io.BytesIO()
+            Image.new("RGB", (900, 600), (40 * i, 80, 120)).save(buf, "PNG")
+            z.writestr(f"word/media/fig{i}.png", buf.getvalue())
+            rels.append(f'<Relationship Id="rId{i}" Type="image" Target="media/fig{i}.png"/>')
+            body.append(
+                f'<w:p><w:r><w:drawing><wp:extent cx="{3 * 914400}" cy="{2 * 914400}"/><a:blip r:embed="rId{i}"/></w:drawing></w:r></w:p>'
+                f"<w:p><w:r><w:t>Figure {i}: legend.</w:t></w:r></w:p>"
+            )
+        z.writestr("word/_rels/document.xml.rels", f'<Relationships>{"".join(rels)}</Relationships>')
+        z.writestr("word/document.xml", f'<w:document {w}><w:body>{"".join(body)}</w:body></w:document>')
+    return path
+
+
+def test_combined_figure_docx_counts_each_picture(tmp_path):
+    """One Word file holding every figure counts as that many figures."""
+    path = _figure_docx(tmp_path / "figures.docx", 3)
+    assert figure_check.figure_file_count(path) == 3
+    venue = Venue(slug="testj", name="Test Venue", fields=[Field(id="figure_files", label="Figures", type="filelist")])
+    figs = figure_check.attached_figures(venue, {"figure_files": f"{path} | Figures"}, r.FigureRules(placement="combined_file"))
+    assert [f.number for f in figs] == [1, 2, 3] and all(f.attached and f.kind == "raster" and f.dpi for f in figs)
+
+
+def test_combined_file_placement_shapes_the_default_figure_field(monkeypatch):
+    from paperpush import database
+
+    reqs = r.ManuscriptRequirements(slug="anyvenue", figures=r.FigureRules(placement="combined_file", formats=[".docx", ".pdf"]))
+    monkeypatch.setattr(r, "get_requirements", lambda slug: reqs)
+    field = next(f for f in database.default_form("anyvenue")["fields"] if f["id"] == "figure_files")
+    assert "combining all the figures" in field["help"] and field["accept"] == [".docx", ".pdf"]

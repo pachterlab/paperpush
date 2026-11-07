@@ -83,6 +83,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `language` | string or null | Mandated language variant, if any. |
 | `thousands_separator` | `comma` \| `space` or null | How numbers of 10,000 and over group their thousands: comma (10,000) or space (10 000, often a thin space). Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent. |
 | `group_four_digit_numbers` | boolean or null | Whether four-digit numbers take the thousands separator too: yes for 1,000, no for 1000 (SI and some house styles). Empty when the guidelines do not say. |
+| `et_al_period` | boolean or null | Whether 'et al' takes a full stop: yes for 'et al.', no for 'et al' (AMA and RSNA house style). Empty when the guidelines do not say; `validate` then asks for 'et al.'. |
 | `initial_submission_any_format` | string or null | Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings. |
 | `notes` | list of string or null | Rules with no structured key, one per string. |
 
@@ -126,6 +127,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `optional` | list of string or null | Canonical section names the venue allows but does not require. |
 | `order` | list of string or null | Prescribed section order, if the venue states one. |
 | `combined_allowed` | list of string or null | Combined headings the venue accepts (e.g. Results and Discussion). |
+| `max_words` | map of integer or null | Word limit per section, keyed by canonical section name (matched via $aliases); a section runs from its heading to the next recognised heading. |
 | `notes` | list of string or null | Rules with no structured key. |
 
 ## statements
@@ -159,7 +161,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `legends_location` | `end_of_manuscript` \| `with_figure` \| `after_references` or null | Where figure legends go. |
 | `multipanel_labels` | string or null | Required style of panel labels. |
 | `color_charge` | boolean or null | Color figures carry a charge. |
-| `placement` | `separate_files` \| `end_of_manuscript` \| `inline` \| `end_or_inline` or null | Where figures go for the initial submission. |
+| `placement` | `separate_files` \| `end_of_manuscript` \| `inline` \| `end_or_inline` \| `combined_file` or null | Where figures go for the initial submission. combined_file: every figure in one document (Word or PDF), in citation order, each legend after its figure. |
 | `notes` | list of string or null | Rules with no structured key. |
 
 ## tables
@@ -169,7 +171,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `formats` | list of string or null | Accepted table file extensions. |
 | `editable` | boolean or null | Tables must be editable text, not images. |
 | `max_count` | integer or null | Maximum number of main-text tables. |
-| `placement` | `separate_files` \| `end_of_manuscript` \| `inline` \| `end_or_inline` or null | Where tables go for the initial submission. |
+| `placement` | `separate_files` \| `end_of_manuscript` \| `inline` \| `end_or_inline` \| `combined_file` or null | Where tables go for the initial submission. |
 | `notes` | list of string or null | Rules with no structured key. |
 
 ## supplementary
@@ -180,6 +182,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `max_file_size_mb` | number or null | Maximum size of each supplementary file in MB. |
 | `max_count` | integer or null | Maximum number of supplementary files. |
 | `combined_single_pdf` | boolean or null | Supplementary text, figures, and tables must be combined into one PDF. |
+| `max_pages` | integer or null | Maximum pages of each supplementary file (a PDF, or a Word file's saved page count). |
 | `notes` | list of string or null | Rules with no structured key. |
 
 ## references

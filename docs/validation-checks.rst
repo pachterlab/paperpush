@@ -7,7 +7,7 @@ MCP tool ``validate_subfile`` runs them too.
 
 .. BEGIN VALIDATION CHECK COUNT
 
-PaperPush currently has **123 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
+PaperPush currently has **124 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
 
 .. END VALIDATION CHECK COUNT
 
@@ -140,52 +140,53 @@ cited reference when ``--reference-check-full`` is used. Venue rules marked
 84. ``guidelines.reference_count`` — Reference count within the limit
 85. ``guidelines.reference_list`` — Reference entries (DOIs, preprints, unpublished work)
 86. ``guidelines.reference_style`` — Citation style (numbered or author-year, in order)
-87. ``guidelines.section_order`` — Sections in the guidelines' order
-88. ``guidelines.sections`` — Required section headings present
-89. ``guidelines.sizes`` — Files within the guidelines' size limits
-90. ``guidelines.statements`` — Required statements and declarations present
-91. ``guidelines.supplementary`` — Supplementary material bundled as the guidelines ask
-92. ``guidelines.template`` — Layout matches the venue's compiled template
-93. ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
-94. ``guidelines.title_page`` — Title page carries the required items
-95. ``guidelines.title_page_file`` — Title page uploaded as a separate file
+87. ``guidelines.section_length`` — Sections within the guidelines' word limits
+88. ``guidelines.section_order`` — Sections in the guidelines' order
+89. ``guidelines.sections`` — Required section headings present
+90. ``guidelines.sizes`` — Files within the guidelines' size limits
+91. ``guidelines.statements`` — Required statements and declarations present
+92. ``guidelines.supplementary`` — Supplementary material bundled and within length as the guidelines ask
+93. ``guidelines.template`` — Layout matches the venue's compiled template
+94. ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
+95. ``guidelines.title_page`` — Title page carries the required items
+96. ``guidelines.title_page_file`` — Title page uploaded as a separate file
 
 **Integrity and external sources**
 
-96. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
-97. ``integrity.dois`` — Reference DOIs match the works they cite
-98. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
-99. ``integrity.links`` — Links cited in the files are reachable
-100. ``integrity.openreview`` — Authors' OpenReview IDs and profiles
-101. ``integrity.pdf_reader`` — PDF glyph reader (pdfminer.six) available
-102. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
-103. ``integrity.retractions`` — No cited work has been retracted
-104. ``integrity.sensitive`` — No secrets or private information in the files
-105. ``integrity.unmatched_references`` — References without a DOI match a registered work
+97. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
+98. ``integrity.dois`` — Reference DOIs match the works they cite
+99. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
+100. ``integrity.links`` — Links cited in the files are reachable
+101. ``integrity.openreview`` — Authors' OpenReview IDs and profiles
+102. ``integrity.pdf_reader`` — PDF glyph reader (pdfminer.six) available
+103. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
+104. ``integrity.retractions`` — No cited work has been retracted
+105. ``integrity.sensitive`` — No secrets or private information in the files
+106. ``integrity.unmatched_references`` — References without a DOI match a registered work
 
 **Page layout**
 
-106. ``layout.font`` — Body font
-107. ``layout.font_size`` — Body text size
-108. ``layout.language`` — English spelling variant
-109. ``layout.line_numbers`` — Continuous line numbers
-110. ``layout.line_spacing`` — Double line spacing
-111. ``layout.margins`` — Page margins
-112. ``layout.page_numbers`` — Page numbers
-113. ``layout.page_size`` — Page size
-114. ``layout.template`` — Prepared with the venue's template or LaTeX class
+107. ``layout.font`` — Body font
+108. ``layout.font_size`` — Body text size
+109. ``layout.language`` — English spelling variant
+110. ``layout.line_numbers`` — Continuous line numbers
+111. ``layout.line_spacing`` — Double line spacing
+112. ``layout.margins`` — Page margins
+113. ``layout.page_numbers`` — Page numbers
+114. ``layout.page_size`` — Page size
+115. ``layout.template`` — Prepared with the venue's template or LaTeX class
 
 **Prose**
 
-115. ``prose.acronyms`` — Acronyms spelled out at first use
-116. ``prose.brackets`` — Brackets and quotes pair up
-117. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
-118. ``prose.double_spaces`` — Double spaces between words
-119. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
-120. ``prose.punctuation_spacing`` — Spacing around punctuation
-121. ``prose.repeated_words`` — Repeated words
-122. ``prose.repetition`` — Varied word choice (no heavily repeated words)
-123. ``prose.spelling`` — Common misspellings (codespell)
+116. ``prose.acronyms`` — Acronyms spelled out at first use
+117. ``prose.brackets`` — Brackets and quotes pair up
+118. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
+119. ``prose.double_spaces`` — Double spaces between words
+120. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
+121. ``prose.punctuation_spacing`` — Spacing around punctuation
+122. ``prose.repeated_words`` — Repeated words
+123. ``prose.repetition`` — Varied word choice (no heavily repeated words)
+124. ``prose.spelling`` — Common misspellings (codespell)
 
 .. END VALIDATION CHECK LIST
 

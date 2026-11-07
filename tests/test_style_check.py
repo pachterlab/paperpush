@@ -255,3 +255,11 @@ def test_no_manuscript_queues_no_ai_task():
     run_checks(checks, VENUE, {})
     assert not checks.ai_tasks
     assert all(r.status == report.NOT_APPLICABLE for r in checks.results)
+
+
+def test_et_al_without_full_stop_as_house_style():
+    paragraphs = ["Kamran et al [5] identified 789 articles, as Smith et. al did."]
+    default = sc.conventions(paragraphs).problems
+    assert any(p.startswith("2 malformed 'et al.'") for p in default)
+    house = sc.conventions(paragraphs, et_al_period=False).problems
+    assert len(house) == 1 and house[0].startswith("1 malformed 'et al'") and "et. al" in house[0]
