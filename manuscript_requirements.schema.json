@@ -709,6 +709,17 @@
           ],
           "description": "Whether four-digit numbers take the thousands separator too: yes for 1,000, no for 1000 (SI and some house styles). Empty when the guidelines do not say."
         },
+        "et_al_period": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether 'et al' takes a full stop: yes for 'et al.', no for 'et al' (AMA and RSNA house style). Empty when the guidelines do not say; `validate` then asks for 'et al.'."
+        },
         "initial_submission_any_format": {
           "anyOf": [
             {
@@ -1037,6 +1048,20 @@
             }
           ],
           "description": "Combined headings the venue accepts (e.g. Results and Discussion)."
+        },
+        "max_words": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Word limit per section, keyed by canonical section name (matched via $aliases); a section runs from its heading to the next recognised heading."
         },
         "notes": {
           "anyOf": [
@@ -1374,7 +1399,8 @@
                 "separate_files",
                 "end_of_manuscript",
                 "inline",
-                "end_or_inline"
+                "end_or_inline",
+                "combined_file"
               ],
               "type": "string"
             },
@@ -1382,7 +1408,7 @@
               "type": "null"
             }
           ],
-          "description": "Where figures go for the initial submission."
+          "description": "Where figures go for the initial submission. combined_file: every figure in one document (Word or PDF), in citation order, each legend after its figure."
         },
         "notes": {
           "anyOf": [
@@ -1447,7 +1473,8 @@
                 "separate_files",
                 "end_of_manuscript",
                 "inline",
-                "end_or_inline"
+                "end_or_inline",
+                "combined_file"
               ],
               "type": "string"
             },
@@ -1523,6 +1550,17 @@
             }
           ],
           "description": "Supplementary text, figures, and tables must be combined into one PDF."
+        },
+        "max_pages": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Maximum pages of each supplementary file (a PDF, or a Word file's saved page count)."
         },
         "notes": {
           "anyOf": [

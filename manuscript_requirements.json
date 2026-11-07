@@ -10869,12 +10869,19 @@
             "Key Results (up to 3 results, max 75 words, on the abbreviated title page) and a one-sentence Summary Statement (max 30 words) are required.",
             "Structured abstract in five sections: Background, Purpose, Materials and Methods, Results, Conclusion.",
             "For human participants Table 1 should be the demographics table and Figure 1 a flow diagram of participants and exclusions.",
-            "A STARD, CONSORT, PRISMA-DTA, or STROBE checklist is required at first submission for studies with human subjects."
+            "A STARD, CONSORT, PRISMA-DTA, or STROBE checklist is required at first submission for studies with human subjects.",
+            "Introduction states the hypothesis (prospective studies only) and purpose in its final paragraph; no hypothesis for retrospective studies, meta-analyses/systematic reviews, or technical development papers.",
+            "Materials and Methods states prospective or retrospective design, the study date range, sample selection and size derivation, and readers' number, training and years of experience (with initials of author-readers); its last paragraph gives statistical methods, software with version and manufacturer, and the significance threshold.",
+            "Results opens with participant demographics (number, mean age ± SD or median and IQR, men vs women) citing Table 1, and the number excluded per criterion; give numerators and denominators for all percentages and comparison values for every P value.",
+            "P values to 2 decimal places, or 3 when P < .01 (or when rounding to 2 would make P appear non-significant, e.g. P = .046); smallest reported P < .001, largest P > .99; avoid hedge terms such as 'trend' or 'marginal'."
           ]
         },
         "abstract": {
           "max_words": 300,
-          "structured": true
+          "structured": true,
+          "notes": [
+            "Results section of the abstract opens with the number, sex and mean age ± SD (or median and IQR, whole numbers) of participants; the Conclusion must derive directly from the results and address the study purpose."
+          ]
         },
         "references": {
           "max_count": 35
@@ -10884,6 +10891,14 @@
         },
         "tables": {
           "max_count": 4
+        },
+        "sections": {
+          "max_words": {
+            "Introduction": 400,
+            "Methods": 800,
+            "Results": 1000,
+            "Discussion": 800
+          }
         }
       },
       "Technical Developments": {
@@ -10934,7 +10949,8 @@
         },
         "abstract": {
           "max_words": 200,
-          "structured": false
+          "structured": false,
+          "min_words": 100
         },
         "references": {
           "max_count": 100
@@ -11302,7 +11318,7 @@
         "Radiology uses double-anonymized peer review; the manuscript file (abbreviated title page, abstract, main body, references, figure legends, embedded tables) must not identify authors, institution, or funding, and prior work must not be self-identified.",
         "Submit separately: cover letter, full title page, response letter (revisions only), checklist (Original Research and Technical Developments), figures, acknowledgments, supplemental materials.",
         "The manuscript file holds, in order: abbreviated title page (anonymized), abstract, main body, references, figure legends (revisions), and tables embedded one per page.",
-        "Main-text limits shown at the top level are those of Original Research (3,000 words, 6 figures, 4 tables); other article types override them.",
+        "Main-text limits shown at the top level are those of Original Research (3,000 words, 6 figures, 4 tables); its per-section word limits are set under Original Research only; other article types override them.",
         "Double space all text with adequate margins, do not right justify, do not number pages; maximum of 10 abbreviations, each used at least five times.",
         "Manuscript submissions go through ScholarOne; the submitting author must link an ORCID iD, and no multiple corresponding authors are allowed (at most two first authors and two senior authors).",
         "Top-level display-item cap is the Original Research total of 6 figures plus 4 tables."
@@ -11417,7 +11433,9 @@
       ],
       "notes": [
         "Supplemental text, tables and figures are compiled in one Word document uploaded as a 'Supplemental File for Review'; movies (mp4 preferred, under 30 MB) and audio (mp3) are uploaded separately as 'Multimedia'.",
-        "Supplemental material is not copyedited."
+        "Supplemental material is not copyedited.",
+        "Supplemental Materials hold background information, mathematical derivations and statistical analyses essential to understanding the study; summarize and cite them in the relevant main-text section.",
+        "Authors are encouraged to post anonymized raw data or spreadsheets online."
       ]
     },
     "references": {
@@ -11462,12 +11480,13 @@
           "notes": [
             "Main text limit is 3,000 words, Introduction to Discussion.",
             "Key Points (up to 3, on the abbreviated title page) and a 1 to 2 sentence Summary Statement are required.",
-            "Structured abstract of 250 words or less in four sections: Purpose, Materials and Methods, Results, Conclusion.",
-            "CLAIM checklist for AI studies (or STARD, CONSORT, PRISMA-DTA, STROBE) required at first submission for human-subject studies."
+            "Structured abstract of 200 words or less in four sections: Purpose, Materials and Methods, Results, Conclusion.",
+            "CLAIM checklist for AI studies (or STARD, CONSORT, PRISMA-DTA, STROBE) required at first submission for human-subject studies.",
+            "Section limits: Introduction 400 words, Materials and Methods 800, Results 1,000, Discussion 800."
           ]
         },
         "abstract": {
-          "max_words": 250,
+          "max_words": 200,
           "structured": true
         },
         "references": {
@@ -11478,6 +11497,14 @@
         },
         "tables": {
           "max_count": 4
+        },
+        "sections": {
+          "max_words": {
+            "Introduction": 400,
+            "Methods": 800,
+            "Results": 1000,
+            "Discussion": 800
+          }
         }
       },
       "Technical Developments": {
@@ -11702,10 +11729,12 @@
         "Double-anonymized peer review: the abbreviated title page and acknowledgments must be anonymized; do not mention authors' institution or funding in the manuscript.",
         "Submit separately: cover letter, full title page, response letter (revisions only), checklist (Original Research and Technical Developments), figures, supplemental materials.",
         "The manuscript file holds, in order: abbreviated title page (anonymized), abstract, main body, acknowledgments (anonymized), references, figure legends, tables embedded one per page.",
-        "Main-text limits shown at the top level are those of Original Research (3,000 words, 6 figures, 4 tables); other article types override them.",
+        "Main-text limits shown at the top level are those of Original Research (3,000 words, 200-word abstract, 6 figures, 4 tables); its per-section word limits are set under Original Research only; other article types override them.",
         "Maximum of 10 abbreviations; double space, do not right justify, do not number pages.",
-        "Authors must disclose where and when earlier versions (conference papers, preprints) were presented and how the present work differs; preprints on arXiv are allowed and are not prior publication."
-      ]
+        "Authors must disclose where and when earlier versions (conference papers, preprints) were presented and how the present work differs; preprints on arXiv are allowed and are not prior publication.",
+        "References and text follow AMA/RSNA style: 'et al' takes no full stop."
+      ],
+      "et_al_period": false
     },
     "title_page": {
       "required_items": [
@@ -11726,7 +11755,7 @@
       ]
     },
     "abstract": {
-      "max_words": 250,
+      "max_words": 200,
       "structured": true,
       "structured_headings": [
         "Purpose",
@@ -11735,7 +11764,7 @@
         "Conclusion"
       ],
       "notes": [
-        "Structured abstract for Original Research and Technical Developments (250 words or less, four sections); review-type articles use an unstructured abstract of 100 to 200 words."
+        "Structured abstract for Original Research (200 words or less) and Technical Developments (250 words or less), in four sections; review-type articles use an unstructured abstract of 100 to 200 words."
       ]
     },
     "sections": {
@@ -11774,6 +11803,7 @@
     },
     "figures": {
       "formats": [
+        ".docx",
         ".tif",
         ".tiff",
         ".eps",
@@ -11786,8 +11816,8 @@
       ],
       "min_dpi": 300,
       "max_count": 6,
-      "legends_location": "with_figure",
-      "placement": "end_or_inline",
+      "legends_location": "after_references",
+      "placement": "combined_file",
       "min_font_size_pt": 12,
       "notes": [
         "New submissions: figures combined into one text document in citation order with each legend after its figure. Revisions: figures uploaded individually as PSD, TIF, AI, or EPS (PNG not accepted), 300 dpi, 3 to 7 inches wide; graphs and illustrations 1200 dpi.",
@@ -11809,7 +11839,8 @@
       ],
       "notes": [
         "Supplemental text, tables and figures compiled in one Word document uploaded as a 'Supplemental File for Review', limited to 12 pages; movies (under 30 MB) and audio uploaded separately as 'Multimedia'."
-      ]
+      ],
+      "max_pages": 12
     },
     "references": {
       "style": "Numbered list in order of first citation, NLM journal abbreviations, with DOI",
