@@ -49,6 +49,17 @@ skill:
      - fix what validate flags (in the ``.tex``/``.docx`` sources and the
        ``.sub``), re-validate until nothing fixable is left, and report what
        needs the author
+   * - ``/paperpush-transfer``
+     - move a manuscript from one venue to another: copy the files into a
+       new ``<venue>/`` directory, create and autofill its ``.sub`` (reusing
+       earlier ``.sub`` files), validate, and write ``transfer.txt``
+       describing the changes
+   * - ``/paperpush-respond-to-reviewers``
+     - prepare a revision in two phases: copy the manuscript and reviews
+       into a new ``revisionN/`` directory and propose a plan, then (once
+       approved) write the response to reviewers, the clean revised
+       manuscript, and a marked manuscript (red text by default), and
+       validate
    * - ``/paperpush-submit``
      - log in and fill in the portal from a ready ``.sub`` (optionally
        skipping validation); invokes portal-debug if it stalls
@@ -128,6 +139,10 @@ The examples use bioRxiv; replace ``biorxiv`` with any venue slug.
    validate finds: it edits the manuscript sources and the ``.sub``, validates
    again until nothing fixable is left, and reports what needs your decision.
 
+   If you have not chosen a venue yet, ``paperpush subfile general`` writes a
+   ``.sub`` with just the files and metadata every venue asks for, which
+   validate checks against the rules that apply to any manuscript.
+
    To check files before you have a ``.sub``, name them instead:
 
    .. code-block:: bash
@@ -185,10 +200,17 @@ Helper commands
    See :doc:`commands/venues`.
 
 ``paperpush pick-venue``
-   List supported venues that fit your manuscript's topic, from keywords, the
-   manuscript file, or ``--title``/``--abstract``; add ``--ai`` for an LLM's
-   ranking with reasons. It checks thematic fit only, not impact or likelihood
-   of acceptance. See :doc:`commands/pick-venue`.
+   List journals that fit your manuscript's topic, from keywords, the
+   manuscript file, or ``--title``/``--abstract``: any journal, from the most
+   similar works in OpenAlex, with the venues PaperPush supports marked.
+   ``--paperpush-supported-only`` ranks only the supported venues; add
+   ``--ai`` for an LLM's ranking of them with reasons. It checks thematic fit
+   only, not impact or likelihood of acceptance. See :doc:`commands/pick-venue`.
+
+``paperpush find-reviewers VENUE.sub.txt``
+   Suggest reviewers who recently published similar work, leaving out the
+   authors, their recent co-authors, and their colleagues; ``--write`` adds
+   them to the ``.sub``. See :doc:`commands/find-reviewers`.
 
 ``paperpush update-venues``
    Update the venue data from the remote venue-data branch. See

@@ -1066,6 +1066,22 @@ def _status_for(issues: list[Issue]) -> str:
     return report.PASSED
 
 
+@dataclass(frozen=True)
+class PublisherFallback:
+    """The venue's rules include its publisher's house rules (see :meth:`Checks.use_publisher_fallback`)."""
+
+    publisher: str  # display name
+    venue: str  # display name
+    rules_only: bool  # a journal paperpush does not list: every rule is the publisher's
+    own: Any  # the venue's own resolved ManuscriptRequirements, house rules left out
+
+    @property
+    def suffix(self) -> str:
+        if self.rules_only:
+            return f" (a {self.publisher} house rule; check that the journal's own guidelines keep it)"
+        return f" (a {self.publisher} house rule; {self.venue}'s own guidelines do not state it, so check that it applies)"
+
+
 class Checks:
     """Runs checks and keeps one :class:`~paperpush.report.CheckResult` each.
 
@@ -1084,6 +1100,73 @@ class Checks:
         self.ai_tasks: list = []
         # Settings the check modules read (e.g. ``cover_letter_max_age_days``).
         self.options: dict = dict(options or {})
+        # Set by use_publisher_fallback when the venue's rules include its
+        # publisher's house rules: what those rules catch is relabelled.
+        self.publisher_fallback: Optional[PublisherFallback] = None
+        self._rerunning = False
+
+    def use_publisher_fallback(self, venue: Venue, values: dict[str, str]) -> None:
+        """Report what the publisher's house rules (not the venue's own) catch as warnings.
+
+        A rule the venue's own guidelines do not state, taken from its
+        publisher's (see :func:`paperpush.requirements.get_requirements`), may not
+        hold for this journal, so it never fails the check outright. A check that
+        finds anything is run again without those rules; an issue only the full
+        rules raise is the publisher's, and becomes a warning that says so.
+        """
+        from .requirements import ManuscriptRequirements, get_publisher, get_requirements, own_rules_only, resolve
+
+        reqs = get_requirements(venue.slug)
+        if reqs is None or not reqs.publisher:
+            self.publisher_fallback = None
+            return
+        with own_rules_only():
+            own = get_requirements(venue.slug)
+        own = resolve(own, values) if own is not None else ManuscriptRequirements(slug=venue.slug)
+        pub = get_publisher(reqs.publisher)
+        self.publisher_fallback = PublisherFallback(publisher=pub.display_name if pub else reqs.publisher, venue=venue.name, rules_only=reqs.publisher_rules_only, own=own)
+
+    def _own_args(self, args: tuple, kwargs: dict) -> tuple[tuple, dict]:
+        from .requirements import SECTION_TYPES, ManuscriptRequirements
+
+        own = self.publisher_fallback.own
+        by_type = {typ: key for key, typ in SECTION_TYPES.items()}
+
+        def swap(value):
+            if isinstance(value, ManuscriptRequirements):
+                return own if value.slug == own.slug or not value.publisher else value.without_publisher_rules()
+            key = by_type.get(type(value))
+            return getattr(own, key) if key else value
+
+        return tuple(swap(a) for a in args), {k: swap(v) for k, v in kwargs.items()}
+
+    def _label_publisher_issues(self, fn, args: tuple, kwargs: dict, out: "Outcome") -> "Outcome":
+        """``out`` with the issues only the publisher's house rules raise turned into labelled warnings."""
+        from dataclasses import replace
+
+        from .requirements import own_rules_only
+
+        fallback = self.publisher_fallback
+        own_args, own_kwargs = self._own_args(args, kwargs)
+        results, tasks = len(self.results), len(self.ai_tasks)
+        self._rerunning = True
+        try:
+            with own_rules_only():
+                own_out = fn(*own_args, **own_kwargs)
+        except (NotApplicable, Unchecked):
+            own_out = []
+        except Exception as exc:  # noqa: BLE001 -- cannot tell; leave the issues as they are
+            logger.debug("re-running %s without the publisher's rules failed: %s", getattr(fn, "__name__", fn), exc)
+            return out
+        finally:
+            self._rerunning = False
+            # The re-run must leave no trace: drop what it recorded or queued.
+            del self.results[results:]
+            del self.ai_tasks[tasks:]
+        own_issues = own_out.issues if isinstance(own_out, Outcome) else (own_out or [])
+        own_keys = {(i.field, i.message) for i in own_issues}
+        labelled = [i if i.unchecked or (i.field, i.message) in own_keys else replace(i, level=WARNING, message=i.message + fallback.suffix) for i in out.issues]
+        return Outcome(labelled, out.detail)
 
     def run(self, check_id: str, title: str, category: str, fn, *args, **kwargs):
         report = self._report
@@ -1101,6 +1184,8 @@ class Checks:
             out = Outcome([])
         elif isinstance(out, list):
             out = Outcome(out)
+        if self.publisher_fallback is not None and not self._rerunning and any(not i.unchecked for i in out.issues):
+            out = self._label_publisher_issues(fn, args, kwargs, out)
         return self.record(check_id, title, category, _status_for(out.issues), issues=out.issues, detail=out.detail)
 
     def record(self, check_id: str, title: str, category: str, status: str, *, issues: list[Issue] | None = None, detail: str = "", source: str = ""):
@@ -1177,6 +1262,7 @@ _MANUSCRIPT_STAGES = (
     ("reference_review", "Reference age and density"),
     ("cover_letter_check", "Cover letter"),
     ("prose_check", "Spelling and prose"),
+    ("rigor_check", "Rigor and reproducibility"),
 )
 
 
@@ -1358,8 +1444,8 @@ def validate_report(
     ``files_only`` is for files named without a ``.sub`` (see
     :mod:`paperpush.file_inputs`): ``subfile`` then holds only upload paths, so
     the form checks and the OpenReview lookup are reported as not applicable
-    instead of failing on every empty field. With the generic venue
-    (:func:`paperpush.database.generic_venue`) the author-guideline checks are
+    instead of failing on every empty field. With the general venue
+    (:func:`paperpush.database.general_venue`) the author-guideline checks are
     not applicable too, leaving the checks that apply to any manuscript.
     ``notes`` are put at the top of the report (how the files were placed).
 
@@ -1386,7 +1472,8 @@ def validate_report(
     values = subfile.values
     if reference_check_full and not check_manuscript:
         raise ValueError("reference_check_full needs check_manuscript to read citation contexts")
-    checks = Checks(options={"cover_letter_max_age_days": cover_letter_max_age_days, "reference_check_full": reference_check_full, "references_alphabetical": references_alphabetical, "references_citation_order": references_citation_order})
+    checks = Checks(options={"cover_letter_max_age_days": cover_letter_max_age_days, "reference_check_full": reference_check_full, "references_alphabetical": references_alphabetical, "references_citation_order": references_citation_order, "check_registries": check_references})
+    checks.use_publisher_fallback(venue, subfile.values)
     if ai_only:
         if not check_manuscript:
             raise ValueError("ai_only needs check_manuscript: the manuscript checks decide which AI checks apply")
@@ -1507,7 +1594,7 @@ def validate_report(
 def _set_scope(result, venue: Venue, values: dict[str, str], files_only: bool, notes: Optional[list[str]]) -> None:
     """Record on ``result`` what was validated: a .sub, files for a venue, or files alone."""
     result.notes = list(notes or [])
-    if venue.is_generic:
+    if venue.is_general:
         result.scope = "general"
     elif files_only:
         result.scope = "files"

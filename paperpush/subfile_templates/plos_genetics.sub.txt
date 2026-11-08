@@ -1,7 +1,8 @@
 # paperpush submission file for plos_genetics  -*- mode: yaml -*-
 # PLOS Genetics (PLOS)
 #
-# Edit the values below, then run:  paperpush submit plos_genetics.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate plos_genetics.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

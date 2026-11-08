@@ -115,6 +115,21 @@ def test_add_venue_cli_merges_into_the_databases(tmp_path, data_dir, capsys):
     assert main(["add-venue", str(out), "--data-dir", str(data_dir), "--force"]) == 0
 
 
+def test_add_venue_cli_new_data_dir(tmp_path, monkeypatch, capsys):
+    """A fresh --data-dir is seeded from the active copy: an existing slug is caught by check, and the hint is absolute."""
+    monkeypatch.chdir(tmp_path)
+    existing = tmp_path / "existing.txt"
+    assert main(["add-venue", "--template", "--from", SLUGS[0], "-o", str(existing)]) == 0
+    capsys.readouterr()
+    assert main(["add-venue", str(existing), "--data-dir", "fresh"]) == 1
+    assert "already a venue" in capsys.readouterr().err
+
+    path = tmp_path / "my_journal.txt"
+    path.write_text(_filled(), encoding="utf-8")
+    assert main(["add-venue", str(path), "--data-dir", "draft/data"]) == 0
+    assert f"PAPERPUSH_VENUE_DATA={tmp_path / 'draft' / 'data'} " in capsys.readouterr().out
+
+
 def test_add_venue_template_cli(tmp_path, capsys):
     out = tmp_path / "x.txt"
     assert main(["add-venue", "--template", "new_venue", "-o", str(out)]) == 0

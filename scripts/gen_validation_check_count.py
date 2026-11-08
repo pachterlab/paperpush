@@ -111,6 +111,7 @@ def check_list(catalog: dict[str, str]) -> str:
         "front_matter": "Abstract and front matter", "bibliography": "Bibliography",
         "prose": "Prose", "integrity": "Integrity and external sources",
         "details": "Additional manuscript details", "ai": "Checks requiring a reader",
+        "rigor": "Rigor and reproducibility",
     }
     by_group: dict[str, list[str]] = {}
     for check_id in sorted(catalog):

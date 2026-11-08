@@ -30,8 +30,18 @@ use `paperpush-submit` directly instead.
    guess it, scan the repository for candidate folders, or fall back to test
    fixtures.
 2. **The venue slug** (e.g. `bioinformatics`). If the user did not say it, ask
-   or infer it from their message. Confirm it is supported with
-   `paperpush venues`.
+   or infer it from their message. Look it up with `paperpush venues` (try its
+   name, abbreviation, and publisher's title). If it is not listed, don't stop:
+   see [Venue paperpush does not support](#venue-paperpush-does-not-support).
+
+**Initial submissions only.** If the manuscript directory is a `revision<N>/`
+directory or holds a response-to-reviewers document (`response_to_reviewers.*`,
+`rebuttal.*`, ...), or the user says it is a revision after review, warn them
+before any other work: paperpush submits new manuscripts, and a revision is
+uploaded through the venue's own "submit revision" link. Offer
+`paperpush-respond-to-reviewers` to prepare the revision, and continue here
+only if they confirm they want a new submission (then pass that confirmation
+on to `paperpush-submit`).
 
 Do **not** ask for a `.sub` path. Resolve it by this hierarchy: (1) an explicit
 `.sub` the user provided; (2) else an existing `<venue>.sub.txt` in the manuscript
@@ -69,8 +79,8 @@ fly. See step 1.
    only blocks step 4. Never ask for their password in the chat.
 
    Skip this step for a validate-only venue (`paperpush venues` marks them;
-   `submit` cannot fill their portal). Tell the user that up front, and stop
-   after step 3.
+   `submit` cannot fill their portal) or a venue paperpush does not support.
+   Tell the user that up front, and stop after step 3.
 
 1. **Resolve the `.sub` by hierarchy** (user-provided > in manuscript dir >
    create on the fly):
@@ -137,6 +147,29 @@ fly. See step 1.
    Relay its summary. The final submit is the
    user's to click.
 
+## Venue paperpush does not support
+
+A venue `paperpush venues` does not list can still be prepared and checked, but
+not submitted. Tell the user so up front, then:
+
+- **Before step 1**, run the `paperpush-add-venue-validate` skill (Skill tool)
+  for the venue in its **temporary mode**. It reads the venue's guidelines and
+  writes a draft entry to `<scratch>/venue_drafts/<slug>/data`, outside
+  paperpush's own databases.
+- Run steps 1-3 with `PAPERPUSH_VENUE_DATA=<scratch>/venue_drafts/<slug>/data`
+  set on every `paperpush` command (`subfile`, `autofill`, `validate`), and
+  give that path to `paperpush-autofill` and `paperpush-validate` when you
+  invoke them. Tell `paperpush-validate` the draft entry already exists so it
+  does not build a second one. Without the variable, paperpush does not know
+  the venue.
+- Skip step 0 (no login) and **stop after step 3: never run step 4 or
+  `paperpush-submit`.** paperpush has no runner for this venue's portal. Tell
+  the user to upload the files through the venue's own portal, using the
+  validated `.sub` as their checklist.
+- In the summary, say the rules came from a temporary entry read from the
+  guidelines just now, and pass on `paperpush-validate`'s pointers to the draft
+  files and its suggestion to send the entry upstream as a pull request.
+
 ## Rules
 
 - **Always use absolute paths** for the `.sub` file and the manuscript directory.
@@ -147,6 +180,8 @@ fly. See step 1.
   you do the rest of the work.
 - Never run `paperpush login` yourself — it is interactive and belongs in the
   user's terminal.
+- Never run `paperpush-submit` for a validate-only venue or a venue paperpush
+  does not support.
 - Never go on to `paperpush-submit` past a failed `validate`, or past warnings
   the user has not seen and agreed to continue with, unless the user asked to
   skip validation.

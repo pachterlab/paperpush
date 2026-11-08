@@ -1,7 +1,8 @@
 # paperpush submission file for patterns  -*- mode: yaml -*-
 # Patterns
 #
-# Edit the values below, then run:  paperpush submit patterns.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate patterns.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

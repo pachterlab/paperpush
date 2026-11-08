@@ -26,6 +26,22 @@ allowed options. Fill in the values, then move on to :doc:`autofill` or
 
 Lines beginning with ``#`` are comments and are ignored when the file is read.
 
+A general ``.sub``
+------------------
+
+.. code-block:: bash
+
+   paperpush subfile general
+
+writes ``general.sub.txt``, a ``.sub`` tied to no venue. It holds only what
+every venue asks for: title, abstract, keywords, authors, the manuscript, a
+title page, figures, tables, supplementary files, and a cover letter (the same
+form as the web page's "General" option). ``paperpush autofill`` fills it like
+any other, and ``paperpush validate general.sub.txt`` runs the checks that
+apply to any manuscript, without a venue's author guidelines. It cannot be
+submitted: once you choose a venue, create that venue's ``.sub`` and copy the
+values across, or run the ``/paperpush-transfer`` skill in an AI agent.
+
 Field order
 -----------
 
@@ -56,6 +72,7 @@ Arguments
 ``venue``
    The venue slug, e.g. ``biorxiv``, ``arxiv``, ``nature``. Run
    ``paperpush venues`` to see every slug, or browse :doc:`../venues`.
+   Use ``general`` when you have not chosen a venue yet (see below).
 
 Options
 -------

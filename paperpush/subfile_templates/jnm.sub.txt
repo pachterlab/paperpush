@@ -1,7 +1,8 @@
 # paperpush submission file for jnm  -*- mode: yaml -*-
 # The Journal of Nuclear Medicine (SNMMI)
 #
-# Edit the values below, then run:  paperpush submit jnm.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate jnm.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

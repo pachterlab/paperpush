@@ -224,8 +224,9 @@ def pick_venue(
     venue_name: str = "",
     venue_types: Optional[list[Literal["preprint", "journal", "conference"]]] = None,
     limit: int = 10,
+    paperpush_supported_only: bool = False,
 ) -> dict[str, Any]:
-    """Rank the supported venues for a manuscript, or search them by name.
+    """Find journals for a manuscript, rank the supported venues for it, or search them by name.
 
     Give the manuscript's `title`, `abstract`, and `keywords`, or `manuscript`
     (an absolute path to a .tex/.zip/.docx/.pdf, or a .txt/.md holding them)
@@ -238,22 +239,92 @@ def pick_venue(
     ranking. `venue_name` searches venues by slug, name, or full name (e.g.
     "nature methods"); `venue_types` narrows the field.
 
-    Returns the ranked `matches` (slug, name, venue_type, keywords, score, and
-    the reasons it matched), the subjects used, what was read from the
-    manuscript, and `subject_vocabulary`. Only venues paperpush supports are
-    ranked, on thematic fit alone; follow up with `describe_venue` and
-    `create_subfile` for the chosen slug.
+    Returns the ranked `matches` among the venues paperpush supports (slug,
+    name, venue_type, keywords, score, and the reasons it matched), the
+    subjects used, what was read from the manuscript, and `subject_vocabulary`.
+
+    Unless `paperpush_supported_only` is set, a manuscript (or its title,
+    abstract, or keywords) is also matched against any journal: `openalex`
+    holds the journals and preprint servers that published the most similar
+    works in OpenAlex (name, publisher, similar works with examples, open
+    access, APC, h-index), each marked with its `paperpush_slug` when
+    paperpush supports it. If OpenAlex cannot be reached, `openalex.error`
+    says why and only `matches` is filled. Venues are ranked on thematic fit
+    alone; follow up with `describe_venue` and `create_subfile` for a
+    supported slug, or `validate_subfile` with venue "general" otherwise.
     """
     from .database import VENUE_KEYWORDS
-    from .venue_select import select
+    from .openalex import OpenAlexError
+    from .venue_select import find_journals, select
 
     if not (keywords or title.strip() or abstract.strip() or manuscript or venue_name.strip() or venue_types):
         raise ValueError("give keywords, a title, abstract, manuscript, venue_name, or venue_types")
     selection = select(keywords=keywords or (), title=title, abstract=abstract, manuscript=str(_resolve(manuscript)) if manuscript else None, name=venue_name, venue_types=tuple(venue_types or ()))
     result = selection.to_dict(limit=limit)
     result["subject_vocabulary"] = [k for k in VENUE_KEYWORDS if k != "general"]
-    if selection.manuscript is not None and not selection.subjects:
+    result["openalex"] = None
+    if selection.manuscript is not None and not paperpush_supported_only:
+        try:
+            journals = find_journals(selection.manuscript, venue_types=tuple(venue_types or ()))
+            result["openalex"] = journals.to_dict(limit=limit)
+        except (OpenAlexError, ValueError) as exc:
+            result["openalex"] = {"error": f"{exc}; only the supported venues were ranked"}
+    if selection.manuscript is not None and not selection.subjects and not (result["openalex"] or {}).get("journals"):
         result["note"] = "No subject could be inferred; read the manuscript and pass subjects from subject_vocabulary as `keywords`."
+    return result
+
+
+def find_reviewers(
+    subfile: Optional[str] = None,
+    manuscript: Optional[str] = None,
+    title: str = "",
+    abstract: str = "",
+    keywords: Optional[list[str]] = None,
+    authors: Optional[list[str]] = None,
+    exclude: Optional[list[str]] = None,
+    limit: int = 10,
+    years: int = 6,
+    write: bool = False,
+) -> dict[str, Any]:
+    """Suggest peer reviewers: researchers who recently published work like the manuscript's (OpenAlex).
+
+    Give a `subfile` (an absolute path to a .sub: its title, abstract,
+    keywords, authors, and already-opposed reviewers are read, and its
+    manuscript when the .sub lacks a title or abstract), a `manuscript`
+    (absolute path), or the `title`, `abstract`, and `keywords`. `authors`
+    adds manuscript authors as "Name | affiliation" strings (an ORCID iD in the
+    string is used to find them); `exclude` names people not to suggest.
+
+    Left out: the manuscript's authors, anyone who co-authored with them in the
+    last four years, anyone at one of their institutions, and the excluded
+    names; `excluded` lists who was left out and why. Each of `reviewers`
+    carries name, institution, ORCID, OpenAlex id, a score, and the similar
+    works behind the suggestion. OpenAlex has no e-mail addresses, so `email`
+    is blank: tell the author to add them. With `write` (needs `subfile`) the
+    suggestions are appended to the .sub's suggested-reviewer field. Present
+    them as suggestions for the author to vet, not a conflict-of-interest check.
+    """
+    from .openalex import OpenAlexError
+    from .reviewer_finder import find_reviewers as _find
+    from .reviewer_finder import gather_inputs, write_to_subfile
+
+    got = gather_inputs(str(_resolve(subfile)) if subfile else None, manuscript=str(_resolve(manuscript)) if manuscript else None, title=title, abstract=abstract, keywords=keywords or (), authors=authors or (), exclude=exclude or ())
+    if got.is_empty():
+        raise ValueError("give a subfile, manuscript, title, abstract, or keywords")
+    if write and got.sub_path is None:
+        raise ValueError("write needs a subfile")
+    try:
+        search = _find(got.title, got.abstract, got.keywords, authors=got.authors, exclude=got.exclude, limit=max(limit, 1), years=years)
+    except OpenAlexError as exc:
+        raise ValueError(f"{exc}; find_reviewers needs OpenAlex") from exc
+    result = search.to_dict()
+    result["manuscript"] = {"source": got.source or "arguments", "title": got.title, "keywords": list(got.keywords), "authors": [a.name for a in got.authors]}
+    if write and search.candidates:
+        text = got.sub_path.read_text(encoding="utf-8")
+        new_text, added = write_to_subfile(text, got.venue, search.candidates)
+        if added:
+            got.sub_path.write_text(new_text, encoding="utf-8")
+        result["written"] = {"subfile": str(got.sub_path), "added": added}
     return result
 
 
@@ -365,6 +436,13 @@ def create_subfile(
     resolved against the server's working directory rather than yours. Omit it
     to write `<venue>.sub.txt` there.
 
+    Pass `venue="general"` when the author has not chosen a venue yet: the
+    `.sub` then holds only what every venue asks for (title, abstract,
+    keywords, authors, manuscript, title page, figures, tables, supplements,
+    cover letter), and validate runs the checks that apply to any manuscript.
+    It cannot be submitted; once a venue is chosen, create that venue's `.sub`
+    and carry the values across.
+
     Refuses to clobber an existing file unless `overwrite` is true.
     """
     resolved = _venue_or_error(venue)
@@ -409,10 +487,10 @@ def _validation_inputs(subfile: Optional[str], manuscript_dir: Optional[str], ve
 
     From the ``.sub`` when one is given, with any named files replacing its
     paths; else from the named files alone, checked against ``venue`` or, with
-    none, the generic venue (general checks only). See :mod:`paperpush.file_inputs`.
+    none, the general venue (general checks only). See :mod:`paperpush.file_inputs`.
     """
     from . import file_inputs
-    from .database import generic_venue
+    from .database import general_venue
     from .subfile import SubFile
 
     named = file_inputs.given(files)
@@ -424,7 +502,7 @@ def _validation_inputs(subfile: Optional[str], manuscript_dir: Optional[str], ve
     elif not named:
         raise ValueError("pass a .sub file, or the files to check (manuscript, title_page, cover_letter, figures, tables, supplement)")
     else:
-        path, venue_def = None, _venue_or_error(venue) if venue else generic_venue()
+        path, venue_def = None, _venue_or_error(venue) if venue else general_venue()
         sub = SubFile(venue=venue_def.slug, values={})
     notes: list[str] = []
     if named:
@@ -1086,6 +1164,7 @@ def submit(
     recover: bool = True,
     expose_cdp: bool = False,
     skip_validate: bool = False,
+    confirm_new_submission: bool = False,
 ) -> dict[str, Any]:
     """Open the venue's portal and fill in the submission form from a `.sub` file.
 
@@ -1099,7 +1178,14 @@ def submit(
     `submit_status` to follow it and `submit_close` to shut the browser when the
     author is done. A `pid` in the result means the browser is opening.
 
-    Two preflights run first, and both stop before any browser opens:
+    The preflights below run first, and each stops before any browser opens:
+
+    - `submit` is for initial submissions. A `.sub` in a `revisionN/` directory,
+      or beside a response-to-reviewers document, comes back as
+      `confirmation_required` with the reasons: a revision goes through the
+      venue's own "submit revision" link, and a new submission would duplicate
+      it. Ask the author; pass `confirm_new_submission=true` only if they want a
+      brand-new submission anyway.
 
     - The `.sub` file is validated. Errors come back as `blocked`, with the same
       list `validate_subfile` gives. `skip_validate` turns this off (the CLI's
@@ -1133,11 +1219,27 @@ def submit(
     path, _, venue = _load_subfile(subfile, manuscript_dir)
 
     if not venue.has_form:
+        if venue.is_general:
+            raise ValueError("A general .sub is not tied to a venue, so there is no portal to submit to; create the chosen venue's .sub and carry the values across.")
         raise ValueError(f"{venue.slug} is validate-only: {_VALIDATE_ONLY_REASON}")
     try:
         venues_pkg.get_runner(venue.slug)
     except KeyError:
         raise ValueError(f"no submission runner is registered for {venue.slug!r}; " "this venue can be prepared but not driven") from None
+
+    if not confirm_new_submission:
+        from .revision import subfile_revision_signals
+        from .subfile import load as _load
+
+        signals = subfile_revision_signals(path, venue, _load(str(path)).values)
+        if signals:
+            return {
+                "status": "confirmation_required",
+                "venue": venue.slug,
+                "subfile": str(path),
+                "signals": signals,
+                "reason": ("This looks like a revised manuscript. submit is for initial submissions: it opens a new submission, " "so a revision sent this way becomes a duplicate. Revisions go through the venue's own 'submit revision' link. " "Ask the author; call submit again with confirm_new_submission=true only if they want a new submission."),
+            }
 
     checked = None if skip_validate else validate_subfile(str(path), check_links=False, check_sensitive=False, check_references=False, check_openreview=False)
     if checked is not None and not checked["ok"]:
@@ -1180,6 +1282,8 @@ def submit(
         command.append("--close-on-failure")
     if skip_validate:
         command.append("--skip-validate")
+    if confirm_new_submission:
+        command.append("--yes")
 
     log_path = _submit_log_path(venue.slug)
     log_file = log_path.open("wb")
@@ -1402,6 +1506,7 @@ def venue_resource(slug: str) -> str:
 TOOLS = (
     list_supported_venues,
     pick_venue,
+    find_reviewers,
     describe_venue,
     field_options,
     create_subfile,
@@ -1458,7 +1563,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
     )
     for tool in TOOLS:
         server.tool()(tool)

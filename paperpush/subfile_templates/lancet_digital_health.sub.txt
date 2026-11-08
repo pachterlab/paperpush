@@ -1,7 +1,8 @@
 # paperpush submission file for lancet_digital_health  -*- mode: yaml -*-
 # The Lancet Digital Health
 #
-# Edit the values below, then run:  paperpush submit lancet_digital_health.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate lancet_digital_health.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

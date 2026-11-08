@@ -253,9 +253,20 @@ def starter_doc(slug: str = "") -> VenueDoc:
 
 
 def _raw_databases(data_dir: Optional[Path] = None) -> tuple[dict, dict, dict]:
-    """The raw venues, forms and requirements databases (unresolved)."""
+    """The raw venues, forms and requirements databases (unresolved).
+
+    A file still missing from ``data_dir`` is read from the active copy, the
+    one :func:`merge` seeds it with, so :func:`check` sees what merge will.
+    """
     paths = database_paths(data_dir)
-    return tuple(json.loads(paths[k].read_text(encoding="utf-8")) if paths[k].is_file() else {} for k in ("venues", "forms", "requirements"))  # type: ignore[return-value]
+    source = venue_data.active_source() if data_dir else None
+
+    def read(path: Path) -> dict:
+        if not path.is_file() and source is not None:
+            path = source.path(path.name)
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+
+    return tuple(read(paths[k]) for k in ("venues", "forms", "requirements"))  # type: ignore[return-value]
 
 
 def doc_for(slug: str, data_dir: Optional[Path] = None) -> VenueDoc:

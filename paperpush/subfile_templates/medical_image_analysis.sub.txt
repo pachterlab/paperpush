@@ -1,7 +1,8 @@
 # paperpush submission file for medical_image_analysis  -*- mode: yaml -*-
 # Medical Image Analysis (Elsevier)
 #
-# Edit the values below, then run:  paperpush submit medical_image_analysis.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate medical_image_analysis.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

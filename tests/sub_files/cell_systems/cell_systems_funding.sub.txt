@@ -1,7 +1,9 @@
 # paperpush submission file for cell_systems  -*- mode: yaml -*-
 # Cell Systems (Cell Press)
 #
-# Edit the values below, then run:  paperpush submit cell_systems.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate cell_systems.sub.txt`
+#   - to fill out submission portal: `paperpush submit cell_systems.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

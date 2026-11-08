@@ -1,7 +1,9 @@
 # paperpush submission file for nature  -*- mode: yaml -*-
 # Nature - International weekly journal of science
 #
-# Edit the values below, then run:  paperpush submit nature.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate nature.sub.txt`
+#   - to fill out submission portal: `paperpush submit nature.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

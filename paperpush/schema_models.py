@@ -239,7 +239,7 @@ def build_forms_schema() -> dict[str, Any]:
 
 _REQ_SCHEMA_ID = "https://paperpush.org/schemas/manuscript_requirements.schema.json"
 _REQ_TITLE = "paperpush manuscript requirements database"
-_REQ_DESCRIPTION = "Schema for manuscript_requirements.json. The top-level object maps a venue slug to " "what its author guidelines require of the manuscript, grouped into shared sections " "(manuscript, title_page, abstract, keywords, sections, statements, figures, tables, " "supplementary, references, cover_letter, upload). Generated from the dataclasses in " "paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate."
+_REQ_DESCRIPTION = "Schema for manuscript_requirements.json. The top-level object maps a venue slug to " "what its author guidelines require of the manuscript, grouped into shared sections " "(manuscript, title_page, abstract, keywords, sections, statements, figures, tables, " "supplementary, references, cover_letter, upload). Keys of the form publisher:<slug> hold a publisher's " "house rules, which back the rules of every venue that names that publisher in venues.json. Generated from the dataclasses in " "paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate."
 
 
 def _requirements_section_schema(typ: type, defs: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -262,6 +262,18 @@ def _requirements_section_schema(typ: type, defs: dict[str, Any] | None = None) 
     return schema
 
 
+def _publisher_schema() -> dict[str, Any]:
+    """The schema of one ``$publishers`` entry."""
+    from .requirements import Publisher
+
+    schema = _strip_model_description(_clean(TypeAdapter(Publisher).json_schema()))
+    schema.pop("$defs", None)
+    schema["properties"].pop("slug", None)
+    schema.pop("required", None)
+    schema["additionalProperties"] = False
+    return schema
+
+
 def build_requirements_schema() -> dict[str, Any]:
     """Assemble the JSON Schema (draft 2020-12) for ``manuscript_requirements.json``."""
     nested_defs: dict[str, Any] = {}
@@ -269,7 +281,9 @@ def build_requirements_schema() -> dict[str, Any]:
     top = _strip_model_description(_clean(TypeAdapter(ManuscriptRequirements).json_schema()))
     top.pop("$defs", None)
     properties = top["properties"]
-    properties.pop("slug", None)
+    # Set when an entry is resolved (requirements._RUNTIME_KEYS), never stored.
+    for key in ("slug", "publisher", "from_publisher"):
+        properties.pop(key, None)
     for key, typ in SECTION_TYPES.items():
         # The section's one-line class docstring doubles as its description.
         summary = (typ.__doc__ or "").strip().splitlines()[0] if typ.__doc__ else ""
@@ -308,8 +322,14 @@ def build_requirements_schema() -> dict[str, Any]:
                 },
                 "additionalProperties": False,
             },
+            "$publishers": {
+                "type": "object",
+                "description": "The publishers whose house rules can back a venue's own (keyed by publisher slug; a venue names one with `publisher` in venues.json). Their rules are the `publisher:<slug>` entries.",
+                "propertyNames": {"pattern": "^[a-z0-9_]+$"},
+                "additionalProperties": {"$ref": "#/$defs/publisher"},
+            },
         },
-        "patternProperties": {"^[A-Za-z0-9_]+$": {"$ref": "#/$defs/venue"}},
+        "patternProperties": {"^[A-Za-z0-9_]+$": {"$ref": "#/$defs/venue"}, "^publisher:[a-z0-9_]+$": {"$ref": "#/$defs/venue"}},
         "additionalProperties": False,
-        "$defs": {"venue": top, "rules": rules, **sections, **nested_defs},
+        "$defs": {"venue": top, "rules": rules, "publisher": _publisher_schema(), **sections, **nested_defs},
     }

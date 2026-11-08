@@ -55,6 +55,28 @@ or `describe_venue(<venue>)` over MCP. If the venue is validate-only, tell the
 user that paperpush can check the manuscript against the venue's guidelines but
 cannot fill in its portal. Give them the `submission_url` and stop.
 
+### 0b. Check it is an initial submission
+
+`paperpush submit` opens a **new** submission. A revision goes through the
+venue's own "submit revision" link for the existing manuscript; sent through
+`submit`, it becomes a duplicate submission. Before going on, look for signs
+that the `.sub` is a revision:
+
+- the `.sub` or a file it names sits in a `revision<N>/` directory (as made by
+  `paperpush-respond-to-reviewers`);
+- the `.sub` names, or sits beside, a response-to-reviewers document
+  (`response_to_reviewers.*`, `rebuttal.*`, `reply to reviewers`, ...);
+- the user calls it a revision or resubmission after review.
+
+If any applies, **warn the user and ask** whether they really want a new
+submission. Tell them a revision is uploaded through the venue's "submit
+revision" link, and that `paperpush-respond-to-reviewers` prepares the files.
+Go on only if they say yes; then pass `confirm_new_submission=true` to the
+MCP `submit` tool (or `--yes` to the CLI). The tool and the CLI make the same
+check: MCP returns `confirmation_required` with the `signals`, and the CLI
+asks in the terminal (or stops, without a terminal). Never set
+`confirm_new_submission` / `--yes` without the user's answer.
+
 ### 1. Check the login
 
 ```
@@ -168,6 +190,8 @@ way.
 
 - Never run `paperpush login` yourself or ask for a password.
 - Never press, or try to press, the final submit button.
+- `submit` is for initial submissions. Warn and ask before submitting a `.sub`
+  that looks like a revision (step 0b).
 - Skip validation only when the user asks for it, and warn them what that risks.
 - Do not autofill, run validation checks, or create a `.sub` here; those
   belong to `paperpush-autofill`, `paperpush-validate`, and

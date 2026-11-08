@@ -178,3 +178,13 @@ passing.
 List the files added or changed, the test results (offline and live, with
 output on failure), any test draft left in the portal, and anything you could
 not automate. Do not commit unless the user asks.
+
+Then, for a new runner or a real fix, suggest sending it upstream as a pull
+request, as in `paperpush-add-venue-validate`'s **Share it** step: from a
+branch, commit only this venue's files (runner, venue data, regenerated
+templates and tables, `tests/test_<slug>.py`, `tests/sample_subfiles.json`
+and `tests/sub_files/<slug>/`, `scripts/guideline_fingerprints.json`), then
+`gh pr create --repo pachterlab/paperpush`, or open one at
+https://github.com/pachterlab/paperpush/compare. Only suggest it: don't
+push or open the PR unless the user says yes. Never commit credentials or
+saved session state.

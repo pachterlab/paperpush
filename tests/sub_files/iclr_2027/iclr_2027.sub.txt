@@ -1,7 +1,9 @@
 # paperpush submission file for iclr_2027  -*- mode: yaml -*-
 # The Fifteenth International Conference on Learning Representations
 #
-# Edit the values below, then run:  paperpush submit iclr_2027.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate iclr_2027.sub.txt`
+#   - to fill out submission portal: `paperpush submit iclr_2027.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

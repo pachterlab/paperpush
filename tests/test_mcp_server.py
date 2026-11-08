@@ -823,3 +823,25 @@ def test_recovery_report_errors(fake_launch, tmp_path):
         mcp_server.recovery_report(424242)
     with pytest.raises(ValueError, match="no recoveries were logged"):
         mcp_server.recovery_report(directory=str(tmp_path))
+
+
+def test_submit_asks_before_submitting_a_revision(tmp_path, no_launch):
+    import shutil
+
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    folder = tmp_path / "revision1"
+    shutil.copytree(VALID_SUB.parent, folder)
+    result = mcp_server.submit(str(folder / VALID_SUB.name))
+    assert result["status"] == "confirmation_required"
+    assert any("revision1" in s for s in result["signals"])
+
+
+def test_submit_confirmed_new_submission_passes_yes(tmp_path, fake_launch):
+    import shutil
+
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    folder = tmp_path / "revision1"
+    shutil.copytree(VALID_SUB.parent, folder)
+    result = mcp_server.submit(str(folder / VALID_SUB.name), confirm_new_submission=True, skip_validate=True)
+    assert result["status"] == "running"
+    assert "--yes" in fake_launch.instances[0].command

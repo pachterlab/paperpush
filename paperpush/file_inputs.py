@@ -8,8 +8,8 @@ given them directly (``--manuscript``, ``--title-page``, ``--cover-letter``,
 * with ``--venue`` and no ``.sub``, the files are checked against that venue's
   author guidelines, and the checks that read the ``.sub``'s form fields are
   reported as not applicable;
-* with neither, the files are checked against the placeholder generic venue
-  (:func:`paperpush.database.generic_venue`): only the checks that apply to any
+* with neither, the files are checked against the placeholder general venue
+  (:func:`paperpush.database.general_venue`): only the checks that apply to any
   manuscript run (links, references, hidden text, citation order, prose, ...).
 
 Each flag names a *role* (see :data:`paperpush.requirements_check._ROLE_FIELD_IDS`)
@@ -25,7 +25,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Mapping, Optional, Sequence, Union
 
-from .database import GENERIC_SLUG, Field, Venue, default_form
+from .database import GENERAL_SLUG, Field, Venue, default_form
 
 # (key, role, takes several files). ``key`` is the CLI flag's dest and the MCP
 # tool's argument name; ``role`` is the requirements_check role it fills.
@@ -89,7 +89,7 @@ def _fallback_field(role: str) -> Field:
     from .requirements_check import upload_role_ids
 
     ids = upload_role_ids(role)
-    for spec in default_form(GENERIC_SLUG)["fields"]:
+    for spec in default_form(GENERAL_SLUG)["fields"]:
         if spec["id"] in ids:
             return Field.from_dict(spec)
     raise KeyError(role)
@@ -121,7 +121,7 @@ def apply_files(venue: Venue, values: Mapping[str, str], files: Mapping[str, Pat
         else:
             target = _fallback_field(role)
             fields.append(target)
-            if not venue.is_generic:
+            if not venue.is_general:
                 names = ", ".join(Path(p).name for p in paths)
                 notes.append(f"{venue.name or venue.slug}'s form has no {target.label.lower()} upload; {names} is checked, but the portal has nowhere to upload it")
         if target.type == "file" and len(paths) > 1:

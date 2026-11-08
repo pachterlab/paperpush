@@ -1,7 +1,8 @@
 # paperpush submission file for ieee_tmi  -*- mode: yaml -*-
 # IEEE Transactions on Medical Imaging
 #
-# Edit the values below, then run:  paperpush submit ieee_tmi.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate ieee_tmi.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

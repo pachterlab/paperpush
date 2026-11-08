@@ -1,7 +1,9 @@
 # paperpush submission file for combinatorica  -*- mode: yaml -*-
 # Combinatorica (János Bolyai Mathematical Society / Springer)
 #
-# Edit the values below, then run:  paperpush submit combinatorica.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate combinatorica.sub.txt`
+#   - to fill out submission portal: `paperpush submit combinatorica.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

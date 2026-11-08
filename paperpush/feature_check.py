@@ -7,6 +7,7 @@ import unicodedata
 import zipfile
 from pathlib import Path
 
+from . import placeholders
 from .ai_validate import AiTask
 from .bibliography_check import read_bibliography
 from .database import Venue
@@ -125,9 +126,139 @@ def _word_file_cleanliness(venue: Venue, values: dict[str, str]) -> Outcome:
     return Outcome(issues, f"inspected {len(word_files)} Word file(s) for tracked changes and EndNote fields")
 
 
+def _author_names(venue: Venue, values: dict[str, str]) -> list[str]:
+    """Full names (two words or more) from the .sub's author-list fields."""
+    from .validate import parse_authors
+
+    names: list[str] = []
+    for field in venue.fields:
+        if field.type != "authorlist" or "author" not in field.id.lower():
+            continue
+        for author in parse_authors(values.get(field.id, ""), field.fields):
+            name = (author.get("name") or " ".join(p for p in (author.get("first_name", ""), author.get("last_name", "")) if p)).strip()
+            if len(name.split()) >= 2 and name not in names:
+                names.append(name)
+    return names
+
+
+def _name_then_digit(name: str) -> re.Pattern[str]:
+    """A name immediately followed (no space) by a digit; group 1 is the digit."""
+    body = r"\s+".join(re.escape(part) for part in name.split())
+    return re.compile(rf"(?<!\w){body}(\d)", re.IGNORECASE)
+
+
+_W_PARA = re.compile(r"<w:p\b.*?</w:p>", re.DOTALL)
+_W_RUN = re.compile(r"<w:r\b.*?</w:r>", re.DOTALL)
+_W_TEXT = re.compile(r"<w:t(?:\s[^>]*)?>([^<]*)</w:t>")
+
+
+# Where the front matter (title, authors, affiliations) ends on a manuscript's first page.
+_FRONT_END = re.compile(r"^\s*(?:#+\s*)?(?:\d+\.?\s*)?(?:abstract|summary|introduction|background|main)\b\s*:?\s*$", re.IGNORECASE | re.MULTILINE)
+_TEX_FRONT_END = re.compile(r"\\begin\{abstract\}|\\maketitle|\\section\*?\{|\\abstract\{")
+
+
+def _front(text: str, latex: bool = False) -> str:
+    """The part of a manuscript's source before its abstract or first section."""
+    m = (_TEX_FRONT_END if latex else _FRONT_END).search(text)
+    return text[: m.start()] if m else text
+
+
+def _docx_inline(xml: str, patterns: dict[str, re.Pattern[str]], first_page: bool) -> list[str]:
+    hits: list[str] = []
+    for para in _W_PARA.findall(xml):
+        if first_page and _FRONT_END.fullmatch("".join(_W_TEXT.findall(para))):
+            break
+        text, raised = "", []
+        for run in _W_RUN.findall(para):
+            piece = "".join(_W_TEXT.findall(run))
+            text += piece
+            raised += [bool(re.search(r'<w:vertAlign w:val="superscript"', run))] * len(piece)
+        for name, pattern in patterns.items():
+            hits += [name for m in pattern.finditer(text) if not raised[m.start(1)]]
+        if first_page and re.search(r'<w:br [^>]*w:type="page"|<w:lastRenderedPageBreak/>|<w:pageBreakBefore/>', para):
+            break
+    return hits
+
+
+def _pdf_inline(pages, patterns: dict[str, re.Pattern[str]], first_page: bool) -> list[str]:
+    hits: list[str] = []
+    for page in pages[:1] if first_page else pages:
+        text, index = "", []
+        prev = None
+        for g in page.glyphs:
+            if g.in_figure or not g.text:
+                continue
+            if prev is not None and not g.text.isspace() and not text.endswith(" "):
+                new_line = abs(g.y0 - prev.y0) > prev.size and g.x0 < prev.x0
+                if new_line or g.x0 - prev.x1 > 0.2 * prev.size:
+                    text, index = text + " ", index + [None]
+            text, index = text + g.text, index + [g] * len(g.text)
+            prev = g
+        for name, pattern in patterns.items():
+            for m in pattern.finditer(text):
+                digit, before = index[m.start(1)], index[m.start(1) - 1]
+                if digit is None or before is None:
+                    continue
+                if digit.size >= 0.9 * before.size and abs(digit.y0 - before.y0) < 0.15 * before.size:
+                    hits.append(name)
+    return hits
+
+
+def _affiliation_superscripts(venue: Venue, values: dict[str, str]) -> Outcome:
+    """Flag an author name followed directly by an affiliation number that is not superscripted ("Joe Rich2")."""
+    from . import document
+
+    names = _author_names(venue, values)
+    if not names:
+        raise NotApplicable("no author names in the .sub")
+    # The manuscript's first page (under the title) and the whole title page.
+    title_pages = _files(venue, values, "title_page")
+    paths = {p: False for p in title_pages}
+    for p in _files(venue, values, "manuscript"):
+        paths.setdefault(p, True)
+    if not paths:
+        raise NotApplicable("no manuscript or title page")
+    patterns = {name: _name_then_digit(name) for name in names}
+    issues: list[Issue] = []
+    read: list[str] = []
+    for path, first_page in paths.items():
+        doc = document.get(path)
+        if doc.is_docx:
+            xml = doc.docx_part("word/document.xml")
+            hits = None if xml is None else _docx_inline(xml, patterns, first_page)
+        elif doc.is_tex:
+            source = doc.tex_source
+            if source is not None and first_page:
+                source = _front(source, latex=True)
+            hits = None if source is None else [n for n, p in patterns.items() if p.search(source)]
+        elif doc.is_markdown or doc.suffix == ".txt":
+            try:
+                source = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                source = None
+            if source is not None and first_page:
+                source = _front(source)
+            hits = None if source is None else [n for n, p in patterns.items() if p.search(source)]
+        elif doc.is_pdf:
+            pages = doc.glyph_pages
+            hits = None if pages is None else _pdf_inline(pages, patterns, first_page)
+        else:
+            hits = None
+        if hits is None:
+            continue
+        read.append(path.name)
+        for name in dict.fromkeys(hits):
+            issues.append(Issue(WARNING, "", f"{path.name}: the affiliation number after '{name}' is not superscripted (e.g. '{name}1' should be '{name}¹')"))
+    if not read:
+        raise Unchecked("could not read the author line of any manuscript or title page")
+    return Outcome(issues, f"checked {len(names)} author name(s) in {', '.join(read)}")
+
+
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("details.reference_order", "Reference list is alphabetical or follows first citation", CATEGORY, _reference_order, venue, values, bool(checks.options.get("references_alphabetical")), bool(checks.options.get("references_citation_order")))
     checks.run("details.word_cleanliness", "Word files have no tracked changes or EndNote fields", CATEGORY, _word_file_cleanliness, venue, values)
+    checks.run("details.placeholders", "No placeholders, to-do notes, comments, or highlighting left in the files", CATEGORY, placeholders.check, venue, values)
+    checks.run("details.affiliation_superscripts", "Affiliation numbers after author names are superscripted", CATEGORY, _affiliation_superscripts, venue, values)
 
     manuscripts = _files(venue, values, "manuscript")
     if not manuscripts:

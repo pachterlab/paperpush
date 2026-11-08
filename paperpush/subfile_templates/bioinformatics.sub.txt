@@ -1,7 +1,9 @@
 # paperpush submission file for bioinformatics  -*- mode: yaml -*-
 # Bioinformatics (Oxford University Press)
 #
-# Edit the values below, then run:  paperpush submit bioinformatics.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate bioinformatics.sub.txt`
+#   - to fill out submission portal: `paperpush submit bioinformatics.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

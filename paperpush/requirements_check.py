@@ -56,6 +56,7 @@ import re
 from dataclasses import replace
 from pathlib import Path
 
+from . import ai_policy
 from .database import Field, Venue
 from .manuscript import headings as manuscript_headings
 from .manuscript import normalize_heading, pages_before_references, reference_count, section_word_counts, title_page_text, total_pages, total_words, words_before_references
@@ -289,6 +290,8 @@ STATEMENT_IN_TEXT: dict[str, re.Pattern[str]] = {
         # Acronyms are matched case-sensitively ("CARE", not "care"); the wording is not.
         r"|(?i:\breport(?:ing|ed)?\b[^.]{0,80}\b(?:guidelines?|checklists?|statement|extension)\b|\b(?:guidelines?|checklists?)\b[^.]{0,40}\breporting\b)",
     ),
+    # An AI-use disclosure is often a sentence in the Methods or Acknowledgements.
+    "ai_use": ai_policy.IN_TEXT,
 }
 
 
@@ -691,7 +694,8 @@ HANDLED_RULES = frozenset(
         "abstract.structured_headings", "abstract.no_references", "abstract.no_abbreviations",
         "keywords.min", "keywords.max",
         "sections.required", "sections.order", "sections.combined_allowed", "sections.max_words",
-        "statements.required",
+        "statements.required", "statements.ai_use_if_used", "statements.ai_use_locations", "statements.ai_use_cover_letter",
+        "statements.ai_copyediting_exempt", "statements.ai_authorship_prohibited",
         "figures.formats", "figures.min_dpi", "figures.min_dpi_line_art", "figures.min_dpi_combination",
         "figures.max_file_size_mb", "figures.max_count", "figures.single_column_width_mm", "figures.double_column_width_mm",
         "figures.max_width_mm", "figures.max_height_mm", "figures.color_mode", "figures.min_font_size_pt",
@@ -708,7 +712,7 @@ HANDLED_RULES = frozenset(
 # Rule keys that describe rather than constrain (what a count leaves out, a
 # template's download link, a preference), or free text handed to the AI
 # checks (``notes``).
-INFORMATIONAL_RULES = frozenset({"manuscript.count_excludes", "manuscript.initial_submission_any_format", "manuscript.count_includes", "manuscript.template_url", "figures.vector_formats", "figures.color_charge", "sections.optional", "statements.optional", "notes"})
+INFORMATIONAL_RULES = frozenset({"manuscript.count_excludes", "manuscript.initial_submission_any_format", "manuscript.count_includes", "manuscript.template_url", "figures.vector_formats", "figures.color_charge", "sections.optional", "statements.optional", "revision.marked_manuscript", "notes"})
 
 GUIDELINES = "Guidelines"
 
@@ -746,7 +750,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     base = get_requirements(venue.slug)
     if base is None:
         logger.debug("No manuscript requirements recorded for %s", venue.slug)
-        checks.record("guidelines", "Author-guideline checks ran (needs a venue with recorded guidelines)", GUIDELINES, NOT_APPLICABLE, detail="no venue given (name one with --venue to check its author guidelines)" if venue.is_generic else f"no author-guideline rules are recorded for {venue.slug}")
+        checks.record("guidelines", "Author-guideline checks ran (needs a venue with recorded guidelines)", GUIDELINES, NOT_APPLICABLE, detail="no venue given (name one with --venue to check its author guidelines)" if venue.is_general else f"no author-guideline rules are recorded for {venue.slug}")
         return
     reqs = resolve(base, values)
     logger.info("Checking %s against its manuscript requirements", venue.slug)
@@ -761,6 +765,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     run("guidelines.section_order", "Sections in the guidelines' order", _section_order_check, venue, reqs, values)
     run("guidelines.section_length", "Sections within the guidelines' word limits", _section_length_check, venue, reqs, values)
     run("guidelines.statements", "Required statements and declarations present", _statements_check, venue, reqs, values)
+    run("guidelines.ai_policy", "Use of generative AI disclosed where the guidelines ask, and no AI tool listed as an author", ai_policy.check, venue, reqs, values)
     run("guidelines.title_page", "Title page carries the required items", _title_page_check, checks, venue, reqs, values)
     run("guidelines.title_page_file", "Title page uploaded as a separate file", _title_page_file_check, venue, reqs, values)
     run("guidelines.reference_count", "Reference count within the limit", _reference_count_check, venue, reqs, values)

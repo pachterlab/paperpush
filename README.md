@@ -7,7 +7,7 @@ Prepare manuscripts for submission to preprint servers, journals, and conference
 PaperPush provides the following services:
 - A standardized system to share all data submitted to a journal/conference
 <!-- BEGIN VALIDATION CHECK COUNT -->
-- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 124 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
+- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 131 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
 <!-- END VALIDATION CHECK COUNT -->
 - A central database of journal/conference manuscript requirements
 - Automated and fast submission portal filling with deterministic scripts
@@ -18,25 +18,48 @@ PaperPush provides the following services:
 Workflow to create the manuscript metadata (.sub) file, validate against author guidelines, and fill out the submission portal. Follow your favorite path:
 
 ### Claude Code (other AI agents listed below):
+
+#### Install
 - `/plugin marketplace add pachterlab/paperpush`
 - `/plugin install paperpush@paperpush`
+
+#### Venue-specific metadata collection, tailored checking, and submission portal filling for a supported venue
 - `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.`
+
+#### Venue-specific metadata collection and tailored checking for an unsupported venue
+- `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE_NAME with PaperPush.`
+
+#### General manuscript checking
+- `/paperpush-validate Validate my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.`
+
+#### Manuscript venue transfer
+- `/paperpush-transfer Transfer my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY to VENUE_2 with PaperPush.`
+
+#### Respond to reviewers
+- `/paperpush-respond-to-reviewers Prepare my response to reviewers in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.`
+
 
 ### Website: 
 - Visit [paperpush.onrender.com](https://paperpush.onrender.com)
 - Select the VENUE (or upload a .sub file)
+  - For general manuscript checks, select "General"
 - Upload manuscript files and fill out the metadata fields
 - Click the blue "Validate" button to validate the files and metadata against author guidelines
 - Click the blue "Share" button to share the editable form with co-authors (or download and share the .sub file)
 - (If available) Click the "Fill out submission portal automatically" button and follow the instructions
 
 ### CLI: 
-- `paperpush subfile VENUE`  # create a .sub file
-- Fill out VENUE.sub.txt
-- `paperpush validate VENUE.sub.txt`  # validate the files and data in VENUE.sub.txt
+- To install:
+  - `pip install paperpush["all"]`  # Recommended — for AI API usage, MCP server, local web deployment, and additional manuscript validation checks
+  - `playwright install chromium`  # Required for `submit`
+- `paperpush subfile VENUE`  # create a .sub file (`paperpush subfile general` if you have not chosen a venue yet)
+- Fill out VENUE.sub.txt  # or agent skill /paperpush-autofill
+- `paperpush validate VENUE.sub.txt`  # validate the files and data in VENUE.sub.txt  # or agent skill /paperpush-validate
+  - For general manuscript checks, run: `paperpush validate --manuscript MANUSCRIPT ...`
 - Share VENUE.sub.txt with co-authors (it can be viewed in a text editor, with `paperpush web VENUE.sub.txt`, or via upload onto [paperpush.onrender.com](https://paperpush.onrender.com))
 - (If available) `paperpush login VENUE`  # log in to the VENUE submission portal
-- (If available) `paperpush submit VENUE.sub.txt`  # fill out the VENUE submission portal with information in VENUE.sub.txt
+- (If available) `paperpush submit VENUE.sub.txt`  # fill out the VENUE submission portal with information in VENUE.sub.txt  # or agent skill /paperpush-submit
+  - `submit` is for **initial submissions only**. Upload a revision through the venue's own "submit revision" link for the existing manuscript (prepare it with `/paperpush-respond-to-reviewers`)
 
 ## Website
 
@@ -97,20 +120,14 @@ Use the agent skill `/paperpush-prepare-submission` to run this entire pipeline.
 
 1. `paperpush subfile VENUE`: creates a file VENUE.sub.txt that is a template for the VENUE submission. Fields are grouped into the same sections for every venue (manuscript type, files, details, authors, reviewers, declarations, additional); add `--venue-order` to list them in the order the venue's portal asks for them instead.
 2. **fill out VENUE.sub.txt:** Open VENUE.sub.txt in a text editor to edit manually, or run `paperpush web VENUE.sub.txt` to edit in a web browser. Use the agent skill `/paperpush-autofill My manuscript files are in /PATH/TO/MANUSCRIPT/DIRECTORY. Fill out VENUE.sub.txt` or the command `paperpush autofill --engine api -p /PATH/TO/MANUSCRIPT/DIRECTORY ... VENUE.sub.txt` (API) to automatically fill from the manuscript directory with AI. `paperpush autofill` requires the provider's API key. The AI agent may not be able to fill out all fields if some information is not in the manuscript directory.
-3. `paperpush validate VENUE.sub.txt`: run the pre-submission checks on the filled `VENUE.sub.txt`. Use the agent skill `/paperpush-validate` or the CLI flag `--ai` (API) to run checks with AI. The AI checks require the provider's API key. To check files before making a `.sub`, name them instead: `paperpush validate --manuscript main.tex --title-page title.tex --figures fig1.png fig2.png` runs the checks that apply to any manuscript (links, references, hidden text, citation order, prose, ...), and adding `--venue VENUE` checks them against that venue's author guidelines too. Use the agent skill `/paperpush-fix` to fix the issues validate finds: it edits the manuscript sources and the `.sub`, validates again until nothing fixable is left, and reports what needs your decision.
+3. `paperpush validate VENUE.sub.txt`: run the pre-submission checks on the filled `VENUE.sub.txt`. Use the agent skill `/paperpush-validate` or the CLI flag `--ai` (API) to run checks with AI. The AI checks require the provider's API key. To check files without a `.sub`, name them instead: `paperpush validate --manuscript main.tex --title-page title.tex --figures fig1.png fig2.png ...` runs the checks that apply to any manuscript (links, references, hidden text, citation order, prose, etc.), and adding `--venue VENUE` checks them against that venue's author guidelines too. Use the agent skill `/paperpush-fix` to fix the issues validate finds: it edits the manuscript sources and the `.sub`, validates again until nothing fixable is left, and reports what needs your decision.
 4. `paperpush login VENUE`: log in to the VENUE submission portal.
-5. `paperpush submit VENUE.sub.txt`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. Use the agent skill `/paperpush-submit` to run login and submit on a .sub file. Use the agent skill `/paperpush-portal-debug` or the CLI flag `--ai` (API) to have AI fix any issues that may arise. Ignore validation checks with the `--skip-validate` flag.
+5. `paperpush submit VENUE.sub.txt`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. Use the agent skill `/paperpush-submit` to run login and submit on a .sub file. Use the agent skill `/paperpush-portal-debug` or the CLI flag `--ai` (API) to have AI fix any issues that may arise. Ignore validation checks with the `--skip-validate` flag. **Use `submit` only for initial submissions**: it opens a new submission, so a revision sent this way becomes a duplicate. Upload revisions through the venue's own "submit revision" link instead (`/paperpush-respond-to-reviewers` prepares the revised manuscript, marked manuscript, and response to reviewers). `submit` warns and asks before continuing when the `.sub` is in a `revisionN/` directory or sits beside a response-to-reviewers document (`--yes` skips the question).
 
 Helper commands:
 - `paperpush venues`: List supported venues. Filters combine:
-  - `--validate`: only venues paperpush can validate a manuscript against.
-  - `--submit`: only venues that also support automated submission portal filling.
-  - `-k/--keywords KW[,KW...]`: only venues tagged with any of these subject keywords (e.g. `biology,genetics`).
-  - `-t/--type TYPE`: only venues of this kind (`preprint`, `journal`, or `conference`; repeatable).
-  - `--columns COL[,COL...]` / `--hide-columns COL[,COL...]`: choose which columns to show (`slug`, `venue`, `keywords`, `type`, `link`, `validate`, `submit`).
-
-  For example, `paperpush venues --submit -t journal -k biology` lists the biology journals paperpush can submit to.
-- `paperpush pick-venue`: List supported venues that are a good thematic fit for your manuscript. Give it the manuscript's keywords (`pick-venue hippocampus, place cells`; a keyword can be a venue subject such as `immunology`), the manuscript itself (`pick-venue manuscript.pdf`), or its `--title` and `--abstract`, which are matched against each venue's subject keywords (`--venue-name` searches by name instead); add `--ai` (API) for an LLM's ranking with a reason for each venue. Note that this only searches the venues supported in PaperPush; and it only checks for thematic fit, not impact or likelihood of acceptance.
+- `paperpush pick-venue`: List journals that are a good thematic fit for your manuscript. Give keywords, the manuscript, or its `--title` and `--abstract`. By default it searches any journal, through the works most similar to yours in [OpenAlex](https://openalex.org), and marks the ones PaperPush supports; `--paperpush-supported-only` ranks only the venues supported in PaperPush (offline). It only checks for thematic fit, not impact or likelihood of acceptance.
+- `paperpush find-reviewers VENUE.sub.txt`: Suggest peer reviewers who recently published similar work (from OpenAlex), leaving out the manuscript's authors, their recent co-authors, colleagues at their institutions, and anyone you `--exclude`. `--write` adds the suggestions to the .sub's reviewer field; fill in their e-mail addresses, which OpenAlex does not have.
 - `paperpush update-venues`: Update the venue data (venues.json, submission_forms.json, manuscript_requirements.json) from the remote venue-data branch.
 - `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
 - `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
@@ -123,6 +140,8 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 [paperpush.readthedocs.io](https://paperpush.readthedocs.io)
 
 ## Supported venues
+
+`paperpush validate --manuscript main.tex` runs general-purpose checks (links, references, hidden text, citation order, prose, ...) on any manuscript, whether or not its venue is listed below.
 
 <!-- BEGIN SUPPORTED VENUES -->
 **Preprint servers**
@@ -226,6 +245,21 @@ New venues are added for submit with paperpush releases - `pip install -U paperp
 
 Each venue is listed in `paperpush/venues.json` (the master list of venues and their general metadata), `paperpush/manuscript_requirements.json` (the manuscript guidelines), and `paperpush/submission_forms.json` (the fields the portal asks for). The script for automatic venue login and submission lives in `/paperpush/venues/PLATFORM/VENUE.py` in a VENUE class with methods `login` and `submit`. See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`DEVELOPMENT.md`](DEVELOPMENT.md) for more details.
 
+## AI Skills
+
+| Skill | Use it to |
+| --- | --- |
+| `/paperpush-prepare-submission` | go from a manuscript directory to a filled-in portal (autofill, validate, submit if supported) |
+| `/paperpush-autofill` | fill a `.sub` from the manuscript files |
+| `/paperpush-validate` | run every check, including the ones that need a reader |
+| `/paperpush-fix` | fix what validate flags (in the `.tex`/`.docx` sources and the `.sub`), re-validate until nothing fixable is left, and report what needs the author |
+| `/paperpush-submit` | log in and fill in the portal from a ready `.sub` (optionally skipping validation) — invokes `/paperpush-portal-debug` if it stalls |
+| `/paperpush-portal-debug` | get a stalled `paperpush submit` run unstuck |
+| `/paperpush-transfer` | move a manuscript from one venue to another: copy the files into a new `<venue>/` directory, create and autofill its `.sub` (reusing earlier `.sub` files), validate, and write `transfer.txt` describing the changes |
+| `/paperpush-respond-to-reviewers` | prepare a revision in two phases: (1) copy the manuscript and reviews into a new `revisionN/` directory (e.g., revision1, revision2, etc.) and propose a plan for each comment, then (once you approve) (2) revise the manuscript; write the response to reviewers, the clean revised manuscript, and a marked manuscript; and validate the revised manuscript |
+| `/paperpush-add-venue-validate` | add or refresh a venue's author guidelines (contributors) |
+| `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and  `submit` support for a venue, with tests (contributors) |
+
 ## What is a .sub file
 
 The .sub file is the yaml-like text file that contains all metadata and file paths required to upload a manuscript onto a venue's submission portal. An example snippet is shown below. In this case, you would provide "/PATH/TO/MANUSCRIPT.pdf", "TITLE", and "HERE IS THE ABSTRACT".
@@ -269,33 +303,11 @@ pip install 'paperpush[mcp]'
 The server exposes the whole pipeline as tools. See [`AGENTS.md`](AGENTS.md) for
 the tool list and the contract agents should follow.
 
-## AI Skills
+## Comparison with other tools
 
-| Skill | Use it to |
-| --- | --- |
-| `/paperpush-prepare-submission` | go from a manuscript directory to a filled-in portal (autofill, validate, submit) |
-| `/paperpush-autofill` | fill a `.sub` from the manuscript files |
-| `/paperpush-validate` | run every check, including the ones that need a reader |
-| `/paperpush-fix` | fix what validate flags (in the `.tex`/`.docx` sources and the `.sub`), re-validate until nothing fixable is left, and report what needs the author |
-| `/paperpush-submit` | log in and fill in the portal from a ready `.sub` (optionally skipping validation) — invokes portal-debug if it stalls |
-| `/paperpush-portal-debug` | get a stalled `paperpush submit` run unstuck |
-| `/paperpush-add-venue-validate` | add or refresh a venue's author guidelines (contributors) |
-| `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and  `submit` support for a venue, with tests (contributors) |
+[![PaperPush compared with other manuscript tools](docs/_static/comparison.png)](docs/_static/comparison.pdf)
 
-## For AI agents
-
-If you are an AI agent asked to submit a manuscript on the user's behalf, read
-[`AGENTS.md`](AGENTS.md) — or, if you are working from a `pip install` rather
-than a clone of this repo, run `paperpush --agent-guide`, which prints the same
-document from the copy that shipped with the installed version. It describes how to run the full pipeline while doing
-your **own** field extraction (reading the manuscript and writing a
-`values.json` for the default `--engine manual`) rather than relying on the
-API-backed engine. It also asks the agent to check `paperpush login --list`
-before it starts, and to tell you right away if you still need to run
-`paperpush login <venue>` yourself — that sign-in is interactive and belongs in
-your terminal. Agents that support skills should install them (see
-[Use with AI](#use-with-ai)); `AGENTS.md` lists what each skill does and when
-to use it.
+Green means supported, amber means partial, red means not supported, and grey means unknown. The data reflect what each tool advertises (see the sources in the script), so let us know if something has changed. [PDF version](docs/_static/comparison.pdf). Regenerate with `python scripts/gen_comparison_table.py`.
 
 ## FAQ
 
@@ -311,6 +323,12 @@ Here are a few possibilities, in order of decreasing ease of resolution:
 - The submission portal is having server issues. You can try logging in to the portal manually to see if it is working, as well as on a different browser and at a different time.
 - The sub file has an option that we did not anticipate. You can try running the unit test for the venue with `pytest tests/test_submit.py --run-portal -s --venue VENUE`. If this passes, then it indicates an option in the sub file is not being handled correctly. If this fails, then it indicates that the submission portal has changed since the last time the venue was tested. In either case, please open an issue with the error message.
 - The submission portal has changed since the last time the venue was tested. You can run the unit test listed above to see if this is the case. If so, please open an issue with the error message.
+
+*Can I still use PaperPush if my venue is not listed?*
+Yes! PaperPush can still validate manuscript files with up to 125 general validation checks. You can do this in the following ways:
+- AI agent: Run the skill `/paperpush-validate Validate my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.` for general checks, or `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE_NAME with PaperPush.` for venue-specific checks in which the agent can retrieve guidelines from the venue's website.
+- Web app: Choose the "General" venue option and upload your manuscript files/directory for general checks.
+- CLI: Run `paperpush validate --manuscript MANUSCRIPT ...` for general checks, or `paperpush subfile general` for a .sub with the files and metadata every venue asks for (title, abstract, keywords, authors, manuscript, figures, supplements, cover letter, ...), then fill it in and `paperpush validate general.sub.txt`.
 
 
 *I do not see my venue in the supported list. Is it possible to add a venue?*
@@ -335,7 +353,22 @@ It depends on the complexity of the submission portal and your comfort with codi
 
 *Can I vibe code a new journal?*
 
-Yes, with `/paperpush-add-venue` (see [`CONTRIBUTING.md`](CONTRIBUTING.md)). AI agents can navigate submission portals and write the Venue class for login and submit, but it can take a lot of tokens and may stall at times, so some human oversight helps. In my experience, LLMs can make the code a bit verbose and abstract away some of the action names, which may be harder to read/maintain in my opinion, but this is just stylistic. My favorite code style is in `arxiv.py`.
+Yes, with `/paperpush-add-venue` to add or update a venue for guideline validation and submission portal filling, or `/paperpush-add-venue-validate` to add or update a venue for guideline validation only (see [`CONTRIBUTING.md`](CONTRIBUTING.md)). AI agents can navigate submission portals and write the Venue class for login and submit, but it can take a lot of tokens and may stall at times, so some human oversight helps. In my experience, LLMs can make the code a bit verbose and abstract away some of the action names, which may be harder to read/maintain in my opinion, but this is just stylistic. My favorite code style is in `arxiv.py`.
+
+## For AI agents
+
+If you are an AI agent asked to submit a manuscript on the user's behalf, read
+[`AGENTS.md`](AGENTS.md) — or, if you are working from a `pip install` rather
+than a clone of this repo, run `paperpush --agent-guide`, which prints the same
+document from the copy that shipped with the installed version. It describes how to run the full pipeline while doing
+your **own** field extraction (reading the manuscript and writing a
+`values.json` for the default `--engine manual`) rather than relying on the
+API-backed engine. It also asks the agent to check `paperpush login --list`
+before it starts, and to tell you right away if you still need to run
+`paperpush login <venue>` yourself — that sign-in is interactive and belongs in
+your terminal. Agents that support skills should install them (see
+[Use with AI](#use-with-ai)); `AGENTS.md` lists what each skill does and when
+to use it.
 
 
 ## License

@@ -142,6 +142,22 @@ def _no_network_reference_search(monkeypatch):
     monkeypatch.setattr(reference_search._Service, "get", lambda self, *a, **k: None)
 
 
+@pytest.fixture(autouse=True)
+def _no_network_openalex(monkeypatch):
+    """Keep the suite offline: OpenAlex (pick-venue, find-reviewers) is "unreachable".
+
+    ``pick-venue`` then falls back to ranking the supported venues, as it does
+    without a network. Tests of the OpenAlex paths patch ``openalex.get_json``
+    themselves.
+    """
+    import paperpush.openalex as openalex
+
+    def _offline(*args, **kwargs):
+        raise openalex.OpenAlexError("OpenAlex is offline in tests")
+
+    monkeypatch.setattr(openalex, "get_json", _offline)
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--run-portal",

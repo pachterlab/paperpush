@@ -1,7 +1,9 @@
 # paperpush submission file for nucleic_acids_research  -*- mode: yaml -*-
 # Nucleic Acids Research (Oxford University Press)
 #
-# Edit the values below, then run:  paperpush submit nucleic_acids_research.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate nucleic_acids_research.sub.txt`
+#   - to fill out submission portal: `paperpush submit nucleic_acids_research.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

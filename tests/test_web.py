@@ -23,7 +23,7 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient
 
-from paperpush.database import get_venue, list_venues
+from paperpush.database import GENERAL_SLUG, get_venue, list_venues
 from paperpush.subfile import default_filename, parse, render_template, replace_block, replace_scalar, subfile_stem
 from paperpush.validate import validate_report
 from paperpush.web.app import LIVE_CHECKS, Settings, create_app, live_rules, localize_values, safe_name, venue_schema_issues
@@ -60,8 +60,30 @@ def test_index_and_static_assets_are_served(client):
         assert client.get(f"/static/{asset}").status_code == 200
 
 
-def test_venue_list_matches_the_database(client):
-    assert [v["slug"] for v in client.get("/api/venues").json()] == [v.slug for v in list_venues()]
+def test_venue_list_is_general_then_the_database(client):
+    listed = client.get("/api/venues").json()
+    assert listed[0]["slug"] == GENERAL_SLUG and listed[0]["name"] == "General"
+    assert [v["slug"] for v in listed[1:]] == [v.slug for v in list_venues()]
+
+
+def test_general_venue_has_the_common_uploads_and_metadata(client):
+    detail = client.get(f"/api/venues/{GENERAL_SLUG}").json()
+    assert detail["name"] == "General" and detail["venue_type"] == "general"
+    assert not detail["supports_submit"] and not detail["login_required"]
+    assert detail["manuscript_requirements"] is None
+    assert {f["id"] for f in detail["fields"]} >= {"title", "abstract", "authors", "manuscript_file", "figure_files", "cover_letter"}
+    assert detail["template"] == render_template(get_venue(GENERAL_SLUG), fill_defaults=True)
+    assert "paperpush validate general.sub.txt" in detail["template"] and "paperpush submit" not in detail["template"]
+
+
+def test_general_venue_validates_with_the_general_checks(client, ws):
+    _upload_manuscript(client, ws)
+    text = render_template(get_venue(GENERAL_SLUG), fill_defaults=True, values={"manuscript_file": "manuscript.pdf"})
+    res = client.post(f"/api/workspaces/{ws}/validate", json={"text": text}).json()
+    assert res["venue"] == GENERAL_SLUG
+    by_id = _checks(res)
+    assert by_id["files.uploads"]["status"] == "passed"
+    assert by_id["guidelines"]["status"] == "not_applicable"
 
 
 def test_venue_detail_carries_template_and_field_definitions(client):

@@ -505,6 +505,10 @@ class VenueInfo:
         bool,
         PField(description="Hidden from listings but still reachable by get_venue."),
     ] = False
+    publisher: Annotated[
+        str,
+        PField(description="Slug of the venue's publisher, as listed under $publishers in manuscript_requirements.json (e.g. elsevier, springer_nature). Its house rules (the publisher:<slug> entry) back the venue's own: a rule the venue's guidelines do not state falls back to the publisher's, reported as a warning. Empty for a venue with no publisher, or one whose publisher is not listed."),
+    ] = ""
     site_url: Annotated[str, PField(description="Public homepage URL.")] = ""
     submission_guide: Annotated[str, PField(description="URL of the author/submission guide.")] = ""
     description: Annotated[str, PField(description="Short description of the venue.")] = ""
@@ -574,9 +578,9 @@ class Venue(SubmissionForm, VenueInfo):
     has_form: bool = True
 
     @property
-    def is_generic(self) -> bool:
-        """Whether this is the placeholder for "no venue" (:func:`generic_venue`)."""
-        return self.slug == GENERIC_SLUG
+    def is_general(self) -> bool:
+        """Whether this is the placeholder for "no venue" (:func:`general_venue`)."""
+        return self.slug == GENERAL_SLUG
 
     @property
     def supports_validate(self) -> bool:
@@ -604,6 +608,7 @@ class Venue(SubmissionForm, VenueInfo):
             full_name=data.get("full_name", ""),
             submission_url=data.get("submission_url", ""),
             venue_type=data.get("venue_type", "journal"),
+            publisher=str(data.get("publisher", "") or "").lower(),
             site_url=data.get("site_url", ""),
             submission_guide=data.get("submission_guide", ""),
             description=data.get("description", ""),
@@ -628,14 +633,33 @@ FORM_KEYS = frozenset(f.name for f in dataclass_fields(SubmissionForm)) | {"remo
 TITLE_PAGE_FIELD: dict[str, Any] = {"id": "title_page_file", "autofill": "filemap", "label": "Title page", "type": "file", "help": "Optional. Path to the title page, when it is a separate file from the manuscript."}
 
 # The slug of the placeholder venue ``validate`` checks against when none is
-# named: no submission form beyond :func:`default_form` and no author-guideline
-# rules, so only the checks that apply to any manuscript run.
-GENERIC_SLUG = "generic"
+# named (and ``paperpush subfile general`` writes a .sub for): no submission
+# form beyond :func:`default_form` and no author-guideline rules, so only the
+# checks that apply to any manuscript run.
+GENERAL_SLUG = "general"
 
 
-def generic_venue() -> "Venue":
+def general_venue() -> "Venue":
     """The placeholder venue for validating files without naming a venue."""
-    return Venue.from_dict(GENERIC_SLUG, {"name": "no venue (general checks)", **default_form(GENERIC_SLUG)}, has_form=False)
+    return Venue.from_dict(GENERAL_SLUG, {"name": "General", "full_name": "General (no specific venue)", **default_form(GENERAL_SLUG)}, has_form=False)
+
+
+def publisher_venue(publisher: str) -> "Venue":
+    """A validate-only venue for a journal paperpush does not list, checked against its publisher's house rules.
+
+    ``publisher`` is a publisher's slug, name, or Crossref name, with or without
+    the ``publisher:`` prefix. Its slug is the requirements key
+    (``publisher:elsevier``), so every check that looks the venue's rules up
+    by slug finds the house rules. Raises ``KeyError`` when the publisher is
+    unknown or the database holds no house rules for it.
+    """
+    from .requirements import get_publisher, get_requirements, publisher_key
+
+    pub = get_publisher(publisher)
+    if pub is None or get_requirements(publisher_key(pub.slug)) is None:
+        raise KeyError(publisher)
+    slug = publisher_key(pub.slug)
+    return Venue.from_dict(slug, {"name": f"{pub.display_name} (house rules)", "full_name": f"A {pub.display_name} journal, checked against {pub.display_name}'s house rules", "publisher": pub.slug, "submission_guide": pub.site_url, **default_form(slug)}, has_form=False)
 
 
 def default_form(slug: str) -> dict[str, Any]:
@@ -680,7 +704,7 @@ def default_form(slug: str) -> dict[str, Any]:
         {"id": "manuscript_file", "autofill": "filemap", "label": "Manuscript file", "type": "file", "required": True, "help": "Path to the manuscript (PDF, Word, or LaTeX source)."},
     ]
     # A separate title page only when the guidelines ask for one (or, for the
-    # generic venue, which has no guidelines, so any title page can be named).
+    # general venue, which has no guidelines, so any title page can be named).
     if reqs is None or reqs.title_page.separate_file:
         fields.append(dict(TITLE_PAGE_FIELD))
     figure_field: dict[str, Any] = {"id": "figure_files", "autofill": "filemap", "label": "Figure files", "type": "filelist", "help": "Optional. One figure file per line as 'path | label' (label optional)."}
@@ -1044,8 +1068,16 @@ def get_venue(slug: str) -> Venue:
 
     Raises ``KeyError`` if no venue matches.
     """
-    info, forms = _load_info(), _load_raw()
     key = slug.lower()
+    if key == GENERAL_SLUG:
+        # The placeholder "no venue" (general checks only), so a .sub written
+        # for it (the web page's "General" option) loads like any other.
+        return general_venue()
+    from .requirements import is_publisher_key
+
+    if is_publisher_key(key):
+        return publisher_venue(key)
+    info, forms = _load_info(), _load_raw()
     for candidate, data in info.items():
         if candidate.lower() == key or data.get("name", "").lower() == key:
             logger.debug("Resolved venue %r to %r", slug, candidate)

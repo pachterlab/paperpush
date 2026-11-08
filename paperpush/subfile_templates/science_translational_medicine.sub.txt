@@ -1,7 +1,9 @@
 # paperpush submission file for science_translational_medicine  -*- mode: yaml -*-
 # Science Translational Medicine - American Association for the Advancement of Science (AAAS)
 #
-# Edit the values below, then run:  paperpush submit science_translational_medicine.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate science_translational_medicine.sub.txt`
+#   - to fill out submission portal: `paperpush submit science_translational_medicine.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

@@ -42,6 +42,7 @@ The keys of one venue entry. Each section key holds the object described in its 
 | `references` | [references](#references) or null | Reference style and count. |
 | `cover_letter` | [cover_letter](#cover_letter) or null | Whether a cover letter is required and how it is supplied. |
 | `upload` | [upload](#upload) or null | Size caps on the submission's uploads as a whole. |
+| `revision` | [revision](#revision) or null | What a revised manuscript is sent with: the marked copy and the response to reviewers. |
 | `notes` | list of string | Venue-wide rules that fit no section. |
 
 ## rules
@@ -136,6 +137,11 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 |---|---|---|
 | `required` | list of `data_availability` \| `code_availability` \| `competing_interests` \| `author_contributions` \| `funding` \| `acknowledgements` \| `ethics_approval` \| `consent_to_participate` \| `consent_to_publish` \| `materials_availability` \| `lead_contact` \| `inclusion_and_diversity` \| `ai_use` \| `reproducibility` \| `ethics_statement` \| `clinical_trial_registration` \| `reporting_guidelines` or null | Canonical ids of the declarations the manuscript must contain (matched via $aliases). |
 | `optional` | list of `data_availability` \| `code_availability` \| `competing_interests` \| `author_contributions` \| `funding` \| `acknowledgements` \| `ethics_approval` \| `consent_to_participate` \| `consent_to_publish` \| `materials_availability` \| `lead_contact` \| `inclusion_and_diversity` \| `ai_use` \| `reproducibility` \| `ethics_statement` \| `clinical_trial_registration` \| `reporting_guidelines` or null | Declarations the venue accepts but does not require. |
+| `ai_use_if_used` | boolean or null | Use of generative AI (LLMs, image generators) must be disclosed when there was any. To require a statement whether or not AI was used, list ai_use in required instead. |
+| `ai_use_locations` | list of `methods` \| `acknowledgements` \| `statement` \| `supplementary` \| `figure_captions` or null | Where in the manuscript the AI-use disclosure may go; any one of them will do: methods, acknowledgements, statement (a section of its own), supplementary (the supplementary material), figure_captions (the legend of each AI-touched figure). Unset: anywhere. |
+| `ai_use_cover_letter` | boolean or null | The AI-use disclosure must also be made in the cover letter. |
+| `ai_copyediting_exempt` | boolean or null | AI used only to improve language, grammar, or spelling (copy editing) need not be disclosed. |
+| `ai_authorship_prohibited` | boolean or null | AI tools (ChatGPT, LLMs) may not be listed as authors. |
 | `notes` | list of string or null | Rules with no structured key. |
 
 ## figures
@@ -213,6 +219,13 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 |---|---|---|
 | `max_total_mb` | number or null | Maximum combined size of one submission's uploads in MB. |
 | `max_file_mb` | number or null | Per-file size cap that applies to every upload, in MB. |
+| `notes` | list of string or null | Rules with no structured key. |
+
+## revision
+
+| Key | Type | Description |
+|---|---|---|
+| `marked_manuscript` | `none` \| `red_text` \| `highlight` \| `track_changes` \| `other` or null | How the changes are marked in the marked-up copy of a revised manuscript: none (no marked copy wanted), red_text, highlight, track_changes (Word Track Changes), or other (described in notes). Unset: not stated (paperpush-respond-to-reviewers defaults to red_text). |
 | `notes` | list of string or null | Rules with no structured key. |
 
 ## TemplateLayout

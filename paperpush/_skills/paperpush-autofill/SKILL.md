@@ -11,7 +11,8 @@ description: >-
 
 # paperpush autofill (Claude skill)
 
-Populate a `<venue>.sub.txt` file from a directory of manuscript files. You read
+Populate a `<venue>.sub.txt` file (creating it with `paperpush subfile` first if
+it does not exist) from a directory of manuscript files. You read
 the files and decide the values; the `paperpush autofill` command does all
 the writing, gating, and validation, so you cannot accidentally overwrite a
 policy field or produce an invalid file. Your job is extraction, not writing.
@@ -79,12 +80,22 @@ named the venue, use it; otherwise infer or ask per the inputs below.
      metadata, and revision/workflow flags. Fill everything that *is* derivable;
      list only these in `unfilled`, with a short reason, and move on.
 
-2. **Render the skeleton** if the `.sub` does not exist yet (its comments also
-   restate each field's options and help):
+2. **Make sure the `.sub` exists — create it if it does not.** `paperpush
+   autofill` fills an existing `.sub`; it does not create one, so never skip
+   this check. Resolve the path in this order:
+   - If the user named a `.sub` path, use it. If that file does not exist yet,
+     create it at that path with the command below.
+   - Else if `<manuscript-dir>/<venue>.sub.txt` already exists, reuse it (do not
+     overwrite it unless the user asks to regenerate).
+   - Else create it in the manuscript directory:
 
    ```
-   paperpush subfile <venue> -o <venue>.sub.txt
+   paperpush subfile <venue> -o <manuscript-dir>/<venue>.sub.txt
    ```
+
+   Use an absolute path for `-o`, check the file exists afterwards, and use
+   that resolved path for every later step. The new file's comments also
+   restate each field's options and help.
 
 3. **Read the files and extract values.** Read the user-identified files with
    the Read tool (PDFs and images are read directly). For a `.docx` or `.tex`

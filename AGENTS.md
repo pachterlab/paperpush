@@ -4,6 +4,47 @@ Guidance for any AI agent (Codex, Claude, or otherwise) that decides to use
 `paperpush` to submit a manuscript to a venue - a journal, preprint server, or conference -
 on a user's behalf.
 
+## tl;dr
+
+paperpush builds the manuscript metadata (`.sub`) file, validates the files and
+metadata against the venue's author guidelines, and fills in the venue's
+submission portal. Match the user's request to one of these entry points:
+
+| The user wants to... | Skill to run |
+| --- | --- |
+| prepare and submit a manuscript to a **supported** venue (collect metadata, run checks tailored to the venue, fill in the portal) | `paperpush-prepare-submission` |
+| prepare a manuscript for a venue paperpush **does not support** yet (collect metadata, check it against that venue's guidelines; no portal filling) | `paperpush-prepare-submission` (validation builds a temporary venue entry through `paperpush-add-venue-validate`) |
+| check a manuscript with no particular venue in mind | `paperpush-validate` (CLI: `paperpush validate --manuscript FILE ...`) |
+| move a manuscript from one venue to another | `paperpush-transfer` |
+| respond to reviewers | `paperpush-respond-to-reviewers` |
+
+The same flow through the CLI, step by step:
+
+```
+paperpush subfile <venue>                # create <venue>.sub.txt
+                                         # fill it in (skill: paperpush-autofill)
+paperpush validate <venue>.sub.txt       # skill: paperpush-validate
+paperpush login <venue>                  # the user runs this, not you (see below)
+paperpush submit <venue>.sub.txt         # skill: paperpush-submit; stops before the final submit
+```
+
+- `login` and `submit` only work for venues that have a submission runner.
+  `paperpush venues` marks the validate-only ones.
+- **`submit` is for initial submissions only.** A revision is uploaded through
+  the "submit revision" link the venue gives for the existing manuscript.
+  Prepare the revision with `paperpush-respond-to-reviewers`, and don't run
+  `submit` for it.
+- To share a `.sub` with co-authors, send them the file: it is plain text. They
+  can also open it in a form with `paperpush web <venue>.sub.txt` (the user
+  runs this, see below) or by uploading it to
+  [paperpush.onrender.com](https://paperpush.onrender.com).
+- Users who want no install can do all of this on the website,
+  [paperpush.onrender.com](https://paperpush.onrender.com): pick the venue (or
+  "General" for checks with no venue), upload the files, then Validate, Share,
+  and, when the venue supports it, fill in the portal automatically.
+
+The rest of this file covers each step in detail.
+
 ## Skills: which one to use, and when
 
 paperpush ships its workflows as agent skills (`skills/<name>/SKILL.md`). If
@@ -15,15 +56,18 @@ open the `SKILL.md` and follow it as written.
 | --- | --- | --- |
 | `paperpush-prepare-submission` | The whole flow: checks the login, finds or creates the `.sub`, runs autofill, runs validate (stopping on errors or more than 5 warnings and offering `paperpush-fix`), then hands off to `paperpush-submit`. | asks to prepare, get ready, or submit a manuscript to a venue, and has not named a single step. **Start here when in doubt.** |
 | `paperpush-autofill` | Reads the manuscript directory, writes `values.json`, and applies it with `paperpush autofill --engine manual`. Leaves `never` fields for the author. | wants a `.sub` filled from their files, and nothing else yet. |
-| `paperpush-validate` | Runs `paperpush validate`, then does the checks that need a reader (lettering in raster figures, panel labels, figure and panel content vs. legends and text, free-text guideline rules, `.sub` vs manuscript) through `--ai-tasks` / `--ai-results`. Optionally saves the report. | asks whether a manuscript or `.sub` is ready, meets a venue's guidelines, or passes validation, or wants the AI checks or a saved report. |
+| `paperpush-validate` | Runs `paperpush validate`, then does the checks that need a reader (lettering in raster figures, panel labels, figure and panel content vs. legends and text, free-text guideline rules, `.sub` vs manuscript) through `--ai-tasks` / `--ai-results`. Optionally saves the report. For a venue paperpush does not support yet, builds a temporary entry with `paperpush-add-venue-validate` (temporary mode) and validates against it. | asks whether a manuscript or `.sub` is ready, meets a venue's guidelines, or passes validation, or wants the AI checks or a saved report. |
 | `paperpush-fix` | Backs up the files, runs `paperpush validate --json`, finds the editable source behind each file (the `.tex`/`.docx` behind a PDF), fixes the mechanical issues and trims text over a limit by at most 100 words and 50% of the limit, rebuilds the PDF, and validates again, for up to three rounds. Reports what it fixed, what needs the author's decision, and what it can't fix. Never ticks a confirmation or invents content. | asks to fix what validate found, to make a `.sub` pass validation, or to clean up the errors and warnings. |
+| `paperpush-transfer` | Moves a manuscript prepared for one venue to another: copies the files into `<source-dir>/<venue>/` (never touching the originals), creates the new `.sub`, runs `autofill` reusing the values in earlier `.sub` files, runs `validate` (offering `fix`), and writes `transfer.txt` listing every change. | wants to transfer, resubmit, or move a manuscript from one venue to another, e.g. after a rejection. |
+| `paperpush-respond-to-reviewers` | Two phases. Phase 1: makes `<manuscript-dir>/revisionN/` (N = one more than the existing revisions), copies the manuscript files and the reviews into it, drafts the response document (comments verbatim in italics, responses in plain text), and proposes a plan per comment, then stops for the author. Phase 2, once approved: revises the copy, writes the responses, builds the marked manuscript (`revision.marked_manuscript` from the venue's guidelines unless the user overrides it; default red text; or highlight, Word Track Changes, or none), and runs `validate`. Never touches the originals or submits. | has received reviews or a decision letter and wants a revision, a response to reviewers, or a rebuttal letter. |
 | `paperpush-submit` | Takes a filled `.sub` to the portal: re-checks the login (`paperpush login <venue> --check`), confirms with the user, runs `submit` (or `submit(skip_validate=true)` when asked to skip validation), and follows the run, handing a failed step to `paperpush-portal-debug`. Stops before the final submit. | has a `.sub` ready and wants the portal filled in, e.g. "fill out the submission portal to nature", optionally "skip validation". |
 | `paperpush-portal-debug` | Gets a stalled `paperpush submit` run past the failing step on the live page (`submit_page` / `submit_act` / `submit_resume`), logs every runner change it needs, and puts those changes into the runner with a test when working in a source checkout. Never sends the submission. | reports that `submit` is stuck, failed at a step, or hit a portal that changed. Also use it yourself whenever `submit_status` shows `recovery.paused`. |
-| `paperpush-add-venue-validate` | Reads a venue's author guidelines and records them in `manuscript_requirements.json`, and its basic submission fields in `submission_forms.json`, through a venue file and `paperpush add-venue`. For an existing venue, re-reads the pages and updates what changed. | wants a venue that `validate` can check against, or wants a venue's guidelines, limits, or rules added or refreshed. *Contributor skill: needs a clone of the repo.* |
+| `paperpush-add-venue-validate` | Reads a venue's author guidelines (from its web pages, or from guideline files the user provides) and records them in `manuscript_requirements.json`, and its basic submission fields in `submission_forms.json`, through a venue file and `paperpush add-venue`. For an existing venue, re-reads the pages and updates what changed. Temporary mode writes a draft entry outside paperpush's databases instead (no clone needed). Suggests a pull request for a new venue. | wants a venue that `validate` can check against, or wants a venue's guidelines, limits, or rules added or refreshed. *Contributor skill: needs a clone of the repo.* |
 | `paperpush-add-venue` | Full `submit` support: a `Venue` class with Playwright `login()` / `submit()`, the portal's fields, a sample `.sub` with generated documents, unit tests, and a live run that stops before the final submit. For an existing runner, runs its tests and fixes what fails. Has the user create an account and run `paperpush login` rather than handing over a password. | wants to submit to a venue paperpush can't submit to yet, or reports that a venue's runner or tests are broken. Runs `paperpush-add-venue-validate` first if the venue has no guidelines entry yet. *Contributor skill: needs a clone of the repo.* |
 
 The skills call each other where the steps overlap: `prepare-submission` runs
-`autofill`, `validate`, and `submit`, and offers `fix` when validate stops it; `fix` uses `validate`'s AI-check steps
+`autofill`, `validate`, and `submit`, and offers `fix` when validate stops it;
+`transfer` runs `autofill` and `validate`, and offers `fix`; `respond-to-reviewers` runs `validate` (and `autofill` for a new `.sub`), and offers `fix`; `validate` runs `add-venue-validate` in temporary mode for a venue paperpush does not support; `fix` uses `validate`'s AI-check steps
 in its first and last rounds; `submit` uses `portal-debug` for a
 step that fails; `add-venue` runs `add-venue-validate`, and uses
 `portal-debug` for a live step that stalls. Don't run the same step twice.
@@ -111,8 +155,13 @@ back the command for the user to run, so the user's password never passes
 through the conversation. (It does run the login itself when
 `PAPERPUSH_USERNAME` and `PAPERPUSH_PASSWORD` are already set in the server's
 environment.) Everything else in this document maps to a tool too —
-`list_supported_venues`, `pick_venue` (rank venues for a manuscript: read it
-yourself and pass the subjects you judge it covers as `keywords`), `describe_venue` for the schema, `field_options`,
+`list_supported_venues`, `pick_venue` (find journals for a manuscript: by
+default any journal, from OpenAlex, with the ones paperpush supports marked by
+slug; with `paperpush_supported_only` it ranks only the supported venues, and
+then you should read the manuscript yourself and pass the subjects you judge it
+covers as `keywords`), `find_reviewers` (suggest reviewers from OpenAlex with
+co-authors and colleagues screened out; OpenAlex has no e-mail addresses, so
+the author adds those), `describe_venue` for the schema, `field_options`,
 `create_subfile`, `read_subfile`, `autofill_subfile` (same `values.json` shape,
 passed as the `values` argument), `validate_subfile`, `submit`, `submit_status`,
 `submit_page`, `submit_act`, `submit_resume`, and `submit_close`. Pass **absolute paths**: the server has its own working
@@ -303,6 +352,14 @@ it only the general checks run (links, references, hidden text, citation
 order, prose, ...). The form checks are reported as not applicable either way,
 so this is a check of the files, not a verdict on the submission. With a
 `.sub`, a file flag replaces that file's path. See `paperpush.file_inputs`.
+
+For an author who has not chosen a venue, `paperpush subfile general` (MCP:
+`create_subfile` with `venue="general"`) writes a `.sub` tied to no venue,
+with only what every venue asks for (title, abstract, keywords, authors,
+manuscript, title page, figures, tables, supplements, cover letter). Autofill
+and validate treat it like any other `.sub` (validate runs only the general
+checks); `login` and `submit` refuse it. Once a venue is chosen, move it over
+with `paperpush-transfer`.
 
 ## The report, and the checks you run yourself
 

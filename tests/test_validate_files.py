@@ -8,7 +8,7 @@ import pytest
 
 from paperpush import mcp_server
 from paperpush.cli import main
-from paperpush.database import GENERIC_SLUG, default_form, generic_venue, get_venue
+from paperpush.database import GENERAL_SLUG, default_form, general_venue, get_venue
 from paperpush.file_inputs import apply_files, validate_command
 from paperpush.subfile import SubFile
 from paperpush.validate import validate_report
@@ -20,13 +20,37 @@ def _status(report, check_id: str) -> str:
     return next(r.status for r in report.results if r.id == check_id)
 
 
-# --- the generic venue and the title-page upload ---------------------------------
+# --- the general venue and the title-page upload ---------------------------------
 
 
-def test_generic_venue_has_every_upload_role():
-    ids = {f.id for f in generic_venue().fields}
+def test_general_venue_has_every_upload_role():
+    ids = {f.id for f in general_venue().fields}
     assert {"manuscript_file", "title_page_file", "cover_letter", "figure_files", "table_files", "supplementary_files"} <= ids
-    assert generic_venue().is_generic and not get_venue("nature").is_generic
+    assert general_venue().is_general and not get_venue("nature").is_general
+
+
+def test_subfile_general_writes_a_venue_free_template(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert GENERAL_SLUG == "general" and get_venue("General").is_general
+    assert main(["subfile", "general"]) == 0
+    text = (tmp_path / "general.sub.txt").read_text()
+    assert "@venue: general" in text
+    assert "paperpush validate general.sub.txt" in text and "paperpush submit" not in text
+    assert "/paperpush-transfer" in text
+    for field in ("title", "abstract", "keywords", "authors", "manuscript_file", "title_page_file", "figure_files", "table_files", "supplementary_files", "cover_letter"):
+        assert f"\n{field}:" in text, field
+
+
+def test_login_and_submit_refuse_a_general_subfile(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    main(["subfile", "general"])
+    capsys.readouterr()
+    assert main(["submit", "general.sub.txt"]) == 1
+    assert "not tied to any venue" in capsys.readouterr().err
+    assert main(["login", "general"]) == 0
+    assert "not tied to any venue" in capsys.readouterr().out
+    with pytest.raises(ValueError, match="not tied to a venue"):
+        mcp_server.submit(str(tmp_path / "general.sub.txt"))
 
 
 def test_default_form_has_a_title_page_upload_only_when_the_guidelines_ask():
@@ -38,7 +62,7 @@ def test_default_form_has_a_title_page_upload_only_when_the_guidelines_ask():
 
 
 def test_apply_files_fills_the_role_fields_with_absolute_paths(tmp_path):
-    placed = apply_files(generic_venue(), {}, {"manuscript": "paper.pdf", "figures": ["f1.png", "f2.png"], "title_page": "tp.pdf"}, base=tmp_path)
+    placed = apply_files(general_venue(), {}, {"manuscript": "paper.pdf", "figures": ["f1.png", "f2.png"], "title_page": "tp.pdf"}, base=tmp_path)
     assert placed.values["manuscript_file"] == str(tmp_path / "paper.pdf")
     assert placed.values["figure_files"] == f"{tmp_path / 'f1.png'}\n{tmp_path / 'f2.png'}"
     assert placed.values["title_page_file"] == str(tmp_path / "tp.pdf")
@@ -55,14 +79,14 @@ def test_apply_files_adds_an_upload_the_venue_lacks_and_says_so(tmp_path):
 
 
 def test_apply_files_replaces_the_sub_value_and_notes_it(tmp_path):
-    placed = apply_files(generic_venue(), {"manuscript_file": "/old.pdf"}, {"manuscript": "new.pdf"}, base=tmp_path)
+    placed = apply_files(general_venue(), {"manuscript_file": "/old.pdf"}, {"manuscript": "new.pdf"}, base=tmp_path)
     assert placed.values["manuscript_file"] == str(tmp_path / "new.pdf")
     assert placed.notes == ["--manuscript replaces the .sub's manuscript_file"]
 
 
 def test_apply_files_refuses_several_files_for_a_single_upload(tmp_path):
     with pytest.raises(ValueError, match="--manuscript takes one file"):
-        apply_files(generic_venue(), {}, {"manuscript": ["a.pdf", "b.pdf"]}, base=tmp_path)
+        apply_files(general_venue(), {}, {"manuscript": ["a.pdf", "b.pdf"]}, base=tmp_path)
 
 
 def test_validate_command_rebuilds_the_flags():
@@ -79,7 +103,7 @@ def _files_report(venue, files, base):
 
 
 def test_no_venue_runs_only_the_general_checks(manuscript_pdf, tmp_path):
-    report = _files_report(generic_venue(), {"manuscript": str(manuscript_pdf)}, tmp_path)
+    report = _files_report(general_venue(), {"manuscript": str(manuscript_pdf)}, tmp_path)
     assert report.scope == "general"
     assert report.files == [str(manuscript_pdf)]
     # No .sub: empty title/abstract/authors are not errors.
@@ -94,7 +118,7 @@ def test_no_venue_runs_only_the_general_checks(manuscript_pdf, tmp_path):
 
 
 def test_no_venue_does_not_check_which_venue_a_cover_letter_names(cover_letter_pdf, tmp_path):
-    report = _files_report(generic_venue(), {"cover_letter": str(cover_letter_pdf)}, tmp_path)
+    report = _files_report(general_venue(), {"cover_letter": str(cover_letter_pdf)}, tmp_path)
     assert _status(report, "cover_letter.venue") == "not_applicable"
 
 
@@ -164,7 +188,7 @@ def test_cli_web_needs_a_sub(manuscript_pdf, capsys):
 
 def test_mcp_validate_takes_files_relative_to_the_manuscript_dir(manuscript_pdf):
     result = mcp_server.validate_subfile(manuscript_dir=str(manuscript_pdf.parent), manuscript=manuscript_pdf.name, check_links=False, check_references=False)
-    assert result["scope"] == "general" and result["venue"] == GENERIC_SLUG
+    assert result["scope"] == "general" and result["venue"] == GENERAL_SLUG
     assert result["files"] == [str(manuscript_pdf)]
 
 

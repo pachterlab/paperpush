@@ -129,6 +129,7 @@ _NOTES_FILES = {
     "references": ("manuscript",),
     "cover_letter": ("cover_letter",),
     "upload": (),
+    "revision": (),
 }
 _NOTES_TITLES = {
     "": "Follows the guidelines' other general rules (not checked automatically)",
@@ -168,7 +169,9 @@ def guideline_tasks(venue: Venue, values: dict[str, str]) -> list[AiTask]:
         groups: list[tuple[str, list[str]]] = [("", list(reqs.notes))]
         groups += [(key, list(getattr(reqs, key).notes)) for key in SECTION_TYPES]
         for section, notes in groups:
-            if not notes:
+            # Revision rules apply to a revised manuscript, which validate does
+            # not check (paperpush-respond-to-reviewers reads them).
+            if not notes or section == "revision":
                 continue
             files: list[str] = []
             for role in _NOTES_FILES.get(section, ("manuscript",)):

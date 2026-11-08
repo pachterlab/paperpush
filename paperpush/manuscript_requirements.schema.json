@@ -201,6 +201,17 @@
           ],
           "description": "Size caps on the submission's uploads as a whole."
         },
+        "revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/revision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What a revised manuscript is sent with: the marked copy and the response to reviewers."
+        },
         "notes": {
           "description": "Venue-wide rules that fit no section.",
           "items": {
@@ -347,6 +358,17 @@
             }
           ],
           "description": "Size caps on the submission's uploads as a whole."
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/revision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What a revised manuscript is sent with: the marked copy and the response to reviewers."
         },
         "notes": {
           "type": "array",
@@ -1149,6 +1171,71 @@
           ],
           "description": "Declarations the venue accepts but does not require."
         },
+        "ai_use_if_used": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Use of generative AI (LLMs, image generators) must be disclosed when there was any. To require a statement whether or not AI was used, list ai_use in required instead."
+        },
+        "ai_use_locations": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "methods",
+                  "acknowledgements",
+                  "statement",
+                  "supplementary",
+                  "figure_captions"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where in the manuscript the AI-use disclosure may go; any one of them will do: methods, acknowledgements, statement (a section of its own), supplementary (the supplementary material), figure_captions (the legend of each AI-touched figure). Unset: anywhere."
+        },
+        "ai_use_cover_letter": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The AI-use disclosure must also be made in the cover letter."
+        },
+        "ai_copyediting_exempt": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "AI used only to improve language, grammar, or spelling (copy editing) need not be disclosed."
+        },
+        "ai_authorship_prohibited": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "AI tools (ChatGPT, LLMs) may not be listed as authors."
+        },
         "notes": {
           "anyOf": [
             {
@@ -1756,6 +1843,44 @@
             }
           ],
           "description": "Per-file size cap that applies to every upload, in MB."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "revision": {
+      "properties": {
+        "marked_manuscript": {
+          "anyOf": [
+            {
+              "enum": [
+                "none",
+                "red_text",
+                "highlight",
+                "track_changes",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the changes are marked in the marked-up copy of a revised manuscript: none (no marked copy wanted), red_text, highlight, track_changes (Word Track Changes), or other (described in notes). Unset: not stated (paperpush-respond-to-reviewers defaults to red_text)."
         },
         "notes": {
           "anyOf": [

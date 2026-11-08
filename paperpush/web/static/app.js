@@ -307,7 +307,8 @@
 
   // ---------------------------------------------------------- venue picker
 
-  const TYPE_LABELS = { preprint: "Preprint servers", journal: "Journals", conference: "Conferences" };
+  // "general" is the no-venue option (general checks only): listed first, under no heading.
+  const TYPE_LABELS = { general: "", preprint: "Preprint servers", journal: "Journals", conference: "Conferences" };
   let comboActive = -1;
 
   function venueMatches(q) {
@@ -324,14 +325,14 @@
     for (const type of Object.keys(TYPE_LABELS)) {
       const group = matches.filter((v) => v.venue_type === type);
       if (!group.length) continue;
-      list.append(el("li", { class: "group", role: "presentation", text: TYPE_LABELS[type] }));
+      if (TYPE_LABELS[type]) list.append(el("li", { class: "group", role: "presentation", text: TYPE_LABELS[type] }));
       for (const v of group) {
         const li = el(
           "li",
           { role: "option", id: `venue-opt-${index}`, "data-slug": v.slug, "data-index": index, class: index === comboActive ? "active" : null },
           el("span", { class: "vname", text: v.name }),
           el("span", { class: "vfull", text: v.full_name && v.full_name !== v.name ? v.full_name : v.description || "" }),
-          v.supports_submit ? null : el("span", { class: "chip plain", title: "paperpush checks the manuscript but cannot fill this venue's portal yet", text: "validate only" }),
+          v.supports_submit || v.venue_type === "general" ? null : el("span", { class: "chip plain", title: "paperpush checks the manuscript but cannot fill this venue's portal yet", text: "validate only" }),
         );
         li.addEventListener("mousedown", (e) => { e.preventDefault(); chooseVenue(v.slug); });
         list.append(li);
@@ -443,19 +444,23 @@
     $$("[data-venue-name]").forEach((n) => (n.textContent = v.name));
     $("#venue-name").textContent = v.full_name || v.name;
     $("#venue-sub").textContent = v.description || "";
+    const general = v.venue_type === "general";
+    $("#initial-note").hidden = general;
     const chips = [];
-    chips.push(el("span", { class: "chip plain", text: TYPE_LABELS[v.venue_type]?.replace(/s$/, "").replace(/ servers?$/, " server") || v.venue_type }));
+    if (general) chips.push(el("span", { class: "chip plain", title: "Pick a venue to also check its author guidelines and fill its portal", text: "General checks only" }));
+    else chips.push(el("span", { class: "chip plain", text: TYPE_LABELS[v.venue_type]?.replace(/s$/, "").replace(/ servers?$/, " server") || v.venue_type }));
     if (v.anonymous) chips.push(el("span", { class: "chip warn", title: "Nothing in the files may identify the authors", text: "Double-blind" }));
-    if (!v.supports_submit) chips.push(el("span", { class: "chip plain", title: "paperpush checks the manuscript against the guidelines but cannot fill this portal yet", text: "Validate only" }));
+    if (!v.supports_submit && !general) chips.push(el("span", { class: "chip plain", title: "paperpush checks the manuscript against the guidelines but cannot fill this portal yet", text: "Validate only" }));
     if (v.login_required) chips.push(el("span", { class: "chip plain", text: "Portal login needed to submit" }));
     $("#venue-chips").replaceChildren(...chips);
     // Validate-only venues have no runner to fill the portal: gray the button out.
     const portalWrap = $("#portal-wrap");
     $("#portal-btn").disabled = !v.supports_submit;
-    portalWrap.dataset.tooltip = v.supports_submit ? "" : "Not supported for this venue";
+    const noPortal = general ? "Pick a venue to fill its submission portal" : "Not supported for this venue";
+    portalWrap.dataset.tooltip = v.supports_submit ? "" : noPortal;
     portalWrap.tabIndex = v.supports_submit ? -1 : 0;
     if (v.supports_submit) portalWrap.removeAttribute("aria-label");
-    else portalWrap.setAttribute("aria-label", "Not supported for this venue");
+    else portalWrap.setAttribute("aria-label", noPortal);
     const links = [];
     if (v.submission_guide) links.push(el("a", { href: v.submission_guide, target: "_blank", rel: "noopener", text: "Author guidelines ↗" }));
     if (v.submission_url) links.push(el("a", { href: v.submission_url, target: "_blank", rel: "noopener", text: "Submission portal ↗" }));
@@ -908,7 +913,7 @@
     const top = [
       ...(uploads.length ? [el("div", { class: "toc-group", "data-group": "uploads", text: "File uploads" })] : []),
       ...uploads.map((f) => item(`card-${f.id}`, f.label, { required: f.required, key: f.id, cls: "st-empty" })),
-      item("req-panel", "Author guidelines", { key: "guidelines", cls: "st-info" }),
+      ...(state.requirements ? [item("req-panel", "Author guidelines", { key: "guidelines", cls: "st-info" })] : []),
     ];
     const groups = [];
     for (const [key, title] of GROUPS) {
@@ -2482,7 +2487,7 @@
     renderSharedNote();
     const input = $("#venue-search");
     input.disabled = false;
-    $("#venue-hint").textContent = `${state.venues.length} venues. Search by name, or open the list.`;
+    $("#venue-hint").textContent = `${state.venues.filter((v) => v.venue_type !== "general").length} venues. Search by name, or open the list, or pick General for the checks that apply to any manuscript.`;
     if (await openLocal()) return;
     await route();
     if (!state.venue) input.focus();

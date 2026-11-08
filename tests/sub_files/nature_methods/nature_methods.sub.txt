@@ -1,7 +1,9 @@
 # paperpush submission file for nature_methods  -*- mode: yaml -*-
 # Nature Methods
 #
-# Edit the values below, then run:  paperpush submit nature_methods.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate nature_methods.sub.txt`
+#   - to fill out submission portal: `paperpush submit nature_methods.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

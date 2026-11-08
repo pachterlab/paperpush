@@ -1,7 +1,8 @@
 # paperpush submission file for nature_computational_science  -*- mode: yaml -*-
 # Nature Computational Science
 #
-# Edit the values below, then run:  paperpush submit nature_computational_science.sub.txt
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate nature_computational_science.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:

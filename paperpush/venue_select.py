@@ -30,6 +30,13 @@ read the manuscript themselves and pass the subjects as keywords.
 
 Either way this ranks thematic fit among the venues paperpush supports only --
 not impact, scope details, or the likelihood of acceptance.
+
+**Any journal** (:func:`find_journals`, the ``pick-venue`` default for a
+manuscript): the works most similar to the manuscript are looked up in OpenAlex
+(:mod:`paperpush.openalex`) and grouped by the journal (or preprint server)
+they appeared in, ranked by how many similar works each published, how closely
+they match, and how recent they are. Journals paperpush supports are marked
+with their slug. ``--paperpush-supported-only`` keeps to the ranking above.
 """
 
 from __future__ import annotations
@@ -39,6 +46,7 @@ import logging
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 from .database import VENUE_KEYWORDS, Venue, list_venues
@@ -717,3 +725,219 @@ def rank_via_api(
             picks.append(AiPick(slug, str(item.get("fit", "")), _clean(str(item.get("reason", "")))))
     subjects = [s for s in data.get("subjects", []) if s in VENUE_KEYWORDS]
     return AiRanking(subjects, picks[:limit], model=f"{provider} {model}")
+
+
+# ---------------------------------------------------------------------------
+# Any journal, from OpenAlex (the ``pick-venue`` default for a manuscript)
+# ---------------------------------------------------------------------------
+
+# How far back similar works count, and how much older ones count.
+JOURNAL_YEARS = 8
+# Source types kept: journals and conference proceedings; a repository only
+# when it is a preprint server (bioRxiv, arXiv, ...), not an aggregator such as
+# PubMed Central or a review site.
+_KEPT_SOURCE_TYPES = {"journal", "conference"}
+_PREPRINT_SERVER = re.compile(r"rxiv\b|\barxiv", re.IGNORECASE)
+# ``--type`` values and the OpenAlex source types they keep.
+_TYPE_TO_SOURCE = {"journal": {"journal"}, "conference": {"conference"}, "preprint": {"repository"}}
+
+
+def _recency(year: int | None, this_year: int) -> float:
+    if not year:
+        return 0.5
+    age = this_year - int(year)
+    return 1.0 if age <= 3 else 0.75 if age <= 6 else 0.5
+
+
+def _name_key(name: str) -> str:
+    """A journal name for matching across sources: no parenthetical, "the", or punctuation."""
+    from .openalex import fold
+
+    name = re.sub(r"\([^)]*\)", " ", name or "").replace("&", " and ")
+    words = fold(name).split()
+    if words and words[0] == "the":
+        words = words[1:]
+    return " ".join(words)
+
+
+def _supported_by_name(venues: list[Venue] | None = None) -> dict[str, Venue]:
+    """The venues paperpush supports, keyed by every name they go by (see :func:`_name_key`)."""
+    out: dict[str, Venue] = {}
+    for venue in list_venues() if venues is None else venues:
+        for name in (venue.name, venue.full_name):
+            key = _name_key(name)
+            if key and key not in out:
+                out[key] = venue
+    return out
+
+
+def support_level(venue: Venue) -> str:
+    """``"validate + submit"``, ``"validate"``, ``"submit"``, or ``"listed"`` for a supported venue."""
+    parts = [p for p, ok in (("validate", venue.supports_validate), ("submit", venue.supports_submit)) if ok]
+    return " + ".join(parts) or "listed"
+
+
+@dataclass(frozen=True)
+class JournalHit:
+    """A journal (or other source) that published works similar to the manuscript."""
+
+    source_id: str
+    name: str
+    source_type: str
+    score: int  # 0-100, the best match is 100
+    works: int  # similar works it published
+    examples: tuple[tuple[str, int | None], ...] = ()  # (title, year) of its closest matches
+    publisher: str = ""
+    issn_l: str = ""
+    homepage: str = ""
+    is_oa: bool | None = None
+    is_in_doaj: bool | None = None
+    apc_usd: int | None = None
+    h_index: int | None = None
+    slug: str = ""  # the paperpush venue, when supported
+    support: str = ""  # what paperpush supports for it (see support_level)
+
+
+def journal_dict(hit: JournalHit) -> dict:
+    """A journal hit as plain data (``--json`` and the MCP tool)."""
+    return {
+        "name": hit.name,
+        "openalex_id": hit.source_id,
+        "source_type": hit.source_type,
+        "score": hit.score,
+        "similar_works": hit.works,
+        "examples": [{"title": t, "year": y} for t, y in hit.examples],
+        "publisher": hit.publisher,
+        "issn_l": hit.issn_l,
+        "homepage": hit.homepage,
+        "is_oa": hit.is_oa,
+        "is_in_doaj": hit.is_in_doaj,
+        "apc_usd": hit.apc_usd,
+        "h_index": hit.h_index,
+        "paperpush_slug": hit.slug or None,
+        "paperpush_support": hit.support or None,
+    }
+
+
+@dataclass(frozen=True)
+class JournalSearch:
+    """The result of :func:`find_journals`."""
+
+    hits: list[JournalHit]
+    query: str
+    works: int
+    since_year: int
+
+    def to_dict(self, limit: int | None = None) -> dict:
+        hits = self.hits if limit is None else self.hits[: max(limit, 0)]
+        return {"source": "OpenAlex", "search": self.query, "similar_works": self.works, "since_year": self.since_year, "journals": [journal_dict(h) for h in hits], "total_journals": len(self.hits)}
+
+
+def find_journals(
+    query: ManuscriptQuery,
+    *,
+    venue_types: tuple[str, ...] = (),
+    years: int = JOURNAL_YEARS,
+    venues: list[Venue] | None = None,
+    this_year: int | None = None,
+) -> JournalSearch:
+    """Journals that publish work like ``query``'s, from OpenAlex, best first.
+
+    The works most similar to the manuscript (:func:`paperpush.openalex.similar_works`)
+    are grouped by the source they appeared in; each source scores the sum,
+    over its works, of the work's similarity to the manuscript (relative to the
+    best match) times a recency factor, scaled so the top source is 100. The manuscript itself,
+    when OpenAlex already has it, is left out. ``venue_types`` (``journal``,
+    ``conference``, ``preprint``) narrows the source types kept.
+
+    Raises :class:`paperpush.openalex.OpenAlexError` when OpenAlex does not
+    answer and :class:`ValueError` when ``query`` has nothing to search on.
+    """
+    from . import openalex
+
+    this_year = this_year or date.today().year
+    since = this_year - years
+    abstract = query.abstract or query.body
+    search, works = openalex.similar_works(query.title, abstract, query.keywords, since_year=since)
+    kept_types = set().union(*(_TYPE_TO_SOURCE[t] for t in venue_types if t in _TYPE_TO_SOURCE)) if venue_types else None
+    own_title = openalex.fold(query.title)
+    scores: dict[str, float] = {}
+    counts: dict[str, int] = {}
+    examples: dict[str, list[tuple[str, int | None]]] = {}
+    names: dict[str, tuple[str, str]] = {}
+    for work in works:
+        title = work.get("display_name") or ""
+        if own_title and openalex.fold(title) == own_title:
+            continue
+        src = ((work.get("primary_location") or {}).get("source")) or {}
+        sid = openalex.short_id(src.get("id") or "")
+        stype = src.get("type") or ""
+        if not sid:
+            continue
+        if kept_types is not None:
+            if stype not in kept_types or (stype == "repository" and not _PREPRINT_SERVER.search(src.get("display_name") or "")):
+                continue
+        elif stype not in _KEPT_SOURCE_TYPES and not (stype == "repository" and _PREPRINT_SERVER.search(src.get("display_name") or "")):
+            continue
+        year = work.get("publication_year")
+        scores[sid] = scores.get(sid, 0.0) + float(work.get("similarity") or 0) * _recency(year, this_year)
+        counts[sid] = counts.get(sid, 0) + 1
+        examples.setdefault(sid, []).append((title, year))
+        names[sid] = (src.get("display_name") or sid, stype)
+    if not scores:
+        return JournalSearch([], search, len(works), since)
+    ranked = sorted(scores, key=lambda s: (-scores[s], names[s][0].lower()))
+    details = openalex.sources(ranked[: openalex.BATCH])
+    supported = _supported_by_name(venues)
+    best = scores[ranked[0]]
+    hits: list[JournalHit] = []
+    for sid in ranked:
+        info = details.get(sid, {})
+        name = info.get("display_name") or names[sid][0]
+        venue = supported.get(_name_key(name)) or supported.get(_name_key(names[sid][0]))
+        stats = info.get("summary_stats") or {}
+        hits.append(
+            JournalHit(
+                source_id=sid,
+                name=name,
+                source_type=info.get("type") or names[sid][1],
+                score=max(1, round(100 * scores[sid] / best)),
+                works=counts[sid],
+                examples=tuple(examples[sid][:3]),
+                publisher=info.get("host_organization_name") or "",
+                issn_l=info.get("issn_l") or "",
+                homepage=info.get("homepage_url") or "",
+                is_oa=info.get("is_oa"),
+                is_in_doaj=info.get("is_in_doaj"),
+                apc_usd=info.get("apc_usd"),
+                h_index=stats.get("h_index"),
+                slug=venue.slug if venue else "",
+                support=support_level(venue) if venue else "",
+            )
+        )
+    return JournalSearch(hits, search, len(works), since)
+
+
+def format_journals(hits: list[JournalHit]) -> list[str]:
+    """Render journal hits as numbered display lines, two per journal."""
+    lines: list[str] = []
+    width = len(str(len(hits)))
+    for i, hit in enumerate(hits, 1):
+        facts = [f"{hit.works} similar work{'s' if hit.works != 1 else ''}"]
+        if hit.publisher:
+            facts.insert(0, hit.publisher)
+        if hit.h_index is not None:
+            facts.append(f"h-index {hit.h_index}")
+        if hit.is_oa:
+            facts.append("open access" + (" (DOAJ)" if hit.is_in_doaj else ""))
+        if hit.apc_usd:
+            facts.append(f"APC ${hit.apc_usd:,}")
+        if hit.source_type and hit.source_type != "journal":
+            facts.append(hit.source_type)
+        support = f"  [paperpush: {hit.slug}, {hit.support}]" if hit.slug else ""
+        lines.append(f"{i:>{width}}. {hit.name} -- {'; '.join(facts)}{support}")
+        if hit.examples:
+            title, year = hit.examples[0]
+            title = " ".join(title.split())
+            lines.append(f"{'':>{width}}  e.g. {title[:90]}{'…' if len(title) > 90 else ''}" + (f" ({year})" if year else ""))
+    return lines

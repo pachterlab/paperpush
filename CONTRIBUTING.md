@@ -4,7 +4,7 @@
 
 ### Claude Code (or another AI agent):
 - `/paperpush-add-venue Add VENUE (LINK_TO_GUIDELINES) to PaperPush`
-  - to add just `validate` and a basic .sub file, without `login`/`submit` support and a comprehensive .sub file: `/paperpush-add-venue-validate Add VENUE (LINK_TO_GUIDELINES) to PaperPush (validate-only)`
+  - to add just `validate` and a basic .sub file, without `login`/`submit` support and a comprehensive .sub file: `/paperpush-add-venue-validate Add VENUE (LINK_TO_GUIDELINES) to PaperPush (validate-only)` (or pass paths to saved guideline files instead of a link: `/paperpush-add-venue-validate Add VENUE to PaperPush (validate-only) from guidelines.pdf figures.html`)
   - to add `login`/`submit` support and a comprehensive .sub file to a venue that supports `validate`: `/paperpush-add-venue Add login/submit support for VENUE to PaperPush`
   
 You must have an account to the VENUE you are adding for the AI agent to navigate it and convert it into a script. It will ask you to log in on the command line once it implements the login process (if login is required by VENUE). 

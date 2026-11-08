@@ -7,7 +7,9 @@ description: >-
   say, the venue's free-text guideline rules, whether every .sub field says
   what the manuscript says), which you do yourself instead of through an API
   key. Produces the color-coded report of what passed, failed, and was not
-  checked, optionally saved as PDF/HTML/Markdown/text. Triggers: "validate my
+  checked, optionally saved as PDF/HTML/Markdown/text. For a venue paperpush
+  does not support yet, first builds a temporary entry from the venue's
+  guidelines and validates against that. Triggers: "validate my
   sub", "check my submission against the guidelines", "is my manuscript ready
   for <venue>", "run the AI checks for validate".
 ---
@@ -52,6 +54,43 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
   reported as warnings.
 
 ## Steps
+
+0. **Venue paperpush does not support yet?** If the user names a venue
+   (`--venue`, or the venue they want a `.sub` for) that `paperpush venues`
+   does not list (try its name, abbreviation, and publisher's title), don't
+   stop there and don't fall back to venue-free checks silently. Tell the
+   user it is not supported, then build a **temporary** entry for it and
+   validate against that:
+
+   1. Run the `paperpush-add-venue-validate` skill (Skill tool) for the venue
+      in its **temporary mode**: it reads the venue's guidelines and writes
+      the entry into a draft data directory,
+      `<scratch>/venue_drafts/<slug>/`, instead of paperpush's own databases.
+      This works from a pip install too: no repo clone is needed.
+   2. Run every `paperpush` command below (and `paperpush subfile <slug>` if
+      a `.sub` is needed) with `PAPERPUSH_VENUE_DATA=<scratch>/venue_drafts/<slug>/data`
+      set, so paperpush reads the draft entry. Without it the venue is
+      unknown.
+   3. In the summary (step 4), say the rules came from a temporary entry
+      that was read from the venue's guidelines just now, so they are only
+      as good as that reading. Point the user to the draft files they can
+      hot-fix:
+      - `<scratch>/venue_drafts/<slug>/<slug>.txt`: the venue file, the
+        easy one to edit (every key is commented);
+      - `<scratch>/venue_drafts/<slug>/data/manuscript_requirements.json`
+        and `submission_forms.json`: the JSON entries validate reads.
+
+      After editing the venue file, they (or you) rebuild the JSON and
+      re-validate:
+      ```
+      paperpush add-venue <scratch>/venue_drafts/<slug>/<slug>.txt --data-dir <scratch>/venue_drafts/<slug>/data --overwrite
+      PAPERPUSH_VENUE_DATA=<scratch>/venue_drafts/<slug>/data paperpush validate ...
+      ```
+      Say the draft is temporary: it lives in a scratch directory, so copy
+      it somewhere if they want to keep it.
+   4. End with the add-venue-validate skill's **share it** suggestion: send
+      the entry upstream as a pull request so the venue is supported for
+      everyone.
 
 1. **Run the deterministic checks and export the AI tasks.**
 
@@ -141,5 +180,7 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
 - Never add hidden text or reviewer instructions anywhere.
 - Use absolute paths; keep the task and result JSON in a scratch directory, not
   the manuscript directory.
+- A temporary venue entry (step 0) never goes into paperpush's own databases
+  or the repo: always `--data-dir` plus `PAPERPUSH_VENUE_DATA`.
 - If the user has an API key and prefers it, `paperpush validate <sub> --ai`
   does steps 1–3 in one call through the provider's API instead.

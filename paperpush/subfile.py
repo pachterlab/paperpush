@@ -237,7 +237,18 @@ def render_template(
         f"# paperpush submission file for {venue.slug}  -*- mode: yaml -*-",
         f"# {venue.full_name or venue.slug}",
         "#",
-        "# Edit the values below, then run:  paperpush submit " f"{default_filename(venue)}",
+        "# Edit the values below, then:",
+        *(
+            [
+                f"#   - to run the checks that apply to any manuscript: `paperpush validate {default_filename(venue)}`",
+                "#   - to move it to a specific venue once you choose one: run /paperpush-transfer in an AI agent,",
+                "#     or create that venue's .sub (`paperpush subfile VENUE`) and copy the values across",
+            ]
+            if venue.is_general
+            else [f"#   - to validate against venue guidelines: `paperpush validate {default_filename(venue)}`"]
+        ),
+        # Validate-only venues (and the general placeholder) have no portal runner.
+        *([f"#   - to fill out submission portal: `paperpush submit {default_filename(venue)}`"] if venue.supports_submit and not venue.is_general else []),
         "# Lines starting with '#' are comments and are ignored.",
         "#",
         "# To fill this in through a form instead, open it in the paperpush web page:",

@@ -250,6 +250,203 @@
       ]
     }
   },
+  "$publishers": {
+    "aaas": {
+      "name": "AAAS (Science family)",
+      "site_url": "https://www.science.org/content/page/science-information-authors",
+      "crossref_names": [
+        "American Association for the Advancement of Science (AAAS)",
+        "American Association for the Advancement of Science"
+      ]
+    },
+    "acs": {
+      "name": "American Chemical Society",
+      "site_url": "https://publish.acs.org/publish/author_guidelines",
+      "crossref_names": [
+        "American Chemical Society (ACS)",
+        "American Chemical Society"
+      ]
+    },
+    "ama": {
+      "name": "American Medical Association (JAMA Network)",
+      "site_url": "https://jamanetwork.com/journals/jama/pages/instructions-for-authors",
+      "crossref_names": [
+        "American Medical Association (AMA)",
+        "American Medical Association"
+      ]
+    },
+    "bmj": {
+      "name": "BMJ",
+      "site_url": "https://authors.bmj.com/",
+      "crossref_names": [
+        "BMJ",
+        "BMJ Publishing Group"
+      ]
+    },
+    "cambridge": {
+      "name": "Cambridge University Press",
+      "site_url": "https://www.cambridge.org/core/services/authors/journals",
+      "crossref_names": [
+        "Cambridge University Press (CUP)",
+        "Cambridge University Press"
+      ]
+    },
+    "cell_press": {
+      "name": "Cell Press",
+      "site_url": "https://www.cell.com/information-for-authors",
+      "parent": "elsevier"
+    },
+    "cshl_press": {
+      "name": "Cold Spring Harbor Laboratory Press",
+      "site_url": "https://genome.cshlp.org/site/misc/ifora.xhtml",
+      "crossref_names": [
+        "Cold Spring Harbor Laboratory",
+        "Cold Spring Harbor Laboratory Press"
+      ]
+    },
+    "elsevier": {
+      "name": "Elsevier",
+      "site_url": "https://www.elsevier.com/researcher/author/policies-and-guidelines",
+      "crossref_names": [
+        "Elsevier BV",
+        "Elsevier",
+        "Elsevier Ltd"
+      ]
+    },
+    "frontiers": {
+      "name": "Frontiers",
+      "site_url": "https://www.frontiersin.org/guidelines/author-guidelines",
+      "crossref_names": [
+        "Frontiers Media SA",
+        "Frontiers Media S.A."
+      ]
+    },
+    "ieee": {
+      "name": "IEEE",
+      "site_url": "https://journals.ieeeauthorcenter.ieee.org/",
+      "crossref_names": [
+        "Institute of Electrical and Electronics Engineers (IEEE)",
+        "Institute of Electrical and Electronics Engineers",
+        "IEEE"
+      ]
+    },
+    "iop": {
+      "name": "IOP Publishing",
+      "site_url": "https://publishingsupport.iopscience.iop.org/author-guidelines-for-journal-articles/",
+      "crossref_names": [
+        "IOP Publishing"
+      ]
+    },
+    "karger": {
+      "name": "Karger",
+      "site_url": "https://www.karger.com/Resources/Authors",
+      "crossref_names": [
+        "S. Karger AG",
+        "Karger"
+      ]
+    },
+    "mdpi": {
+      "name": "MDPI",
+      "site_url": "https://www.mdpi.com/authors",
+      "crossref_names": [
+        "MDPI AG",
+        "MDPI"
+      ]
+    },
+    "mms": {
+      "name": "Massachusetts Medical Society (NEJM Group)",
+      "site_url": "https://www.nejm.org/author-center",
+      "crossref_names": [
+        "Massachusetts Medical Society"
+      ]
+    },
+    "nas": {
+      "name": "National Academy of Sciences (PNAS)",
+      "site_url": "https://www.pnas.org/author-center",
+      "crossref_names": [
+        "Proceedings of the National Academy of Sciences"
+      ]
+    },
+    "oup": {
+      "name": "Oxford University Press",
+      "site_url": "https://academic.oup.com/pages/authoring/journals",
+      "crossref_names": [
+        "Oxford University Press (OUP)",
+        "Oxford University Press"
+      ]
+    },
+    "plos": {
+      "name": "PLOS",
+      "site_url": "https://plos.org/resources/for-authors/",
+      "crossref_names": [
+        "Public Library of Science (PLoS)",
+        "Public Library of Science"
+      ]
+    },
+    "rsna": {
+      "name": "Radiological Society of North America",
+      "site_url": "https://pubs.rsna.org/page/author-services",
+      "crossref_names": [
+        "Radiological Society of North America (RSNA)",
+        "Radiological Society of North America"
+      ]
+    },
+    "sage": {
+      "name": "SAGE",
+      "site_url": "https://www.sagepub.com/journals/information-for-authors",
+      "crossref_names": [
+        "SAGE Publications",
+        "SAGE Publishing"
+      ]
+    },
+    "snmmi": {
+      "name": "Society of Nuclear Medicine and Molecular Imaging",
+      "site_url": "https://jnm.snmjournals.org/page/authors",
+      "crossref_names": [
+        "Society of Nuclear Medicine",
+        "Society of Nuclear Medicine and Molecular Imaging"
+      ]
+    },
+    "springer_nature": {
+      "name": "Springer Nature",
+      "site_url": "https://www.springernature.com/gp/authors",
+      "crossref_names": [
+        "Springer Science and Business Media LLC",
+        "Springer Nature",
+        "Springer Nature Switzerland",
+        "Springer International Publishing",
+        "Springer Berlin Heidelberg",
+        "BioMed Central",
+        "Springer Nature Singapore"
+      ]
+    },
+    "taylor_francis": {
+      "name": "Taylor & Francis",
+      "site_url": "https://authorservices.taylorandfrancis.com/",
+      "crossref_names": [
+        "Informa UK Limited",
+        "Taylor & Francis",
+        "Taylor and Francis"
+      ]
+    },
+    "wiley": {
+      "name": "Wiley",
+      "site_url": "https://authorservices.wiley.com/",
+      "crossref_names": [
+        "Wiley",
+        "John Wiley & Sons, Ltd",
+        "Wiley-Blackwell"
+      ]
+    },
+    "wolters_kluwer": {
+      "name": "Wolters Kluwer",
+      "site_url": "https://journals.lww.com/pages/default.aspx",
+      "crossref_names": [
+        "Ovid Technologies (Wolters Kluwer Health)",
+        "Wolters Kluwer"
+      ]
+    }
+  },
   "biorxiv": {
     "source_urls": [
       "https://www.biorxiv.org/submit-a-manuscript",
@@ -345,6 +542,7 @@
         "reporting_guidelines",
         "ai_use"
       ],
+      "ai_use_if_used": true,
       "notes": [
         "Ethics: authors must confirm 'all relevant ethical guidelines have been followed, all necessary IRB and/or ethics committee approvals have been obtained', and medRxiv requires 'a statement of ethical oversight by an independent dedicated oversight body' for any research involving human subjects, samples, or data (including anonymized data and surveys) unless the data are already publicly available.",
         "Clinical trials must be 'registered with an internationally recognized trial registry', specifically 'a trial ID from an ICMJE-recognized trial registry (such as clinicaltrials.gov)', or provide documented exemption.",
@@ -352,7 +550,6 @@
         "Competing interests declaration is mandatory.",
         "Data availability statement required, covering 'the availability of all data referred to in the manuscript'; large datasets should be deposited in an appropriate repository (e.g. PDB, GenBank, NIH databases) rather than posted to medRxiv itself.",
         "PRISMA guidelines are recommended (not stated as mandatory) for systematic reviews with meta-analyses: 'We recommend using PRISMA guidelines'.",
-        "Use of AI tools in manuscript preparation must be detailed in the manuscript, with authors accountable for accuracy and originality of AI-assisted content.",
         "PRISMA reporting is recommended for systematic reviews."
       ]
     },
@@ -626,6 +823,11 @@
       "optional": [
         "ai_use"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "supplementary"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
         "A data availability statement is a requirement for all papers published in the journal.",
         "All authors must disclose any potential conflict of interest at the point of submission.",
@@ -941,12 +1143,18 @@
         "funding",
         "ai_use"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods",
+        "acknowledgements"
+      ],
+      "ai_use_cover_letter": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "A Data Availability statement is mandatory in all papers, placed at the end of the manuscript.",
         "An Author Contributions statement is mandatory for all articles (preferably at original submission, no later than revision); CRediT taxonomy encouraged.",
         "All authors must disclose potential conflicts of interest at submission; the corresponding author ensures all co-authors' conflicts are declared.",
         "Funding-source disclosure (for the Open Access charge) is requested/encouraged but not compulsory; the Funding subheading follows Acknowledgements.",
-        "AI/LLM use (content/image generation, code, data processing, translation) must be disclosed both in the cover letter and in the Methods or Acknowledgements section; AI tools cannot be listed as authors and the Journal screens for them in author lists.",
         "Human-subjects research requires ethics-committee/IRB approval (or documented exemption) and informed consent, per the Declaration of Helsinki; participant data must be anonymized.",
         "Animal research requires institutional animal-care-committee approval and compliance with national/international guidelines (ARRIVE recommended); committee name and permit/license numbers must be in the Methods, with euthanasia/anesthesia and housing/husbandry details."
       ]
@@ -1143,8 +1351,7 @@
         "Avoid using 'Introduction' as a section heading for Articles; subheadings may appear within 'Results'.",
         "Order of manuscript elements: title, authors, affiliations, bold first paragraph (summary), main text, main references, tables, figure legends, Methods (with data/code availability statements), Methods references, acknowledgements, funding statement, author contributions, competing interests, additional information, Extended Data figure/table legends.",
         "The Methods section cannot contain figures or tables; essential display items should be Extended Data or, exceptionally, Supplementary Information.",
-        "The manuscript_type field values 'Biological Sciences - Article', 'Physical Sciences - Article', and 'Social Sciences - Article' all follow the same Article-type formatting rules recorded at this top level; they differ only in subject area.",
-        "Large Language Models (e.g. ChatGPT) do not satisfy authorship criteria; any LLM use must be documented in the Methods section (or a suitable alternative part)."
+        "The manuscript_type field values 'Biological Sciences - Article', 'Physical Sciences - Article', and 'Social Sciences - Article' all follow the same Article-type formatting rules recorded at this top level; they differ only in subject area."
       ]
     },
     "title_page": {
@@ -1209,6 +1416,8 @@
         "reporting_guidelines",
         "clinical_trial_registration"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Data Availability statement is required in the Methods section under the heading 'Data Availability'.",
         "Competing interests statement is required for all content in the journal.",
@@ -1218,8 +1427,7 @@
         "Code availability statement (heading 'Code availability' in Methods) is required only for studies using custom code central to the main claims.",
         "A Nature Portfolio Reporting Summary (life-sciences and behavioural/social-sciences reporting guidelines) must be completed before peer review and is published with the article if accepted.",
         "Prospective clinical trials must be registered (e.g. clinicaltrials.gov) before patient enrollment and the trial registration number reported in the manuscript; phase II/III RCTs must follow CONSORT reporting.",
-        "Related manuscripts with overlapping authorship under consideration or in press elsewhere must be disclosed and included as separate files at submission.",
-        "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section."
+        "Related manuscripts with overlapping authorship under consideration or in press elsewhere must be disclosed and included as separate files at submission."
       ]
     },
     "figures": {
@@ -1424,7 +1632,6 @@
         "Article structure: Introduction (without heading), Results, Discussion, Online Methods; Results and Methods use topical subheadings, Discussion does not.",
         "Manuscript file must contain names/affiliations of all co-authors (or, for double-anonymized review, these go in the cover letter instead), a detailed description of methods/materials sufficient for replication, and a reference list.",
         "Up to 10 Extended Data figures/tables may be included as online-only display items that are not counted against the 6-item main-text limit.",
-        "Large Language Models (e.g. ChatGPT) do not satisfy authorship criteria; LLM use must be documented in the Methods section (or a suitable alternative part).",
         "Shares the eJournalPress submission system (mts-nbt.nature.com) with other Nature Portfolio titles."
       ]
     },
@@ -1449,6 +1656,8 @@
       "required": [
         "competing_interests"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Competing interests statement is required for all Nature Portfolio content.",
         "Cover letter should disclose any related manuscripts under consideration or in press elsewhere, and any prior discussion with a Nature Biotechnology editor about the work."
@@ -1648,7 +1857,6 @@
         "Manuscript file must contain names/affiliations of all co-authors (or, for double-anonymized review, these go in the cover letter instead), a detailed description of methods/materials sufficient for replication, and a reference list.",
         "Up to 10 Extended Data figures/tables may be included as online-only display items, not counted against the 6-item main-text limit.",
         "Primary research formats are Article, Brief Communication, Analysis, and Resource.",
-        "Large Language Models (e.g. ChatGPT) do not satisfy authorship criteria; LLM use must be documented in the Methods section (or a suitable alternative part).",
         "Cover letter should explain the importance of the work and why it suits Nature Methods' readership; disclose related manuscripts under consideration/in press elsewhere and any prior discussion with an editor; not seen by peer reviewers.",
         "Encourages active voice and avoiding jargon/acronyms where possible."
       ]
@@ -1677,6 +1885,8 @@
       "optional": [
         "reporting_guidelines"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Competing interests statement required for all submissions (shared Nature Portfolio policy).",
         "All life-sciences submissions must include a completed Nature Portfolio Reporting Summary."
@@ -1943,10 +2153,13 @@
         "ai_use",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement"
+      ],
       "notes": [
         "Resource Availability section (Lead Contact, Materials Availability, Data and Code Availability subheadings) is required for all research articles.",
         "A Declaration of Interests form is required for all papers; its wording must match the manuscript's 'Declaration of Interests' section (use 'The authors declare no competing interests.' if none).",
-        "A 'Declaration of Generative AI and AI-assisted technologies in the writing process' section is required only if such tools were used in writing; omit if there is nothing to disclose.",
         "Author Contributions is required for all papers; CRediT taxonomy is encouraged but a traditional prose format is also accepted.",
         "Acknowledgments is strongly encouraged (not strictly required) for all research articles; use it to credit non-authors and list funding sources."
       ]
@@ -2217,10 +2430,13 @@
         "ai_use",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement"
+      ],
       "notes": [
         "Data and Code Availability statement must have 3 parts: (1) data reported in the paper (even if none), (2) original code reported (even if none), (3) the standard sentence 'Any additional information required to reanalyze the data reported in this paper is available from the lead contact upon request.'",
         "A Declaration of Interests form is required and its wording must match the manuscript's 'Declaration of Interests' section (use 'The authors declare no competing interests.' if none).",
-        "A 'Declaration of generative AI and AI-assisted technologies in the manuscript preparation process' section is required only if such tools were used in writing; omit if there is nothing to disclose.",
         "Acknowledgments is strongly encouraged (not strictly required); Standardized data reporting checklists (battery, photovoltaic cell, catalysis) are strongly encouraged where relevant."
       ]
     },
@@ -2455,10 +2671,13 @@
         "ai_use",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement"
+      ],
       "notes": [
         "Author Contributions section is required for all primary research papers, placed immediately after Acknowledgments; CRediT taxonomy encouraged.",
-        "Declaration of Interests form required and uploaded; its content (including 'no competing interests' declarations) must also appear in a manuscript section titled 'Declaration of Interests,' after Author Contributions.",
-        "A 'Declaration of generative AI and AI-assisted technologies in the manuscript preparation process' section is required only if generative AI/AI-assisted technology was used in writing; omit if there is nothing to disclose."
+        "Declaration of Interests form required and uploaded; its content (including 'no competing interests' declarations) must also appear in a manuscript section titled 'Declaration of Interests,' after Author Contributions."
       ]
     },
     "figures": {
@@ -3046,8 +3265,7 @@
       "separate_file": false,
       "notes": [
         "Title should include the study design if appropriate; avoid abbreviations, the words 'novel'/'new' are not restricted but abbreviations should be minimized.",
-        "List full names, institutional addresses and email addresses for all authors.",
-        "LLMs (e.g. ChatGPT) do not satisfy authorship criteria and must not be listed as authors; any LLM use must be documented in the Methods section."
+        "List full names, institutional addresses and email addresses for all authors."
       ]
     },
     "abstract": {
@@ -3114,6 +3332,11 @@
         "author_contributions",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
         "All required declarations are grouped under a single 'Declarations' heading with these exact subheadings, confirmed on the live article-type pages: Ethics approval and consent to participate; Consent for publication; Availability of data and materials; Competing interests; Funding; Authors' contributions; Acknowledgements; Authors' information (optional).",
         "Any subsection not relevant to the manuscript must still be included with the text 'Not applicable'.",
@@ -3355,8 +3578,7 @@
         "Accepted main-manuscript file formats: Microsoft Word (DOC, DOCX), Rich Text Format (RTF), TeX/LaTeX (via BioMed Central's TeX template).",
         "Do not use page breaks in the manuscript.",
         "Use SI units throughout; embed any special characters used.",
-        "No fixed main-text word limit is stated for Research, Software, Database or Review articles (Matters Arising has its own ~1200-word guideline -- see article_types).",
-        "LLMs (e.g. ChatGPT) do not satisfy authorship criteria and must not be listed as authors; any LLM use must be documented in the Methods section."
+        "No fixed main-text word limit is stated for Research, Software, Database or Review articles (Matters Arising has its own ~1200-word guideline -- see article_types)."
       ]
     },
     "title_page": {
@@ -3437,6 +3659,11 @@
         "author_contributions",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
         "Confirmed on the Research-article page: required declarations are grouped under a single 'Declarations' heading with these exact subheadings: Ethics approval and consent to participate; Consent for publication; Availability of data and materials; Competing interests; Funding; Authors' contributions; Acknowledgements; Authors' information (optional).",
         "Any subsection not relevant to the manuscript should still be included with the text 'Not applicable'.",
@@ -3626,6 +3853,12 @@
         "ai_use",
         "code_availability"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods",
+        "acknowledgements"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
         "The Acknowledgments paragraph covers, in order: non-author contributions, Funding, Author contributions (CRediT taxonomy encouraged, authors identified by initials), an optional Diversity/equity/ethics/inclusion statement, Competing interests, and Data/code/materials availability.",
         "If all data are in the paper and supplementary materials, use the sentence 'All data are available in the manuscript or the supplementary materials.'",
@@ -5103,9 +5336,12 @@
         "data_availability",
         "ai_use"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement"
+      ],
       "notes": [
         "Declaration of competing interest is required for all submissions, via Elsevier's declaration template/tool (do not convert the .docx template to another file type; choose the first option in the template if there is nothing to declare).",
-        "If generative AI/AI-assisted technology was used in the writing process, a 'Declaration of Generative AI and AI-assisted technologies in the writing process' section is required at the end of the manuscript (before the References list); not needed if there is nothing to disclose.",
         "Role of the funding source: identify who funded the research and briefly describe their role in study design/data/writing/decision to submit (or state they had no such role); recommended wording: 'Funding: This work was supported by [funder] [grant number(s)]', or, if unfunded, 'This research did not receive any specific grant from funding agencies in the public, commercial, or not-for-profit sectors.'",
         "Research data sharing/linking is encouraged, not required; a CRediT/author-contribution statement is not mentioned in this journal's guide for authors."
       ]
@@ -5327,6 +5563,10 @@
       "optional": [
         "ethics_statement"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "acknowledgements"
+      ],
       "notes": [
         "The Responsible NLP checklist is required as part of the submission form; incorrect, incomplete, or misleading answers can lead to desk rejection.",
         "Any use of generative AI for writing or coding must be disclosed in the Responsible NLP checklist and/or the Acknowledgements section."
@@ -5395,6 +5635,9 @@
       "required": [
         "ai_use",
         "reproducibility"
+      ],
+      "ai_use_locations": [
+        "statement"
       ],
       "notes": [
         "An 'AI Use Statement' section before the references is mandatory and must be in the paper; a missing statement is desk rejected. If no generative AI was used, say so.",
@@ -5591,12 +5834,15 @@
         "funding",
         "ai_use"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement"
+      ],
       "notes": [
         "Declaration of interests section is required for all papers (use 'The authors declare no competing interests.' if none).",
         "A 'data and code availability' section is required for publication.",
         "Human-participant studies must state IRB approval in the methods and affirm informed consent; sex and/or gender of participants must be reported.",
         "Animal studies must name the approving committee in the methods.",
-        "Generative AI use in writing must be disclosed in a section before the references.",
         "Acknowledgments are limited to 250 words and also list funding sources; author contributions (CRediT encouraged) use initials."
       ]
     },
@@ -6076,10 +6322,13 @@
         "ai_use",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement"
+      ],
       "notes": [
         "Resource Availability section (Lead Contact, Materials Availability, Data and Code Availability subheadings) is required for all research articles.",
         "A Declaration of Interests form is required for all papers; its wording must match the manuscript's 'Declaration of Interests' section (use 'The authors declare no competing interests.' if none).",
-        "A 'Declaration of Generative AI and AI-assisted technologies in the writing process' section is required only if such tools were used in writing; omit if there is nothing to disclose.",
         "Author Contributions is required for all papers; CRediT taxonomy is encouraged but a traditional prose format is also accepted.",
         "Acknowledgments is strongly encouraged (not strictly required) for all research articles; use it to credit non-authors and list funding sources."
       ]
@@ -6221,6 +6470,9 @@
     "statements": {
       "required": [
         "ai_use"
+      ],
+      "ai_use_locations": [
+        "statement"
       ],
       "notes": [
         "A section titled 'LLM Usage Statement' is mandatory, placed after the main text and before the references; it must name the tool(s), the affected parts, and the extent of use (including editing and grammar), or state that no LLMs or generative AI tools were used. It must not reveal author identity and does not count toward the page limit; a missing statement is rejected without review.",
@@ -6789,7 +7041,6 @@
         "LaTeX: Springer Nature template encouraged; a PDF is compiled with pdfLaTeX during submission and all editable source files must be uploaded.",
         "The guidelines read state no overall word limit for Research articles.",
         "Title should include the study design where appropriate; list full names and addresses for all authors and indicate the corresponding author.",
-        "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section.",
         "Abbreviations used in the text are defined at first use and listed in a List of abbreviations.",
         "The Research page snapshot was read from the Internet Archive because the live page was blocked."
       ]
@@ -6861,6 +7112,11 @@
       "optional": [
         "clinical_trial_registration"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
         "Ethics approval and consent to participate is required even when approval was waived, naming the committee and reference number where appropriate; otherwise state 'Not applicable'.",
         "Consent for publication is needed for any individual person's data; state 'Not applicable' if none.",
@@ -7105,8 +7361,7 @@
         "Author biographies are not published and must not be included.",
         "Supplemental documents may not extend the manuscript with text, figures, or tables; allowed types are graphical abstract, video, media, dataset, code, and the published conference paper being extended.",
         "Cover letters are strongly discouraged unless the manuscript underwent prior review elsewhere or extends a conference paper; do not suggest reviewers in the cover letter.",
-        "Extended conference papers must have under 20% overlap (Crossref Similarity Check) with the conference paper, which must be cited and uploaded as a supporting document.",
-        "AI-generated content (text, figures, images, code) must be disclosed in the Acknowledgments section."
+        "Extended conference papers must have under 20% overlap (Crossref Similarity Check) with the conference paper, which must be cited and uploaded as a supporting document."
       ]
     },
     "abstract": {
@@ -7138,7 +7393,13 @@
       "Manuscript must be in clear, concise English; a language editing certificate may be requested on resubmission.",
       "Review papers are by invitation only after a proposal is approved.",
       "Previously rejected manuscripts must disclose this in a cover letter with an executive summary and the original decision letter."
-    ]
+    ],
+    "statements": {
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "acknowledgements"
+      ]
+    }
   },
   "ieee_tnnls": {
     "source_urls": [
@@ -7216,6 +7477,10 @@
     "statements": {
       "optional": [
         "ai_use"
+      ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "acknowledgements"
       ],
       "notes": [
         "Use of AI-generated text must be disclosed in the acknowledgements section, with a citation to the AI system used."
@@ -7623,6 +7888,11 @@
         "reporting_guidelines",
         "ai_use",
         "ethics_approval"
+      ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "acknowledgements",
+        "methods"
       ],
       "notes": [
         "Data Sharing Statement required for original data reports and systematic reviews, from one or two named authors (usually the corresponding author).",
@@ -8781,10 +9051,14 @@
         "author_contributions",
         "ai_use"
       ],
+      "ai_use_locations": [
+        "statement",
+        "figure_captions"
+      ],
+      "ai_copyediting_exempt": true,
       "notes": [
         "Data statement is required at submission (journal follows Elsevier Option C: deposit data in a repository and cite it, or explain why not).",
         "Author contributions use CRediT roles.",
-        "Generative AI use must be declared in a section before the reference list (basic grammar/spelling tools exempt).",
         "Declaration of competing interests is required of all authors."
       ]
     },
@@ -8954,7 +9228,12 @@
       "optional": [
         "funding",
         "acknowledgements"
-      ]
+      ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods"
+      ],
+      "ai_authorship_prohibited": true
     },
     "references": {
       "max_count": 50,
@@ -9005,7 +9284,6 @@
     "notes": [
       "Initial submissions are accepted as PDF, Word or TeX/LaTeX (compiled PDF for TeX/LaTeX) and need no special formatting; after acceptance in principle only Word or TeX/LaTeX is accepted.",
       "Double-anonymized peer review is available as an opt-in; authors are responsible for anonymizing the manuscript themselves.",
-      "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section.",
       "Other content types are non-primary: Comment (title up to 60 characters, up to 2,500 words, up to 4 display items, up to 15 references), Correspondence (300-800 words, 1 display item, up to 10 references), Matters Arising (up to 1,200 words, 2 display items, ~15 references)."
     ]
   },
@@ -9094,6 +9372,11 @@
         "acknowledgements",
         "clinical_trial_registration"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
         "Code Availability statement is required for studies using custom code or an algorithm central to the conclusions.",
         "Ethics statement is required for research involving human participants, their data or biological material, or animals.",
@@ -9157,8 +9440,7 @@
     },
     "notes": [
       "Submission is online only; Nature Communications publishes a single primary research format (Article) and is fully open access with an article processing charge.",
-      "Previously unreported custom code central to the main claims must be made available to editors and reviewers at submission.",
-      "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section."
+      "Previously unreported custom code central to the main claims must be made available to editors and reviewers at submission."
     ]
   },
   "nature_genetics": {
@@ -9334,7 +9616,6 @@
         "LaTeX: standard class files (article.cls, revtex.cls, amsart.cls), all text in one file in default Computer Modern fonts, numerical references only, references included in the manuscript file (copy the .bbl contents), and the file must compile without errors or warnings.",
         "Manuscript file must contain names and affiliations of all co-authors (or these go in the cover letter for double-anonymized review), a detailed description of the findings with enough methods for replication, and a reference list.",
         "A maximum of 10 Extended Data display items is permitted (online only).",
-        "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section.",
         "Tables go at the end of the text document; complex tables may be a separate Excel file."
       ]
     },
@@ -9365,6 +9646,11 @@
         "code_availability",
         "reporting_guidelines"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
         "Funding should be declared in a separate funding statement (Nature Portfolio funding statements policy).",
         "Data and code availability standards are enforced at acceptance in principle; a Data Availability section's references are numbered after the Methods references."
@@ -9515,7 +9801,12 @@
       "optional": [
         "funding",
         "acknowledgements"
-      ]
+      ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods"
+      ],
+      "ai_authorship_prohibited": true
     },
     "references": {
       "max_count": 50,
@@ -9563,7 +9854,6 @@
     "notes": [
       "Initial submissions are accepted as PDF, Word or TeX/LaTeX (compiled PDF for TeX/LaTeX) and need no special formatting; after acceptance in principle only Word or TeX/LaTeX is accepted.",
       "Double-anonymized peer review is available as an opt-in; authors are responsible for anonymizing the manuscript themselves.",
-      "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section.",
       "Other content types are non-primary: Correspondence 500-1,000 words (1 display item, 10 references); Review and Perspective 3,000-4,000 words (up to 100 references); Comment 1,500-2,000 words (15 references)."
     ]
   },
@@ -9663,6 +9953,11 @@
         "acknowledgements",
         "reporting_guidelines"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
         "Funding should be declared in a separate funding statement; acknowledgements should be brief."
       ]
@@ -9714,7 +10009,6 @@
     "notes": [
       "Initial submissions are accepted as PDF, Word or TeX/LaTeX (compiled PDF for TeX/LaTeX) and need no special formatting; after acceptance in principle only Word or TeX/LaTeX is accepted.",
       "Double-anonymized peer review is available as an opt-in; authors are responsible for anonymizing the manuscript themselves.",
-      "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section.",
       "Other content types (Correspondence up to 1,000 words, 2 display items, 10 references; Review up to 4,000 words, 100 references; Perspective up to 4,000 words, 100 references; Comment 1,500-2,000 words, 15 references) are non-primary and not recorded as article types here."
     ]
   },
@@ -10270,10 +10564,13 @@
         "ai_use",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement"
+      ],
       "notes": [
         "Resource Availability section (Lead Contact, Materials Availability, Data and Code Availability subheadings) is required for all research articles.",
         "A Declaration of Interests form is required for all papers; its wording must match the manuscript's 'Declaration of Interests' section (use 'The authors declare no competing interests.' if none).",
-        "A 'Declaration of Generative AI and AI-assisted technologies in the writing process' section is required only if such tools were used in writing; omit if there is nothing to disclose.",
         "Author Contributions is required for all papers; CRediT taxonomy is encouraged but a traditional prose format is also accepted.",
         "Acknowledgments is strongly encouraged (not strictly required) for all research articles; use it to credit non-authors and list funding sources."
       ]
@@ -10509,7 +10806,6 @@
         "Initial submissions need not follow formatting requirements, which apply at acceptance; supply a compiled PDF (or Word) at first submission, LaTeX accepted at acceptance.",
         "Title up to 15 words, free of punctuation, idioms, and puns.",
         "Cover letter, editable manuscript, figures, optional single Supplementary Information file, and relevant reporting checklists accompany a submission.",
-        "Large language models cannot be authors; LLM use must be documented in the Methods.",
         "All Methods must be in the main manuscript, not Supplementary Information."
       ]
     },
@@ -10563,6 +10859,11 @@
         "reporting_guidelines",
         "funding"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
         "Data availability is a mandatory separate section after Methods and before References; code availability is required where applicable, in the Methods.",
         "Author contributions must refer to each author by initials.",
@@ -13217,7 +13518,6 @@
         "Editable files are required for production; a non-editable manuscript (such as a PDF) must be replaced by an editable file at revision, or after acceptance if no revision is needed.",
         "LaTeX: the Springer Nature LaTeX template is encouraged; a PDF is compiled with pdfLaTeX and TexLive 2021 during submission and all editable source files must be uploaded.",
         "No word limit is stated for Research articles.",
-        "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section (or a suitable alternative part).",
         "Abbreviations are defined at first use, and a list of abbreviations can be provided.",
         "Footnotes may be used but must not consist solely of a reference citation; always use footnotes instead of endnotes.",
         "Cropped gels and blots must be marked as cropped in the legend, with uncropped full-length images in a single supplementary figure."
@@ -13289,6 +13589,8 @@
         "author_contributions",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Studies with human participants, data or tissue need an ethics approval and consent statement (even if approval was waived), naming the committee and reference number where appropriate.",
         "Consent for publication is needed for any individual person's data; state 'Not applicable' if none.",
@@ -13560,7 +13862,6 @@
         "Editable files are required for production; a non-editable manuscript (such as a PDF) must be replaced by an editable file at revision, or after acceptance if no revision is needed.",
         "LaTeX: the Springer Nature LaTeX template is encouraged; a PDF is compiled with pdfLaTeX and TexLive 2021 during submission and all editable source files must be uploaded.",
         "No length limit applies to the Methods section; no overall word limit is stated for Research Articles.",
-        "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section (or a suitable alternative part).",
         "Abbreviations are defined in the text at first use.",
         "Footnotes may be used but must not consist solely of a reference citation; always use footnotes instead of endnotes.",
         "Authors should refer to the BioMed Central Minimum Standards of Reporting Checklist."
@@ -13629,6 +13930,8 @@
         "author_contributions",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Studies with human participants, data or tissue need an ethics approval and consent statement (even if approval was waived), naming the committee and reference number where appropriate.",
         "Consent for publication is needed for any individual person's data; state 'Not applicable' if none.",
@@ -13981,7 +14284,6 @@
         "Editable files are required for production; a non-editable manuscript (such as a PDF) must be replaced by an editable file at revision, or after acceptance if no revision is needed.",
         "LaTeX: the Springer Nature LaTeX template is encouraged; a PDF is compiled with pdfLaTeX and TexLive 2021 during submission and all editable source files must be uploaded.",
         "No word limit is stated for Research articles.",
-        "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section (or a suitable alternative part).",
         "Abbreviations are defined at first use, and a list of abbreviations should be provided.",
         "Footnotes may be used but must not consist solely of a reference citation; always use footnotes instead of endnotes.",
         "Use of reporting checklists is strongly encouraged, including STROBE-MR for Mendelian Randomization studies."
@@ -14058,6 +14360,8 @@
       "optional": [
         "clinical_trial_registration"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Studies with human participants, data or tissue need an ethics approval and consent statement (even if approval was waived), naming the committee and reference number where appropriate.",
         "Consent for publication is needed for any individual person's data; state 'Not applicable' if none.",
@@ -14424,7 +14728,6 @@
       "Double-anonymized peer review is offered as an option; authors who choose it put author names, affiliations and contact information in the cover letter instead of the manuscript file.",
       "Content types listed: Article, Analysis, Brief Communication, Resource, Correspondence, Review, Perspective, Comment, Matters Arising (specialist submission process), News and Views, Feature.",
       "Correspondence, Review, Perspective, Comment, News and Views and Feature should not include original (previously unpublished) results or data and can only be published through the subscription route.",
-      "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section (or a suitable alternative part).",
       "Corresponding authors must link their ORCID to their manuscript tracking system account before final acceptance."
     ],
     "manuscript": {
@@ -14477,6 +14780,8 @@
         "data_availability",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Funding should be declared in a separate funding statement (Nature Portfolio funding statements policy).",
         "Acknowledgements should be brief, should not thank anonymous referees or editors, may acknowledge grant or contribution numbers, and dedications are not permitted except for someone directly involved in the research.",
@@ -14693,7 +14998,6 @@
       "Double-anonymized peer review is offered as an option; authors who choose it put author names, affiliations and contact information in the cover letter instead of the manuscript file.",
       "Content types listed: Article, Resource, Technical Report, Correspondence, Review, Perspective, Comment, Matters Arising (specialist submission process), News and Views, Obituary.",
       "Correspondence, Review, Perspective, Comment, News and Views and Obituary should not include original (previously unpublished) results or data and can only be published through the subscription route.",
-      "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section (or a suitable alternative part).",
       "Corresponding authors must link their ORCID to their manuscript tracking system account before final acceptance."
     ],
     "manuscript": {
@@ -14746,6 +15050,8 @@
         "data_availability",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Funding should be declared in a separate funding statement (Nature Portfolio funding statements policy).",
         "Acknowledgements should be brief, should not thank anonymous referees or editors, and dedications are not permitted except for someone directly involved in the research.",
@@ -14957,7 +15263,6 @@
       "Double-anonymized peer review is offered as an option; authors who choose it put author names, affiliations and contact information in the cover letter instead of the manuscript file.",
       "Content types listed: Article, Brief Communication, Resource, Review, Perspective, Comment, Technical Report, Registered Report, Matters Arising (specialist submission process), News and Views.",
       "Review, Perspective, Comment and News and Views should not include original (previously unpublished) results or data and can only be published through the subscription route.",
-      "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section (or a suitable alternative part).",
       "Corresponding authors must link their ORCID to their manuscript tracking system account before final acceptance."
     ],
     "manuscript": {
@@ -15010,6 +15315,8 @@
         "data_availability",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Funding should be declared in a separate funding statement (Nature Portfolio funding statements policy).",
         "Acknowledgements should be brief, should not thank anonymous referees or editors, and dedications are not permitted except for someone directly involved in the research.",
@@ -15230,7 +15537,6 @@
       "Double-anonymized peer review is offered as an option; authors who choose it put author names, affiliations and contact information in the cover letter instead of the manuscript file.",
       "Content types listed: Article, Analysis, Brief Communication, Resource, Technical Report, Correspondence, Review, Perspective, Comment, Matters Arising (specialist submission process), Book Review, News and Views.",
       "Correspondence, Review, Perspective, Comment, Book Review and News and Views should not include original (previously unpublished) research findings and can only be published through the subscription route.",
-      "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section (or a suitable alternative part).",
       "Corresponding authors must link their ORCID to their manuscript tracking system account before final acceptance."
     ],
     "manuscript": {
@@ -15284,6 +15590,8 @@
         "data_availability",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Funding should be declared in a separate funding statement (Nature Portfolio funding statements policy).",
         "Acknowledgements should be brief, should not thank anonymous referees or editors, and dedications are not permitted except for someone directly involved in the research.",
@@ -15557,7 +15865,6 @@
     "notes": [
       "Scientific Reports publishes original research in two formats, Article and Registered Report; Matters Arising are handled through a separate process.",
       "Manuscripts are formally considered only when submitted through the online submission system; a quality check against the initial-submission checklist precedes assignment to an Editorial Board Member.",
-      "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section (or a suitable alternative part).",
       "Title and abstract in the manuscript must exactly match those entered on the submission system, and all author details must be entered in both."
     ],
     "manuscript": {
@@ -15645,6 +15952,8 @@
         "consent_to_participate",
         "consent_to_publish"
       ],
+      "ai_use_if_used": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "A Data Availability Statement is mandatory in all manuscripts, as a section titled 'Data Availability' at the end of the main text before References.",
         "An Author Contribution Statement is required after the references, listing every author's contribution.",
@@ -15783,7 +16092,6 @@
     "notes": [
       "Communications Biology publishes original research in one format, the Article; other submittable types are Review, Mini Review, Perspective, Comment and Matters Arising (separate guidelines). Pre-submission enquiries are not accepted.",
       "All manuscripts undergo initial screening checks against the Policy Guide requirements before the editorial process.",
-      "Large Language Models do not satisfy authorship criteria; LLM use must be documented in the Methods section (AI-assisted copy editing need not be declared).",
       "Corresponding authors must link their ORCID to their manuscript tracking system account before final acceptance."
     ],
     "manuscript": {
@@ -15865,6 +16173,12 @@
         "ethics_statement",
         "clinical_trial_registration"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods"
+      ],
+      "ai_copyediting_exempt": true,
+      "ai_authorship_prohibited": true,
       "notes": [
         "Author Contributions, Competing Interests, Funding and Data Availability statements must be included in the manuscript and entered into the online system.",
         "A Code Availability statement is required for studies using custom code or a mathematical algorithm central to the conclusions.",
@@ -16175,8 +16489,13 @@
       ]
     },
     "statements": {
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "acknowledgements",
+        "methods"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
-        "Use of generative AI must be acknowledged in the acknowledgements section (and methods if applicable).",
         "For animal or human subject research, an ethics approval statement should be included in the Materials and Methods.",
         "If the manuscript content previously appeared online (e.g., thesis or preprint), this should be mentioned in the acknowledgements and the source listed in the references."
       ]
@@ -16579,8 +16898,13 @@
       ]
     },
     "statements": {
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "acknowledgements",
+        "methods"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
-        "Use of generative AI must be acknowledged in the acknowledgements section (and methods if applicable).",
         "For animal or human subject research, an ethics approval statement should be included in the Materials and Methods.",
         "If the manuscript content previously appeared online (e.g., thesis or preprint), this should be mentioned in the acknowledgements and the source listed in the references."
       ]
@@ -16943,8 +17267,13 @@
       ]
     },
     "statements": {
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "acknowledgements",
+        "methods"
+      ],
+      "ai_authorship_prohibited": true,
       "notes": [
-        "Use of generative AI must be acknowledged in the acknowledgements section (and methods if applicable).",
         "For animal or human subject research, an ethics approval statement should be included in the Materials and Methods.",
         "If the manuscript content previously appeared online (e.g., thesis or preprint), this should be mentioned in the acknowledgements and the source listed in the references."
       ]
@@ -17350,12 +17679,17 @@
         "ai_use",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement",
+        "methods"
+      ],
+      "ai_copyediting_exempt": true,
       "notes": [
         "The Resource availability section is required for all research articles, with the subsections 'Lead contact', 'Materials availability', and 'Data and code availability'.",
         "Acknowledgments are strongly encouraged for all research articles and list non-author contributions and funding sources (including grant numbers).",
         "Author contributions are required for all papers, using author initials; the CRediT taxonomy is encouraged but a traditional format is accepted.",
-        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'",
-        "A declaration of generative AI and AI-assisted technologies in the manuscript preparation process is required only if such tools (beyond basic grammar, spelling, and reference checkers) were used in preparing the manuscript; other uses of AI tools are reported in the methods or STAR Methods."
+        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'"
       ]
     },
     "figures": {
@@ -17516,12 +17850,17 @@
         "ai_use",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement",
+        "methods"
+      ],
+      "ai_copyediting_exempt": true,
       "notes": [
         "The Resource availability section is required for all research articles, with the subsections 'Lead contact', 'Materials availability', and 'Data and code availability'.",
         "Acknowledgments are strongly encouraged for all research articles and list non-author contributions and funding sources (including grant numbers).",
         "Author contributions are required for all papers, using author initials; the CRediT taxonomy is encouraged but a traditional format is accepted.",
-        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'",
-        "A declaration of generative AI and AI-assisted technologies in the manuscript preparation process is required only if such tools (beyond basic grammar, spelling, and reference checkers) were used in preparing the manuscript; other uses of AI tools are reported in the methods or STAR Methods."
+        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'"
       ]
     },
     "figures": {
@@ -17669,12 +18008,17 @@
         "ai_use",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement",
+        "methods"
+      ],
+      "ai_copyediting_exempt": true,
       "notes": [
         "The Resource availability section is required for all research articles, with the subsections 'Lead contact', 'Materials availability', and 'Data and code availability'.",
         "Acknowledgments are strongly encouraged for all research articles and list non-author contributions and funding sources (including grant numbers).",
         "Author contributions are required for all papers, using author initials; the CRediT taxonomy is encouraged but a traditional format is accepted.",
-        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'",
-        "A declaration of generative AI and AI-assisted technologies in the manuscript preparation process is required only if such tools (beyond basic grammar, spelling, and reference checkers) were used in preparing the manuscript; other uses of AI tools are reported in the methods or STAR Methods."
+        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'"
       ]
     },
     "figures": {
@@ -17828,12 +18172,17 @@
         "ai_use",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement",
+        "methods"
+      ],
+      "ai_copyediting_exempt": true,
       "notes": [
         "The Resource availability section is required for all research articles, with the subsections 'Lead contact', 'Materials availability', and 'Data and code availability'.",
         "Acknowledgments are strongly encouraged for all research articles and list non-author contributions and funding sources (including grant numbers).",
         "Author contributions are required for all papers, using author initials; the CRediT taxonomy is encouraged but a traditional format is accepted.",
-        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'",
-        "A declaration of generative AI and AI-assisted technologies in the manuscript preparation process is required only if such tools (beyond basic grammar, spelling, and reference checkers) were used in preparing the manuscript; other uses of AI tools are reported in the methods or STAR Methods."
+        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'"
       ]
     },
     "figures": {
@@ -17999,6 +18348,12 @@
         "acknowledgements",
         "ai_use"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods",
+        "acknowledgements"
+      ],
+      "ai_use_cover_letter": true,
       "notes": [
         "A Data Availability Statement, following the Discussion, is required and gives accession numbers and editor/reviewer access information (token or user name/password) for deposited data; if an exception to data sharing is granted, the statement must say what cannot be shared and why.",
         "Data types that must be deposited before submission include genome-wide analyses (e.g. ChIP-Seq, RNA-Seq), novel nucleic acid or protein sequences (with raw high-throughput data), novel 3D structures, mass spectrometry proteomics data, software and source codes, and flow cytometry data.",
@@ -18006,7 +18361,6 @@
         "All funding support, including industry and foreign talents program awards, must be acknowledged, with funder names as in the Crossref funder registry and specific grant numbers.",
         "Acknowledgments of persons precede acknowledgments of funding sources.",
         "All authors must disclose any potential conflict of interest at submission.",
-        "Use of AI (e.g. to generate content or images, write code, process data, or translate) must be disclosed in the cover letter and in the Methods or Acknowledgements section.",
         "Research with human participants or animals requires an ethics/approval statement (committee name and permit numbers where available) in the Methods section, or a statement of exemption."
       ]
     },
@@ -18225,12 +18579,17 @@
         "ai_use",
         "acknowledgements"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "statement",
+        "methods"
+      ],
+      "ai_copyediting_exempt": true,
       "notes": [
         "The Resource availability section is required for all research articles (and might also be required for applicable reviews and perspectives), with the subsections 'Lead contact', 'Materials availability', and 'Data and code availability'.",
         "Acknowledgments are strongly encouraged for all research articles and list non-author contributions and funding sources (including grant numbers).",
         "Author contributions are required for all papers, using author initials; the CRediT taxonomy is encouraged but a traditional format is accepted.",
-        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'",
-        "A declaration of generative AI and AI-assisted technologies in the manuscript preparation process is required only if such tools (beyond basic grammar, spelling, and reference checkers) were used in preparing the manuscript; other uses of AI tools are reported in the methods or STAR Methods."
+        "The Declaration of interests is required for all papers and must be identical to the text in the declaration of interests form; with nothing to disclose, use 'The authors declare no competing interests.'"
       ]
     },
     "figures": {
@@ -18391,6 +18750,12 @@
         "acknowledgements",
         "ai_use"
       ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods",
+        "acknowledgements"
+      ],
+      "ai_use_cover_letter": true,
       "notes": [
         "A Data Availability Statement, following the Discussion, is required and gives accession numbers and editor/reviewer access information (token or user name/password) for deposited data; if an exception to data sharing is granted, the statement must say what cannot be shared and why.",
         "Data types that must be deposited before submission include genome-wide analyses (e.g. ChIP-Seq, RNA-Seq), novel nucleic acid or protein sequences (with raw high-throughput data), novel 3D structures, mass spectrometry proteomics data, and software and source codes.",
@@ -18398,7 +18763,6 @@
         "All funding support, including industry and foreign talents program awards, must be acknowledged, with funder names as in the Crossref funder registry and specific grant numbers.",
         "Acknowledgments of persons precede acknowledgments of funding sources.",
         "All authors must disclose any potential conflict of interest at submission.",
-        "Use of AI (e.g. to generate content or images, write code, process data, or translate) should be disclosed in the cover letter and in the Methods or Acknowledgements section.",
         "Research with human participants or animals requires an ethics/approval statement (committee name and permit numbers where available) in the Methods section, or a statement of exemption."
       ]
     },
@@ -18472,8 +18836,7 @@
       "notes": [
         "If the manuscript was previously rejected by NAR Genomics and Bioinformatics, the cover letter must give the manuscript number of the earlier submission.",
         "The cover letter gives details of any third-party data cited as personal communication, and the corresponding author confirms permission was obtained for each.",
-        "The submitting author must disclose in the cover letter (and provide copies of) all related or similar preprints, dissertations, manuscripts, and papers by the same authors, with a concise explanation of how the submission differs.",
-        "Any use of AI should be disclosed in the cover letter."
+        "The submitting author must disclose in the cover letter (and provide copies of) all related or similar preprints, dissertations, manuscripts, and papers by the same authors, with a concise explanation of how the submission differs."
       ]
     }
   }

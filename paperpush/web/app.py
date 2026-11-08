@@ -68,7 +68,7 @@ from .. import venuefile
 from .. import venues as venues_pkg
 from .._logging import configure_logging
 from ..autofill import effective_role
-from ..database import Venue, accepted_options, get_venue
+from ..database import GENERAL_SLUG, Venue, accepted_options, get_venue
 from ..filematch import match_files
 from ..mcp_server import field_options, list_supported_venues
 from ..requirements import any_format_initial_rule, get_requirements
@@ -716,16 +716,42 @@ def venue_schema_issues(venue: Venue, report) -> list[dict[str, str]]:
     return [{"level": i.level, "field": i.field, "message": i.message} for i in result.issues if i.field in custom]
 
 
+# How the page shows the placeholder "no venue" (:func:`paperpush.database.general_venue`):
+# the first option in the venue picker, for checking files before choosing a venue.
+GENERAL_OPTION: dict[str, Any] = {
+    "slug": GENERAL_SLUG,
+    "name": "General",
+    "full_name": "General (no specific venue)",
+    "venue_type": "general",
+    "description": "The usual files and metadata, checked against the rules that apply to any manuscript (no venue's author guidelines).",
+}
+
+
+def venue_list() -> list[dict[str, Any]]:
+    """The venues for the picker: "General" first, then every supported venue."""
+    general = {
+        **GENERAL_OPTION,
+        "keywords": [],
+        "submission_url": "",
+        "submission_guide": "",
+        "login_required": False,
+        "supports_validate": True,
+        "supports_submit": False,
+    }
+    return [general, *list_supported_venues()]
+
+
 def venue_detail(slug: str) -> dict[str, Any]:
     venue = _venue_or_404(slug)
     reqs = get_requirements(venue.slug)
     ms = manuscript_field(venue)
+    shown = GENERAL_OPTION if venue.is_general else {}
     return {
         "slug": venue.slug,
-        "name": venue.name,
-        "full_name": venue.full_name,
-        "venue_type": venue.venue_type,
-        "description": venue.description,
+        "name": shown.get("name", venue.name),
+        "full_name": shown.get("full_name", venue.full_name),
+        "venue_type": shown.get("venue_type", venue.venue_type),
+        "description": shown.get("description", venue.description),
         "submission_url": venue.submission_url,
         "submission_guide": venue.submission_guide,
         "site_url": venue.site_url,
@@ -977,7 +1003,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/venues")
     def venues() -> list[dict[str, Any]]:
-        return list_supported_venues()
+        return venue_list()
 
     @app.get("/api/venues/{slug}")
     def venue(slug: str) -> dict[str, Any]:

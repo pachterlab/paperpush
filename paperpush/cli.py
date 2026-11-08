@@ -8,8 +8,12 @@ Implemented so far:
     paperpush venues -k KW -t TYPE
                                       filter by subject keywords and venue type
     paperpush pick-venue <keywords|manuscript>
-                                      rank venues for a manuscript (--title, --abstract,
-                                      --manuscript; --venue-name to search by name)
+                                      find journals for a manuscript (any journal, from
+                                      OpenAlex; --paperpush-supported-only for the
+                                      supported venues; --venue-name to search by name)
+    paperpush find-reviewers <subfile|manuscript>
+                                      suggest reviewers from OpenAlex, screening out
+                                      co-authors and colleagues (--write fills the .sub)
     paperpush subfile <venue>   create a <venue>.sub.txt template
     paperpush options <venue>.<field>
                                       list the allowed values for a field
@@ -58,7 +62,7 @@ from pydantic import ConfigDict, validate_call
 
 from . import __url__, __version__, credentials, venue_data
 from ._logging import configure_logging
-from .database import generic_venue, get_venue, list_venues
+from .database import Venue, general_venue, get_venue, list_venues
 from .subfile import default_filename, find_subfile, is_subfile_name, subfile_stem, with_subfile_suffix, write_template
 from .venues.common import DEFAULT_TIMEOUT_SECONDS
 
@@ -107,6 +111,16 @@ def _print_agent_guide() -> int:
 
 
 _VALIDATE_ONLY = "paperpush can check a manuscript against its author guidelines ('paperpush validate') but cannot submit to it, so there is nothing to log in to."
+_GENERAL_NO_SUBMIT = (
+    "a general .sub is not tied to any venue, so there is no portal to log in to or submit to. "
+    "Once you choose a venue, create its .sub ('paperpush subfile VENUE') and copy the values across "
+    "(or run /paperpush-transfer in an AI agent)."
+)
+
+
+def _validate_only_message(venue: Venue) -> str:
+    """Why ``login``/``submit`` refuse a venue without a portal runner."""
+    return _GENERAL_NO_SUBMIT if venue.is_general else f"{venue.slug} is validate-only: {_VALIDATE_ONLY}"
 
 
 _TYPE_LABELS = {venue_type: heading.removesuffix("s").removesuffix(" server") for venue_type, heading in _VENUE_GROUPS}
@@ -220,6 +234,12 @@ def _print_venues(
     console.print(table)
     console.print(f"\nFor more details, see {_VENUES_URL}", highlight=False, soft_wrap=True)
     console.print(f"Venue data: {venue_data.active_source().describe()} (refresh with 'paperpush update-venues')", highlight=False, soft_wrap=True)
+    console.print(
+        "'paperpush validate --manuscript FILE' runs general-purpose checks on any manuscript, whether or not its venue is listed; "
+        "'paperpush subfile general' writes a .sub with the files and metadata every venue asks for, for when you have not chosen a venue yet.",
+        highlight=False,
+        soft_wrap=True,
+    )
     return 0
 
 
@@ -421,7 +441,8 @@ def _cmd_add_venue(args: argparse.Namespace) -> int:
             print(f"  {path.name}: {problem}", file=sys.stderr)
         return 1
 
-    data_dir = Path(args.data_dir) if args.data_dir else None
+    # Absolute, so the PAPERPUSH_VENUE_DATA hint below works from any directory.
+    data_dir = Path(args.data_dir).expanduser().absolute() if args.data_dir else None
     result = venuefile.check(doc, force=args.overwrite, data_dir=data_dir)
     for warning in result.warnings:
         print(f"warning: {warning}", file=sys.stderr)
@@ -436,7 +457,11 @@ def _cmd_add_venue(args: argparse.Namespace) -> int:
         print(f"\n(dry run) {path} is valid; nothing written.", file=sys.stderr)
         return 0
 
-    merged = venuefile.merge(doc, data_dir=data_dir, force=args.overwrite)
+    try:
+        merged = venuefile.merge(doc, data_dir=data_dir, force=args.overwrite)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     where = venuefile.database_paths(data_dir)["venues"].parent
     for name in merged.written:
         print(f"Added {doc.slug} to {where / name}")
@@ -593,7 +618,8 @@ def _cmd_web(args: argparse.Namespace) -> int:
 @_validate
 def _cmd_pick_venue(args: argparse.Namespace) -> int:
     from .autofill import AutofillApiError
-    from .venue_select import format_hits, pick_venues, rank_via_api, select
+    from .openalex import OpenAlexError
+    from .venue_select import find_journals, format_hits, format_journals, pick_venues, rank_via_api, select
 
     positional = list(args.keywords_pos or [])
     manuscript = args.manuscript
@@ -618,6 +644,21 @@ def _cmd_pick_venue(args: argparse.Namespace) -> int:
         print(f"error: found no title, abstract, or text to go on in {mq.source}", file=sys.stderr)
         return 1
 
+    # Any journal, from OpenAlex: the default for manuscript input. A venue-name
+    # search, a portal filter, and --ai are about the supported venues only.
+    journals = None
+    openalex_error = ""
+    use_openalex = mq is not None and not args.paperpush_supported_only and not args.ai and not args.portal
+    if use_openalex:
+        try:
+            journals = find_journals(mq, venue_types=tuple(args.types or ()))
+        except (OpenAlexError, ValueError) as exc:
+            openalex_error = str(exc)
+        if journals is not None and not journals.hits:
+            openalex_error = "OpenAlex found no journals publishing similar work"
+        if openalex_error:
+            print(f"note: {openalex_error}; ranking only the venues paperpush supports.", file=sys.stderr)
+
     ranking = None
     if args.ai:
         if mq is None:
@@ -635,9 +676,13 @@ def _cmd_pick_venue(args: argparse.Namespace) -> int:
     if args.json:
         data = selection.to_dict(limit=None if args.all else args.limit)
         data["ai"] = ranking.to_dict() if ranking else None
+        if journals is not None and journals.hits:
+            data["openalex"] = journals.to_dict(limit=None if args.all else args.limit)
+        else:
+            data["openalex"] = {"error": openalex_error} if use_openalex else None
         json.dump(data, sys.stdout, indent=2)
         print()
-        return 0 if (selection.hits or (ranking and ranking.picks)) else 1
+        return 0 if (selection.hits or (ranking and ranking.picks) or (journals is not None and journals.hits)) else 1
 
     if mq is not None and mq.source not in ("query", "options"):
         found = [name for name, value in (("title", mq.title), ("abstract", mq.abstract), ("keywords", mq.keywords)) if value]
@@ -647,6 +692,20 @@ def _cmd_pick_venue(args: argparse.Namespace) -> int:
             print(f"No title or abstract found in {mq.source}; used the start of its text.")
         if mq.title:
             print(f"  Title: {mq.title}")
+    if journals is not None and journals.hits:
+        shown_journals = journals.hits if args.all else journals.hits[: max(args.limit, 0)]
+        print(f"Journals publishing similar work (OpenAlex: {journals.works} similar works since {journals.since_year}):")
+        for line in format_journals(shown_journals):
+            print(line)
+        supported = [h for h in journals.hits if h.slug]
+        if supported:
+            print(f"\nUse 'paperpush subfile {supported[0].slug}' to create the submission template for {supported[0].name}, the best match paperpush supports.")
+        elif selection.hits:
+            print(f"\npaperpush supports none of these; the closest supported venue is {selection.hits[0].venue.slug} (rank only supported venues with --paperpush-supported-only).")
+        print("For a venue paperpush does not support, 'paperpush validate --manuscript FILE' runs the general checks.")
+        print("Ranked by how many similar works each published, how closely they match, and how recent they are -- not by impact or the chance of acceptance.")
+        return 0
+
     if ranking is not None:
         if ranking.subjects:
             print(f"Subjects ({ranking.model}): {', '.join(ranking.subjects)}")
@@ -687,6 +746,69 @@ def _cmd_pick_venue(args: argparse.Namespace) -> int:
     if mq is not None:
         print("This matched words against each venue's subject keywords; add --ai for an LLM's ranking with reasons.")
     return 0
+
+
+@_validate
+def _cmd_find_reviewers(args: argparse.Namespace) -> int:
+    from .openalex import OpenAlexError
+    from .reviewer_finder import COAUTHOR_YEARS, find_reviewers, format_reviewers, gather_inputs, write_to_subfile
+
+    try:
+        got = gather_inputs(args.input, manuscript=args.manuscript, title=args.title or "", abstract=args.abstract or "", keywords=args.keywords or [], authors=args.author or [], exclude=args.exclude or [])
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if got.is_empty():
+        print("error: find-reviewers needs a .sub, a manuscript, --title, --abstract, or --keywords", file=sys.stderr)
+        print("Run 'paperpush find-reviewers --help' for usage.", file=sys.stderr)
+        return 2
+    if args.write and got.sub_path is None:
+        print("error: --write needs a .sub file to write the reviewers into", file=sys.stderr)
+        return 2
+    title, abstract, keywords, authors, exclude, sub_path, venue, source = got.title, got.abstract, got.keywords, got.authors, got.exclude, got.sub_path, got.venue, got.source or "options"
+
+    try:
+        search = find_reviewers(title, abstract, keywords, authors=authors, exclude=exclude, limit=max(args.limit, 1), years=args.years)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except OpenAlexError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        json.dump(search.to_dict(), sys.stdout, indent=2)
+        print()
+    else:
+        if source != "options":
+            print(f"Read the manuscript from {source}." + (f"\n  Title: {title}" if title else ""))
+        if authors:
+            print(f"Screened out the {len(authors)} manuscript author(s), their co-authors since {search.since_year + args.years - COAUTHOR_YEARS}, and colleagues at their institutions ({len(search.authors_found)} of {len(authors)} found in OpenAlex).")
+        if not search.candidates:
+            print("error: found no reviewers without a conflict among the authors of similar work", file=sys.stderr)
+            return 1
+        print(f"Suggested reviewers (OpenAlex: {search.works} similar works since {search.since_year}):")
+        for line in format_reviewers(search):
+            print(line)
+        if search.excluded:
+            shown = "; ".join(f"{e.name} ({e.reason})" for e in search.excluded[:5])
+            more = f", and {len(search.excluded) - 5} more (see --json)" if len(search.excluded) > 5 else ""
+            print(f"\nLeft out for conflicts: {shown}{more}.")
+        for note in search.notes:
+            print(f"Note: {note}")
+        print("Check each suggestion yourself: names and affiliations in OpenAlex are not always clean, and a conflict it does not record (a close colleague, a competitor) is not screened out.")
+
+    if args.write and search.candidates:
+        text = sub_path.read_text(encoding="utf-8")
+        try:
+            new_text, added = write_to_subfile(text, venue, search.candidates)
+        except ValueError as exc:
+            print(f"error: --write: {exc}", file=sys.stderr)
+            return 1
+        if added:
+            sub_path.write_text(new_text, encoding="utf-8")
+        print(f"Added {added} reviewer(s) to {sub_path}; fill in their e-mail addresses before validating.", file=sys.stderr if args.json else sys.stdout)
+    return 0 if search.candidates else 1
 
 
 def _venue_keywords() -> tuple[str, ...]:
@@ -874,7 +996,7 @@ def _cmd_login(args: argparse.Namespace) -> int:
     from . import venues
 
     if not venue.has_form:
-        print(f"{venue.slug} is validate-only: {_VALIDATE_ONLY}")
+        print(_validate_only_message(venue))
         return 0
 
     sub_base = venues.submission_base(venue.slug)
@@ -1338,7 +1460,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
             return 2
     else:
-        venue_def = generic_venue()
+        venue_def = general_venue()
         venue = venue_def.slug
 
     notes: list[str] = []
@@ -1473,7 +1595,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         print(f"\nRan only the AI checks on {Path(label).name}; run 'paperpush validate' without --ai-only for the full pre-submission checks.", file=note_stream)
         return 0
     if files_only:
-        what = f"{venue}'s author guidelines" if not venue_def.is_generic else "the general checks (no venue given)"
+        what = f"{venue}'s author guidelines" if not venue_def.is_general else "the general checks (no venue given)"
         print(f"\nThe files passed {what}. Make a .sub ('paperpush subfile VENUE') to check the whole submission.", file=note_stream)
         return 0
     if result.downgraded:
@@ -1557,8 +1679,33 @@ def _cmd_submit(args: argparse.Namespace) -> int:
     except KeyError:
         venue_def = None
     if venue_def is not None and not venue_def.has_form:
-        print(f"error: {venue_def.slug} is validate-only: {_VALIDATE_ONLY}", file=sys.stderr)
+        print(f"error: {_validate_only_message(venue_def)}", file=sys.stderr)
         return 1
+    if venue_def is not None:
+        from .revision import subfile_revision_signals
+
+        signals = subfile_revision_signals(args.subfile, venue_def, subfile.values)
+        if signals:
+            logger.warning("submit: %s looks like a revised manuscript: %s", args.subfile, "; ".join(signals))
+            print(
+                f"warning: {args.subfile} looks like a revised manuscript:\n"
+                + "".join(f"  - {reason}\n" for reason in signals)
+                + "paperpush submit is for initial submissions: it opens a new submission, so a revision\n"
+                "sent this way becomes a duplicate. Upload a revision through the venue's own\n"
+                "'submit revision' link instead (the paperpush-respond-to-reviewers skill prepares the files).",
+                file=sys.stderr,
+            )
+            if not getattr(args, "yes", False):
+                if not sys.stdin.isatty():
+                    print("Stopping. Pass --yes to submit it as a new submission anyway.", file=sys.stderr)
+                    return 1
+                try:
+                    answer = input("Submit it as a new submission anyway? [y/N] ").strip().lower()
+                except (KeyboardInterrupt, EOFError):
+                    answer = ""
+                if answer not in ("y", "yes"):
+                    print("Not submitted.", file=sys.stderr)
+                    return 1
     if venue_def is not None and getattr(args, "skip_validate", False):
         logger.info("submit: --skip-validate given; not validating %s", args.subfile)
         print(f"warning: --skip-validate given; submitting {args.subfile} without running validate.", file=sys.stderr)
@@ -2270,7 +2417,7 @@ def _cmd_requirements(args: argparse.Namespace) -> int:
     print(f"  venue data: {venue_data.active_source().describe()}")
     if article_types and not args.article_type:
         print(f"  article types with their own rules: {', '.join(article_types)} (use --article-type)")
-    for section in ("manuscript", "title_page", "abstract", "keywords", "sections", "statements", "figures", "tables", "supplementary", "references", "cover_letter", "upload"):
+    for section in ("manuscript", "title_page", "abstract", "keywords", "sections", "statements", "figures", "tables", "supplementary", "references", "cover_letter", "upload", "revision"):
         rules = data.get(section)
         if not rules:
             continue
@@ -2371,7 +2518,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # metavar lists only the public commands; the internal 'schema' command is
     # registered below but deliberately left out so it does not appear in --help.
-    sub = parser.add_subparsers(dest="command", metavar="{venues,subfile,options,autofill,validate,requirements,login,submit,codegen,web,pick-venue,add-venue,update-venues,install-skills}")
+    sub = parser.add_subparsers(dest="command", metavar="{venues,subfile,options,autofill,validate,requirements,login,submit,codegen,web,pick-venue,find-reviewers,add-venue,update-venues,install-skills}")
 
     p_venues = sub.add_parser(
         "venues",
@@ -2389,7 +2536,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_venues.set_defaults(func=_cmd_venues)
 
     p_subfile = sub.add_parser("subfile", parents=[verbosity], help="create a <venue>.sub.txt submission template")
-    p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv")
+    p_subfile.add_argument("venue", help="venue slug, e.g. biorxiv; or 'general' for a .sub with the files and metadata every venue asks for (title, abstract, keywords, authors, manuscript, title page, figures, tables, supplements, cover letter), checked by validate against the rules that apply to any manuscript")
     p_subfile.add_argument("-o", "--output", metavar="OUT", help="output path for the .sub file (default: VENUE.sub.txt in the current directory, e.g. biorxiv.sub.txt; .sub.txt is added unless the name already ends in .sub.txt or .sub)")
     p_subfile.add_argument("--dont-fill-defaults", dest="fill_defaults", action="store_false", help="leave fields with default values empty instead of pre-populating them")
     p_subfile.add_argument("--overwrite", action="store_true", help="overwrite an existing .sub file")
@@ -2614,6 +2761,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_submit.add_argument("--headless", action="store_true", help="run the browser headless (default: headed, so you " "can sign in and review)")
     p_submit.add_argument("--debug", action="store_true", help="open the Playwright Inspector at the first step " "to walk the wizard line by line; reuses a saved " "session from an earlier run to skip sign-in")
     p_submit.add_argument("--new-session", action="store_true", help="discard any saved browser session and sign in " "fresh (use after switching accounts)")
+    p_submit.add_argument("-y", "--yes", action="store_true", help="submit without asking when the .sub looks like a revised manuscript (it is in a revisionN/ directory or beside a response to reviewers). submit is for initial submissions; revisions go through the venue's own 'submit revision' link")
     p_submit.add_argument("--skip-validate", action="store_true", help="do not run validate on the .sub before opening the browser " "(default: validate first and stop on any error)")
     p_submit.add_argument(
         "--timeout",
@@ -2688,15 +2836,21 @@ def build_parser() -> argparse.ArgumentParser:
         "pick-venue",
         parents=[verbosity],
         help="find venues for a manuscript, from its keywords, title, and abstract",
-        description="Rank the supported venues for a manuscript.\n\n"
+        description="Find journals for a manuscript, or rank the venues paperpush supports.\n\n"
         "  paperpush pick-venue hippocampus 'place cells'      keywords (a venue subject such as 'immunology' matches directly)\n"
         "  paperpush pick-venue paper.pdf                      a manuscript (.tex, .zip, .docx, .pdf, or a .txt/.md with its title and abstract)\n"
         "  paperpush pick-venue --title T --abstract A memory  the parts separately\n"
         "  paperpush pick-venue --venue-name 'nature neuro'    venues by name\n"
-        "  paperpush pick-venue paper.pdf --ai                 an LLM's ranking, with a reason for each venue\n\n"
-        "Keywords and the title count three times as much as the abstract when they are matched to venue subjects "
+        "  paperpush pick-venue paper.pdf --paperpush-supported-only   only the venues paperpush supports (offline)\n"
+        "  paperpush pick-venue paper.pdf --ai                 an LLM's ranking of the supported venues, with a reason each\n\n"
+        "By default a manuscript (or its title, abstract, or keywords) is matched against any journal: the most similar "
+        "works in OpenAlex are grouped by the journal or preprint server that published them, and the journals paperpush "
+        "supports are marked with their slug. Needs network access; set OPENALEX_API_KEY to use your own OpenAlex budget. "
+        "If OpenAlex cannot be reached, only the supported venues are ranked.\n\n"
+        "With --paperpush-supported-only (and for --venue-name, --portal, and --ai), only the venues paperpush supports are "
+        "ranked: keywords and the title count three times as much as the abstract when they are matched to venue subjects "
         "with a built-in word list (offline); --ai asks an LLM instead and needs a provider API key. "
-        "Only venues paperpush supports are ranked, on thematic fit alone.",
+        "Either way venues are ranked on thematic fit alone.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_pick.add_argument("keywords_pos", nargs="*", metavar="KEYWORD", help="the manuscript's keywords, comma-separated as in a paper's keyword line (words without commas form one phrase, e.g. single cell RNA-seq, T cell exhaustion). A single existing file is read as --manuscript instead")
@@ -2709,11 +2863,40 @@ def build_parser() -> argparse.ArgumentParser:
     p_pick.add_argument("--portal", dest="portal", action="append", metavar="PORTAL", help="only venues submitting through this portal (repeatable), e.g. scholarone")
     p_pick.add_argument("-n", "--limit", type=int, default=5, metavar="N", help="show at most N matches (default: 5)")
     p_pick.add_argument("--all", action="store_true", help="show every match instead of limiting")
+    p_pick.add_argument("--paperpush-supported-only", action="store_true", help="rank only the venues paperpush supports, offline, instead of searching OpenAlex for any journal")
     p_pick.add_argument("--ai", action="store_true", help="ask an LLM to choose the subjects and rank the venues, with a reason each (needs ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY)")
     p_pick.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(--ai) LLM provider; defaults to the first whose API key is set")
     p_pick.add_argument("--model", help="(--ai) model to use (default: the provider's autofill default)")
-    p_pick.add_argument("--json", action="store_true", help="print the result as JSON for agents: matches (slug, name, venue_type, portal, keywords, score, reasons), the subjects used, what was read from the manuscript, and the --ai ranking")
+    p_pick.add_argument("--json", action="store_true", help="print the result as JSON for agents: matches (the supported venues: slug, name, venue_type, portal, keywords, score, reasons), openalex (any journal: name, publisher, similar works, open access, APC, h-index, paperpush slug), the subjects used, what was read from the manuscript, and the --ai ranking")
     p_pick.set_defaults(func=_cmd_pick_venue)
+
+    p_rev = sub.add_parser(
+        "find-reviewers",
+        parents=[verbosity],
+        help="suggest reviewers for a manuscript from OpenAlex, screening out co-authors and colleagues",
+        description="Suggest peer reviewers: researchers who recently published work like the manuscript's (from OpenAlex).\n\n"
+        "  paperpush find-reviewers nature.sub.txt            title, abstract, keywords, and authors from a .sub\n"
+        "  paperpush find-reviewers nature.sub.txt --write    ... and add the suggestions to its reviewer field\n"
+        "  paperpush find-reviewers paper.pdf --author 'Ada Lovelace | University of London'\n"
+        "  paperpush find-reviewers --title T --abstract A --exclude 'Charles Babbage'\n\n"
+        "Left out: the manuscript's authors (from the .sub or --author; an ORCID iD in --author is used to find them), "
+        "anyone who co-authored with them in the last few years, anyone at one of their institutions, and every --exclude "
+        "name (plus the opposed and excluded reviewers already in the .sub). OpenAlex has no e-mail addresses, so those are "
+        "left blank for you to fill in. Needs network access; set OPENALEX_API_KEY to use your own OpenAlex budget.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_rev.add_argument("input", nargs="?", metavar="SUBFILE|MANUSCRIPT", help="a .sub file (title, abstract, keywords, and authors are read from it, and from its manuscript when the .sub lacks them) or a manuscript (.tex, .zip, .docx, .pdf, or a .txt/.md with its title and abstract)")
+    p_rev.add_argument("--manuscript", metavar="PATH", help="a manuscript to read the title, abstract, and keywords from")
+    p_rev.add_argument("--title", metavar="TEXT", help="the manuscript's title (replaces the one read from a file)")
+    p_rev.add_argument("--abstract", metavar="TEXT", help="the manuscript's abstract (replaces the one read from a file)")
+    p_rev.add_argument("-k", "--keywords", action="append", metavar="KW[,KW...]", help="the manuscript's keywords (repeatable; comma-separated)")
+    p_rev.add_argument("--author", action="append", metavar="AUTHOR", help="a manuscript author, as 'Name' or 'Name | affiliation', optionally with their ORCID iD, so that they, their co-authors, and their colleagues are left out (repeatable; added to the .sub's authors)")
+    p_rev.add_argument("--exclude", action="append", metavar="NAME", help="a person not to suggest, e.g. an opposed reviewer (repeatable)")
+    p_rev.add_argument("-n", "--limit", type=int, default=10, metavar="N", help="suggest at most N reviewers (default: 10)")
+    p_rev.add_argument("--years", type=int, default=6, metavar="N", help="consider similar work from the last N years (default: 6)")
+    p_rev.add_argument("--write", action="store_true", help="add the suggestions to the .sub's suggested-reviewer field (existing lines are kept); the e-mail column is left blank")
+    p_rev.add_argument("--json", action="store_true", help="print the result as JSON for agents: reviewers (name, institution, orcid, openalex_id, score, similar_works), excluded (name, reason), and notes")
+    p_rev.set_defaults(func=_cmd_find_reviewers)
 
     p_add = sub.add_parser(
         "add-venue",

@@ -13,31 +13,45 @@ optional -- a venue records only what its guidelines state -- and is grouped
 into sections that share the same vocabulary across venues (``manuscript``,
 ``title_page``, ``abstract``, ``keywords``, ``sections``, ``statements``,
 ``figures``, ``tables``, ``supplementary``, ``references``, ``cover_letter``,
-``upload``). Two mechanisms keep the file DRY:
+``upload``, ``revision``). Two mechanisms keep the file DRY:
 
 * ``inherits``: an entry takes another venue's requirements wholesale and then
   overrides individual keys section by section (a key set to ``null`` drops the
   inherited value). This is how the AAAS family shares Science's rules.
+* publisher fallback: an entry keyed ``publisher:<slug>`` holds a
+  publisher's house rules (Elsevier's Guide for Authors, Springer Nature's
+  editorial policies, ...). A venue whose ``venues.json`` entry names that
+  ``publisher`` starts from them, so a rule the venue's own guidelines do not
+  state falls back to the publisher's; a key the venue sets (``null``
+  included) wins. Rules taken this way are recorded on the result
+  (``from_publisher``) and ``validate`` reports what they catch as warnings,
+  never errors: a house rule may not hold for every journal. A journal
+  paperpush does not list can be checked against its publisher's rules alone
+  (``paperpush validate --publisher``). ``$publishers`` names each publisher
+  and the names Crossref uses for it.
 * ``article_types``: per-article-type overrides, keyed by the exact option
   string of the ``.sub`` field named in ``article_type_field``. The top level
   holds the primary research-article rules; :func:`resolve` applies the
   overrides for the article type a filled ``.sub`` selects.
 
-Keys starting with ``$`` (``$schema``, ``$aliases``) are metadata, not venues.
+Keys starting with ``$`` (``$schema``, ``$aliases``, ``$publishers``) are metadata, not venues.
 ``$aliases`` maps each canonical section/statement name to the heading
 wordings that count as it when the manuscript text is searched.
 """
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import copy
 import json
 import logging
-from dataclasses import dataclass, fields as dataclass_fields
+import re
+from dataclasses import dataclass, fields as dataclass_fields, replace
 from dataclasses import field as dataclass_field
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Iterator, Literal, Optional
 
 from pydantic import Field as PField
 from pydantic import TypeAdapter, ValidationError
@@ -50,6 +64,27 @@ logger = logging.getLogger(__name__)
 # published copy (see paperpush.venue_data).
 REQUIREMENTS_PATH = Path(__file__).with_name("manuscript_requirements.json")
 
+# A publisher's house rules are stored as an ordinary entry under this prefix
+# (``publisher:elsevier``); ``$publishers`` holds each publisher's metadata.
+PUBLISHER_PREFIX = "publisher:"
+PUBLISHERS_KEY = "$publishers"
+_PUBLISHER_SLUG = re.compile(r"^[a-z0-9_]+$")
+
+
+def publisher_key(slug: str) -> str:
+    """The database key of a publisher's house rules: ``publisher:<slug>``."""
+    return PUBLISHER_PREFIX + slug.strip().lower().removeprefix(PUBLISHER_PREFIX)
+
+
+def is_publisher_key(key: str) -> bool:
+    """Whether ``key`` names a publisher's house rules rather than a venue."""
+    return key.lower().startswith(PUBLISHER_PREFIX)
+
+
+def is_venue_key(key: str) -> bool:
+    """Whether ``key`` is a venue entry (not ``$`` metadata, not a publisher)."""
+    return not key.startswith("$") and not is_publisher_key(key)
+
 # Where figures/tables sit for the initial submission. ``combined_file``: one
 # document (a Word file or PDF) holding all of them, each legend after its figure.
 Placement = Literal["separate_files", "end_of_manuscript", "inline", "end_or_inline", "combined_file"]
@@ -59,6 +94,9 @@ ManuscriptPlacement = Literal["end", "inline", "separate", "end_or_inline"]
 LegendsLocation = Literal["end_of_manuscript", "with_figure", "after_references"]
 # How the thousands in a number are grouped (manuscript.thousands_separator).
 ThousandsSeparator = Literal["comma", "space"]
+# How a revised manuscript's changes are marked in the "marked" copy sent with
+# the response to reviewers. ``none``: the venue wants no marked copy.
+MarkedManuscript = Literal["none", "red_text", "highlight", "track_changes", "other"]
 
 # Canonical ids for the items a title page may have to carry.
 TitlePageItem = Literal[
@@ -104,6 +142,10 @@ StatementId = Literal[
     "clinical_trial_registration",
     "reporting_guidelines",
 ]
+
+
+# Where a manuscript may disclose its use of generative AI (statements.ai_use_locations).
+AiUseLocation = Literal["methods", "acknowledgements", "statement", "supplementary", "figure_captions"]
 
 
 def _notes() -> Any:
@@ -225,6 +267,11 @@ class StatementRules:
 
     required: Annotated[Optional[list[StatementId]], PField(description="Canonical ids of the declarations the manuscript must contain (matched via $aliases).")] = None
     optional: Annotated[Optional[list[StatementId]], PField(description="Declarations the venue accepts but does not require.")] = None
+    ai_use_if_used: Annotated[Optional[bool], PField(description="Use of generative AI (LLMs, image generators) must be disclosed when there was any. To require a statement whether or not AI was used, list ai_use in required instead.")] = None
+    ai_use_locations: Annotated[Optional[list[AiUseLocation]], PField(description="Where in the manuscript the AI-use disclosure may go; any one of them will do: methods, acknowledgements, statement (a section of its own), supplementary (the supplementary material), figure_captions (the legend of each AI-touched figure). Unset: anywhere.")] = None
+    ai_use_cover_letter: Annotated[Optional[bool], PField(description="The AI-use disclosure must also be made in the cover letter.")] = None
+    ai_copyediting_exempt: Annotated[Optional[bool], PField(description="AI used only to improve language, grammar, or spelling (copy editing) need not be disclosed.")] = None
+    ai_authorship_prohibited: Annotated[Optional[bool], PField(description="AI tools (ChatGPT, LLMs) may not be listed as authors.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()
 
 
@@ -311,6 +358,14 @@ class UploadRules:
     notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()
 
 
+@dataclass(frozen=True)
+class RevisionRules:
+    """What a revised manuscript is sent with: the marked copy and the response to reviewers."""
+
+    marked_manuscript: Annotated[Optional[MarkedManuscript], PField(description="How the changes are marked in the marked-up copy of a revised manuscript: none (no marked copy wanted), red_text, highlight, track_changes (Word Track Changes), or other (described in notes). Unset: not stated (paperpush-respond-to-reviewers defaults to red_text).")] = None
+    notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()
+
+
 # The section classes, keyed by the JSON key each lives under. Shared by the
 # loader (to build each section), :func:`resolve` (to merge article-type
 # overrides), and the schema generator.
@@ -327,6 +382,7 @@ SECTION_TYPES: dict[str, type] = {
     "references": ReferenceRules,
     "cover_letter": CoverLetterRules,
     "upload": UploadRules,
+    "revision": RevisionRules,
 }
 
 
@@ -358,7 +414,42 @@ class ManuscriptRequirements:
     references: ReferenceRules = ReferenceRules()
     cover_letter: CoverLetterRules = CoverLetterRules()
     upload: UploadRules = UploadRules()
+    revision: RevisionRules = RevisionRules()
     notes: Annotated[list[str], PField(description="Venue-wide rules that fit no section.")] = _notes()
+    # Set when the entry is resolved, never stored in the database (see
+    # _RUNTIME_KEYS): the publisher whose house rules fill the gaps, and which
+    # rules came from it -- "section.key" paths, plus "article_types.<name>"
+    # for a whole per-type override. Notes taken from the publisher are tagged
+    # in their text instead (see publisher_note_tag).
+    publisher: str = ""
+    from_publisher: frozenset[str] = frozenset()
+
+    @property
+    def publisher_rules_only(self) -> bool:
+        """Whether every rule came from the publisher (a journal paperpush does not list)."""
+        return is_publisher_key(self.slug)
+
+    def without_publisher_rules(self) -> "ManuscriptRequirements":
+        """These requirements with every rule taken from the publisher removed."""
+        if not self.publisher:
+            return self
+        data = self.to_dict()
+        data.pop("slug", None)
+        data.pop("publisher", None)
+        data.pop("from_publisher", None)
+        tag = publisher_note_tag(self.publisher)
+        for path in self.from_publisher:
+            head, _, key = path.partition(".")
+            if head == "article_types":
+                (data.get("article_types") or {}).pop(key, None)
+            elif isinstance(data.get(head), dict):
+                data[head].pop(key, None)
+        for key in list(SECTION_TYPES) + ["notes"]:
+            if key == "notes":
+                data["notes"] = [n for n in data.get("notes", []) if not n.startswith(tag)]
+            elif isinstance(data.get(key), dict) and "notes" in data[key]:
+                data[key]["notes"] = [n for n in data[key]["notes"] if not n.startswith(tag)]
+        return ManuscriptRequirements.from_dict(self.slug, data)
 
     @classmethod
     def from_dict(cls, slug: str, data: dict[str, Any]) -> "ManuscriptRequirements":
@@ -371,6 +462,8 @@ class ManuscriptRequirements:
             article_type_field=str(data.get("article_type_field", "") or ""),
             article_types={k: dict(v) for k, v in (data.get("article_types") or {}).items()},
             notes=list(data.get("notes", []) or []),
+            publisher=str(data.get("publisher", "") or "").lower(),
+            from_publisher=frozenset(data.get("from_publisher") or ()),
             **sections,
         )
 
@@ -393,6 +486,9 @@ class ManuscriptRequirements:
                 out[key] = section
         if self.notes:
             out["notes"] = list(self.notes)
+        if self.publisher:
+            out["publisher"] = self.publisher
+            out["from_publisher"] = sorted(self.from_publisher)
         return out
 
 
@@ -530,7 +626,8 @@ def _resolve_entry(slug: str, raw: dict[str, Any], seen: tuple[str, ...] = ()) -
 
 # Keys an entry may carry at its top level (``slug`` is the database key, not a
 # key inside the entry), and keys an ``article_types`` override may carry.
-_ENTRY_KEYS = frozenset(f.name for f in dataclass_fields(ManuscriptRequirements)) - {"slug"}
+_RUNTIME_KEYS = frozenset({"slug", "publisher", "from_publisher"})
+_ENTRY_KEYS = frozenset(f.name for f in dataclass_fields(ManuscriptRequirements)) - _RUNTIME_KEYS
 _OVERRIDE_KEYS = frozenset(SECTION_TYPES) | {"notes"}
 _ALIASES_ADAPTER = TypeAdapter(dict[str, dict[str, list[str]]])
 
@@ -586,6 +683,8 @@ def _entry_problem(slug: str, entry: Any) -> Optional[str]:
                 _ALIASES_ADAPTER.validate_python(entry)
             except ValidationError as exc:
                 return f"$aliases does not match this version's shape ({exc.errors()[0]['msg']})"
+        elif slug == PUBLISHERS_KEY:
+            return _publishers_problem(entry)
         return None
     problem = _rules_problem(entry, _ENTRY_KEYS, slug)
     if problem:
@@ -664,29 +763,235 @@ def check_requirements_file(path: Path) -> list[str]:
     for slug in raw:
         if not slug.startswith("$"):
             ManuscriptRequirements.from_dict(slug, _resolve_entry(slug, raw))
-    return [slug for slug in published if not slug.startswith("$")]
+    return [slug for slug in published if is_venue_key(slug)]
 
 
 def list_requirements() -> list[ManuscriptRequirements]:
-    """Every venue entry in the database, sorted by slug."""
+    """Every venue entry in the database, sorted by slug (publishers' house rules excluded).
+
+    Each is the venue's own rules, without its publisher's (see
+    :func:`get_requirements` for the rules ``validate`` applies).
+    """
     raw = _load_raw()
-    return sorted((ManuscriptRequirements.from_dict(k, _resolve_entry(k, raw)) for k in raw if not k.startswith("$")), key=lambda r: r.slug)
+    return sorted((ManuscriptRequirements.from_dict(k, _resolve_entry(k, raw)) for k in raw if is_venue_key(k)), key=lambda r: r.slug)
+
+
+# ---------------------------------------------------------------------------
+# Publishers
+
+
+@dataclass(frozen=True)
+class Publisher:
+    """A publisher, as ``$publishers`` records it."""
+
+    slug: str
+    name: Annotated[str, PField(description="Display name, e.g. 'Springer Nature'.")] = ""
+    site_url: Annotated[str, PField(description="URL of the publisher's author guidelines (its house rules), or its homepage.")] = ""
+    crossref_names: Annotated[list[str], PField(description="Publisher names as Crossref records them (e.g. 'Elsevier BV'), for finding the publisher of a journal paperpush does not list from its ISSN.")] = dataclass_field(default_factory=list)
+    parent: Annotated[str, PField(description="Slug of the publisher this one is an imprint of (Cell Press: elsevier). Informational; the house rules chain through `inherits`.")] = ""
+
+    @property
+    def display_name(self) -> str:
+        return self.name or self.slug
+
+    @property
+    def has_rules(self) -> bool:
+        """Whether the database holds this publisher's house rules."""
+        raw = _load_raw()
+        return _find_key(raw, publisher_key(self.slug)) is not None
+
+
+_PUBLISHER_KEYS = frozenset(f.name for f in dataclass_fields(Publisher)) - {"slug"}
+
+
+def _publishers_problem(entry: Any) -> Optional[str]:
+    if not isinstance(entry, dict):
+        return f"{PUBLISHERS_KEY} is not an object"
+    for slug, data in entry.items():
+        if not _PUBLISHER_SLUG.match(str(slug)):
+            return f"{PUBLISHERS_KEY}: publisher slug {slug!r} is not lowercase letters, digits, and underscores"
+        if not isinstance(data, dict):
+            return f"{PUBLISHERS_KEY}.{slug} is not an object"
+        unknown = sorted(set(data) - _PUBLISHER_KEYS)
+        if unknown:
+            return f"{PUBLISHERS_KEY}.{slug} has key(s) this version does not know: {', '.join(unknown)}"
+        try:
+            _adapter(Publisher).validate_python({"slug": slug, **data})
+        except ValidationError as exc:
+            return f"{PUBLISHERS_KEY}.{slug} does not match this version's types ({exc.errors()[0]['msg']})"
+    return None
+
+
+def list_publishers() -> list[Publisher]:
+    """Every publisher ``$publishers`` records, sorted by slug."""
+    table = _load_raw().get(PUBLISHERS_KEY) or {}
+    return sorted((Publisher(slug=str(k).lower(), **{f: v for f, v in (d or {}).items() if f in _PUBLISHER_KEYS}) for k, d in table.items()), key=lambda p: p.slug)
+
+
+def get_publisher(name: str) -> Optional[Publisher]:
+    """The publisher with this slug, display name, or Crossref name (case-insensitive), or None."""
+    wanted = _fold_name(name.removeprefix(PUBLISHER_PREFIX))
+    if not wanted:
+        return None
+    for pub in list_publishers():
+        if wanted in {_fold_name(pub.slug), _fold_name(pub.name), *(_fold_name(n) for n in pub.crossref_names)}:
+            return pub
+    return None
+
+
+def _fold_name(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()
+
+
+def publisher_note_tag(publisher: str) -> str:
+    """The prefix marking a note taken from ``publisher``'s house rules."""
+    pub = get_publisher(publisher)
+    return f"[{pub.display_name if pub else publisher} house rule] "
+
+
+# validate re-runs a check without the publisher's rules to tell which issues
+# they caused (see paperpush.validate.Checks); this switches get_requirements
+# to the venue's own rules for the duration.
+_OWN_RULES_ONLY: contextvars.ContextVar[bool] = contextvars.ContextVar("paperpush_own_rules_only", default=False)
+
+
+@contextlib.contextmanager
+def own_rules_only() -> Iterator[None]:
+    """Within the block, :func:`get_requirements` leaves out publishers' house rules."""
+    token = _OWN_RULES_ONLY.set(True)
+    try:
+        yield
+    finally:
+        _OWN_RULES_ONLY.reset(token)
+
+
+def _find_key(raw: dict[str, Any], key: str) -> Optional[str]:
+    key = key.lower()
+    return next((k for k in raw if not k.startswith("$") and k.lower() == key), None)
+
+
+def venue_publisher(slug: str) -> str:
+    """The ``publisher`` slug ``venues.json`` records for the venue, or ""."""
+    from .database import _load_info
+
+    info = _load_info()
+    key = next((k for k in info if k.lower() == slug.lower()), None)
+    return str((info.get(key) or {}).get("publisher", "") or "").strip().lower() if key else ""
+
+
+def _tag_notes(entry: dict[str, Any], tag: str) -> dict[str, Any]:
+    """``entry`` with every note (top level, sections, article types) prefixed by ``tag``."""
+    out = copy.deepcopy(entry)
+
+    def tag_all(rules: dict[str, Any]) -> None:
+        if rules.get("notes"):
+            rules["notes"] = [n if n.startswith(tag) else tag + n for n in rules["notes"]]
+        for key in SECTION_TYPES:
+            section = rules.get(key)
+            if isinstance(section, dict) and section.get("notes"):
+                section["notes"] = [n if n.startswith(tag) else tag + n for n in section["notes"]]
+
+    tag_all(out)
+    for override in (out.get("article_types") or {}).values():
+        if isinstance(override, dict):
+            tag_all(override)
+    return out
+
+
+def _rule_paths(entry: dict[str, Any]) -> set[str]:
+    """The ``section.key`` path of every rule ``entry`` sets (notes excluded)."""
+    paths = {f"{section}.{key}" for section in SECTION_TYPES for key in (entry.get(section) or {}) if key != "notes"}
+    paths |= {f"article_types.{name}" for name in (entry.get("article_types") or {})}
+    return paths
+
+
+def _with_publisher(slug: str, own: Optional[dict[str, Any]], publisher: str, raw: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """``own`` (a resolved venue entry, or None) layered onto ``publisher``'s house rules.
+
+    Returns None when the database holds no house rules for ``publisher``. The
+    result records the publisher and which rules came from it (``from_publisher``).
+    The publisher's per-type overrides apply only to a venue with no entry of its
+    own: its ``article_types`` are keyed by the venue's own option strings.
+    """
+    pkey = _find_key(raw, publisher_key(publisher))
+    if pkey is None:
+        return None
+    base = _tag_notes(_resolve_entry(pkey, raw), publisher_note_tag(publisher))
+    base.pop("inherits", None)
+    if own is None:
+        merged = base
+        taken = _rule_paths(base)
+    else:
+        base.pop("article_types", None)
+        base.pop("article_type_field", None)
+        own_body = {k: v for k, v in own.items() if k != "inherits"}
+        merged = merge_entries(base, own_body)
+        if own.get("inherits"):
+            merged["inherits"] = own["inherits"]
+        else:
+            merged.pop("inherits", None)
+        for key in ("source_urls", "retrieved"):
+            if not own.get(key):
+                merged.pop(key, None)
+        taken = {p for p in _rule_paths(base) if p not in _rule_paths(own_body) and _path_in(merged, p) and not _path_nulled(own_body, p)}
+    merged["publisher"] = publisher
+    merged["from_publisher"] = sorted(taken)
+    return merged
+
+
+def _path_in(entry: dict[str, Any], path: str) -> bool:
+    head, _, key = path.partition(".")
+    return isinstance(entry.get(head), dict) and key in entry[head]
+
+
+def _path_nulled(entry: dict[str, Any], path: str) -> bool:
+    head, _, key = path.partition(".")
+    return head in entry and (entry[head] is None or (isinstance(entry[head], dict) and key in entry[head] and entry[head][key] is None))
+
+
+def _chain(slug: str, raw: dict[str, Any]) -> list[str]:
+    """``slug`` and every entry it inherits from, lower-cased, nearest first."""
+    out: list[str] = []
+    key: Optional[str] = _find_key(raw, slug)
+    while key is not None and key.lower() not in out:
+        out.append(key.lower())
+        base = str(raw[key].get("inherits", "") or "")
+        key = _find_key(raw, base) if base else None
+    return out
 
 
 def get_requirements(slug: str) -> Optional[ManuscriptRequirements]:
-    """The requirements for ``slug`` (case-insensitive), or None if none are recorded.
+    """The requirements ``validate`` applies for ``slug`` (case-insensitive), or None if none are recorded.
 
-    A venue without an entry is not an error: ``paperpush validate`` simply has
+    The venue's own rules, layered onto its publisher's house rules when
+    ``venues.json`` names a ``publisher`` the database has rules for (the
+    result's ``from_publisher`` says which rules came from there). A venue
+    with no entry of its own gets its publisher's rules alone. ``slug`` may also
+    be a ``publisher:<slug>`` key, for a journal paperpush does not list: every
+    rule then counts as the publisher's.
+
+    A venue without either is not an error: ``paperpush validate`` simply has
     no manuscript rules to apply for it.
     """
     raw = _load_raw()
-    key = slug.lower()
-    for candidate in raw:
-        if candidate.startswith("$"):
-            continue
-        if candidate.lower() == key:
-            return ManuscriptRequirements.from_dict(candidate, _resolve_entry(candidate, raw))
-    return None
+    own_only = _OWN_RULES_ONLY.get()
+    if is_publisher_key(slug):
+        key = _find_key(raw, slug)
+        if key is None:
+            return None
+        if own_only:
+            return ManuscriptRequirements(slug=key.lower())
+        publisher = key[len(PUBLISHER_PREFIX) :].lower()
+        merged = _with_publisher(key, None, publisher, raw)
+        return None if merged is None else ManuscriptRequirements.from_dict(key, merged)
+    key = _find_key(raw, slug)
+    own = _resolve_entry(key, raw) if key is not None else None
+    publisher = "" if own_only else venue_publisher(slug)
+    if publisher and publisher_key(publisher) not in _chain(slug, raw):
+        merged = _with_publisher(key or slug, own, publisher, raw)
+        if merged is not None:
+            return ManuscriptRequirements.from_dict(key or slug, merged)
+    return None if own is None else ManuscriptRequirements.from_dict(key, own)
 
 
 def resolve(reqs: ManuscriptRequirements, values: dict[str, str]) -> ManuscriptRequirements:
@@ -712,7 +1017,14 @@ def resolve(reqs: ManuscriptRequirements, values: dict[str, str]) -> ManuscriptR
     base.pop("slug", None)
     merged = merge_entries(base, override)
     merged.pop("article_types", None)
-    return ManuscriptRequirements.from_dict(reqs.slug, merged)
+    resolved = ManuscriptRequirements.from_dict(reqs.slug, merged)
+    if reqs.publisher:
+        # The override's rules belong to whoever wrote the override.
+        set_here = _rule_paths(override)
+        taken = set(reqs.from_publisher) - {p for p in reqs.from_publisher if p.startswith("article_types.")}
+        taken = (taken | set_here) if f"article_types.{name}" in reqs.from_publisher else (taken - set_here)
+        resolved = replace(resolved, from_publisher=frozenset(taken))
+    return resolved
 
 
 def any_format_initial_rule(slug: str, values: Optional[dict[str, str]] = None) -> str:
