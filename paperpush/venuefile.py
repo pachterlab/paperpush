@@ -809,6 +809,10 @@ def check(doc: VenueDoc, *, force: bool = False, data_dir: Optional[Path] = None
     problem = _info_problem(slug, doc.venue)
     if problem:
         res.errors.append(f"[venue] {problem}")
+    publisher = str(doc.venue.get("publisher") or "").strip().lower()
+    known_publishers = reqs_db.get("$publishers") or {}
+    if publisher and publisher not in known_publishers:
+        res.errors.append(f"[venue] publisher {publisher!r} is not listed under $publishers in manuscript_requirements.json; use one of {', '.join(sorted(known_publishers))}, or leave it empty")
 
     if doc.form is None and doc.requirements is None:
         res.errors.append("The file has neither a submission form nor requirements, so paperpush could do nothing with this venue. Fill in [form] or [requirements].")

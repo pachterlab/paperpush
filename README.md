@@ -125,11 +125,13 @@ Use the agent skill `/paperpush-prepare-submission` to run this entire pipeline.
 5. `paperpush submit VENUE.sub.txt`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. Use the agent skill `/paperpush-submit` to run login and submit on a .sub file. Use the agent skill `/paperpush-portal-debug` or the CLI flag `--ai` (API) to have AI fix any issues that may arise. Ignore validation checks with the `--skip-validate` flag. **Use `submit` only for initial submissions**: it opens a new submission, so a revision sent this way becomes a duplicate. Upload revisions through the venue's own "submit revision" link instead (`/paperpush-respond-to-reviewers` prepares the revised manuscript, marked manuscript, and response to reviewers). `submit` warns and asks before continuing when the `.sub` is in a `revisionN/` directory or sits beside a response-to-reviewers document (`--yes` skips the question).
 
 Helper commands:
-- `paperpush venues`: List supported venues. Filters combine:
-- `paperpush pick-venue`: List journals that are a good thematic fit for your manuscript. Give keywords, the manuscript, or its `--title` and `--abstract`. By default it searches any journal, through the works most similar to yours in [OpenAlex](https://openalex.org), and marks the ones PaperPush supports; `--paperpush-supported-only` ranks only the venues supported in PaperPush (offline). It only checks for thematic fit, not impact or likelihood of acceptance.
-- `paperpush find-reviewers VENUE.sub.txt`: Suggest peer reviewers who recently published similar work (from OpenAlex), leaving out the manuscript's authors, their recent co-authors, colleagues at their institutions, and anyone you `--exclude`. `--write` adds the suggestions to the .sub's reviewer field; fill in their e-mail addresses, which OpenAlex does not have.
+- `paperpush venues`: List supported venues.
+- `paperpush publishers`: List the publishers whose house rules back their venues' own guidelines. Where a venue's guidelines are silent, its publisher's house rules apply, reported as warnings.
 - `paperpush update-venues`: Update the venue data (venues.json, submission_forms.json, manuscript_requirements.json) from the remote venue-data branch.
-- `paperpush requirements VENUE`: print VENUE's author guidelines, if available.
+- `paperpush requirements VENUE`: print VENUE's author guidelines, if available. Rules marked `*` come from its publisher's house rules.
+- `paperpush pick-venue`: List journals that are a good thematic fit for your manuscript. Give keywords, the manuscript, or its `--title` and `--abstract`. By default it searches any journal, through the works most similar to yours in [OpenAlex](https://openalex.org), and marks the ones PaperPush supports; `--paperpush-supported-only` ranks only the venues supported in PaperPush (offline). It only checks for thematic fit, not impact or likelihood of acceptance.
+- `paperpush format VENUE.sub.txt`: reformat the manuscript (.docx or LaTeX) for VENUE. It first looks for the venue's own Word or LaTeX template (the recorded template link, then the venue's author-guideline pages) and applies it; without one it applies the venue's layout rules (page size, margins, font, spacing, line and page numbers). The original is never changed; the result and a CHANGES.md go to a new directory. `--list-templates` only shows the templates found.
+- `paperpush find-reviewers VENUE.sub.txt`: Suggest peer reviewers who recently published similar work (from OpenAlex), leaving out the manuscript's authors, their recent co-authors, colleagues at their institutions, and anyone you `--exclude`. `--write` adds the suggestions to the .sub's reviewer field; fill in their e-mail addresses, which OpenAlex does not have.
 - `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
 - `paperpush web VENUE.sub.txt`: open a sub file in a local deployment of the web application
 
@@ -258,7 +260,7 @@ Each venue is listed in `paperpush/venues.json` (the master list of venues and t
 | `/paperpush-transfer` | move a manuscript from one venue to another: copy the files into a new `<venue>/` directory, create and autofill its `.sub` (reusing earlier `.sub` files), validate, and write `transfer.txt` describing the changes |
 | `/paperpush-respond-to-reviewers` | prepare a revision in two phases: (1) copy the manuscript and reviews into a new `revisionN/` directory (e.g., revision1, revision2, etc.) and propose a plan for each comment, then (once you approve) (2) revise the manuscript; write the response to reviewers, the clean revised manuscript, and a marked manuscript; and validate the revised manuscript |
 | `/paperpush-add-venue-validate` | add or refresh a venue's author guidelines (contributors) |
-| `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and  `submit` support for a venue, with tests (contributors) |
+| `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and `submit` support for a venue, with tests (contributors) |
 
 ## What is a .sub file
 
@@ -328,7 +330,7 @@ Here are a few possibilities, in order of decreasing ease of resolution:
 Yes! PaperPush can still validate manuscript files with up to 125 general validation checks. You can do this in the following ways:
 - AI agent: Run the skill `/paperpush-validate Validate my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.` for general checks, or `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE_NAME with PaperPush.` for venue-specific checks in which the agent can retrieve guidelines from the venue's website.
 - Web app: Choose the "General" venue option and upload your manuscript files/directory for general checks.
-- CLI: Run `paperpush validate --manuscript MANUSCRIPT ...` for general checks, or `paperpush subfile general` for a .sub with the files and metadata every venue asks for (title, abstract, keywords, authors, manuscript, figures, supplements, cover letter, ...), then fill it in and `paperpush validate general.sub.txt`.
+- CLI: Run `paperpush validate --manuscript MANUSCRIPT --issn ISSN` (or `--publisher NAME`) to check against the journal's publisher's house rules, when paperpush has them (`paperpush publishers`); what they catch is reported as warnings. Run `paperpush validate --manuscript MANUSCRIPT ...` for general checks, or `paperpush subfile general` for a .sub with the files and metadata every venue asks for (title, abstract, keywords, authors, manuscript, figures, supplements, cover letter, ...), then fill it in and `paperpush validate general.sub.txt`.
 
 
 *I do not see my venue in the supported list. Is it possible to add a venue?*

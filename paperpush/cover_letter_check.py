@@ -197,7 +197,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     )
     checks.run(
         "cover_letter.venue",
-        "Cover letter addressed to the venue" if venue.is_general else f"Cover letter addressed to {venue.name or venue.slug}",
+        "Cover letter addressed to the venue" if venue.is_general or venue.journal_unnamed else f"Cover letter addressed to {venue.name or venue.slug}",
         COVER_LETTER,
         _venue_check,
         checks,
@@ -333,6 +333,8 @@ def _venue_check(checks: Checks, venue: Venue, values: dict[str, str]) -> Outcom
 
     if venue.is_general:
         raise NotApplicable("no venue given, so there is no venue the letter should name")
+    if venue.journal_unnamed:
+        raise NotApplicable("only the publisher was given, so there is no journal the letter should name (pass --issn or --journal to name it)")
     target = venue.name or venue.slug
     others = list_venues()
     issues: list[Issue] = []

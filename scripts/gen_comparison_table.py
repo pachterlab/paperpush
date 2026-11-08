@@ -13,6 +13,11 @@ from. Edit the data there and re-run:
 Outputs (by default):
     docs/_static/comparison.pdf
     docs/_static/comparison.png   (embedded in README.md)
+    docs/_static/comparison.json  (the table data, used by --check)
+
+``--check`` exits 1 when the table data differs from comparison.json (CI runs
+it); ``--if-stale`` re-renders only when it differs (the pre-commit hook runs
+it), so the PaperPush column follows the README's check and venue counts.
 
 The PaperPush column is computed from the repository (venue counts, skill
 count, validation-check count), so it stays current.
@@ -27,7 +32,6 @@ import html
 import json
 import re
 import sys
-from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,6 +45,14 @@ FEATURES = [
     ("open_source", "Open source"),
     ("tailored_checks", "Venue-tailored checks"),
     ("num_checks", "Number of checks"),
+    ("chk_references", "Reference verification (DOIs, retractions, hallucinations)"),
+    ("chk_figures", "Figure quality (resolution, lettering, color)"),
+    ("chk_limits", "Word, page, and section limits"),
+    ("chk_layout", "Page layout (margins, fonts, spacing)"),
+    ("chk_anonymity", "Anonymization for blind review"),
+    ("chk_rigor", "Reporting and rigor (RRIDs, statistics, ethics)"),
+    ("chk_language", "Language and spelling"),
+    ("reformat", "Reformat to venue requirements"),
     ("requirement_db", "Venue requirement database"),
     ("metadata_file", "Submission metadata file"),
     ("shareable", "Shareable (plain-text, versionable)"),
@@ -95,6 +107,14 @@ def paperpush_column() -> dict:
         "open_source": (YES, "BSD-2"),
         "tailored_checks": (YES, f"{validate_venues} venues", "(+ any venue, via online guideline scraping)"),
         "num_checks": (YES, f"{checks}" if checks else "yes"),
+        "chk_references": (YES, "DOIs, retractions, preprint versions"),
+        "chk_figures": (YES, "DPI, lettering, fonts, colorblind"),
+        "chk_limits": (YES, "Word, page, section"),
+        "chk_layout": (YES, "Margins, fonts, spacing, line nos."),
+        "chk_anonymity": (YES, "Yes"),
+        "chk_rigor": (YES, "RRIDs, statistics, cell lines"),
+        "chk_language": (YES, "Spelling, prose, acronyms"),
+        "reformat": (YES, "Yes"),
         "requirement_db": (YES, "Open JSON"),
         "metadata_file": (YES, ".sub file"),
         "shareable": (YES, "Yes"),
@@ -107,6 +127,9 @@ def paperpush_column() -> dict:
         "sources": ["This repository"],
     }
 
+
+# Date the other tools' data was last researched (shown in the table).
+RESEARCHED = "2026-11-07"
 
 # --------------------------------------------------------------------------
 # Other tools. Researched 2026-11-07 from the vendors' sites and listings.
@@ -123,6 +146,14 @@ TOOLS = [
         "open_source": _CLOSED,
         "tailored_checks": (PARTIAL, "Publisher Preflight only"),
         "num_checks": (YES, "30+"),
+        "chk_references": (PARTIAL, "Hallucinated refs"),
+        "chk_figures": (NO, ""),
+        "chk_limits": (YES, "Word counts"),
+        "chk_layout": (UNKNOWN, "?"),
+        "chk_anonymity": (NO, ""),
+        "chk_rigor": (PARTIAL, "Ethics statements"),
+        "chk_language": (YES, ""),
+        "reformat": (NO, ""),
         "requirement_db": (NO, ""),
         "metadata_file": (NO, ""),
         "shareable": (NO, ""),
@@ -143,6 +174,14 @@ TOOLS = [
         "open_source": _CLOSED,
         "tailored_checks": (YES, "Licensing journals"),
         "num_checks": (YES, "30+"),
+        "chk_references": (PARTIAL, "Citation matching"),
+        "chk_figures": (PARTIAL, "Citations, legends"),
+        "chk_limits": (YES, "Word, item counts"),
+        "chk_layout": (PARTIAL, "Line spacing"),
+        "chk_anonymity": (NO, ""),
+        "chk_rigor": (PARTIAL, "Ethics, PRISMA/CONSORT"),
+        "chk_language": (NO, ""),
+        "reformat": (NO, ""),
         "requirement_db": (PARTIAL, "Per-journal configs, private"),
         "metadata_file": (NO, ""),
         "shareable": (NO, ""),
@@ -163,6 +202,14 @@ TOOLS = [
         "open_source": _CLOSED,
         "tailored_checks": (NO, "Generic checks"),
         "num_checks": (YES, "25+"),
+        "chk_references": (YES, "Retracted, hallucinated"),
+        "chk_figures": (UNKNOWN, "?"),
+        "chk_limits": (UNKNOWN, "?"),
+        "chk_layout": (UNKNOWN, "?"),
+        "chk_anonymity": (UNKNOWN, "?"),
+        "chk_rigor": (UNKNOWN, "?"),
+        "chk_language": (YES, ""),
+        "reformat": (PARTIAL, "Citations only"),
         "requirement_db": (NO, ""),
         "metadata_file": (NO, ""),
         "shareable": (NO, ""),
@@ -180,6 +227,14 @@ TOOLS = [
         "open_source": _CLOSED,
         "tailored_checks": (YES, "18,960 journals"),
         "num_checks": (PARTIAL, "Not stated"),
+        "chk_references": (NO, ""),
+        "chk_figures": (PARTIAL, "DPI"),
+        "chk_limits": (YES, "Word limits"),
+        "chk_layout": (UNKNOWN, "?"),
+        "chk_anonymity": (UNKNOWN, "?"),
+        "chk_rigor": (UNKNOWN, "?"),
+        "chk_language": (NO, ""),
+        "reformat": (NO, ""),
         "requirement_db": (PARTIAL, "18,960 journals, private"),
         "metadata_file": (NO, ""),
         "shareable": (NO, ""),
@@ -197,6 +252,14 @@ TOOLS = [
         "open_source": _CLOSED,
         "tailored_checks": (YES, "2,875 journals"),
         "num_checks": (PARTIAL, "Formatting checklist"),
+        "chk_references": (NO, ""),
+        "chk_figures": (UNKNOWN, "?"),
+        "chk_limits": (UNKNOWN, "?"),
+        "chk_layout": (YES, "Applies journal layout"),
+        "chk_anonymity": (NO, ""),
+        "chk_rigor": (UNKNOWN, "?"),
+        "chk_language": (NO, ""),
+        "reformat": (YES, "Word output"),
         "requirement_db": (PARTIAL, "2,875 journals, private"),
         "metadata_file": (NO, ""),
         "shareable": (NO, ""),
@@ -214,6 +277,14 @@ TOOLS = [
         "open_source": _CLOSED,
         "tailored_checks": (YES, "100+ publishers"),
         "num_checks": (YES, "95"),
+        "chk_references": (PARTIAL, "Citation matching"),
+        "chk_figures": (PARTIAL, "Citations, captions"),
+        "chk_limits": (YES, "Word limits"),
+        "chk_layout": (UNKNOWN, "?"),
+        "chk_anonymity": (NO, ""),
+        "chk_rigor": (NO, ""),
+        "chk_language": (YES, ""),
+        "reformat": (NO, ""),
         "requirement_db": (PARTIAL, "Private"),
         "metadata_file": (NO, ""),
         "shareable": (NO, ""),
@@ -231,6 +302,14 @@ TOOLS = [
         "open_source": _CLOSED,
         "tailored_checks": (NO, "Rigor criteria only"),
         "num_checks": (PARTIAL, "Rigor score"),
+        "chk_references": (NO, ""),
+        "chk_figures": (NO, ""),
+        "chk_limits": (NO, ""),
+        "chk_layout": (NO, ""),
+        "chk_anonymity": (NO, ""),
+        "chk_rigor": (YES, "RRIDs, rigor criteria"),
+        "chk_language": (NO, ""),
+        "reformat": (NO, ""),
         "requirement_db": (NO, ""),
         "metadata_file": (NO, ""),
         "shareable": (NO, ""),
@@ -251,6 +330,14 @@ TOOLS = [
         "open_source": _CLOSED,
         "tailored_checks": (NO, "Language only"),
         "num_checks": (NO, "Language only"),
+        "chk_references": (UNKNOWN, "?"),
+        "chk_figures": (NO, ""),
+        "chk_limits": (NO, ""),
+        "chk_layout": (NO, ""),
+        "chk_anonymity": (NO, ""),
+        "chk_rigor": (NO, ""),
+        "chk_language": (YES, ""),
+        "reformat": (NO, ""),
         "requirement_db": (NO, ""),
         "metadata_file": (NO, ""),
         "shareable": (NO, ""),
@@ -271,6 +358,14 @@ TOOLS = [
         "open_source": _CLOSED,
         "tailored_checks": (PARTIAL, "Journal checklist agent"),
         "num_checks": (UNKNOWN, "?"),
+        "chk_references": (UNKNOWN, "?"),
+        "chk_figures": (UNKNOWN, "?"),
+        "chk_limits": (UNKNOWN, "?"),
+        "chk_layout": (YES, "Via templates"),
+        "chk_anonymity": (UNKNOWN, "?"),
+        "chk_rigor": (UNKNOWN, "?"),
+        "chk_language": (UNKNOWN, "?"),
+        "reformat": (YES, "40,000+ templates"),
         "requirement_db": (PARTIAL, "Journal templates"),
         "metadata_file": (NO, ""),
         "shareable": (NO, ""),
@@ -282,6 +377,7 @@ TOOLS = [
         "offline": (NO, ""),
         "sources": [
             "https://libguides.library.arizona.edu/ai-researchers/scispace",
+            "https://scispace.com/formats",
             "https://www.capterra.com/p/178127/Scispace/pricing/",
         ],
     },
@@ -290,7 +386,7 @@ TOOLS = [
 DEFAULT_TEXT = {YES: "Yes", NO: "No", PARTIAL: "Partial", UNKNOWN: "?"}
 
 CSS = """
-@page { size: 17in 8.5in; margin: 0.35in; }
+@page { size: 17in 11in; margin: 0.35in; }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 16px; background: #ffffff; color: #1f2328;
        font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
@@ -335,11 +431,10 @@ def build_html(columns: list[dict]) -> str:
             note_html = f"<small>{html.escape(note)}</small>" if note else ""
             tds.append(f'<td class="{cls}">{html.escape(text)}{note_html}</td>')
         rows.append("<tr>" + "".join(tds) + "</tr>")
-    today = date.today().isoformat()
     return f"""<!doctype html><html><head><meta charset="utf-8">
 <title>PaperPush comparison</title><style>{CSS}</style></head><body>
 <h1>PaperPush compared with other manuscript tools</h1>
-<p class="sub">Feature support as advertised by each tool, checked {today}.
+<p class="sub">Feature support as advertised by each tool, checked {RESEARCHED}.
 Prices are list prices for individual authors where available.</p>
 <table><thead><tr>{''.join(head)}</tr></thead><tbody>{''.join(rows)}</tbody></table>
 <div class="legend"><span class="yes" style="background:#c9f0d1">Supported</span>
@@ -368,11 +463,24 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-png", action="store_true", help="Write only the PDF.")
     ap.add_argument("--html", action="store_true", help="Also write the HTML source.")
     ap.add_argument("--json", action="store_true", help="Print the table data as JSON and exit.")
+    ap.add_argument("--check", action="store_true", help="Exit 1 if the rendered table is out of date.")
+    ap.add_argument("--if-stale", action="store_true", help="Re-render only if the table is out of date.")
     args = ap.parse_args(argv)
 
     columns = [paperpush_column(), *TOOLS]
+    data = json.dumps(columns, indent=2, ensure_ascii=False) + "\n"
     if args.json:
-        print(json.dumps(columns, indent=2, ensure_ascii=False))
+        print(data, end="")
+        return 0
+
+    data_path = args.out_dir / "comparison.json"
+    stale = not data_path.exists() or data_path.read_text() != data
+    if args.check:
+        if stale:
+            print("Comparison table is stale; run python scripts/gen_comparison_table.py", file=sys.stderr)
+            return 1
+        return 0
+    if args.if_stale and not stale:
         return 0
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -382,6 +490,7 @@ def main(argv: list[str] | None = None) -> int:
     pdf = args.out_dir / "comparison.pdf"
     png = None if args.no_png else args.out_dir / "comparison.png"
     render(text, pdf, png)
+    data_path.write_text(data)
     print(f"Wrote {pdf}" + (f" and {png}" if png else ""))
     return 0
 

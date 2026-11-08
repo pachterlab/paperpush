@@ -24,6 +24,7 @@ The keys of one venue entry (the value under a slug).
 | `venue_type` | `preprint` \| `journal` \| `conference` | Kind of venue: a preprint server, a journal, or a conference. |
 | `anonymous` | boolean | Anonymous (double-blind) review: validate checks the attached files and linked anonymous.4open.science repositories for information identifying the authors. |
 | `deprecated` | boolean | Hidden from listings but still reachable by get_venue. |
+| `publisher` | string | Slug of the venue's publisher, as listed under $publishers in manuscript_requirements.json (e.g. elsevier, springer_nature). Its house rules (the publisher:<slug> entry) back the venue's own: a rule the venue's guidelines do not state falls back to the publisher's, reported as a warning. Empty for a venue with no publisher, or one whose publisher is not listed. |
 | `site_url` | string | Public homepage URL. |
 | `submission_guide` | string | URL of the author/submission guide. |
 | `description` | string | Short description of the venue. |

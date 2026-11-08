@@ -144,7 +144,12 @@ Read the whole file first. Every key has a comment describing it.
   typical value.
 - `[venue]`: name, full name, type, homepage, guide URL. Set
   `anonymous: yes` only for double-blind review. Set `keywords` to the subject
-  areas it covers, from the listed choices (e.g. `medicine, radiology`).
+  areas it covers, from the listed choices (e.g. `medicine, radiology`). Set
+  `publisher` to the publisher's slug when `paperpush publishers` lists it
+  (`springer_nature`, `elsevier`, `cell_press`, ...). Its house rules then
+  fill whatever the venue's own guidelines leave unstated, as warnings, so
+  record here only what the venue's own pages say. Do not copy publisher-wide
+  rules into the venue.
 - `[requirements.*]`: the primary research-article rules. Use the structured
   keys where they fit, with canonical ids (`data_availability`, `Methods`, ...;
   see `$aliases` in `manuscript_requirements.json`). Put every other rule in

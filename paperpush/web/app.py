@@ -727,8 +727,22 @@ GENERAL_OPTION: dict[str, Any] = {
 }
 
 
+def _house_rules_options() -> list[dict[str, Any]]:
+    """A picker option per publisher with house rules, for a journal paperpush does not list."""
+    from ..database import publisher_venue
+    from ..requirements import list_publishers
+
+    options = []
+    for pub in list_publishers():
+        if not pub.has_rules:
+            continue
+        venue = publisher_venue(pub.slug)
+        options.append({"slug": venue.slug, "name": f"Other {pub.display_name} journal", "full_name": f"Another {pub.display_name} journal (checked against {pub.display_name}'s house rules)", "venue_type": "journal", "publisher": pub.slug, "description": venue.description, "keywords": [], "submission_url": "", "submission_guide": pub.site_url, "login_required": False, "supports_validate": True, "supports_submit": False})
+    return options
+
+
 def venue_list() -> list[dict[str, Any]]:
-    """The venues for the picker: "General" first, then every supported venue."""
+    """The venues for the picker: "General" first, then every supported venue, then each publisher's house rules."""
     general = {
         **GENERAL_OPTION,
         "keywords": [],
@@ -738,7 +752,7 @@ def venue_list() -> list[dict[str, Any]]:
         "supports_validate": True,
         "supports_submit": False,
     }
-    return [general, *list_supported_venues()]
+    return [general, *list_supported_venues(), *_house_rules_options()]
 
 
 def venue_detail(slug: str) -> dict[str, Any]:

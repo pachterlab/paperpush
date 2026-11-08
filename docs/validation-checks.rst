@@ -1045,6 +1045,8 @@ supplementary files (PDF, Word, LaTeX, Markdown, text) for what a draft carries
 and a submission should not. Every finding is a warning, quoting the first two
 examples of each kind with their context:
 
+- **placeholder text**: ``XXX`` or ``xxx`` on its own (not in an e-mail
+  address, a URL, or a word);
 - **number placeholders**: ``XX%``, ``n = X``, ``p = ?``, ``X.X``, ``20XX``.
   ``XX`` on its own is a karyotype, so it counts only beside a unit or ``%``;
 - **citation placeholders**: ``[ref]``, ``[citation needed]``, ``(cite)``;

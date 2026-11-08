@@ -342,6 +342,33 @@ and `retrieved` (the date, `YYYY-MM-DD`). Two mechanisms keep entries short:
 - `"inherits": "<slug>"` starts from another venue's entry and overrides keys
   section by section (a key set to `null` drops the inherited value; `notes`
   accumulate).
+- Publisher fallback: a venue whose `venues.json` entry names a `publisher`
+  (a slug listed under `$publishers`) starts from that publisher's house
+  rules (Elsevier's Guide for Authors, Springer Nature's editorial policies,
+  ...). They are stored as `$publishers.<slug>.rules`, with the same keys as a
+  venue entry, and loaded as the entry `publisher:<slug>`. They live under `$`
+  because older versions read every other top-level key as a venue and would
+  refuse a published copy with rules for a "venue" `venues.json` does not
+  list. For the same reason a venue entry may not `inherits` a publisher's
+  rules: it names the publisher in `venues.json`. The venue's own keys win, `null`
+  included; a rule its guidelines do not state falls back to the publisher's.
+  `paperpush.requirements.get_requirements` does the layering and records the
+  publisher and which rules came from it (`publisher`, `from_publisher`);
+  publisher notes are prefixed `[<Publisher> house rule]`. `validate` reports
+  what a house rule catches as a warning, never an error, because a journal
+  can depart from its publisher: `Checks.run` re-runs a check that found
+  something without the house rules (`requirements.own_rules_only()`) and
+  relabels the issues only the full rules raise. A publisher's per-type
+  overrides (`article_types`) apply only to a venue with no entry of its own,
+  since they are keyed by venue-specific option strings. A publisher's rules
+  may themselves `inherits` another's (`cell_press` from
+  `"inherits": "publisher:elsevier"`). Record only rules the publisher states for all its
+  journals (house style, policies, file formats); a rule read from one
+  journal's guide belongs on that journal. `paperpush publishers` lists the
+  publishers and which have house rules; `paperpush validate --publisher`
+  (or `--issn` / `--journal`, looked up in Crossref by
+  `paperpush/publisher_lookup.py`) checks a journal paperpush does not list
+  against them, as the venue `publisher:<slug>`.
 - `"article_type_field"` names the `.sub` field that selects the article type
   and `"article_types"` maps each of that field's option strings (exactly as in
   `submission_forms.json`) to the overrides for that type. The top level holds the primary
@@ -351,7 +378,11 @@ and `retrieved` (the date, `YYYY-MM-DD`). Two mechanisms keep entries short:
 The `$aliases` key at the top of the file maps each canonical section and
 statement name to the heading wordings that count as it ("Materials and
 Methods" for `Methods`, "Conflict of interest" for `competing_interests`, ...).
-Add a wording there when a venue uses a new one.
+Add a wording there when a venue uses a new one. `$publishers` maps each
+publisher slug to its `name`, `site_url` (its author guidelines),
+`crossref_names` (the names Crossref's journal registry gives it, for the
+`--issn` lookup), `parent` (for an imprint, e.g. Cell Press of Elsevier), and
+`rules` (its house rules, when recorded).
 
 To keep rules from being reported twice, the checker applies a guideline rule
 only when the `submission_forms.json` field does not already enforce the same

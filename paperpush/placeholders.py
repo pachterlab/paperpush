@@ -3,7 +3,7 @@
 ``details.placeholders`` reads the manuscript, title page, cover letter, and
 supplementary files for the marks a draft carries and a submission should not:
 
-* placeholder text in the prose -- ``XX%``, ``n = X``, ``[ref]``,
+* placeholder text in the prose -- ``XXX``/``xxx``, ``XX%``, ``n = X``, ``[ref]``,
   ``[citation needed]``, ``TBD``, ``Figure X``, ``(Smith et al., 20XX)``,
   ``[insert ...]``, ``Dear [Editor]``, *lorem ipsum*;
 * to-do notes typeset into the document (``\\todo{}``, ``\\fixme{}``,
@@ -26,7 +26,9 @@ from .validate import WARNING, Issue, NotApplicable, Outcome
 _UNITS = r"(?:%|‰|-?fold|mg|µg|μg|ng|kg|g|ml|mL|µl|μl|µL|μL|mM|µM|μM|nM|nm|µm|μm|mm|cm|kb|bp|°C|h|hr|hrs|min|s|days?|weeks?|months?|years?|participants|patients|subjects|samples|cells|mice|rats)"
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # Numbers not filled in. "XX" alone is a karyotype, so it counts only beside a unit or an equals sign.
-    ("number placeholder", re.compile(rf"(?<![\w.])(?:XXX+|[XY]\.[XY]+|XX(?=\s*{_UNITS}\b|\s*%))|(?<![\w])(?:[nNpP]|OR|HR|RR|CI)\s*[=<>]\s*(?:X+|\?+|#+)(?![\w])|\b(?:19|20)XX\b|\(\s*\?{2,}\s*\)")),
+    # "XXX"/"xxx" standing alone (not in an e-mail address, URL, or word); "Xxx" is a gene name.
+    ("placeholder text", re.compile(r"(?<![\w.@/-])(?:XXX+|xxx+)(?![\w@/]|-\d)")),
+    ("number placeholder", re.compile(rf"(?<![\w.])(?:[XY]\.[XY]+|XX(?=\s*{_UNITS}\b|\s*%))|(?<![\w])(?:[nNpP]|OR|HR|RR|CI)\s*[=<>]\s*(?:X+|\?+|#+)(?![\w])|\b(?:19|20)XX\b|\(\s*\?{2,}\s*\)")),
     ("citation placeholder", re.compile(r"\[\s*(?:refs?|references?|citations?(?: needed)?|cite|CITE|REF|REFS|\?+|#+)\s*\]|\((?:refs?|REF|cite|citation needed)\)|\bcitation needed\b", re.IGNORECASE)),
     ("figure or table placeholder", re.compile(r"\b(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?s?\.?|Tables?)\s+(?:S?X{1,2}|#+|TBD)(?![\w])")),
     ("to-do note", re.compile(r"\b(?:TODO|FIXME|TBD|TBC|TKTK)\b|\[\s*(?:insert|add|update|fill in|to be (?:added|completed|confirmed))\b[^\]]{0,60}\]|<\s*(?:insert|add)\b[^>]{0,60}>|\binsert (?:text|figure|table|reference|citation|name|date|here)\b", re.IGNORECASE)),
@@ -77,12 +79,12 @@ def _word_extras(doc) -> list[str]:
     if count:
         first = re.search(r"<w:comment\b[^>]*>(.*?)</w:comment>", comments, re.DOTALL)
         said = " ".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", first.group(1))) if first else ""
-        out.append(f"{count} comment(s) left in the file" + (f" (first: \"{said[:60]}\")" if said else ""))
+        out.append(f"{count} comment(s) left in the file" + (f' (first: "{said[:60]}")' if said else ""))
     body = doc.docx_part("word/document.xml") or ""
     marks = re.findall(r"<w:r\b(?:(?!</w:r>).)*?<w:(?:highlight\s+w:val=\"(?!none)\w+\"|shd\b[^>]*w:fill=\"(?!auto|FFFFFF|ffffff)[0-9A-Fa-f]{6}\")(?:(?!</w:r>).)*?</w:r>", body, re.DOTALL)
     if marks:
         sample = " ".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", marks[0]))
-        out.append(f"{len(marks)} highlighted run(s) of text" + (f" (first: \"{sample[:60]}\")" if sample.strip() else ""))
+        out.append(f"{len(marks)} highlighted run(s) of text" + (f' (first: "{sample[:60]}")' if sample.strip() else ""))
     return out
 
 
@@ -104,7 +106,7 @@ def check(venue: Venue, values: dict[str, str]) -> Outcome:
             for kind, pattern in (("to-do note", _TEX_TODO), ("highlighted text", _TEX_HIGHLIGHT)):
                 hits = list(pattern.finditer(source))
                 if hits:
-                    shown = "; ".join(f"\"{_excerpt(source, m.start(), m.end() + 50)}\"" for m in hits[:2])
+                    shown = "; ".join(f'"{_excerpt(source, m.start(), m.end() + 50)}"' for m in hits[:2])
                     found.append((kind, shown + (f" (and {len(hits) - 2} more)" if len(hits) > 2 else "")))
         text = doc.text
         if text is None and not found:

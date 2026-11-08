@@ -1,0 +1,912 @@
+[
+  {
+    "name": "PaperPush",
+    "price": [
+      "yes",
+      "Free"
+    ],
+    "open_source": [
+      "yes",
+      "BSD-2"
+    ],
+    "tailored_checks": [
+      "yes",
+      "75 venues",
+      "(+ any venue, via online guideline scraping)"
+    ],
+    "num_checks": [
+      "yes",
+      "131"
+    ],
+    "chk_references": [
+      "yes",
+      "DOIs, retractions, preprint versions"
+    ],
+    "chk_figures": [
+      "yes",
+      "DPI, lettering, fonts, colorblind"
+    ],
+    "chk_limits": [
+      "yes",
+      "Word, page, section"
+    ],
+    "chk_layout": [
+      "yes",
+      "Margins, fonts, spacing, line nos."
+    ],
+    "chk_anonymity": [
+      "yes",
+      "Yes"
+    ],
+    "chk_rigor": [
+      "yes",
+      "RRIDs, statistics, cell lines"
+    ],
+    "chk_language": [
+      "yes",
+      "Spelling, prose, acronyms"
+    ],
+    "reformat": [
+      "yes",
+      "Yes"
+    ],
+    "requirement_db": [
+      "yes",
+      "Open JSON"
+    ],
+    "metadata_file": [
+      "yes",
+      ".sub file"
+    ],
+    "shareable": [
+      "yes",
+      "Yes"
+    ],
+    "cli": [
+      "yes",
+      "Yes"
+    ],
+    "ai_agent": [
+      "yes",
+      "MCP server"
+    ],
+    "skills": [
+      "yes",
+      "10"
+    ],
+    "transfer": [
+      "yes",
+      "Yes"
+    ],
+    "portal_filling": [
+      "yes",
+      "24 venues"
+    ],
+    "offline": [
+      "yes",
+      "Yes"
+    ],
+    "sources": [
+      "This repository"
+    ]
+  },
+  {
+    "name": "Paperpal",
+    "price": [
+      "no",
+      "Free tier; $25/mo"
+    ],
+    "open_source": [
+      "no",
+      "No"
+    ],
+    "tailored_checks": [
+      "partial",
+      "Publisher Preflight only"
+    ],
+    "num_checks": [
+      "yes",
+      "30+"
+    ],
+    "chk_references": [
+      "partial",
+      "Hallucinated refs"
+    ],
+    "chk_figures": [
+      "no",
+      ""
+    ],
+    "chk_limits": [
+      "yes",
+      "Word counts"
+    ],
+    "chk_layout": [
+      "unknown",
+      "?"
+    ],
+    "chk_anonymity": [
+      "no",
+      ""
+    ],
+    "chk_rigor": [
+      "partial",
+      "Ethics statements"
+    ],
+    "chk_language": [
+      "yes",
+      ""
+    ],
+    "reformat": [
+      "no",
+      ""
+    ],
+    "requirement_db": [
+      "no",
+      ""
+    ],
+    "metadata_file": [
+      "no",
+      ""
+    ],
+    "shareable": [
+      "no",
+      ""
+    ],
+    "cli": [
+      "no",
+      ""
+    ],
+    "ai_agent": [
+      "no",
+      ""
+    ],
+    "skills": [
+      "no",
+      "0"
+    ],
+    "transfer": [
+      "no",
+      ""
+    ],
+    "portal_filling": [
+      "no",
+      ""
+    ],
+    "offline": [
+      "no",
+      ""
+    ],
+    "sources": [
+      "https://paperpal.com/manuscript-check",
+      "https://www.capterra.com/p/10003076/Paperpal/"
+    ]
+  },
+  {
+    "name": "Penelope.ai",
+    "price": [
+      "no",
+      "Journals pay (from $750/mo)"
+    ],
+    "open_source": [
+      "no",
+      "No"
+    ],
+    "tailored_checks": [
+      "yes",
+      "Licensing journals"
+    ],
+    "num_checks": [
+      "yes",
+      "30+"
+    ],
+    "chk_references": [
+      "partial",
+      "Citation matching"
+    ],
+    "chk_figures": [
+      "partial",
+      "Citations, legends"
+    ],
+    "chk_limits": [
+      "yes",
+      "Word, item counts"
+    ],
+    "chk_layout": [
+      "partial",
+      "Line spacing"
+    ],
+    "chk_anonymity": [
+      "no",
+      ""
+    ],
+    "chk_rigor": [
+      "partial",
+      "Ethics, PRISMA/CONSORT"
+    ],
+    "chk_language": [
+      "no",
+      ""
+    ],
+    "reformat": [
+      "no",
+      ""
+    ],
+    "requirement_db": [
+      "partial",
+      "Per-journal configs, private"
+    ],
+    "metadata_file": [
+      "no",
+      ""
+    ],
+    "shareable": [
+      "no",
+      ""
+    ],
+    "cli": [
+      "no",
+      ""
+    ],
+    "ai_agent": [
+      "no",
+      ""
+    ],
+    "skills": [
+      "no",
+      "0"
+    ],
+    "transfer": [
+      "no",
+      ""
+    ],
+    "portal_filling": [
+      "no",
+      ""
+    ],
+    "offline": [
+      "no",
+      ""
+    ],
+    "sources": [
+      "https://www.penelope.ai",
+      "https://www.capterra.com/p/255629/Penelopeai/"
+    ]
+  },
+  {
+    "name": "Trinka AI",
+    "price": [
+      "no",
+      "Free tier; $80/yr"
+    ],
+    "open_source": [
+      "no",
+      "No"
+    ],
+    "tailored_checks": [
+      "no",
+      "Generic checks"
+    ],
+    "num_checks": [
+      "yes",
+      "25+"
+    ],
+    "chk_references": [
+      "yes",
+      "Retracted, hallucinated"
+    ],
+    "chk_figures": [
+      "unknown",
+      "?"
+    ],
+    "chk_limits": [
+      "unknown",
+      "?"
+    ],
+    "chk_layout": [
+      "unknown",
+      "?"
+    ],
+    "chk_anonymity": [
+      "unknown",
+      "?"
+    ],
+    "chk_rigor": [
+      "unknown",
+      "?"
+    ],
+    "chk_language": [
+      "yes",
+      ""
+    ],
+    "reformat": [
+      "partial",
+      "Citations only"
+    ],
+    "requirement_db": [
+      "no",
+      ""
+    ],
+    "metadata_file": [
+      "no",
+      ""
+    ],
+    "shareable": [
+      "no",
+      ""
+    ],
+    "cli": [
+      "no",
+      ""
+    ],
+    "ai_agent": [
+      "no",
+      ""
+    ],
+    "skills": [
+      "no",
+      "0"
+    ],
+    "transfer": [
+      "no",
+      ""
+    ],
+    "portal_filling": [
+      "no",
+      ""
+    ],
+    "offline": [
+      "no",
+      ""
+    ],
+    "sources": [
+      "https://trinka.ai/features",
+      "https://trinka.ai/pricing"
+    ]
+  },
+  {
+    "name": "Research Eagle",
+    "price": [
+      "no",
+      "Free tier; $12/paper"
+    ],
+    "open_source": [
+      "no",
+      "No"
+    ],
+    "tailored_checks": [
+      "yes",
+      "18,960 journals"
+    ],
+    "num_checks": [
+      "partial",
+      "Not stated"
+    ],
+    "chk_references": [
+      "no",
+      ""
+    ],
+    "chk_figures": [
+      "partial",
+      "DPI"
+    ],
+    "chk_limits": [
+      "yes",
+      "Word limits"
+    ],
+    "chk_layout": [
+      "unknown",
+      "?"
+    ],
+    "chk_anonymity": [
+      "unknown",
+      "?"
+    ],
+    "chk_rigor": [
+      "unknown",
+      "?"
+    ],
+    "chk_language": [
+      "no",
+      ""
+    ],
+    "reformat": [
+      "no",
+      ""
+    ],
+    "requirement_db": [
+      "partial",
+      "18,960 journals, private"
+    ],
+    "metadata_file": [
+      "no",
+      ""
+    ],
+    "shareable": [
+      "no",
+      ""
+    ],
+    "cli": [
+      "no",
+      ""
+    ],
+    "ai_agent": [
+      "no",
+      ""
+    ],
+    "skills": [
+      "no",
+      "0"
+    ],
+    "transfer": [
+      "no",
+      ""
+    ],
+    "portal_filling": [
+      "no",
+      ""
+    ],
+    "offline": [
+      "no",
+      ""
+    ],
+    "sources": [
+      "https://researcheagle.org/",
+      "https://researcheagle.org/pricing"
+    ]
+  },
+  {
+    "name": "Articlo",
+    "price": [
+      "no",
+      "$19/paper or $19/mo"
+    ],
+    "open_source": [
+      "no",
+      "No"
+    ],
+    "tailored_checks": [
+      "yes",
+      "2,875 journals"
+    ],
+    "num_checks": [
+      "partial",
+      "Formatting checklist"
+    ],
+    "chk_references": [
+      "no",
+      ""
+    ],
+    "chk_figures": [
+      "unknown",
+      "?"
+    ],
+    "chk_limits": [
+      "unknown",
+      "?"
+    ],
+    "chk_layout": [
+      "yes",
+      "Applies journal layout"
+    ],
+    "chk_anonymity": [
+      "no",
+      ""
+    ],
+    "chk_rigor": [
+      "unknown",
+      "?"
+    ],
+    "chk_language": [
+      "no",
+      ""
+    ],
+    "reformat": [
+      "yes",
+      "Word output"
+    ],
+    "requirement_db": [
+      "partial",
+      "2,875 journals, private"
+    ],
+    "metadata_file": [
+      "no",
+      ""
+    ],
+    "shareable": [
+      "no",
+      ""
+    ],
+    "cli": [
+      "no",
+      ""
+    ],
+    "ai_agent": [
+      "no",
+      ""
+    ],
+    "skills": [
+      "no",
+      "0"
+    ],
+    "transfer": [
+      "yes",
+      "Re-targeting"
+    ],
+    "portal_filling": [
+      "no",
+      ""
+    ],
+    "offline": [
+      "no",
+      ""
+    ],
+    "sources": [
+      "https://getarticlo.com/",
+      "https://getarticlo.com/journals"
+    ]
+  },
+  {
+    "name": "CheckMyManuscript",
+    "price": [
+      "no",
+      "$50/report"
+    ],
+    "open_source": [
+      "no",
+      "No"
+    ],
+    "tailored_checks": [
+      "yes",
+      "100+ publishers"
+    ],
+    "num_checks": [
+      "yes",
+      "95"
+    ],
+    "chk_references": [
+      "partial",
+      "Citation matching"
+    ],
+    "chk_figures": [
+      "partial",
+      "Citations, captions"
+    ],
+    "chk_limits": [
+      "yes",
+      "Word limits"
+    ],
+    "chk_layout": [
+      "unknown",
+      "?"
+    ],
+    "chk_anonymity": [
+      "no",
+      ""
+    ],
+    "chk_rigor": [
+      "no",
+      ""
+    ],
+    "chk_language": [
+      "yes",
+      ""
+    ],
+    "reformat": [
+      "no",
+      ""
+    ],
+    "requirement_db": [
+      "partial",
+      "Private"
+    ],
+    "metadata_file": [
+      "no",
+      ""
+    ],
+    "shareable": [
+      "no",
+      ""
+    ],
+    "cli": [
+      "no",
+      ""
+    ],
+    "ai_agent": [
+      "no",
+      ""
+    ],
+    "skills": [
+      "no",
+      "0"
+    ],
+    "transfer": [
+      "no",
+      ""
+    ],
+    "portal_filling": [
+      "no",
+      ""
+    ],
+    "offline": [
+      "no",
+      ""
+    ],
+    "sources": [
+      "https://checkmymanuscript.com/"
+    ]
+  },
+  {
+    "name": "SciScore",
+    "price": [
+      "no",
+      "Paid; free via some journals"
+    ],
+    "open_source": [
+      "no",
+      "No"
+    ],
+    "tailored_checks": [
+      "no",
+      "Rigor criteria only"
+    ],
+    "num_checks": [
+      "partial",
+      "Rigor score"
+    ],
+    "chk_references": [
+      "no",
+      ""
+    ],
+    "chk_figures": [
+      "no",
+      ""
+    ],
+    "chk_limits": [
+      "no",
+      ""
+    ],
+    "chk_layout": [
+      "no",
+      ""
+    ],
+    "chk_anonymity": [
+      "no",
+      ""
+    ],
+    "chk_rigor": [
+      "yes",
+      "RRIDs, rigor criteria"
+    ],
+    "chk_language": [
+      "no",
+      ""
+    ],
+    "reformat": [
+      "no",
+      ""
+    ],
+    "requirement_db": [
+      "no",
+      ""
+    ],
+    "metadata_file": [
+      "no",
+      ""
+    ],
+    "shareable": [
+      "no",
+      ""
+    ],
+    "cli": [
+      "no",
+      ""
+    ],
+    "ai_agent": [
+      "no",
+      ""
+    ],
+    "skills": [
+      "no",
+      "0"
+    ],
+    "transfer": [
+      "no",
+      ""
+    ],
+    "portal_filling": [
+      "no",
+      ""
+    ],
+    "offline": [
+      "no",
+      ""
+    ],
+    "sources": [
+      "https://sciscore.com/",
+      "https://pmc.ncbi.nlm.nih.gov/articles/PMC7644557/"
+    ]
+  },
+  {
+    "name": "Writefull",
+    "price": [
+      "no",
+      "Free tier; ~$15/mo"
+    ],
+    "open_source": [
+      "no",
+      "No"
+    ],
+    "tailored_checks": [
+      "no",
+      "Language only"
+    ],
+    "num_checks": [
+      "no",
+      "Language only"
+    ],
+    "chk_references": [
+      "unknown",
+      "?"
+    ],
+    "chk_figures": [
+      "no",
+      ""
+    ],
+    "chk_limits": [
+      "no",
+      ""
+    ],
+    "chk_layout": [
+      "no",
+      ""
+    ],
+    "chk_anonymity": [
+      "no",
+      ""
+    ],
+    "chk_rigor": [
+      "no",
+      ""
+    ],
+    "chk_language": [
+      "yes",
+      ""
+    ],
+    "reformat": [
+      "no",
+      ""
+    ],
+    "requirement_db": [
+      "no",
+      ""
+    ],
+    "metadata_file": [
+      "no",
+      ""
+    ],
+    "shareable": [
+      "no",
+      ""
+    ],
+    "cli": [
+      "no",
+      ""
+    ],
+    "ai_agent": [
+      "no",
+      ""
+    ],
+    "skills": [
+      "no",
+      "0"
+    ],
+    "transfer": [
+      "no",
+      ""
+    ],
+    "portal_filling": [
+      "no",
+      ""
+    ],
+    "offline": [
+      "no",
+      ""
+    ],
+    "sources": [
+      "https://www.writefull.com",
+      "https://www.capterra.com/p/236309/Writefull/pricing/"
+    ]
+  },
+  {
+    "name": "SciSpace",
+    "price": [
+      "no",
+      "Free tier; $12–20/mo"
+    ],
+    "open_source": [
+      "no",
+      "No"
+    ],
+    "tailored_checks": [
+      "partial",
+      "Journal checklist agent"
+    ],
+    "num_checks": [
+      "unknown",
+      "?"
+    ],
+    "chk_references": [
+      "unknown",
+      "?"
+    ],
+    "chk_figures": [
+      "unknown",
+      "?"
+    ],
+    "chk_limits": [
+      "unknown",
+      "?"
+    ],
+    "chk_layout": [
+      "yes",
+      "Via templates"
+    ],
+    "chk_anonymity": [
+      "unknown",
+      "?"
+    ],
+    "chk_rigor": [
+      "unknown",
+      "?"
+    ],
+    "chk_language": [
+      "unknown",
+      "?"
+    ],
+    "reformat": [
+      "yes",
+      "40,000+ templates"
+    ],
+    "requirement_db": [
+      "partial",
+      "Journal templates"
+    ],
+    "metadata_file": [
+      "no",
+      ""
+    ],
+    "shareable": [
+      "no",
+      ""
+    ],
+    "cli": [
+      "no",
+      ""
+    ],
+    "ai_agent": [
+      "no",
+      ""
+    ],
+    "skills": [
+      "no",
+      "0"
+    ],
+    "transfer": [
+      "no",
+      ""
+    ],
+    "portal_filling": [
+      "no",
+      ""
+    ],
+    "offline": [
+      "no",
+      ""
+    ],
+    "sources": [
+      "https://libguides.library.arizona.edu/ai-researchers/scispace",
+      "https://scispace.com/formats",
+      "https://www.capterra.com/p/178127/Scispace/pricing/"
+    ]
+  }
+]

@@ -17,6 +17,10 @@ VENUE = Venue(slug="testj", name="Test", fields=[Field(id="manuscript_file", lab
     "text, kind",
     [
         ("The effect was XX% larger.", "number placeholder"),
+        ("The value was XXX.", "placeholder text"),
+        ("Funded by grant xxx.", "placeholder text"),
+        ("see XXXX here", "placeholder text"),
+        ("a XXX-fold increase", "placeholder text"),
         ("We enrolled n = X participants.", "number placeholder"),
         ("As shown before [ref].", "citation placeholder"),
         ("A known result [citation needed].", "citation placeholder"),
@@ -39,6 +43,8 @@ def test_placeholders_found(text, kind):
         "See Figure 2 and Table S1 (p = 0.01, n = 12).",
         "The X chromosome and the XIST gene.",
         "We reference prior work [12].",
+        "Write to xxx@example.com or see https://example.org/xxx/data.",
+        "The Xxx gene and the xxx-1 allele.",
     ],
 )
 def test_ordinary_text_is_clean(text):

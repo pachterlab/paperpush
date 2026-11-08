@@ -7,7 +7,7 @@ the submission workflow. This section documents every command in detail.
 .. code-block:: text
 
    usage: paperpush [-h] [--version] [--agent-guide]
-                    {venues,subfile,options,autofill,validate,requirements,login,submit,codegen,recovery-report,web,pick-venue,find-reviewers,add-venue,update-venues,install-skills} ...
+                    {venues,subfile,options,autofill,validate,requirements,format,publishers,login,submit,codegen,recovery-report,web,pick-venue,find-reviewers,add-venue,update-venues,install-skills} ...
 
 Global options
 --------------
@@ -47,6 +47,8 @@ The commands, in workflow order
    autofill
    validate
    requirements
+   format
+   publishers
    login
    submit
    recovery-report

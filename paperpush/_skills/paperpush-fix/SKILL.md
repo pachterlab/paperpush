@@ -153,7 +153,8 @@ these:
 - Layout and template (`layout.*`, `guidelines.template`): changing the
   margins, font, or class changes the paper's look everywhere. Report the
   one-line change (e.g. `\usepackage[margin=1in]{geometry}`) for the author
-  to apply.
+  to apply. When the source is a `.docx` or LaTeX, offer `paperpush format`
+  instead (step 3b); run it only if the author agrees.
 - `details.word_cleanliness` (tracked changes or comments left in a `.docx`):
   whether to accept or reject them is the author's call.
 - `integrity.sensitive`, `integrity.hidden_text`, `integrity.anonymity`:
@@ -166,6 +167,38 @@ these:
   the author meant.
 
 When in doubt, choose tier 3.
+
+## Step 3b: reformat first, if the author wants it
+
+When round 1 has page-layout or template issues (`layout.*`,
+`guidelines.template`) and the manuscript's source is a `.docx` or LaTeX
+(`.tex`, or a `.zip` of sources), ask once, before any other edit, whether to
+reformat it with `paperpush format`. Say what that means: it applies the
+venue's own Word or LaTeX template when one can be found (else the venue's
+layout rules), it restyles the whole document, and it writes a new copy,
+leaving the current file as it is. It's an offer, not a fix: if the author
+says no, the layout issues stay in tier 3 with the one-line change for each.
+
+If they say yes, do it before step 4, so the other fixes go into the
+formatted copy rather than a file the `.sub` is about to stop pointing at:
+
+```
+paperpush format <abs .sub> --update-sub --json [--manuscript <abs source>]
+```
+
+(MCP: `format_manuscript(subfile=..., update_subfile=true)`.) Pass
+`--manuscript` when the `.sub` names a PDF built from the source. The result
+goes to `formatted_<venue>/` beside the manuscript, and `--update-sub` points
+the `.sub`'s manuscript field at it (the `.sub` is in the step 0 backup). When
+the `.sub` also names a PDF built from that LaTeX, point that field at the
+compiled `formatted_<venue>/<stem>.pdf` (the JSON's `pdf`). From here on, the
+formatted copy is the editable source for step 2's purposes, and step 5
+rebuilds it. Validate again before step 4 (the layout issues the template
+fixed drop out), then sort the remaining issues into tiers as in step 3.
+Keep the JSON's `template`, `changes`, and `left_to_author` for the report;
+`left_to_author` items (reference style, front matter the class wants) go
+under "Needs your decision". If `format` fails, report why and go on with
+the original file.
 
 ## Step 4: apply the fixes
 
@@ -232,8 +265,9 @@ In this order:
 
 1. **Result**: passes or doesn't, the error/warning counts before and after,
    and how many rounds ran.
-2. **Fixed**: grouped by file, each with its check id and a short
-   before → after. For tier 2 trims, show the full diff of the changed
+2. **Fixed**: if step 3b ran, first the formatted file, the template used
+   (or "the venue's layout rules"), and its changes. Then, grouped by file,
+   each fix with its check id and a short before → after. For tier 2 trims, show the full diff of the changed
    sentences and the new count against the limit.
 3. **Needs your decision**: tier 3 issues with a suggestion, e.g. "the
    manuscript is 10,412 words before references; the limit is 3,000. That is

@@ -25,6 +25,8 @@ check manuscript files without a ``.sub``, with or without a venue (see
                              [--cover-letter FILE] [--figures FILE [FILE ...]]
                              [--tables FILE [FILE ...]]
                              [--supplement FILE [FILE ...]]
+                             [--publisher PUBLISHER] [--issn ISSN]
+                             [--journal TITLE]
                              [subfile]
 
 Synopsis
@@ -38,6 +40,7 @@ Synopsis
    paperpush validate nature.sub.txt --initial-submission  # errors become warnings
    paperpush validate --manuscript main.tex --figures fig1.png fig2.png   # no .sub, no venue
    paperpush validate --venue nature --manuscript main.pdf --cover-letter cover.docx
+   paperpush validate --issn 0012-365X --manuscript main.pdf   # a journal paperpush does not list
 
 ``validate`` prints a report of every check, grouped and colored by what
 happened to it: **failed** (red), **warnings** (amber), **needs AI**
@@ -89,6 +92,29 @@ manuscript, say -- the file is still checked, and the report notes that the
 portal has nowhere to upload it. Venues whose guidelines ask for a separate
 title page (``title_page.separate_file``) warn when ``--title-page`` is not
 given.
+
+.. _validate-publisher:
+
+Journals paperpush does not list: publisher house rules
+--------------------------------------------------------
+
+``--publisher PUBLISHER`` (a slug or name, e.g. ``elsevier`` or
+``"Springer Nature"``), ``--issn ISSN``, or ``--journal TITLE`` check the
+named files, or a ``general`` ``.sub``, against the house rules of the
+journal's publisher (see :doc:`publishers`). ``--issn`` and ``--journal`` ask
+Crossref's journal registry who publishes the journal (network access needed;
+``--journal`` needs the exact title, so ``--issn`` is more reliable). They also
+name the journal, so the cover letter is checked for it; ``--publisher`` alone
+leaves that check out. An ISSN or title that turns out to be a journal
+paperpush lists is checked against that venue's own guidelines. When the
+publisher has no house rules recorded, only the general checks run.
+
+Everything a house rule catches is a warning, marked "house rule", never an
+error: a journal can depart from its publisher's rules, so read the journal's
+own guidelines before acting on one. The same holds for a listed venue: where
+its own guidelines are silent and its publisher's house rules state a rule,
+that rule applies as a warning. These options are refused for a ``.sub`` made
+for a listed venue.
 
 Relative paths are resolved against the working directory. ``-o`` with no path
 saves the report next to the first file named. ``--web`` needs a ``.sub``.
@@ -281,7 +307,9 @@ Arguments
 ``--dont-check-references``
    Skip resolving the references' DOIs through ``doi.org``, and the registry
    searches for references without a DOI and for newer versions (Crossref,
-   OpenAlex, arXiv, bioRxiv). Avoids network requests.
+   OpenAlex, arXiv, bioRxiv), and the research-resource lookups of the rigor
+   checks (RRIDs in SciCrunch, cell lines in Cellosaurus). Avoids network
+   requests.
 
 ``--dont-check-for-sensitive-info``
    Skip scanning the uploaded files for information not meant to be published.

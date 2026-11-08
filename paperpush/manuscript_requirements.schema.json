@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://paperpush.org/schemas/manuscript_requirements.schema.json",
   "title": "paperpush manuscript requirements database",
-  "description": "Schema for manuscript_requirements.json. The top-level object maps a venue slug to what its author guidelines require of the manuscript, grouped into shared sections (manuscript, title_page, abstract, keywords, sections, statements, figures, tables, supplementary, references, cover_letter, upload). Generated from the dataclasses in paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate.",
+  "description": "Schema for manuscript_requirements.json. The top-level object maps a venue slug to what its author guidelines require of the manuscript, grouped into shared sections (manuscript, title_page, abstract, keywords, sections, statements, figures, tables, supplementary, references, cover_letter, upload). $publishers holds each publisher's house rules, which back the rules of every venue that names that publisher in venues.json. Generated from the dataclasses in paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate.",
   "type": "object",
   "properties": {
     "$schema": {
@@ -32,6 +32,16 @@
         }
       },
       "additionalProperties": false
+    },
+    "$publishers": {
+      "type": "object",
+      "description": "The publishers whose house rules can back a venue's own, keyed by publisher slug (a venue names one with `publisher` in venues.json). Each publisher's house rules are its `rules`, which paperpush loads as the entry `publisher:<slug>`.",
+      "propertyNames": {
+        "pattern": "^[a-z0-9_]+$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/publisher"
+      }
     }
   },
   "patternProperties": {
@@ -377,6 +387,35 @@
           }
         }
       },
+      "additionalProperties": false
+    },
+    "publisher": {
+      "properties": {
+        "name": {
+          "description": "Display name, e.g. 'Springer Nature'.",
+          "type": "string"
+        },
+        "site_url": {
+          "description": "URL of the publisher's author guidelines (its house rules), or its homepage.",
+          "type": "string"
+        },
+        "crossref_names": {
+          "description": "Publisher names as Crossref records them (e.g. 'Elsevier BV'), for finding the publisher of a journal paperpush does not list from its ISSN.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "parent": {
+          "description": "Slug of the publisher this one is an imprint of (Cell Press: elsevier). Informational; the house rules chain through `inherits`.",
+          "type": "string"
+        },
+        "rules": {
+          "$ref": "#/$defs/venue",
+          "description": "The publisher's house rules: the rules it states for all its journals, with the same keys as a venue entry. They back the rules of every venue whose venues.json entry names this publisher; `inherits` may name another publisher's rules as `publisher:<slug>`. Empty when paperpush holds none."
+        }
+      },
+      "type": "object",
       "additionalProperties": false
     },
     "manuscript": {

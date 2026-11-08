@@ -202,6 +202,7 @@ def list_supported_venues(include_deprecated: bool = False) -> list[dict[str, An
             "name": venue.name,
             "full_name": venue.full_name,
             "venue_type": venue.venue_type,
+            "publisher": venue.publisher,
             "description": venue.description,
             "keywords": list(venue.keywords),
             "submission_url": venue.submission_url,
@@ -326,6 +327,79 @@ def find_reviewers(
             got.sub_path.write_text(new_text, encoding="utf-8")
         result["written"] = {"subfile": str(got.sub_path), "added": added}
     return result
+
+
+def format_manuscript(
+    venue: Optional[str] = None,
+    subfile: Optional[str] = None,
+    manuscript: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    template: Optional[str] = None,
+    use_template: bool = True,
+    list_templates_only: bool = False,
+    keep_direct_formatting: bool = False,
+    update_subfile: bool = False,
+) -> dict[str, Any]:
+    """Reformat a Word (.docx) or LaTeX (.tex/.zip) manuscript for a venue.
+
+    The venue's own template comes first: its recorded template URL, then
+    template links on its author-guideline pages (and for LaTeX its recorded
+    document class, from the TeX installation or CTAN). A Word template's
+    styles, theme, page setup, headers, and footers are applied; a LaTeX
+    template's class, style packages, and bibliography style. Without one, the
+    venue's recorded layout rules are applied (page size, margins, body font and
+    size, double spacing, line numbers, page numbers). Pass `template` (URL or
+    absolute path) to use a specific one, `use_template=False` for the rules
+    only, or `list_templates_only=True` to just see what the search finds.
+
+    Give `subfile` (absolute path; its venue and manuscript are used) or
+    `venue` and `manuscript` (absolute path). The original is never changed;
+    the result goes to `output_dir` (default: formatted_<venue> next to the
+    manuscript) with CHANGES.md. Returns the output path, the template used (or
+    why none was), `changes`, `left_to_author` (reference style, figure
+    placement, front matter a class wants, ... -- tell the author), and
+    `layout_checks`, validate's page-layout checks run on the result.
+    `update_subfile` points the .sub's manuscript field at the new file.
+    """
+    from . import formatter
+    from .requirements_check import manuscript_files
+    from .subfile import load, replace_scalar
+
+    values: dict[str, str] = {}
+    sub_path = None
+    if subfile:
+        sub_path, _text, venue_obj = _load_subfile(subfile)
+        values = dict(load(sub_path).values)
+        if venue:
+            venue_obj = _venue_or_error(venue)
+    elif venue:
+        venue_obj = _venue_or_error(venue)
+    else:
+        raise ValueError("give a subfile, or a venue and a manuscript")
+    if list_templates_only:
+        search = formatter.list_templates(venue_obj, values)
+        return {"venue": venue_obj.slug, "templates": [{"url": link.url, "kind": link.kind, "text": link.text, "found_on": link.found_on, "description": link.describe()} for link in search.links], "pages_read": search.pages, "pages_refused": search.refused}
+    field = None
+    if manuscript:
+        path = _resolve(manuscript)
+        if values:
+            from .requirements_check import _fields_for
+
+            field = next(iter(_fields_for(venue_obj, "manuscript")), None)
+    else:
+        files = manuscript_files(venue_obj, values) if values else []
+        if not files:
+            raise ValueError("give `manuscript`, or a subfile whose manuscript file exists")
+        field, path = files[0]
+    try:
+        result = formatter.format_manuscript(path, venue_obj, values, out_dir=_resolve(output_dir) if output_dir else None, template=str(_resolve(template)) if template and not template.startswith(("http://", "https://")) else template, use_template=use_template, keep_direct_formatting=keep_direct_formatting)
+    except formatter.FormatError as exc:
+        raise ValueError(str(exc)) from exc
+    out = result.to_dict()
+    if update_subfile and sub_path is not None and field is not None:
+        sub_path.write_text(replace_scalar(sub_path.read_text(encoding="utf-8"), field.id, str(result.upload)), encoding="utf-8")
+        out["subfile_updated"] = {"subfile": str(sub_path), "field": field.id}
+    return out
 
 
 def describe_venue(venue: str) -> dict[str, Any]:
@@ -482,14 +556,16 @@ def read_subfile(subfile: str, manuscript_dir: Optional[str] = None) -> dict[str
     }
 
 
-def _validation_inputs(subfile: Optional[str], manuscript_dir: Optional[str], venue: Optional[str], files: dict[str, Any]):
+def _validation_inputs(subfile: Optional[str], manuscript_dir: Optional[str], venue: Optional[str], files: dict[str, Any], publisher: Optional[str] = None, issn: Optional[str] = None, journal: Optional[str] = None):
     """The ``(path, SubFile, Venue, files_only, notes)`` to validate.
 
     From the ``.sub`` when one is given, with any named files replacing its
     paths; else from the named files alone, checked against ``venue`` or, with
     none, the general venue (general checks only). See :mod:`paperpush.file_inputs`.
+    ``publisher`` / ``issn`` / ``journal`` pick the house rules of a journal
+    paperpush does not list (:func:`paperpush.publisher_lookup.resolve_target`).
     """
-    from . import file_inputs
+    from . import file_inputs, publisher_lookup
     from .database import general_venue
     from .subfile import SubFile
 
@@ -505,10 +581,15 @@ def _validation_inputs(subfile: Optional[str], manuscript_dir: Optional[str], ve
         path, venue_def = None, _venue_or_error(venue) if venue else general_venue()
         sub = SubFile(venue=venue_def.slug, values={})
     notes: list[str] = []
+    target = publisher_lookup.resolve_target(venue_def.slug, publisher or "", issn or "", journal or "")
+    if target is not None:
+        notes.append(target.message)
+        if target.venue is not None:
+            venue_def = target.venue
     if named:
         base = Path(manuscript_dir).expanduser() if manuscript_dir else None
         placed = file_inputs.apply_files(venue_def, sub.values, files, base=base)
-        venue_def, notes = placed.venue, placed.notes
+        venue_def, notes = placed.venue, notes + placed.notes
         sub = SubFile(venue=sub.venue, values=placed.values)
     return path, sub, venue_def, not subfile, notes
 
@@ -539,6 +620,9 @@ def validate_subfile(
     initial_submission: bool = False,
     ai_only: bool = False,
     cover_letter_max_age_days: int = 7,
+    publisher: Optional[str] = None,
+    issn: Optional[str] = None,
+    journal: Optional[str] = None,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file and report every check.
 
@@ -571,6 +655,12 @@ def validate_subfile(
     many are self-citations, and the prose (double spaces, repeated words,
     punctuation spacing, unbalanced brackets and quotes, common misspellings,
     repetitive word choice).
+    Where the venue's own guidelines are silent, its publisher's house rules
+    apply (see `list_publishers`); what those catch comes back as warnings
+    marked "house rule", never errors. For a journal paperpush does not list,
+    pass `publisher` (slug or name), `issn`, or `journal` (exact title; both
+    looked up in Crossref, needs network) with a general `.sub` or the named
+    files, to check against the publisher's house rules.
     `reference_check_full` (default false) adds one agent task per cited
     source to verify claim support from its abstract or paper and one to
     verify journal indexing. The regular manuscript pass measures reference
@@ -630,7 +720,7 @@ def validate_subfile(
     from .ai_validate import AiOptions, tasks_payload
 
     files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
-    path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files)
+    path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files, publisher, issn, journal)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
     result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_full=reference_check_full, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
     out: dict[str, Any] = {
@@ -667,6 +757,9 @@ def validation_ai_tasks(
     tables: Optional[list[str]] = None,
     supplement: Optional[list[str]] = None,
     reference_check_full: bool = False,
+    publisher: Optional[str] = None,
+    issn: Optional[str] = None,
+    journal: Optional[str] = None,
 ) -> dict[str, Any]:
     """The validation checks that need a reader's judgement, for you to do yourself.
 
@@ -683,12 +776,13 @@ def validation_ai_tasks(
     authoritative journal indexes.
 
     As with `validate_subfile`, files can be named instead of (or on top of) a
-    `.sub`, with or without a `venue`.
+    `.sub`, with or without a `venue`, and `publisher` / `issn` / `journal`
+    check a journal paperpush does not list against its publisher's house rules.
     """
     from .ai_validate import tasks_payload
 
     files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
-    path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files)
+    path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files, publisher, issn, journal)
     result = _run_validate_report(sub, venue_def, check_links=False, check_references=False, reference_check_full=reference_check_full, check_openreview=False, subfile_path=str(path or ""), files_only=files_only, notes=notes)
     from .file_inputs import validate_command
 
@@ -1503,8 +1597,27 @@ def venue_resource(slug: str) -> str:
 # Server assembly
 # ---------------------------------------------------------------------------
 
+
+def list_publishers() -> list[dict[str, Any]]:
+    """List the publishers whose house rules can back a venue's own.
+
+    Each: its slug, name, whether paperpush holds its house rules
+    (`house_rules`), its author-guidelines URL, and the listed venues that name
+    it. A venue's own guidelines win; where they are silent, its publisher's
+    house rules apply and `validate_subfile` reports what they catch as
+    warnings. Pass a publisher with house rules to `validate_subfile`
+    (`publisher`, or `issn` / `journal` to look it up) to check a journal
+    paperpush does not list.
+    """
+    from .requirements import list_publishers as _publishers
+
+    venues = list_venues()
+    return [{"slug": pub.slug, "name": pub.display_name, "house_rules": pub.has_rules, "site_url": pub.site_url, "parent": pub.parent, "venues": [v.slug for v in venues if v.publisher == pub.slug]} for pub in _publishers()]
+
+
 TOOLS = (
     list_supported_venues,
+    list_publishers,
     pick_venue,
     find_reviewers,
     describe_venue,
@@ -1513,6 +1626,7 @@ TOOLS = (
     read_subfile,
     validate_subfile,
     validation_ai_tasks,
+    format_manuscript,
     autofill_subfile,
     login_status,
     login,
@@ -1563,7 +1677,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile (format_manuscript reformats a .docx/.tex for the venue, with its template when one is found) -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
     )
     for tool in TOOLS:
         server.tool()(tool)

@@ -239,7 +239,7 @@ def build_forms_schema() -> dict[str, Any]:
 
 _REQ_SCHEMA_ID = "https://paperpush.org/schemas/manuscript_requirements.schema.json"
 _REQ_TITLE = "paperpush manuscript requirements database"
-_REQ_DESCRIPTION = "Schema for manuscript_requirements.json. The top-level object maps a venue slug to " "what its author guidelines require of the manuscript, grouped into shared sections " "(manuscript, title_page, abstract, keywords, sections, statements, figures, tables, " "supplementary, references, cover_letter, upload). Keys of the form publisher:<slug> hold a publisher's " "house rules, which back the rules of every venue that names that publisher in venues.json. Generated from the dataclasses in " "paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate."
+_REQ_DESCRIPTION = "Schema for manuscript_requirements.json. The top-level object maps a venue slug to " "what its author guidelines require of the manuscript, grouped into shared sections " "(manuscript, title_page, abstract, keywords, sections, statements, figures, tables, " "supplementary, references, cover_letter, upload). $publishers holds each publisher's " "house rules, which back the rules of every venue that names that publisher in venues.json. Generated from the dataclasses in " "paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate."
 
 
 def _requirements_section_schema(typ: type, defs: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -269,6 +269,7 @@ def _publisher_schema() -> dict[str, Any]:
     schema = _strip_model_description(_clean(TypeAdapter(Publisher).json_schema()))
     schema.pop("$defs", None)
     schema["properties"].pop("slug", None)
+    schema["properties"]["rules"] = {"$ref": "#/$defs/venue", "description": schema["properties"]["rules"].get("description", "")}
     schema.pop("required", None)
     schema["additionalProperties"] = False
     return schema
@@ -324,12 +325,12 @@ def build_requirements_schema() -> dict[str, Any]:
             },
             "$publishers": {
                 "type": "object",
-                "description": "The publishers whose house rules can back a venue's own (keyed by publisher slug; a venue names one with `publisher` in venues.json). Their rules are the `publisher:<slug>` entries.",
+                "description": "The publishers whose house rules can back a venue's own, keyed by publisher slug (a venue names one with `publisher` in venues.json). Each publisher's house rules are its `rules`, which paperpush loads as the entry `publisher:<slug>`.",
                 "propertyNames": {"pattern": "^[a-z0-9_]+$"},
                 "additionalProperties": {"$ref": "#/$defs/publisher"},
             },
         },
-        "patternProperties": {"^[A-Za-z0-9_]+$": {"$ref": "#/$defs/venue"}, "^publisher:[a-z0-9_]+$": {"$ref": "#/$defs/venue"}},
+        "patternProperties": {"^[A-Za-z0-9_]+$": {"$ref": "#/$defs/venue"}},
         "additionalProperties": False,
         "$defs": {"venue": top, "rules": rules, "publisher": _publisher_schema(), **sections, **nested_defs},
     }

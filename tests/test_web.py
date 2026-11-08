@@ -61,9 +61,14 @@ def test_index_and_static_assets_are_served(client):
 
 
 def test_venue_list_is_general_then_the_database(client):
+    from paperpush.requirements import list_publishers
+
     listed = client.get("/api/venues").json()
     assert listed[0]["slug"] == GENERAL_SLUG and listed[0]["name"] == "General"
-    assert [v["slug"] for v in listed[1:]] == [v.slug for v in list_venues()]
+    venues = [v.slug for v in list_venues()]
+    assert [v["slug"] for v in listed[1 : 1 + len(venues)]] == venues
+    # Then one "Other <publisher> journal" per publisher with house rules.
+    assert [v["slug"] for v in listed[1 + len(venues) :]] == [f"publisher:{p.slug}" for p in list_publishers() if p.has_rules]
 
 
 def test_general_venue_has_the_common_uploads_and_metadata(client):

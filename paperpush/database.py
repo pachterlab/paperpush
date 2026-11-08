@@ -583,6 +583,16 @@ class Venue(SubmissionForm, VenueInfo):
         return self.slug == GENERAL_SLUG
 
     @property
+    def is_house_rules_only(self) -> bool:
+        """Whether this stands for a journal paperpush does not list, checked against its publisher's house rules (:func:`publisher_venue`)."""
+        return self.slug.startswith("publisher:")
+
+    @property
+    def journal_unnamed(self) -> bool:
+        """Whether this is a house-rules venue whose journal's own name is not known (only its publisher)."""
+        return self.is_house_rules_only and not self.full_name
+
+    @property
     def supports_validate(self) -> bool:
         """Whether ``manuscript_requirements.json`` has rules for this venue."""
         from .requirements import get_requirements
@@ -644,14 +654,15 @@ def general_venue() -> "Venue":
     return Venue.from_dict(GENERAL_SLUG, {"name": "General", "full_name": "General (no specific venue)", **default_form(GENERAL_SLUG)}, has_form=False)
 
 
-def publisher_venue(publisher: str) -> "Venue":
+def publisher_venue(publisher: str, journal: str = "") -> "Venue":
     """A validate-only venue for a journal paperpush does not list, checked against its publisher's house rules.
 
     ``publisher`` is a publisher's slug, name, or Crossref name, with or without
-    the ``publisher:`` prefix. Its slug is the requirements key
-    (``publisher:elsevier``), so every check that looks the venue's rules up
-    by slug finds the house rules. Raises ``KeyError`` when the publisher is
-    unknown or the database holds no house rules for it.
+    the ``publisher:`` prefix; ``journal`` is the journal's title, when known
+    (it names the venue, e.g. for the cover-letter check). The venue's slug is
+    the requirements key (``publisher:elsevier``), so every check that looks
+    the venue's rules up by slug finds the house rules. Raises ``KeyError``
+    when the publisher is unknown or the database holds no house rules for it.
     """
     from .requirements import get_publisher, get_requirements, publisher_key
 
@@ -659,7 +670,9 @@ def publisher_venue(publisher: str) -> "Venue":
     if pub is None or get_requirements(publisher_key(pub.slug)) is None:
         raise KeyError(publisher)
     slug = publisher_key(pub.slug)
-    return Venue.from_dict(slug, {"name": f"{pub.display_name} (house rules)", "full_name": f"A {pub.display_name} journal, checked against {pub.display_name}'s house rules", "publisher": pub.slug, "submission_guide": pub.site_url, **default_form(slug)}, has_form=False)
+    journal = journal.strip()
+    name = journal or f"{pub.display_name} journal"
+    return Venue.from_dict(slug, {"name": name, "full_name": journal, "description": f"Checked against {pub.display_name}'s house rules; paperpush does not list this journal.", "publisher": pub.slug, "submission_guide": pub.site_url, **default_form(slug)}, has_form=False)
 
 
 def default_form(slug: str) -> dict[str, Any]:

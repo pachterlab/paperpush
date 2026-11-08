@@ -142,6 +142,21 @@ if git diff --cached --name-only --diff-filter=ACMDR -z \
 fi
 
 # ---------------------------------------------------------------------------
+# Keep the README comparison table (docs/_static/comparison.*) in sync with
+# the check count, venue counts, and skill count it reads. Runs after the
+# README generators above; re-renders only when its data changed.
+# ---------------------------------------------------------------------------
+if python scripts/gen_comparison_table.py --if-stale; then
+    if [ -n "$(git status --porcelain -- docs/_static/comparison.json docs/_static/comparison.pdf docs/_static/comparison.png)" ]; then
+        git add docs/_static/comparison.json docs/_static/comparison.pdf docs/_static/comparison.png
+        echo "pre-commit: regenerated the comparison table and re-staged it."
+    fi
+else
+    echo "pre-commit: failed to regenerate the comparison table." >&2
+    status=1
+fi
+
+# ---------------------------------------------------------------------------
 # Warn about limits submission_forms.json and manuscript_requirements.json
 # record differently (e.g. the abstract word limit). Only runs when one of the
 # venue databases is part of this commit. Never blocks the commit: a venue's

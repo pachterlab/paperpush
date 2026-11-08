@@ -18,17 +18,18 @@ into sections that share the same vocabulary across venues (``manuscript``,
 * ``inherits``: an entry takes another venue's requirements wholesale and then
   overrides individual keys section by section (a key set to ``null`` drops the
   inherited value). This is how the AAAS family shares Science's rules.
-* publisher fallback: an entry keyed ``publisher:<slug>`` holds a
-  publisher's house rules (Elsevier's Guide for Authors, Springer Nature's
-  editorial policies, ...). A venue whose ``venues.json`` entry names that
+* publisher fallback: ``$publishers.<slug>.rules`` holds a publisher's house
+  rules (Elsevier's Guide for Authors, Springer Nature's editorial policies,
+  ...), loaded as the entry ``publisher:<slug>`` (they live under ``$`` so
+  older versions, which read every other top-level key as a venue, skip them). A venue whose ``venues.json`` entry names that
   ``publisher`` starts from them, so a rule the venue's own guidelines do not
   state falls back to the publisher's; a key the venue sets (``null``
   included) wins. Rules taken this way are recorded on the result
   (``from_publisher``) and ``validate`` reports what they catch as warnings,
   never errors: a house rule may not hold for every journal. A journal
   paperpush does not list can be checked against its publisher's rules alone
-  (``paperpush validate --publisher``). ``$publishers`` names each publisher
-  and the names Crossref uses for it.
+  (``paperpush validate --publisher``). ``$publishers`` also names each
+  publisher and the names Crossref uses for it.
 * ``article_types``: per-article-type overrides, keyed by the exact option
   string of the ``.sub`` field named in ``article_type_field``. The top level
   holds the primary research-article rules; :func:`resolve` applies the
@@ -554,7 +555,27 @@ def _load_raw() -> dict[str, Any]:
             # copy is merged entry by entry onto what this version can read.
             data = published if source.kind == "override" else merge_published(bundled, published)
     logger.info("Loaded %d manuscript requirement entr(y/ies)", sum(1 for k in data if not k.startswith("$")))
-    return data
+    return _expand_publishers(data)
+
+
+def _expand_publishers(data: dict[str, Any]) -> dict[str, Any]:
+    """``data`` plus a ``publisher:<slug>`` entry for each publisher's house rules.
+
+    The rules are stored inside ``$publishers`` (``$publishers.<slug>.rules``)
+    rather than as top-level entries, because versions of paperpush from before
+    publisher fallback read every top-level key as a venue, and would refuse a
+    published copy with rules for a "venue" ``venues.json`` does not list. The
+    loaded database exposes them as ``publisher:<slug>`` entries, so they resolve
+    and inherit like any other.
+    """
+    table = data.get(PUBLISHERS_KEY) or {}
+    if not isinstance(table, dict) or not any(isinstance(v, dict) and v.get("rules") for v in table.values()):
+        return data
+    out = dict(data)
+    for slug, entry in table.items():
+        if isinstance(entry, dict) and entry.get("rules"):
+            out[publisher_key(str(slug))] = entry["rules"]
+    return out
 
 
 def _merge_section(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -689,6 +710,8 @@ def _entry_problem(slug: str, entry: Any) -> Optional[str]:
     problem = _rules_problem(entry, _ENTRY_KEYS, slug)
     if problem:
         return problem
+    if not is_publisher_key(slug) and is_publisher_key(str(entry.get("inherits", "") or "")):
+        return f"{slug} inherits {entry['inherits']!r}; name the publisher with `publisher` in venues.json instead (its house rules then back the venue's own)"
     top = {k: entry[k] for k in ("source_urls", "retrieved", "inherits", "article_type_field", "notes") if entry.get(k) is not None}
     try:
         _adapter(ManuscriptRequirements).validate_python({"slug": slug, **top})
@@ -759,7 +782,7 @@ def check_requirements_file(path: Path) -> list[str]:
     """
     published = _read_requirements(path)
     bundled = _read_requirements(REQUIREMENTS_PATH) if REQUIREMENTS_PATH.exists() else {}
-    raw = merge_published(bundled, published)
+    raw = _expand_publishers(merge_published(bundled, published))
     for slug in raw:
         if not slug.startswith("$"):
             ManuscriptRequirements.from_dict(slug, _resolve_entry(slug, raw))
@@ -789,6 +812,7 @@ class Publisher:
     site_url: Annotated[str, PField(description="URL of the publisher's author guidelines (its house rules), or its homepage.")] = ""
     crossref_names: Annotated[list[str], PField(description="Publisher names as Crossref records them (e.g. 'Elsevier BV'), for finding the publisher of a journal paperpush does not list from its ISSN.")] = dataclass_field(default_factory=list)
     parent: Annotated[str, PField(description="Slug of the publisher this one is an imprint of (Cell Press: elsevier). Informational; the house rules chain through `inherits`.")] = ""
+    rules: Annotated[dict[str, Any], PField(description="The publisher's house rules: the rules it states for all its journals, with the same keys as a venue entry. They back the rules of every venue whose venues.json entry names this publisher; `inherits` may name another publisher's rules as `publisher:<slug>`. Empty when paperpush holds none.")] = dataclass_field(default_factory=dict)
 
     @property
     def display_name(self) -> str:
@@ -797,8 +821,7 @@ class Publisher:
     @property
     def has_rules(self) -> bool:
         """Whether the database holds this publisher's house rules."""
-        raw = _load_raw()
-        return _find_key(raw, publisher_key(self.slug)) is not None
+        return bool(self.rules)
 
 
 _PUBLISHER_KEYS = frozenset(f.name for f in dataclass_fields(Publisher)) - {"slug"}
@@ -816,9 +839,17 @@ def _publishers_problem(entry: Any) -> Optional[str]:
         if unknown:
             return f"{PUBLISHERS_KEY}.{slug} has key(s) this version does not know: {', '.join(unknown)}"
         try:
-            _adapter(Publisher).validate_python({"slug": slug, **data})
+            _adapter(Publisher).validate_python({"slug": slug, **{k: v for k, v in data.items() if k != "rules"}})
         except ValidationError as exc:
             return f"{PUBLISHERS_KEY}.{slug} does not match this version's types ({exc.errors()[0]['msg']})"
+        rules = data.get("rules")
+        if rules:
+            problem = _entry_problem(publisher_key(str(slug)), rules)
+            if problem:
+                return f"{PUBLISHERS_KEY}.{slug}.rules: {problem}"
+            base = str(rules.get("inherits", "") or "").lower()
+            if base and (not is_publisher_key(base) or not (entry.get(base[len(PUBLISHER_PREFIX) :]) or {}).get("rules")):
+                return f"{PUBLISHERS_KEY}.{slug}.rules inherits {base!r}, which is not another publisher's house rules"
     return None
 
 

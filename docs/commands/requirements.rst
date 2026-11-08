@@ -62,11 +62,25 @@ another's rules and override a few keys, and ``article_types`` holds
 per-article-type overrides keyed by the venue's own article-type option, which
 ``validate`` applies according to the article type selected in the ``.sub``.
 
+Publisher house rules
+^^^^^^^^^^^^^^^^^^^^^
+
+A venue's entry in ``venues.json`` can name its ``publisher``. When the
+database holds that publisher's house rules (``$publishers.<slug>.rules``,
+loaded as ``publisher:<slug>``), they back the venue's own:
+the venue's rules win, and a rule its guidelines do not state falls back to the
+publisher's. The summary marks those rules with ``*``, and ``--json`` lists
+them under ``from_publisher``. :doc:`validate` reports what a house rule
+catches as a warning, never an error, since a journal can depart from its
+publisher's rules. ``paperpush requirements publisher:elsevier`` shows a
+publisher's house rules on their own; :doc:`publishers` lists the publishers.
+
 Arguments
 ---------
 
 ``venue``
-   Venue slug, e.g. ``nature`` (see ``paperpush venues``).
+   Venue slug, e.g. ``nature`` (see ``paperpush venues``), or
+   ``publisher:<slug>`` for a publisher's house rules.
 
 ``--article-type TYPE``
    Show the rules for this article type -- the exact option string of the
@@ -90,5 +104,6 @@ See also
 
 - :doc:`validate` — measures the manuscript and other uploads against these
   rules (``--dont-check-manuscript`` turns that off).
+- :doc:`publishers` — the publishers whose house rules back their venues' own.
 - :doc:`options` — the allowed values of a ``choice`` field, including the
   article-type field whose values key the per-type overrides.

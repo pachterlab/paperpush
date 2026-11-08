@@ -1078,8 +1078,8 @@ class PublisherFallback:
     @property
     def suffix(self) -> str:
         if self.rules_only:
-            return f" (a {self.publisher} house rule; check that the journal's own guidelines keep it)"
-        return f" (a {self.publisher} house rule; {self.venue}'s own guidelines do not state it, so check that it applies)"
+            return f" ({self.publisher} house rule; check that the journal's own guidelines keep it)"
+        return f" ({self.publisher} house rule; {self.venue}'s own guidelines do not state it, so check that it applies)"
 
 
 class Checks:

@@ -4,8 +4,10 @@ description: >-
   Transfer a manuscript that was submitted to one venue to another venue:
   copy the submission files into a new <venue>/ directory inside the
   submission's directory, create the new venue's .sub there, autofill it
-  (reusing the values in any .sub files from earlier submissions), validate
-  it, and write transfer.txt describing what changed. The original files are
+  (reusing the values in any .sub files from earlier submissions), reformat
+  the manuscript for the new venue (its Word/LaTeX template when one is found,
+  else its layout rules), validate it, and write transfer.txt describing what
+  changed. The original files are
   never modified. Triggers: "transfer my manuscript to <venue>", "resubmit
   this paper to <venue>", "my paper was rejected from <venue>, move it to
   <venue>", "reuse my nature sub for cell", "paperpush-transfer".
@@ -15,9 +17,10 @@ description: >-
 
 Moves a manuscript that was already prepared for (or submitted to) one venue
 over to a new one. You copy the files, create and fill the new venue's `.sub`,
-validate it, and write `transfer.txt`, a plain-text record of every change.
-The other skills do the real work: `paperpush-autofill` fills the `.sub`,
-`paperpush-validate` checks it, and `paperpush-fix` (only if the user agrees)
+reformat the manuscript, validate it, and write `transfer.txt`, a plain-text
+record of every change. The other skills and commands do the real work:
+`paperpush-autofill` fills the `.sub`, `paperpush format` reformats the
+manuscript copy for the new venue, `paperpush-validate` checks it, and `paperpush-fix` (only if the user agrees)
 fixes what validate finds. This skill sequences them and carries values over
 from the earlier submission.
 
@@ -48,7 +51,7 @@ delete anything in the source directory**; every change happens in the copy.
      closest directory that holds all of them.
    - New directory: `<source-dir>/<venue>/` (the slug, e.g. `cell/`).
    - If it already exists and is not empty, stop and ask: update it in place
-     (keep its files and `.sub`, re-run steps 4-8) or stop. Never delete it.
+     (keep its files and `.sub`, re-run steps 4-9) or stop. Never delete it.
    - If the source directory already holds transfer subdirectories (a
      subdirectory named after a venue slug with a `.sub` in it), ask which copy
      to start from: the original files, or a transfer that was already
@@ -116,13 +119,48 @@ delete anything in the source directory**; every change happens in the copy.
      `transfer.txt` so the author can re-enter it if it still applies.
    - Write `values.json` in a temporary directory, not the new directory.
 
-6. **Validate.** Invoke the `paperpush-validate` skill (via the Skill tool) on
+6. **Reformat the manuscript for the new venue.** Do this by default; skip it
+   only when the user asked to keep the original formatting (record that in
+   `transfer.txt`). It runs before validation so validation measures the
+   reformatted file.
+   - Only a Word (`.docx`) or LaTeX (`.tex`, or a `.zip` of LaTeX sources)
+     manuscript can be reformatted. If the new `.sub`'s manuscript is a PDF,
+     look in the new directory for its source (a `.docx` or `.tex` with the
+     same stem, or the only one there) and pass it with `--manuscript`. If
+     there is no source, skip the step and put "send the Word or LaTeX source
+     to reformat it for <venue>" in the To-do list.
+   - Run it with absolute paths, writing into the new directory and pointing
+     the new `.sub` at the result:
+
+     ```
+     paperpush format <new-dir>/<venue>.sub.txt -o <new-dir>/formatted --update-sub --json
+     ```
+
+     (MCP: `format_manuscript(subfile=..., output_dir=..., update_subfile=true)`;
+     add `--manuscript <abs source>` for the PDF case above, and without
+     `--update-sub` set the `.sub`'s manuscript field to the formatted file
+     yourself). It looks for the new venue's own template first (the recorded
+     template link, then the venue's author-guideline pages) and otherwise
+     applies the venue's layout rules. The unformatted copy stays in the new
+     directory, so the author can go back to it.
+   - When the manuscript is LaTeX and the PDF upload field points at a PDF,
+     point it at the compiled `formatted/<stem>.pdf` (the JSON's `pdf`) when
+     there is one; if the result did not compile, leave the field as it was
+     and put the reason (from `left_to_author`) in the To-do list.
+   - Keep the JSON result for `transfer.txt`: `template` (or `template_note`),
+     `other_templates`, `changes`, `left_to_author`, and the `layout_checks`
+     that did not pass. `left_to_author` (reference style, front matter the
+     new class wants, figure placement, ...) goes into the To-do list too.
+   - If `format` fails, report the error, keep the unformatted copy, and go on.
+
+7. **Validate.** Invoke the `paperpush-validate` skill (via the Skill tool) on
    the new `.sub`, including the checks that need a reader. Do not run
    `paperpush-fix` yourself: if validate finds errors or warnings, ask whether
-   to run it, and say that it edits only the copies in the new directory. If
-   they say yes, invoke it and use its final validation in step 7.
+   to run it, and say that it edits only the copies in the new directory (the
+   formatted manuscript, when step 6 made one). If they say yes, invoke it and
+   use its final validation in step 8.
 
-7. **Write `<new-dir>/transfer.txt`** (rewrite it if this is a re-run). Plain
+8. **Write `<new-dir>/transfer.txt`** (rewrite it if this is a re-run). Plain
    text, absolute paths, in this order:
 
    ```
@@ -152,12 +190,23 @@ delete anything in the source directory**; every change happens in the copy.
       <rule>: <old> -> <new>   (word, abstract, figure, and reference limits,
       reference style, title page, file formats, anything else that differs)
 
-   4. Validation
+   4. Formatting
+      Formatted manuscript: <abs path>  (unformatted copy: <abs path>)
+      Template: <URL or path>   or   No template (<template_note>); the
+          venue's layout rules were applied
+      Other templates found: <description>, ...
+      Changes: <each change, one line each>
+      Left for you: <each left_to_author item>
+      Layout checks not passed: <id>: <message>, ...
+      (or: "Not reformatted: <reason>" -- kept the original formatting at
+       your request, no Word/LaTeX source, or the error format gave)
+
+   5. Validation
       <n> errors, <n> warnings, <n> not checked
       <each error and warning, one line each>
       <what paperpush-fix changed, if it ran>
 
-   5. To do
+   6. To do
       <the author's remaining tasks, most important first>
       paperpush submit <abs new .sub>   (after: paperpush login <new venue>)
    ```
@@ -168,11 +217,12 @@ delete anything in the source directory**; every change happens in the copy.
    long values (abstracts, statements) to their first 80 characters, with
    `...`, instead of pasting them whole.
 
-8. **Report to the user.** Give the new directory, the `.sub`, and the path to
+9. **Report to the user.** Give the new directory, the `.sub`, and the path to
    `transfer.txt`, then a short summary: how many fields were carried over,
    updated, and new; the guideline differences that matter most (a lower word
-   limit, a different reference style); the validation counts; and what is
-   left for them. For the portal, point them to `paperpush-submit` (or
+   limit, a different reference style); whether the manuscript was reformatted
+   and with which template (or the layout rules); the validation counts; and
+   what is left for them. For the portal, point them to `paperpush-submit` (or
    `paperpush login <venue>` then `paperpush submit <abs .sub>`).
 
 ## Rules
@@ -186,6 +236,6 @@ delete anything in the source directory**; every change happens in the copy.
 - Never write a `never` field, even from an earlier `.sub`.
 - Never invent values: if neither the earlier `.sub` nor the files give it,
   leave it for the author.
-- Delegate filling to `paperpush-autofill`, checking to `paperpush-validate`,
-  and fixing to `paperpush-fix` (with the user's go-ahead); do not duplicate
-  their logic here, and do not submit.
+- Delegate filling to `paperpush-autofill`, reformatting to `paperpush format`,
+  checking to `paperpush-validate`, and fixing to `paperpush-fix` (with the
+  user's go-ahead); do not duplicate their logic here, and do not submit.

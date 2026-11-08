@@ -311,7 +311,122 @@
         "Elsevier BV",
         "Elsevier",
         "Elsevier Ltd"
-      ]
+      ],
+      "rules": {
+        "statements": {
+          "required": [
+            "competing_interests"
+          ],
+          "optional": [
+            "funding",
+            "author_contributions",
+            "data_availability",
+            "ethics_approval",
+            "consent_to_participate",
+            "consent_to_publish",
+            "ai_use"
+          ],
+          "ai_use_if_used": true,
+          "ai_use_locations": [
+            "statement",
+            "methods"
+          ],
+          "ai_copyediting_exempt": true,
+          "ai_authorship_prohibited": true,
+          "notes": [
+            "All submissions must include disclosure of all relationships that could be viewed as presenting a potential conflict of interest; all authors should disclose in their manuscript any financial and personal relationships with other people or organisations that could be viewed as inappropriately influencing (bias) their work.",
+            "All sources of financial support for the research and/or preparation of the article should be disclosed, together with the role of the sponsor(s) in study design, data collection, analysis and interpretation, writing, and the decision to submit; if the funders had no such involvement this should be stated.",
+            "Use of AI tools for manuscript preparation should be disclosed in a separate AI declaration statement in the manuscript at submission, which appears in the published article and names the tool, the purpose of its use, and the extent of the authors' oversight.",
+            "Recommended AI declaration format: section title 'Declaration of generative AI and AI-assisted technologies in the manuscript preparation process', statement 'During the preparation of this work, the author(s) used [NAME OF TOOL / SERVICE] in order to [REASON]. After using this tool/service, the author(s) reviewed and edited the content as needed and take(s) full responsibility for the content of the published article.'",
+            "Basic grammar, spelling and punctuation checks need no AI declaration, but AI tools that make substantive changes to sentence structure or organization of the text should be disclosed; AI features of disability-related assistive technology used solely for accessibility need not be disclosed.",
+            "AI tools used in the research process (rather than manuscript preparation) must be described reproducibly in the Methods section, including the name of the model or tool, the version, and the developer or manufacturer.",
+            "AI tools may not be listed as an author or co-author, nor cited as an author.",
+            "CRediT (Contributor Roles Taxonomy) author statements, listing the roles of all authors, are provided during submission and appear above the acknowledgment section of the published paper.",
+            "Research data policy varies by journal (Elsevier options A-E, from encouraging to requiring deposit and linking); in options B and C a data statement explaining why data cannot be shared is made at submission and appears in the published article.",
+            "Work involving human participants (including their data or biological materials) must include a statement in the manuscript confirming compliance with relevant laws and institutional approval, giving the date and reference number of the ethical approval(s); exempt studies must explain why they are exempt.",
+            "Authors should include a statement in the manuscript confirming informed consent from all human participants (or their legal representatives); consent for publication should also be obtained, and written consent is needed to include case details, images or other identifiable information about individuals.",
+            "Research with vulnerable populations requires a statement in the manuscript that the necessary consents and safeguards were in place and all laws and regulations were followed.",
+            "Manuscripts describing organ transplantation must declare that autonomous consent free from coercion was obtained from donors or next of kin and that organs or tissues were not sourced from executed prisoners or prisoners of conscience.",
+            "Animal studies should comply with the ARRIVE guidelines (or national equivalent), and the manuscript must contain a statement of which guidelines were followed, with the ethics committee approval number when available (or a statement of exemption); the sex of the animals should be indicated.",
+            "Case reports must follow the CARE guidelines and provide the CARE checklist at submission.",
+            "If the work involves chemicals, procedures or equipment with unusual inherent hazards, the author must clearly identify these in the manuscript."
+          ]
+        },
+        "title_page": {
+          "notes": [
+            "Group authorship must be declared on the title page at submission, with a designated corresponding author for the group.",
+            "Authors should use the full, standard title of their institution or its standard abbreviation in affiliations."
+          ]
+        },
+        "figures": {
+          "formats": [
+            ".eps",
+            ".pdf",
+            ".tif",
+            ".tiff",
+            ".jpg",
+            ".jpeg",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx",
+            ".ppt",
+            ".pptx"
+          ],
+          "vector_formats": [
+            ".eps",
+            ".pdf"
+          ],
+          "min_dpi": 300,
+          "min_dpi_line_art": 1000,
+          "min_dpi_combination": 500,
+          "notes": [
+            "Elsevier recommends only EPS, PDF, TIFF or JPEG for electronic artwork; Microsoft Office files (Word, Excel, PowerPoint) are also accepted, and EPS is the preferred format for vector graphics.",
+            "Grayscale and RGB halftones should be at least 300 dpi, bitmap line art at least 1000 dpi (1200 dpi for very fine line weights), and combination line/halftone art 500 dpi; color should preferably be encoded as RGB.",
+            "Use the recommended fonts where possible (Arial or Helvetica, Courier, Symbol, Times or Times New Roman) and embed all fonts in vector files; non-standard fonts may be substituted.",
+            "As a rule of thumb, lettering should have a finished printed size of 7 pt for normal text and no smaller than 6 pt for subscripts and superscripts.",
+            "General image widths are 30 mm minimal, 90 mm single column, 140 mm 1.5 column and 190 mm double column, but some journals have special instructions.",
+            "File names should reflect numbering, type and format (e.g. FIG1.TIF) and always include the file extension.",
+            "No specific feature within an image may be enhanced, obscured, moved, removed or introduced; adjustments of brightness, contrast or color balance are acceptable only if they do not obscure or eliminate information present in the original.",
+            "Explanatory images (flow charts, schematics, workflow diagrams) made with AI tools must disclose the AI use in each image's caption (tool, version, how it was used) and in the general AI disclosure statement.",
+            "Data visualizations may use AI tools only when directly derived from the underlying data via reproducible methods reported in Methods, with the model or tool name, version and developer disclosed in the Methods section.",
+            "AI tools must not be used to create or alter primary research images (e.g. microscopy, blots, scans, patient images).",
+            "General-purpose generative AI image tools must not be used to create graphical abstracts; AI-generated cover art needs prior permission from the journal editor and publisher.",
+            "Figures should be accessible to readers with impaired color vision (color-blind-safe palette, sufficient contrast, magenta instead of red in red-green fluorescent images)."
+          ]
+        },
+        "references": {
+          "preprints_allowed": true,
+          "notes": [
+            "AI-generated references can be incorrect or fabricated, and authors must check the sources of all AI-generated output.",
+            "Authors must cite relevant, timely and verified literature, generally peer-reviewed, and must not enter into arrangements to cite the work of other authors or groups."
+          ]
+        },
+        "notes": [
+          "Submitting the same manuscript to more than one journal concurrently is unacceptable.",
+          "Publication as an abstract, an academic thesis, or an electronic preprint is not considered prior publication, and authors can share their preprint anywhere at any time; some society-owned titles and journals with double-anonymized review have different preprint policies.",
+          "Authors should provide the definitive list and order of authors at original submission; Elsevier journals do not allow authorship changes after acceptance.",
+          "Authors may be asked to provide the research data supporting their paper for editorial review and should be prepared to retain it for a reasonable number of years after publication.",
+          "Authors must check that any AI tool they use keeps their data and unpublished manuscript confidential and is not granted rights to train on their materials.",
+          "Maps should show only the area studied and carry the note 'map lines delineate study areas and do not necessarily depict accepted national boundaries'.",
+          "Elsevier provides Crossref Similarity Check reports for all submissions to its editorial systems."
+        ],
+        "source_urls": [
+          "https://www.elsevier.com/researcher/author/policies-and-guidelines",
+          "https://www.elsevier.com/about/policies-and-standards/generative-ai-policies-for-journals",
+          "https://www.elsevier.com/about/policies-and-standards/publishing-ethics",
+          "https://www.elsevier.com/researcher/author/policies-and-guidelines/credit-author-statement",
+          "https://www.elsevier.com/about/policies-and-standards/research-data",
+          "https://www.elsevier.com/researcher/author/tools-and-resources/research-data/data-guidelines",
+          "https://www.elsevier.com/about/policies-and-standards/sharing",
+          "https://www.elsevier.com/about/policies-and-standards/patient-consent",
+          "https://www.elsevier.com/about/policies-and-standards/author/artwork-and-media-instructions",
+          "https://www.elsevier.com/about/policies-and-standards/author/artwork-and-media-instructions/artwork-overview",
+          "https://www.elsevier.com/about/policies-and-standards/author/artwork-and-media-instructions/artwork-types",
+          "https://www.elsevier.com/about/policies-and-standards/author/artwork-and-media-instructions/artwork-sizing"
+        ],
+        "retrieved": "2026-11-07"
+      }
     },
     "frontiers": {
       "name": "Frontiers",
@@ -418,7 +533,72 @@
         "Springer Berlin Heidelberg",
         "BioMed Central",
         "Springer Nature Singapore"
-      ]
+      ],
+      "rules": {
+        "statements": {
+          "required": [
+            "data_availability",
+            "author_contributions"
+          ],
+          "optional": [
+            "competing_interests",
+            "code_availability",
+            "ethics_approval",
+            "consent_to_participate",
+            "consent_to_publish",
+            "ai_use"
+          ],
+          "ai_use_if_used": true,
+          "ai_authorship_prohibited": true,
+          "notes": [
+            "All original articles must include a data availability statement saying what data are available, where they can be found and any access terms, covering both original and reused data and whether or not the data can be shared publicly.",
+            "If data cannot be shared publicly (for example to protect participant privacy), data availability must still be stated in the manuscript along with any conditions for access.",
+            "Data availability statements should include hyperlinks and persistent identifiers (e.g. DOI or accession number) for data held in a repository.",
+            "Authors must include a statement in the manuscript that specifies the contribution of each author.",
+            "Springer Nature requires declarations of competing interests in selected journals and fields (not yet across the whole portfolio); check the journal's own guidelines.",
+            "Experimental results on animal and human participants must conform to the authors' local regulations and ethical standards; adherence to international standards is encouraged.",
+            "Research using clinical, biomedical or biometric data from human participants requires their explicit consent, which authors must certify and document with evidence when needed.",
+            "Consent to publish must be obtained for any individually identifiable personal data.",
+            "AI use in manuscript preparation (including language editing, formatting and translation) should be clearly described with confirmation of author accountability; AI may not be listed as an author or used to write results or discussion, generate scientific claims or interpretations, or produce data or figures as if empirical.",
+            "AI use in research practice should be declared with the tool and its purpose, and for analytical or interpretive use with a methodological description and validation steps; fabricating data or references with AI is not permitted."
+          ]
+        },
+        "figures": {
+          "notes": [
+            "AI-generated or AI-assisted visual content must be disclosed, with the AI system, purpose and extent of its contribution in an AI declaration in the manuscript and a specific disclosure in the figure caption or legend.",
+            "AI-generated visual content not derived from independently verifiable data, source material, methods, computational outputs or author-developed content is not permitted.",
+            "Permission from the copyright holder is required to reproduce figures, tables or text previously published elsewhere.",
+            "Papers found to contain inappropriately manipulated images are investigated and retracted if fraud is confirmed."
+          ]
+        },
+        "references": {
+          "preprints_allowed": true,
+          "notes": [
+            "Publicly available data on which the conclusions rely should be cited in the reference list with a persistent identifier, using DataCite's minimum information (creator, title, repository, year, identifier) and journal style.",
+            "AI-assisted reference management is permitted with caution, but authors must ensure every reference is real and has been checked."
+          ]
+        },
+        "notes": [
+          "Manuscripts may not be submitted to more than one journal at a time.",
+          "Posting preprints on preprint servers is encouraged and is not considered prior publication; preprint posting details (DOI and licence) should be disclosed at submission.",
+          "For a number of data types, deposition in a community-endorsed public repository is mandatory, and all supporting datasets are strongly encouraged to be made publicly available at publication.",
+          "Peer reviewers are entitled to request access to underlying data and code when needed to evaluate a manuscript.",
+          "The corresponding author must confirm authority to act for all co-authors and that all listed authors agreed to the content, author list and author contribution statements.",
+          "Submitted manuscripts are routinely screened for plagiarism with Crossref Similarity Check (iThenticate).",
+          "Manuscript content must not be uploaded to unsecured or public AI systems."
+        ],
+        "source_urls": [
+          "https://www.springernature.com/gp/policies/editorial-policies",
+          "https://www.springernature.com/gp/authors/research-data-policy",
+          "https://www.springernature.com/gp/authors/research-data-policy/data-availability-statements",
+          "https://www.springernature.com/gp/policies/editorial-policies/ai-manuscript-preparation",
+          "https://www.springernature.com/gp/policies/editorial-policies/using-ai-in-research",
+          "https://www.springernature.com/gp/policies/editorial-policies/third-party-permissions",
+          "https://link.springer.com/brands/springer/journal-policies",
+          "https://www.nature.com/nature-portfolio/editorial-policies/ai"
+        ],
+        "retrieved": "2026-11-07"
+      }
     },
     "taylor_francis": {
       "name": "Taylor & Francis",

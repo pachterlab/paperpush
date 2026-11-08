@@ -707,7 +707,7 @@ def test_build_server_exposes_typed_arguments():
     tool = by_name["validate_subfile"]
     # Renamed from inputSchema to input_schema in MCP SDK 2.0.
     schema = getattr(tool, "input_schema", None) or tool.inputSchema
-    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "venue", "manuscript", "title_page", "cover_letter", "figures", "tables", "supplement", "check_links", "check_sensitive", "check_references", "reference_check_full", "references_alphabetical", "references_citation_order", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "colorblind", "initial_submission", "ai_only", "cover_letter_max_age_days"}
+    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "venue", "manuscript", "title_page", "cover_letter", "figures", "tables", "supplement", "check_links", "check_sensitive", "check_references", "reference_check_full", "references_alphabetical", "references_citation_order", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "colorblind", "initial_submission", "ai_only", "cover_letter_max_age_days", "publisher", "issn", "journal"}
     # Files can be named instead of a .sub, so nothing is required.
     assert not schema.get("required")
 

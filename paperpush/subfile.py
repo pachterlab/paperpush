@@ -197,8 +197,8 @@ def find_subfile(path: str | Path) -> Path:
 
 
 def default_filename(venue: Venue) -> str:
-    """Conventional submission filename for a venue (e.g. ``biorxiv.sub.txt``)."""
-    return f"{venue.slug}{SUFFIX}"
+    """Conventional submission filename for a venue (e.g. ``biorxiv.sub.txt``; ``publisher_elsevier.sub.txt`` for ``publisher:elsevier``)."""
+    return f"{venue.slug.replace(':', '_')}{SUFFIX}"
 
 
 def _format_default(field: Field) -> str:

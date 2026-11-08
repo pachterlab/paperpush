@@ -51,6 +51,16 @@ Per-article-type overrides: the same section keys as a venue entry.
 
 The same section keys as a venue entry (plus `notes`); used as the value of each `article_types` entry.
 
+## publisher
+
+| Key | Type | Description |
+|---|---|---|
+| `name` | string | Display name, e.g. 'Springer Nature'. |
+| `site_url` | string | URL of the publisher's author guidelines (its house rules), or its homepage. |
+| `crossref_names` | list of string | Publisher names as Crossref records them (e.g. 'Elsevier BV'), for finding the publisher of a journal paperpush does not list from its ISSN. |
+| `parent` | string | Slug of the publisher this one is an imprint of (Cell Press: elsevier). Informational; the house rules chain through `inherits`. |
+| `rules` | [venue](#venue) | The publisher's house rules: the rules it states for all its journals, with the same keys as a venue entry. They back the rules of every venue whose venues.json entry names this publisher; `inherits` may name another publisher's rules as `publisher:<slug>`. Empty when paperpush holds none. |
+
 ## manuscript
 
 | Key | Type | Description |

@@ -22,7 +22,10 @@ Implemented so far:
     paperpush validate <subfile>  run the pre-submission checks on a .sub
     paperpush validate --manuscript FILE [--venue VENUE] ...
                                       check files without a .sub (general checks
-                                      only when no venue is named)
+                                      only when no venue is named; --publisher or
+                                      --issn for a journal paperpush does not list)
+    paperpush publishers          list the publishers whose house rules back
+                                      their venues' own
     paperpush requirements <venue>  show what the venue's author guidelines require of the manuscript
                                       (scans referenced files for secrets, GPS
                                       metadata, LaTeX comments, broken links, and
@@ -54,6 +57,7 @@ import getpass
 import json
 import logging
 import os
+import shlex
 import sys
 import textwrap
 from pathlib import Path
@@ -793,7 +797,7 @@ def _cmd_find_reviewers(args: argparse.Namespace) -> int:
         if search.excluded:
             shown = "; ".join(f"{e.name} ({e.reason})" for e in search.excluded[:5])
             more = f", and {len(search.excluded) - 5} more (see --json)" if len(search.excluded) > 5 else ""
-            print(f"\nLeft out for conflicts: {shown}{more}.")
+            print(f"\nLeft out: {shown}{more}.")
         for note in search.notes:
             print(f"Note: {note}")
         print("Check each suggestion yourself: names and affiliations in OpenAlex are not always clean, and a conflict it does not record (a close colleague, a competitor) is not screened out.")
@@ -1399,6 +1403,27 @@ Guideline rules no check reads are listed as 'not implemented'. See
 """
 
 
+def _publisher_target(args: argparse.Namespace, venue: str):
+    """The venue ``validate --publisher/--issn/--journal`` asks for (see :func:`paperpush.publisher_lookup.resolve_target`).
+
+    Returns None when none was given, a ``Target`` otherwise (its venue None:
+    general checks only), or an exit code after printing why it cannot be used.
+    """
+    from . import publisher_lookup
+
+    try:
+        target = publisher_lookup.resolve_target(venue or "", getattr(args, "publisher", None) or "", getattr(args, "issn", None) or "", getattr(args, "journal", None) or "")
+    except publisher_lookup.UnknownPublisher as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if target is not None:
+        print(target.message, file=sys.stderr)
+    return target
+
+
 @_validate
 def _cmd_validate(args: argparse.Namespace) -> int:
     """Run the pre-submission checks on a .sub file and print the full report.
@@ -1451,7 +1476,13 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             print(f"error: {args.subfile} is for {venue}, not {requested_venue}; drop --venue, or make a .sub for {requested_venue} with 'paperpush subfile {requested_venue}'", file=sys.stderr)
             return 1
 
-    if venue:
+    house = _publisher_target(args, venue)
+    if isinstance(house, int):
+        return house
+    if house is not None and house.venue is not None:
+        venue_def = house.venue
+        venue = venue_def.slug
+    elif venue and house is None:
         try:
             venue_def = get_venue(venue)
         except KeyError:
@@ -1478,6 +1509,9 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     rerun = f"paperpush validate {args.subfile}" if args.subfile else file_inputs.validate_command(requested_venue, files)
     if getattr(args, "reference_check_full", False):
         rerun += " --reference-check-full"
+    for flag in ("publisher", "issn", "journal"):
+        if getattr(args, flag, None):
+            rerun += f" --{flag} {shlex.quote(getattr(args, flag))}"
 
     ai_only = getattr(args, "ai_only", False)
     if ai_only and not getattr(args, "check_manuscript", True):
@@ -2374,6 +2408,112 @@ def _cmd_schema(args: argparse.Namespace) -> int:
 
 
 @_validate
+def _cmd_format(args: argparse.Namespace) -> int:
+    """Reformat a manuscript for a venue: its template when one can be found, else its layout rules."""
+    from . import formatter
+    from .requirements_check import manuscript_files
+    from .subfile import find_subfile, load, replace_scalar
+
+    values: dict[str, str] = {}
+    sub_path = None
+    if args.subfile:
+        try:
+            sub_path = find_subfile(args.subfile)
+            sub = load(sub_path)
+        except (OSError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        values = dict(sub.values)
+        slug = args.venue or sub.venue
+    else:
+        slug = args.venue
+    if not slug:
+        print("error: name the venue (--venue VENUE) or give a .sub file", file=sys.stderr)
+        return 1
+    try:
+        venue = get_venue(slug)
+    except KeyError:
+        print(f"error: unknown venue '{slug}'", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
+        return 2
+
+    if args.list_templates:
+        try:
+            search = formatter.list_templates(venue, values, browser=not args.no_browser)
+        except formatter.FormatError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        if args.json:
+            print(json.dumps({"venue": venue.slug, "templates": [vars(link) for link in search.links], "pages": search.pages, "refused": search.refused}, indent=2))
+            return 0
+        print(f"Templates found for {venue.slug} ({len(search.pages)} guideline page(s) read):")
+        for link in search.links:
+            print(f"  - {link.describe()}")
+        if not search.links:
+            print("  none")
+        for refused in search.refused:
+            print(f"  could not read {refused}", file=sys.stderr)
+        return 0
+
+    manuscript_field = None
+    if args.manuscript:
+        manuscript = Path(args.manuscript)
+        if values:
+            from .requirements_check import _fields_for
+
+            manuscript_field = next(iter(_fields_for(venue, "manuscript")), None)
+    else:
+        files = manuscript_files(venue, values) if values else []
+        if not files:
+            print("error: give the manuscript (--manuscript FILE), or a .sub whose manuscript file exists", file=sys.stderr)
+            return 1
+        manuscript_field, manuscript = files[0]
+    try:
+        result = formatter.format_manuscript(
+            manuscript,
+            venue,
+            values,
+            out_dir=Path(args.output) if args.output else None,
+            template=args.template,
+            use_template=not args.no_template,
+            browser=not args.no_browser,
+            keep_direct_formatting=args.keep_direct_formatting,
+            compile_pdf=not args.no_compile,
+        )
+    except formatter.FormatError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if args.update_sub and sub_path is not None and manuscript_field is not None:
+        text = sub_path.read_text(encoding="utf-8")
+        sub_path.write_text(replace_scalar(text, manuscript_field.id, str(result.upload)), encoding="utf-8")
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2))
+        return 0
+    print(f"Formatted {result.manuscript.name} for {venue.slug}: {result.output}")
+    if result.pdf:
+        print(f"  PDF: {result.pdf}")
+    print(f"  Template: {result.template}" if result.template else f"  No template applied ({result.template_note}); used the venue's layout rules")
+    for line in result.other_templates:
+        print(f"  Also found: {line}")
+    for change in result.changes:
+        print(f"  + {change}")
+    for todo in result.left_to_author:
+        print(f"  ! {todo}")
+    failing = [(cid, msgs) for cid, _, status, msgs in result.checks if status in ("failed", "warning")]
+    for cid, msgs in failing:
+        for msg in msgs or [""]:
+            print(f"  layout check {cid}: {msg}")
+    print(f"  Details: {result.report}")
+    if args.update_sub and manuscript_field is not None:
+        print(f"  Updated {manuscript_field.id} in {sub_path.name}")
+    elif sub_path is not None:
+        print(f"  Point {sub_path.name} at the new file (or rerun with --update-sub), then run 'paperpush validate {sub_path.name}'")
+    return 0
+
+
 def _cmd_requirements(args: argparse.Namespace) -> int:
     """Print what a venue's author guidelines require of the manuscript.
 
@@ -2408,6 +2548,15 @@ def _cmd_requirements(args: argparse.Namespace) -> int:
         return 0
 
     print(f"Manuscript requirements for {venue.name} ({venue.slug})")
+    if reqs.publisher:
+        from .requirements import get_publisher
+
+        pub = get_publisher(reqs.publisher)
+        pub_name = pub.display_name if pub else reqs.publisher
+        if reqs.publisher_rules_only:
+            print(f"  {pub_name}'s house rules, for a journal paperpush does not list; validate reports what they catch as warnings")
+        elif reqs.from_publisher:
+            print(f"  rules marked * are {pub_name}'s house rules, which {venue.slug}'s own guidelines do not state; validate reports what they catch as warnings")
     if reqs.retrieved:
         print(f"  read from the author guidelines on {reqs.retrieved}")
     for url in reqs.source_urls:
@@ -2426,13 +2575,39 @@ def _cmd_requirements(args: argparse.Namespace) -> int:
         for key, value in rules.items():
             if isinstance(value, list):
                 value = ", ".join(str(v) for v in value)
-            print(f"  {key.replace('_', ' ')}: {value}")
+            mark = "*" if f"{section}.{key}" in reqs.from_publisher and not reqs.publisher_rules_only else " "
+            print(f" {mark}{key.replace('_', ' ')}: {value}")
         for note in notes:
             print(f"  - {note}")
     if reqs.notes:
         print("\nnotes:")
         for note in reqs.notes:
             print(f"  - {note}")
+    return 0
+
+
+def _cmd_publishers(args: argparse.Namespace) -> int:
+    """List the publishers whose house rules can back a venue's own.
+
+    For each: its slug, name, whether paperpush holds its house rules, and the
+    listed venues that name it. ``--json`` prints the same as JSON.
+    """
+    from .requirements import list_publishers
+
+    venues = list_venues()
+    rows = []
+    for pub in list_publishers():
+        members = [v.slug for v in venues if v.publisher == pub.slug]
+        rows.append({"slug": pub.slug, "name": pub.display_name, "house_rules": pub.has_rules, "site_url": pub.site_url, "parent": pub.parent, "venues": members})
+    if args.json:
+        print(json.dumps(rows, indent=2, ensure_ascii=False))
+        return 0
+    width = max((len(r["slug"]) for r in rows), default=0)
+    for r in rows:
+        rules = "house rules" if r["house_rules"] else "no rules yet"
+        listed = f"; {len(r['venues'])} listed venue(s)" if r["venues"] else ""
+        print(f"{r['slug']:<{width}}  {r['name']} ({rules}{listed})")
+    print("\nCheck a journal paperpush does not list against its publisher's house rules with\n  paperpush validate --manuscript FILE --publisher SLUG   (or --issn ISSN to look the publisher up)")
     return 0
 
 
@@ -2593,6 +2768,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_validate.add_argument("subfile", nargs="?", help="path to the .sub file to check, e.g. biorxiv.sub.txt. Optional when files are named with --manuscript, --title-page, ...: they are then checked without a .sub")
     p_validate.add_argument("--venue", metavar="VENUE", help="(no .sub) check the named files against this venue's author guidelines. Without it, only the checks that apply to any manuscript run: links, references, hidden text, sensitive data, figure/table citation order, front matter, the reference list, and prose")
+    house_group = p_validate.add_argument_group("journals paperpush does not list", "Check the files (or a general .sub) against the journal's publisher's house rules instead (see 'paperpush publishers'). What those rules catch is reported as warnings, since a journal can depart from its publisher's rules.")
+    house_group.add_argument("--publisher", metavar="PUBLISHER", help="the publisher, by slug or name, e.g. elsevier or 'Springer Nature'")
+    house_group.add_argument("--issn", metavar="ISSN", help="the journal's ISSN; its publisher is looked up in Crossref (network)")
+    house_group.add_argument("--journal", metavar="TITLE", help="the journal's exact title; its publisher is looked up in Crossref (network). --issn is more reliable")
     files_group = p_validate.add_argument_group("files", "Check these files instead of, or in place of, the ones the .sub names. Each goes in the venue's upload for it; with no .sub, the form's fields are not checked.")
     files_group.add_argument("--manuscript", metavar="FILE", help="the manuscript (PDF, Word, or LaTeX source)")
     files_group.add_argument("--title-page", dest="title_page", metavar="FILE", help="a separate title page, for venues that ask for one")
@@ -2617,7 +2796,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--dont-check-references",
         dest="check_references",
         action="store_false",
-        help="skip checking the references against the DOI registry. By " "default validate reads the submission's bibliography -- its .bib " "files, and the reference list in the manuscript itself -- resolves " "each DOI through doi.org, and warns when one is " "malformed, duplicated, unregistered, or registered to a different " "title, author, or year than the reference claims -- the usual sign of " "a DOI copied from the wrong reference. It also searches Crossref, " "OpenAlex, and arXiv for the references that have no DOI (a reference " "no registry knows may be fabricated) and checks that preprints are " "cited in their published or latest version. Requires network access.",
+        help="skip checking the references against the DOI registry. By " "default validate reads the submission's bibliography -- its .bib " "files, and the reference list in the manuscript itself -- resolves " "each DOI through doi.org, and warns when one is " "malformed, duplicated, unregistered, or registered to a different " "title, author, or year than the reference claims -- the usual sign of " "a DOI copied from the wrong reference. It also searches Crossref, " "OpenAlex, and arXiv for the references that have no DOI (a reference " "no registry knows may be fabricated) and checks that preprints are " "cited in their published or latest version. The same switch turns " "off the rigor checks' lookups of RRIDs (SciCrunch) and cell lines " "(Cellosaurus). Requires network access.",
     )
     p_validate.add_argument(
         "--reference-check-full",
@@ -2716,6 +2895,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_requirements.add_argument("--article-type", dest="article_type", metavar="TYPE", help="show the rules for this article type (the venue's article-type option string) instead of the default research article")
     p_requirements.add_argument("--json", action="store_true", help="print the requirements as JSON instead of a readable summary")
     p_requirements.set_defaults(func=_cmd_requirements)
+
+    p_format = sub.add_parser(
+        "format",
+        parents=[verbosity],
+        help="reformat a manuscript for a venue: its Word/LaTeX template if one can be found, else its layout rules",
+        description="Reformat a Word (.docx) or LaTeX (.tex/.zip) manuscript for a venue. paperpush first looks for the venue's own template -- the template URL it records, then links on the venue's author-guideline pages (and for LaTeX the recorded document class, from your TeX installation or CTAN) -- and applies it: a Word template's styles, theme, page setup, headers, and footers; or a LaTeX class's files, document class, style packages, and bibliography style. Without a template it applies the layout rules recorded for the venue (page size, margins, body font and size, double spacing, line numbers, page numbers). The original is never modified: the result goes to a new directory with CHANGES.md, which lists every change, what is left for you, and how the result measures against the venue's layout rules.",
+    )
+    p_format.add_argument("subfile", nargs="?", help="a .sub file: its venue and manuscript file are used")
+    p_format.add_argument("--manuscript", metavar="FILE", help="the manuscript to format (.docx, .tex, .zip; .md with pandoc), instead of the .sub's")
+    p_format.add_argument("--venue", metavar="VENUE", help="venue slug (required without a .sub)")
+    p_format.add_argument("-o", "--output", metavar="DIR", help="directory for the result (default: formatted_<venue> next to the manuscript)")
+    p_format.add_argument("--template", metavar="URL_OR_PATH", help="use this template (a .docx/.dotx, a LaTeX .zip/.cls, a GitHub repository) instead of searching for one")
+    p_format.add_argument("--no-template", action="store_true", help="skip the template search and apply the venue's layout rules only")
+    p_format.add_argument("--list-templates", action="store_true", help="only search for the venue's templates and list them")
+    p_format.add_argument("--no-browser", action="store_true", help="read guideline pages over plain HTTPS only, without the headless-browser retry for pages behind a bot check")
+    p_format.add_argument("--keep-direct-formatting", action="store_true", help="Word: keep fonts, sizes, and line spacing set directly on the text (by default they are removed so the new styles apply)")
+    p_format.add_argument("--no-compile", action="store_true", help="LaTeX: do not compile the result")
+    p_format.add_argument("--update-sub", action="store_true", help="point the .sub's manuscript field at the formatted file")
+    p_format.add_argument("--json", action="store_true", help="print the result as JSON")
+    p_format.set_defaults(func=_cmd_format)
+
+    p_publishers = sub.add_parser("publishers", parents=[verbosity], help="list the publishers whose house rules back their venues' own", description="List the publishers paperpush knows, whether it holds their house rules, and the listed venues that name each. A venue's own guidelines win; where they are silent, its publisher's house rules apply, and validate reports what those catch as warnings. A journal paperpush does not list can be checked against its publisher's rules with 'paperpush validate --publisher' (or --issn).")
+    p_publishers.add_argument("--json", action="store_true", help="print JSON")
+    p_publishers.set_defaults(func=_cmd_publishers)
 
     p_login = sub.add_parser("login", parents=[verbosity], help="store credentials for a venue submission system")
     p_login.add_argument("venue", nargs="?", help="venue slug, e.g. biorxiv (omit with --list)")
