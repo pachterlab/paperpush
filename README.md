@@ -32,7 +32,7 @@ Choose your favorite mode: AI agent skills, website, or command line. All modes 
 #### General manuscript checking
 - `/paperpush-validate Validate my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.`
 
-#### Manuscript venue transfer
+#### Manuscript venue transfer reformatting
 - `/paperpush-transfer Transfer my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY to VENUE_2 with PaperPush.`
 
 #### Respond to reviewers
@@ -260,7 +260,7 @@ Each venue is listed in `paperpush/venues.json` (the master list of venues and t
 | `/paperpush-fix` | fix what validate flags (in the `.tex`/`.docx` sources and the `.sub`), re-validate until nothing fixable is left, and report what needs the author |
 | `/paperpush-submit` | log in and fill in the portal from a ready `.sub` (optionally skipping validation) — invokes `/paperpush-portal-debug` if it stalls |
 | `/paperpush-portal-debug` | get a stalled `paperpush submit` run unstuck |
-| `/paperpush-transfer` | move a manuscript from one venue to another: copy the files into a new `<venue>/` directory, create and autofill its `.sub` (reusing earlier `.sub` files), validate, and write `transfer.txt` describing the changes |
+| `/paperpush-transfer` | reformat a manuscript from one venue to another: copy the files into a new `<venue>/` directory, create and autofill its `.sub` (reusing earlier `.sub` files), validate, and write `transfer.txt` describing the changes |
 | `/paperpush-respond-to-reviewers` | prepare a revision in two phases: (1) copy the manuscript and reviews into a new `revisionN/` directory (e.g., revision1, revision2, etc.) and propose a plan for each comment, then (once you approve) (2) revise the manuscript; write the response to reviewers, the clean revised manuscript, and a marked manuscript; and validate the revised manuscript |
 | `/paperpush-add-venue-validate` | add or refresh a venue's author guidelines (contributors) |
 | `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and `submit` support for a venue, with tests (contributors) |
