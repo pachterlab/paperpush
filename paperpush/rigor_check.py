@@ -20,6 +20,15 @@ not applicable.
   freedom and p value (``t(28) = 2.20, p = .036``; F, r, chi-square, z) is
   recomputed, as statcheck does. A p value the statistic cannot produce is a
   warning; one that flips significance at .05 is called a decision error.
+* ``rigor.trial_registration`` -- a manuscript that reports a clinical trial
+  gives a registry ID (NCT, ISRCTN, ACTRN, ...), wherever in the text it is.
+  Whether a paper is a trial comes from the .sub (a trial question or article
+  type) or how the manuscript describes itself. ``ai.rigor.trial_registration``
+  has a reader settle what wording cannot: whether it is a trial under the
+  ICMJE definition, and whether the ID is this trial's own.
+* ``ai.rigor.reporting_guideline`` -- a reader matches the study design to its
+  reporting guideline (PRISMA for systematic reviews, CONSORT for trials, ...)
+  and checks the manuscript follows it. Narrative reviews have none.
 
 All findings are warnings: they rest on reading free text.
 """
@@ -33,8 +42,11 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from typing import Optional
 
+from .ai_validate import AiTask
 from .database import Venue
+from .requirements import get_requirements, resolve
 from .validate import WARNING, Checks, Issue, NotApplicable, Outcome
 
 logger = logging.getLogger(__name__)
@@ -48,13 +60,13 @@ MAX_LOOKUPS = 40
 # text
 
 
-def _texts(venue: Venue, values: dict[str, str]) -> list[tuple[str, str, str]]:
-    """``(field id, file name, text)`` of the manuscript and supplementary files that can be read."""
+def _texts(venue: Venue, values: dict[str, str], roles: tuple[str, ...] = ("manuscript", "supplementary")) -> list[tuple[str, str, str]]:
+    """``(field id, file name, text)`` of the files in ``roles`` that can be read."""
     from . import document
     from .requirements_check import _existing, _fields_for, _paths
 
     out: list[tuple[str, str, str]] = []
-    for role in ("manuscript", "supplementary"):
+    for role in roles:
         for field in _fields_for(venue, role):
             for path in _existing(_paths(field, values)):
                 if path.suffix.lower() not in (".pdf", ".docx", ".tex", ".zip", ".md", ".markdown", ".txt"):
@@ -504,6 +516,103 @@ def _statistics_check(venue: Venue, values: dict[str, str]) -> Outcome:
 
 
 # ---------------------------------------------------------------------------
+# trial registration
+
+# ClinicalTrials.gov and the WHO primary registries. PROSPERO's CRD numbers
+# register reviews, not trials, so they do not count.
+TRIAL_ID = re.compile(
+    r"\b(?:(?i:NCT)[\s-]?\d{8}|(?i:ISRCTN)[\s-]?\d{8}|ACTRN\s?\d{14}|ChiCTR-?(?:[A-Z]{2,4}-?)?\d{8,}|CTRI/\d{4}/\d{2,3}/\d{6}|DRKS\s?\d{8}|NTR\d{3,5}|NL-OMON\d+|IRCT\d{8,}N?\d*|UMIN\d{9}|jRCTs?\d{9,}|JPRN-[A-Za-z]+\d+|KCT\d{7}|PACTR\d{15}|RBR-[0-9a-z]{6,}|SLCTR/\d{4}/\d+|TCTR\d{11}|RPCEC\d{11}|LBCTR\d{10}|20\d{2}-5\d{5}-\d{2}-\d{2})\b"
+    r"|(?i:EudraCT)[^.\n]{0,40}?\b20\d{2}-\d{6}-\d{2}\b"
+)
+_REGISTRY_NAMED = re.compile(r"(?i)\b(?:clinicaltrials\.gov|isrctn|anzctr|eudract|chictr|ictrp|trial\s+registr(?:y|ation)|prospectively\s+registered)\b")
+# "Trial" alone is everyday wording in psychology and machine learning, so a
+# manuscript counts only when it calls itself a trial of a clinical kind.
+_TRIAL_KIND = r"(?:clinical|randomi[sz]ed|controlled|placebo[- ]controlled|double[- ]blind(?:ed)?|single[- ]blind(?:ed)?|open[- ]label|phase\s+(?:[1-4]|IV|I{1,3})(?:/(?:[1-4]|IV|I{1,3}))?[ab]?|cross-?over|multi-?cent(?:er|re)|pragmatic)"
+_WORDS = r"(?:[\w-]+,?\s+)"
+_SELF_TRIAL = re.compile(
+    rf"(?i)\b(?:this|our|the\s+present|the\s+current)\s+{_WORDS}{{0,4}}?{_TRIAL_KIND},?\s+{_WORDS}{{0,3}}?trial\b"
+    rf"|\bwe\s+(?:conducted|performed|carried\s+out|ran|undertook|initiated|report(?:ed)?|present|describe)\s+(?:the\s+(?:results|findings|outcomes)\s+(?:of|from)\s+)?(?:a|an|the)\s+{_WORDS}{{0,5}}?{_TRIAL_KIND},?\s+{_WORDS}{{0,3}}?trial\b"
+    # People assigned to a health intervention; "participants were randomly
+    # assigned to conditions" in a behavioural experiment does not count.
+    r"|\b(?:patients|participants|subjects|volunteers)\b[^.]{0,60}\b(?:randomly\s+(?:assigned|allocated)|randomi[sz]ed)\b[^.]{0,120}\b(?:placebo|treatment|therapy|drug|dose|intervention|standard\s+of\s+care|usual\s+care|vaccine)\b"
+)
+_REVIEW_KIND = r"(?:systematic\s+review|meta-?analysis|scoping\s+review|narrative\s+review|review)"
+_SELF_REVIEW = re.compile(rf"(?i)\b(?:this|our|the\s+present|the\s+current)\s+{_WORDS}{{0,3}}?{_REVIEW_KIND}\b|\bwe\s+(?:conducted|performed|carried\s+out|undertook|present|report)\s+(?:a|an)\s+{_WORDS}{{0,3}}?{_REVIEW_KIND}\b")
+_REVIEW_TITLE = re.compile(r"(?i)\b(?:systematic\s+review|meta-?analysis|scoping\s+review)\b")
+_NOT_A_STUDY = re.compile(r"(?i)\b(?:review|editorial|commentary|comment|perspective|viewpoint|opinion|essay)\b")
+
+
+def _trial_reason(venue: Venue, values: dict[str, str], body: str) -> Optional[str]:
+    """Why this manuscript counts as reporting a clinical trial, or None when it does not."""
+    # What the author declared in the .sub beats anything read from the text.
+    declared = values.get("clinical_trial", "").strip().lower()
+    if declared == "yes":
+        return "the submission form says this manuscript reports a clinical trial"
+    if declared == "no":
+        return None
+    base = get_requirements(venue.slug)
+    article_type = values.get((base.article_type_field if base else "") or "article_type", "").strip()
+    if re.search(r"(?i)\btrial\b", article_type):
+        return f"the article type is '{article_type}'"
+    if _NOT_A_STUDY.search(article_type):
+        return None
+    # A review describes other people's trials in the words a trial uses.
+    if _SELF_REVIEW.search(body) or _REVIEW_TITLE.search(body[:300]):
+        return None
+    match = _SELF_TRIAL.search(body)
+    return f"the manuscript appears to report a clinical trial (\"{' '.join(match.group(0).split())}\")" if match else None
+
+
+def _trial_registration_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    from .manuscript import truncate_at_references
+
+    texts = _texts(venue, values, roles=("manuscript", "title_page"))
+    if not texts:
+        raise NotApplicable("no manuscript text to read")
+    body = "\n".join(truncate_at_references(text) for _, _, text in texts)
+    found = list(dict.fromkeys(" ".join(m.group(0).split()) for m in TRIAL_ID.finditer(body)))
+    if found:
+        return Outcome([], f"trial registry ID(s) given: {', '.join(found[:5])}")
+    reason = _trial_reason(venue, values, body)
+    if reason is None:
+        raise NotApplicable("the manuscript does not report a clinical trial")
+    gap = "it mentions trial registration but gives no registry ID" if _REGISTRY_NAMED.search(body) else "no trial registry ID was found"
+    return Outcome([Issue(WARNING, texts[0][0], f"{reason}, but {gap} (for example NCT01234567 or ISRCTN12345678). ICMJE journals require trials to be registered and the number given in the manuscript; ignore this if the manuscript does not report a trial")], "no registry ID found")
+
+
+# ---------------------------------------------------------------------------
+# tasks for a reader
+
+_TRIAL_TASK = (
+    "Decide whether this manuscript reports a clinical trial under the ICMJE definition: a study that prospectively assigns people or groups of people to a health-related intervention, with or without a comparison group, to evaluate its effect on a health outcome. "
+    "If it does not, return not_applicable; that covers observational studies, behavioural experiments with no health outcome, reviews, and animal or computational work. "
+    "If it does, find the registration number of this trial and name its registry. A secondary analysis counts and must give the parent trial's number. The number of another trial the manuscript cites does not count. "
+    "Fail if the number is missing, quoting any sentence that claims registration without one. If the manuscript gives both the registration date and the date enrollment began and registration came after, fail and state both dates unless the manuscript explains why."
+)
+_GUIDELINE_TASK = (
+    "Identify the study design and the reporting guideline it calls for: systematic review or meta-analysis, PRISMA 2020 (scoping review, PRISMA-ScR; network meta-analysis, PRISMA-NMA; meta-analysis of observational studies, MOOSE or PRISMA); randomized trial, CONSORT; trial protocol, SPIRIT; cohort, case-control, or cross-sectional study, STROBE; diagnostic accuracy, STARD; clinical prediction model, TRIPOD or TRIPOD+AI; case report, CARE; qualitative research, SRQR or COREQ; animal research, ARRIVE; health economic evaluation, CHEERS; quality improvement, SQUIRE. "
+    "A review is systematic only if it reports a reproducible search and predefined inclusion criteria. Return not_applicable when no guideline applies: a narrative or invited review, perspective, editorial, theory, software, methods, in vitro, or purely computational paper. Never apply PRISMA to a narrative review. "
+    "When a guideline applies, name the design and the guideline, then check that the manuscript says it followed that guideline and has what the guideline asks to be submitted: for PRISMA, a flow diagram of records identified, screened, and included, a completed checklist among the files or a statement that one is provided, and whether the protocol was registered (PROSPERO, for example) or a statement that it was not; for CONSORT, a participant flow diagram and a completed checklist. "
+    "Fail naming each missing item. Accept an equivalent statement in any section, and the guideline's extension where one fits. Follow the named venue's requirements and the selected article type when they are supplied."
+)
+
+
+def _queue_reader_tasks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
+    from .requirements_check import _existing, _fields_for, _paths
+
+    def files(*roles: str) -> list[str]:
+        return [str(p) for role in roles for field in _fields_for(venue, role) for p in _existing(_paths(field, values))]
+
+    if not files("manuscript"):
+        return
+    checks.needs_ai(AiTask(id="ai.rigor.trial_registration", title="A clinical trial gives its own registration number", category=CATEGORY, instructions=_TRIAL_TASK, files=files("manuscript", "title_page")))
+    base = get_requirements(venue.slug)
+    required = (resolve(base, values).statements.required or []) if base else []
+    note = " This venue requires a reporting-guideline statement." if "reporting_guidelines" in required else ""
+    checks.needs_ai(AiTask(id="ai.rigor.reporting_guideline", title="Follows the reporting guideline for its study design (PRISMA for systematic reviews, CONSORT for trials, ...)", category=CATEGORY, instructions=_GUIDELINE_TASK + note, files=files("manuscript", "supplementary", "figures")))
+
+
+# ---------------------------------------------------------------------------
 
 
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
@@ -512,3 +621,5 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("rigor.cell_lines", "Cell lines authenticated, tested for mycoplasma, and not known to be misidentified", CATEGORY, _cell_lines_check, venue, values, online)
     checks.run("rigor.design", "Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies", CATEGORY, _design_check, venue, values)
     checks.run("rigor.statistics", "Reported test statistics agree with their p values (statcheck)", CATEGORY, _statistics_check, venue, values)
+    checks.run("rigor.trial_registration", "A clinical trial gives a trial registry ID", CATEGORY, _trial_registration_check, venue, values)
+    _queue_reader_tasks(checks, venue, values)

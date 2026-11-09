@@ -139,7 +139,7 @@ these:
   confirmation): never tick them for the author.
 - Missing content the files don't contain: ethics approval, funding, data
   availability, competing interests, ORCIDs, e-mail addresses,
-  `front_matter.contact_email`, `guidelines.statements`/`guidelines.sections`
+  `front_matter.contact_email`, `front_matter.keywords`, `guidelines.statements`/`guidelines.sections`
   for a missing section. You may draft text the manuscript fully supports
   (for example, a data-availability statement that repeats what Methods says
   about the repository) and present it as a suggestion. Don't insert it.

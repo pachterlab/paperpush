@@ -35,6 +35,7 @@ not to reproduce a word processor's exact tally.
 from __future__ import annotations
 
 import atexit
+import html
 import logging
 import os
 import re
@@ -897,6 +898,11 @@ def normalize_heading(line: str) -> str:
     residual markup, so ``"2. Materials and Methods:"`` and ``"MATERIALS AND
     METHODS"`` both become ``"materials and methods"``.
     """
+    return heading_text(line).lower()
+
+
+def heading_text(line: str) -> str:
+    """A heading line's wording with its case kept: no section number, markup, or trailing punctuation."""
     text = _MD_HEADING_ATTRS.sub("", line.strip())
     text = re.sub(r"^(\*\*|__)(.*)\1$", r"\2", text.strip())
     text = re.sub(r"[ \t]+#+$", "", _HEADING_PREFIX.sub("", text, count=1))
@@ -904,7 +910,7 @@ def normalize_heading(line: str) -> str:
     text = re.sub(r"[{}]", "", text)
     text = text.rstrip(" .:;-\u2013\u2014")
     text = re.sub(r"\s+", " ", text)
-    return text.strip().lower()
+    return text.strip()
 
 
 def _raw_tex_source(path: Path) -> str | None:
@@ -971,6 +977,81 @@ def headings(path: Path) -> list[str] | None:
                 found.append(first)
     return found
 
+
+
+# Multi-word section names, recognizable where a file does not mark its headings (a PDF, plain text, an unstyled Word file).
+_STANDARD_HEADINGS = frozenset(
+    (
+        "materials and methods|methods and materials|results and discussion|discussion and conclusions|data availability|data availability statement|code availability|"
+        "data and code availability|author contributions|competing interests|conflict of interest|conflicts of interest|declaration of interests|ethics statement|ethics approval|"
+        "supplementary material|supplementary materials|supplementary information|statistical analysis|study design|funding sources|financial disclosure"
+    ).split("|")
+)
+_TEX_SECTION_LEVEL = re.compile(r"\\(part|chapter|section|subsection|subsubsection|paragraph)\*?\s*(?:\[[^\]]*\])?\s*\{((?:[^{}]|\{[^{}]*\})*)\}")
+_DOCX_PARAGRAPH = re.compile(r"<w:p[ >].*?</w:p>", re.DOTALL)
+_DOCX_HEADING_STYLE = re.compile(r'<w:pStyle\s+w:val="[^"]*?heading\s*(\d)[^"]*"', re.IGNORECASE)
+_DOCX_TEXT = re.compile(r"<w:t(?:\s[^>]*)?>([^<]*)</w:t>")
+
+
+def _markdown_cased_headings(source: str) -> list[tuple[str, str]]:
+    text = _MD_FENCE.sub("\n", source.replace("\r\n", "\n"))
+    text = _MD_HTML_COMMENT.sub(" ", text)
+    front = _MD_FRONT_MATTER.match(text)
+    if front:
+        text = text[front.end() :]
+    found: list[tuple[int, str, str]] = []
+    for m in _MD_ATX.finditer(text):
+        marks = m.group(0).strip()
+        found.append((m.start(), f"h{len(marks) - len(marks.lstrip('#'))}", m.group(1)))
+    for m in _MD_SETEXT.finditer(text):
+        if not _MD_RULE.fullmatch(m.group(1).strip()):
+            found.append((m.start(), "h1" if m.group(0).rstrip().endswith("=") else "h2", m.group(1)))
+    for pattern, level in ((_MD_BOLD_LINE, "bold"), (_MD_RUN_IN, "run-in")):
+        found += [(m.start(), level, m.group(1)) for m in pattern.finditer(text)]
+    out = []
+    for _, level, raw in sorted(found):
+        plain = _MD_EM.sub(lambda m: m.group(2), _MD_STRONG.sub(lambda m: m.group(2), _MD_CODE.sub(lambda m: m.group(2), raw)))
+        out.append((level, heading_text(plain)))
+    return out
+
+
+def cased_headings(path: Path) -> list[tuple[str, str]] | None:
+    """``(level, heading as written)`` for each heading a manuscript marks, in order.
+
+    LaTeX sectioning commands, Markdown headings, and Word's Heading styles
+    carry their level, so headings can be compared with others of their rank.
+    A file that marks no headings has only its standard multi-word section
+    names read, all at one level ("standard"): any other short line of a PDF
+    might not be a heading. Returns None when the file cannot be read.
+    """
+    from . import document
+
+    doc = document.get(path)
+    found: list[tuple[str, str]] = []
+    if doc.is_tex:
+        if doc.tex_source is None:
+            return None
+        return [(m.group(1), heading_text(m.group(2))) for m in _TEX_SECTION_LEVEL.finditer(doc.tex_source)]
+    if doc.is_markdown:
+        try:
+            found = _markdown_cased_headings(path.read_text("utf-8", "replace"))
+        except OSError:
+            return None
+    elif doc.is_docx:
+        xml = doc.docx_part("word/document.xml")
+        if xml is None:
+            return None
+        for paragraph in _DOCX_PARAGRAPH.findall(xml):
+            style = _DOCX_HEADING_STYLE.search(paragraph)
+            if style:
+                found.append((f"h{style.group(1)}", heading_text(html.unescape("".join(_DOCX_TEXT.findall(paragraph))))))
+    found = [(level, text) for level, text in found if text]
+    if found:
+        return found
+    text = doc.text
+    if text is None:
+        return None
+    return [("standard", heading_text(line)) for line in text.splitlines() if normalize_heading(line) in _STANDARD_HEADINGS]
 
 
 def section_word_counts(path: Path, wordings: dict[str, str]) -> dict[str, int] | None:

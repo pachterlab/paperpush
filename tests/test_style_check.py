@@ -263,3 +263,121 @@ def test_et_al_without_full_stop_as_house_style():
     assert any(p.startswith("2 malformed 'et al.'") for p in default)
     house = sc.conventions(paragraphs, et_al_period=False).problems
     assert len(house) == 1 and house[0].startswith("1 malformed 'et al'") and "et. al" in house[0]
+
+
+# --- acronyms defined twice, with two meanings, or never used ---------------------------------
+
+
+def test_acronym_never_used_and_defined_twice_are_flagged():
+    found = sc.acronyms(["We used a hidden Markov model (HMM) here.", "We fit a random forest (RF) once. The RF was fast.", "A random forest (RF) again."])
+    assert found.rarely_used == ["'HMM'"]
+    assert found.redefined == ["'RF' (2 times)"]
+    assert found.conflicting == []
+
+
+def test_acronym_with_two_meanings_is_conflicting_not_just_redefined():
+    found = sc.acronyms(["We fit a random forest (RF) once. The RF was fast.", "We measured relative fluorescence (RF) too."])
+    assert found.conflicting == ["'RF' ('random forest', 'relative fluorescence')"]
+    assert found.redefined == []
+
+
+def test_acronym_meanings_ignore_plural_and_case_and_unmatched_initials():
+    found = sc.acronyms(["Convolutional Neural Networks (CNNs) ran. The CNNs ran.", "A convolutional neural network (CNN) ran."])
+    assert found.conflicting == [] and found.redefined == ["'CNN' (2 times)"]
+    assert sc._expansion("an electroencephalogram ", "EEG") is None
+    assert sc._expansion("the Department of Energy ", "DOE") == "department of energy"
+    assert sc._expansion("the Department of Energy ", "DE") == "department energy"
+    assert sc._expansion("a genome-wide association study ", "GWAS") == "genome wide association study"
+
+
+def test_acronym_meaning_differs_between_abstract_and_main_text():
+    found = sc.acronyms(["We fit a random forest (RF) and the RF ran."], ["We measured relative fluorescence (RF) and the RF rose."])
+    assert found.conflicting == ["'RF' ('random forest', 'relative fluorescence')"]
+
+
+# --- heading capitalization -------------------------------------------------------------------
+
+
+def test_heading_case_styles():
+    assert sc.heading_case("Materials and methods") == "sentence"
+    assert sc.heading_case("Materials and Methods") == "title"
+    assert sc.heading_case("MATERIALS AND METHODS") == "upper"
+    assert sc.heading_case("materials and methods") == "lower"
+    # One word, an acronym, or a mix shows no style.
+    assert sc.heading_case("Introduction") is None
+    assert sc.heading_case("RNA") is None
+    assert sc.heading_case("Cell Culture and media") is None
+    assert sc.heading_case("Comparison with GPT") is None
+    # Lower-case starts that are names, not a style.
+    assert sc.heading_case("scRNA sequencing") == "sentence"
+    assert sc.heading_case("k-means clustering") == "sentence"
+    assert sc.heading_case("Single-Cell Atlas") == "title"
+    # A name capitalized in the text is not Title Case.
+    assert sc.heading_case("Mapping in Drosophila") == "title"
+    assert sc.heading_case("Mapping in Drosophila", {"drosophila"}) is None
+
+
+def test_inconsistent_heading_case_is_per_level():
+    headings = [("section", "Materials and methods"), ("section", "Author contributions"), ("section", "Data Availability"), ("subsection", "Cell Culture"), ("subsection", "Mouse Models")]
+    hits, styled = sc.inconsistent_heading_case(headings)
+    assert styled == 5
+    assert hits == ["'Data Availability' is Title Case, others are Sentence case"]
+
+
+def _heading_result(path: Path, **values: str):
+    checks = Checks()
+    run_checks(checks, VENUE, {"manuscript_file": str(path), **values})
+    result = next(r for r in checks.results if r.id == "prose.heading_case")
+    return result.status, " | ".join(i.message for i in result.issues), result.detail
+
+
+def test_heading_case_in_latex(tmp_path):
+    tex = tmp_path / "ms.tex"
+    tex.write_text(
+        "\\documentclass{article}\n\\begin{document}\n\\section{Materials and methods}\nText here.\n\\section*{Author contributions}\nText here.\n"
+        "\\section{Data \\emph{Availability}}\nText here.\n\\subsection{Cell Culture}\nText here.\n\\end{document}\n"
+    )
+    status, message, _ = _heading_result(tex)
+    assert status == report.WARNING and "'Data Availability' is Title Case" in message and "Cell Culture" not in message
+
+
+def test_heading_case_in_markdown_skips_the_title_and_names(tmp_path):
+    doc = tmp_path / "ms.md"
+    doc.write_text("# A Study of Mice\n\n## Materials and methods\n\nWe bred flies from Boston here.\n\n## Author contributions\n\nAll did it.\n\n## Flies from Boston\n\nDone.\n")
+    status, _, detail = _heading_result(doc, title="A Study of Mice")
+    assert status == report.PASSED and "capitalized consistently" in detail
+
+
+def test_heading_case_in_word_uses_heading_styles(tmp_path):
+    from zipfile import ZipFile
+
+    def para(style: str, text: str) -> str:
+        props = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ""
+        return f"<w:p>{props}<w:r><w:t>{text}</w:t></w:r></w:p>"
+
+    path = tmp_path / "ms.docx"
+    body = para("Heading1", "Materials and methods") + para("Heading1", "Data Availability") + para("Heading1", "Author contributions") + para("", "Some Short Line Here") + para("", "We did the work on mice in the lab today.")
+    with ZipFile(path, "w") as archive:
+        archive.writestr("word/document.xml", f"<w:document><w:body>{body}</w:body></w:document>")
+    status, message, _ = _heading_result(path)
+    assert status == report.WARNING and "'Data Availability'" in message and "Some Short" not in message
+
+
+def test_heading_case_unmarked_file_reads_only_standard_names(tmp_path):
+    doc = tmp_path / "ms.txt"
+    doc.write_text("Some Odd Short Line\n\nMaterials and methods\n\nWe did the work.\n\nData Availability\n\nOn request.\n\nAuthor contributions\n\nAll.\n")
+    status, message, _ = _heading_result(doc)
+    assert status == report.WARNING and "'Data Availability'" in message and "Odd" not in message
+
+
+def test_heading_case_not_applicable_without_styled_headings(tmp_path):
+    doc = tmp_path / "ms.md"
+    doc.write_text("## Introduction\n\nText.\n\n## Results\n\nText.\n")
+    assert _heading_result(doc)[0] == report.NOT_APPLICABLE
+
+
+def test_acronyms_read_as_main_text_when_there_is_no_introduction(tmp_path):
+    doc = tmp_path / "ms.md"
+    doc.write_text("# A title\n\n## Abstract\n\nWe trained a model on mice.\n\n## Materials and methods\n\nWe used a hidden Markov model (HMM) on the mice here.\n")
+    status, message, _ = _run(doc)[0]["prose.acronyms"]
+    assert status == report.WARNING and "'HMM'" in message

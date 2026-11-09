@@ -7,7 +7,7 @@ Prepare manuscripts for submission to preprint servers, journals, and conference
 PaperPush provides the following services:
 - A standardized system to share all metadata submitted to a venue (the .sub file)
 <!-- BEGIN VALIDATION CHECK COUNT -->
-- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 131 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
+- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 141 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
 <!-- END VALIDATION CHECK COUNT -->
 - A central database of journal/conference manuscript requirements and submission data
 - Automated and fast submission portal filling with deterministic scripts
@@ -330,7 +330,7 @@ Here are a few possibilities, in order of decreasing ease of resolution:
 - The submission portal has changed since the last time the venue was tested. You can run the unit test listed above to see if this is the case. If so, please open an issue with the error message.
 
 *Can I still use PaperPush if my venue is not listed?*
-Yes! PaperPush can still validate manuscript files with up to 125 general validation checks. You can do this in the following ways:
+Yes! PaperPush can still validate manuscript files with up to 132 general validation checks. You can do this in the following ways:
 - AI agent: Run the skill `/paperpush-validate Validate my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.` for general checks, or `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE_NAME with PaperPush.` for venue-specific checks in which the agent can retrieve guidelines from the venue's website.
 - Website: Choose the "General" venue option and upload your manuscript files/directory for general checks.
 - CLI: Run `paperpush validate --manuscript MANUSCRIPT --issn ISSN` (or `--publisher NAME`) to check against the journal's publisher's house rules, when paperpush has them (`paperpush publishers`); what they catch is reported as warnings. Run `paperpush validate --manuscript MANUSCRIPT ...` for general checks, or `paperpush subfile general` for a .sub with the files and metadata every venue asks for (title, abstract, keywords, authors, manuscript, figures, supplements, cover letter, ...), then fill it in and `paperpush validate general.sub.txt`.

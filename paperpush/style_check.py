@@ -25,8 +25,13 @@ reference list are already left out.
   use: used before the definition, spelled out a second time, defined in the
   abstract but not again in the main text (or the other way round), used
   three or more times without ever being defined, or defined and then never
-  used again (write the full term instead). Headings, captions, and the front
-  matter before the abstract are not counted as first use.
+  used again (write the full term instead), or spelled out with two different
+  meanings. Headings, captions, and the front matter before the abstract are
+  not counted as first use.
+* ``prose.heading_case`` -- headings of the same level capitalized differently
+  ("Materials and methods" and "Data Availability"). Words that are capitalized
+  in the running text too (names), acronyms, and one-word headings say nothing
+  about the style, so they are not counted.
 
 The checks that need a reader -- spelling and typos beyond codespell's list,
 grammar, and tense -- are queued as one AI task, ``ai.prose``.
@@ -41,7 +46,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .database import Venue
-from .validate import WARNING, Issue, Outcome, Unchecked
+from .validate import WARNING, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -382,6 +387,8 @@ _KNOWN = frozenset(
     MATLAB ATP GTP NADH NADPH""".split()
 )
 _ROMAN = re.compile(r"[IVXLC]+")
+# Words an acronym's letters skip ("Department of Energy (DE)").
+_ACRONYM_LINK_WORDS = frozenset("a an and the of for in on to with by".split())
 # Uses of an acronym that is never defined before it is reported.
 _UNDEFINED_MIN_USES = 3
 # A paragraph this short with no final full stop is a heading.
@@ -408,6 +415,23 @@ class _Acro:
     definitions: list[tuple[int, int]] = field(default_factory=list)
     uses: int = 0
     snippet: str = ""
+    expansions: list[str] = field(default_factory=list)
+
+
+def _expansion(before: str, acronym: str) -> str | None:
+    """The words before "(ACR)" whose initials spell it, lower-cased; None if they do not ("electroencephalogram (EEG)")."""
+    words = re.findall(r"[A-Za-z0-9']+", before)
+    picked: list[str] = []
+    i = len(words) - 1
+    for letter in reversed(acronym.replace("&", "").lower()):
+        while i >= 0 and words[i].lower() in _ACRONYM_LINK_WORDS and words[i][0].lower() != letter:
+            i -= 1
+        if i < 0 or words[i][0].lower() != letter:
+            return None
+        picked.append(words[i].lower())
+        i -= 1
+    picked[0] = picked[0][:-1] if len(picked[0]) > 3 and picked[0].endswith("s") else picked[0]  # the last word: singular
+    return " ".join(reversed(picked))
 
 
 def _scan_acronyms(paragraphs: list[str]) -> dict[str, _Acro]:
@@ -419,7 +443,11 @@ def _scan_acronyms(paragraphs: list[str]) -> dict[str, _Acro]:
             continue
         defined_here = {(m.group(1), m.start(1)) for m in _DEFINITION.finditer(p)}
         for acr, pos in sorted(defined_here, key=lambda x: x[1]):
-            found.setdefault(acr, _Acro()).definitions.append((i, pos))
+            entry = found.setdefault(acr, _Acro())
+            entry.definitions.append((i, pos))
+            expansion = _expansion(p[: p.rfind("(", 0, pos)], acr)
+            if expansion and expansion not in entry.expansions:
+                entry.expansions.append(expansion)
         for m in _ACRONYM.finditer(p):
             acr = m.group(1)
             if (acr, m.start(1)) in defined_here or acr in _KNOWN or _ROMAN.fullmatch(acr) or len(acr) > 8:
@@ -438,6 +466,7 @@ class Acronyms:
     redefined: list[str] = field(default_factory=list)
     undefined: list[str] = field(default_factory=list)
     rarely_used: list[str] = field(default_factory=list)
+    conflicting: list[str] = field(default_factory=list)
     abstract_only: list[str] = field(default_factory=list)
     abstract_undefined: list[str] = field(default_factory=list)
     defined: int = 0
@@ -453,7 +482,10 @@ def acronyms(body: list[str], abstract: list[str] | None = None) -> Acronyms:
         if a.definitions:
             if a.first_use is not None and a.first_use < a.definitions[0]:
                 out.before_definition.append(f"'{acr}' first appears in {a.snippet}, before it is spelled out")
-            if len(a.definitions) > 1:
+            meanings = list(dict.fromkeys(a.expansions + (abs_found[acr].expansions if acr in abs_found else [])))
+            if len(meanings) > 1:
+                out.conflicting.append(f"'{acr}' (" + ", ".join(f"'{m}'" for m in meanings) + ")")
+            elif len(a.definitions) > 1:
                 out.redefined.append(f"'{acr}' ({len(a.definitions)} times)")
             if a.uses == 0:  # only the definition: the acronym is never used
                 out.rarely_used.append(f"'{acr}'")
@@ -474,6 +506,7 @@ _ACRONYM_KINDS = (
     ("redefined", "acronym(s) spelled out more than once in the main text", "define once, then use the acronym"),
     ("undefined", "acronym(s) used but never spelled out", "define them at first use, unless every reader knows them (a gene, a unit, a name)"),
     ("rarely_used", "acronym(s) spelled out but never used again", "write the full term and drop the acronym"),
+    ("conflicting", "acronym(s) spelled out with different meanings", "give each acronym one meaning"),
 )
 
 
@@ -640,6 +673,93 @@ def _acronym_check(venue: Venue, values: dict[str, str]) -> Outcome:
                 issues.append(_report(hits, noun, fld.id, text.path.name, advice))
         if not any(getattr(found, k) for k, _, _ in _ACRONYM_KINDS):
             details.append(f"{text.path.name}: {found.defined} acronym(s) defined at first use" + ("" if abstract else " (abstract not found, so it was read as main text)"))
+    return Outcome(issues, "; ".join(details))
+
+
+# --- heading capitalization -----------------------------------------------------------------
+
+_HEADING_WORD = re.compile(r"(?<![\w'\u2019-])[^\W\d_][\w'\u2019-]*")
+# Lower-case in Title Case too, so they say nothing about the style.
+_HEADING_SMALL = frozenset("a an and as at but by for from in into nor of on onto or over per the to under via vs versus with within without between among".split())
+_CASE_NAMES = {"upper": "ALL CAPS", "title": "Title Case", "sentence": "Sentence case", "lower": "lower case"}
+# Fewer letters than this in capitals may be an acronym rather than a style ("RNA").
+_UPPER_MIN_LETTERS = 5
+
+
+def _style_neutral(word: str) -> bool:
+    """A word whose capitals are its own: an acronym or mixed-case name ("RNA", "scRNA", "mTOR", "H3K27ac")."""
+    return any(c.isdigit() for c in word) or any(c.isupper() for part in word.split("-") for c in part[1:])
+
+
+def heading_case(text: str, proper: frozenset[str] | set[str] = frozenset()) -> str | None:
+    """A heading's style ("upper", "title", "sentence", "lower"), or None when its words do not show one."""
+    words = _HEADING_WORD.findall(text)
+    if not words:
+        return None
+    letters = [c for c in text if c.isalpha()]
+    if not any(c.islower() for c in letters):
+        return "upper" if len(letters) >= _UPPER_MIN_LETTERS else None
+    first = words[0]
+    if first.islower() and not _style_neutral(first) and len(first.split("-")[0]) > 1:
+        return "lower"
+    capitalized = lowered = 0
+    for word in words[1:]:
+        if word.lower() in _HEADING_SMALL or word.lower() in proper or _style_neutral(word):
+            continue
+        if word[0].isupper():
+            capitalized += 1
+        else:
+            lowered += 1
+    if capitalized and lowered:
+        return None
+    return "title" if capitalized else "sentence" if lowered else None
+
+
+def inconsistent_heading_case(headings: list[tuple[str, str]], proper: frozenset[str] | set[str] = frozenset()) -> tuple[list[str], int]:
+    """Headings styled differently from most others of their level, and how many headings showed a style."""
+    levels: dict[str, list[tuple[str, str]]] = {}
+    for level, text in headings:
+        style = heading_case(text, proper)
+        if style:
+            levels.setdefault(level, []).append((text, style))
+    hits: list[str] = []
+    for found in levels.values():
+        counts = Counter(style for _, style in found)
+        if len(counts) > 1:
+            usual = counts.most_common(1)[0][0]
+            hits += [f"'{text}' is {_CASE_NAMES[style]}, others are {_CASE_NAMES[usual]}" for text, style in found if style != usual]
+    return hits, sum(len(found) for found in levels.values())
+
+
+def _proper_words(paragraphs: list[str]) -> set[str]:
+    """Lower-cased words the running text capitalizes mid-sentence and never writes in lower case: names."""
+    body = [p for p in paragraphs if not _is_heading(p)]
+    capitalized = {w.lower() for p in body for w in re.findall(r"(?<=[a-z,;] )[A-Z][a-z]+\b", p)}
+    return capitalized - {w for p in body for w in re.findall(r"\b[a-z]+\b", p)}
+
+
+def _heading_case_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    from .manuscript import cased_headings
+    from .prose_check import _manuscripts
+
+    title = _norm(values.get("title", ""))
+    issues: list[Issue] = []
+    details: list[str] = []
+    for fld, text in _manuscripts(venue, values):
+        if text.why:
+            issues.append(Issue(WARNING, fld.id, text.why, unchecked=True))
+            continue
+        headings = cased_headings(text.path)
+        if headings is None:
+            issues.append(Issue(WARNING, fld.id, f"could not read the headings of {text.path.name}", unchecked=True))
+            continue
+        hits, styled = inconsistent_heading_case([h for h in headings if _norm(h[1]) != title], _proper_words(text.paragraphs))
+        if hits:
+            issues.append(_report(hits, "heading(s) capitalized differently from the others at their level", fld.id, text.path.name, "use one style for headings of the same level"))
+        elif styled:
+            details.append(f"{text.path.name}: {styled} heading(s) capitalized consistently")
+    if not issues and not details:
+        raise NotApplicable("found no headings whose capitalization shows a style")
     return Outcome(issues, "; ".join(details))
 
 

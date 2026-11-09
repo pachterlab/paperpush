@@ -270,22 +270,30 @@ _REF = re.compile(r"\\(?:ref|cref|Cref|autoref|subref|figref|tabref|vref)\*?\s*\
 _SUPP_SWITCH = re.compile(r"\\renewcommand\s*\{?\s*\\the(figure|table)\s*\}?\s*\{\s*S|\\beginsupplement\b|\\appendix\b")
 
 
-def tex_mentions(source: str) -> list[Mention]:
-    """Citations and definitions from a LaTeX source's labels and references."""
+def _tex_envs(source: str) -> list[tuple[re.Match, str, int]]:
+    """``(environment match, series, number)`` for each figure and table environment."""
     switches = [(m.start(), m.group(1)) for m in _SUPP_SWITCH.finditer(source)]
     counters: dict[str, int] = {}
-    labels: dict[str, tuple[str, int]] = {}
-    spans: list[tuple[int, int]] = []
-    out: list[Mention] = []
+    out = []
     for env in _ENV.finditer(source):
         kind = "table" if "table" in env.group(1) else "figure"
         supp = any(pos < env.start() and (what is None or what == kind) for pos, what in switches)
         series = ("supp_" if supp else "") + kind
         counters[series] = counters.get(series, 0) + 1
+        out.append((env, series, counters[series]))
+    return out
+
+
+def tex_mentions(source: str) -> list[Mention]:
+    """Citations and definitions from a LaTeX source's labels and references."""
+    labels: dict[str, tuple[str, int]] = {}
+    spans: list[tuple[int, int]] = []
+    out: list[Mention] = []
+    for env, series, number in _tex_envs(source):
         spans.append((env.start(), env.end()))
         for label in _LABEL.findall(env.group(2)):
-            labels[label.strip()] = (series, counters[series])
-        out.append(Mention(series, counters[series], env.start(), True, env.group(1)))
+            labels[label.strip()] = (series, number)
+        out.append(Mention(series, number, env.start(), True, env.group(1)))
     for ref in _REF.finditer(source):
         if any(a <= ref.start() < b for a, b in spans):
             continue
@@ -522,6 +530,8 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     from .report import NOT_APPLICABLE, UNCHECKED
 
     checks.run("citations.cross_references", CROSS_REF_TITLE, CITATIONS, _cross_reference_check, venue, values)
+    checks.run("citations.duplicate_captions", "No two figures or tables share a caption or a number", CITATIONS, _duplicate_caption_check, venue, values)
+    checks.run("citations.missing_captions", "Every figure and table has a caption", CITATIONS, _missing_caption_check, venue, values)
     try:
         found, field_id = _manuscript_mentions(venue, values)
     except (NotApplicable, Unchecked) as exc:
@@ -676,6 +686,11 @@ def uncited_panel_problems(cites: list[PanelCite], named: dict[int, list[str]]) 
 
 def legends(text: str) -> list[tuple[int, int, str]]:
     """``(figure number, position, legend text)`` for each main-figure caption in ``text``."""
+    return [(m.number, start, body) for m, start, body in _caption_blocks(text) if m.series == "figure"]
+
+
+def _caption_blocks(text: str) -> list[tuple[Mention, int, str]]:
+    """``(caption's mention, position, caption text)`` for each figure and table caption in ``text``."""
     out = []
     lines = text.split("\n")
     lengths = sorted(len(l) for l in lines if len(l) > 20)
@@ -685,7 +700,7 @@ def legends(text: str) -> list[tuple[int, int, str]]:
     for line in lines:
         offsets.append(pos)
         pos += len(line) + 1
-    starts = {m.pos: m for m in mentions(text) if m.caption and m.series == "figure"}
+    starts = {m.pos: m for m in mentions(text) if m.caption}
     for i, line in enumerate(lines):
         start = offsets[i]
         mention = next((m for p, m in starts.items() if start <= p < start + len(line) + 1), None)
@@ -698,7 +713,7 @@ def legends(text: str) -> list[tuple[int, int, str]]:
             body.append(following)
             if following.rstrip().endswith(".") and len(following) < 0.6 * typical:
                 break  # a short last line: the paragraph ends here
-        out.append((mention.number, start, " ".join(s.strip() for s in body)))
+        out.append((mention, start, " ".join(s.strip() for s in body)))
     return out
 
 
@@ -720,6 +735,161 @@ def tex_legends(source: str) -> list[tuple[int, int, str]]:
 
         out.append((number, env.start(), _tex_to_text(body[caption.end() : i - 1])))
     return out
+
+
+# --- captions present and distinct ----------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Caption:
+    series: str
+    number: int
+    text: str
+
+
+# A caption with fewer words than this ("Table 2. Results") may be the same as another by chance.
+_MIN_CAPTION_WORDS = 4
+_DOCUMENT_SUFFIXES = (".pdf", ".docx", ".tex", ".zip", ".md", ".markdown", ".txt")
+_FILE_NUMBER = re.compile(r"(?:fig(?:ure)?|tab(?:le)?|tbl)[\W_]*(\d{1,3})", re.IGNORECASE)
+_NO_OWN_CAPTION = (".xlsx", ".xls", ".csv", ".tsv")  # a spreadsheet carries its title in the file
+
+
+def _tex_float_captions(source: str) -> list[tuple[str, int, str | None, str]]:
+    """``(series, number, caption text or None, what identifies the float)`` for each figure and table environment."""
+    from .manuscript import _tex_to_text
+
+    out: list[tuple[str, int, str | None, str]] = []
+    for env, series, number in _tex_envs(source):
+        body = env.group(2)
+        found = list(re.finditer(r"\\caption\*?\s*(?:\[[^\]]*\])?\s*\{", body))
+        caption = None
+        if found:  # the last \\caption is the float's own; earlier ones belong to its subfigures
+            depth, i = 1, found[-1].end()
+            while i < len(body) and depth:
+                depth += {"{": 1, "}": -1}.get(body[i], 0)
+                i += 1
+            caption = _tex_to_text(body[found[-1].end() : i - 1])
+        elif re.search(r"\\\w*caption\w*\b|\\\w*legend\b", body):
+            caption = ""  # a package's or the author's own caption macro: there is a caption, its text unread
+        label = _LABEL.search(body)
+        graphic = re.search(r"\\includegraphics\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}", body)
+        out.append((series, number, caption, (label.group(1) if label else Path(graphic.group(1)).name if graphic else f"number {number}")))
+    return out
+
+
+def _file_captions(path: Path) -> list[Caption] | None:
+    """The captions in one file, or None if it cannot be read."""
+    doc = document.get(path)
+    out: list[Caption] = []
+    floats: set[str] = set()
+    if doc.is_tex and doc.tex_source is not None:
+        for series, number, caption, _ in _tex_float_captions(doc.tex_source):
+            floats.add(series)
+            if caption is not None:
+                out.append(Caption(series, number, caption))
+    text = doc.text
+    if text is None:
+        return out if floats else None
+    # A compiled LaTeX file's floats print as captions too; they are counted once, from the source.
+    out += [Caption(m.series, m.number, body) for m, _, body in _caption_blocks(text) if m.series not in floats]
+    return out
+
+
+def _caption_words(text: str) -> list[str]:
+    """A caption's words without its "Figure 2." label."""
+    text = text.strip()
+    label = _MENTION.match(text)
+    return re.findall(r"[a-z0-9]+", (text[label.end() :] if label else text).lower())
+
+
+def duplicate_caption_problems(found: list[Caption]) -> list[str]:
+    """Numbers two captions share, and caption texts two numbers share, as sentences."""
+    numbered: dict[tuple[str, int], list[list[str]]] = {}
+    worded: dict[tuple[str, ...], list[tuple[str, int]]] = {}
+    for caption in found:
+        words = _caption_words(caption.text)
+        if {"continued", "cont", "contd"} & set(words[:3]):
+            continue  # a table running onto another page repeats its label
+        item = (caption.series, caption.number)
+        numbered.setdefault(item, []).append(words)
+        if len(words) >= _MIN_CAPTION_WORDS and item not in worded.get(tuple(words), []):
+            worded.setdefault(tuple(words), []).append(item)
+    problems = []
+    for (series, number), versions in numbered.items():
+        if len(versions) > 1:
+            name = f"{_NAMES[series]} {number}"
+            same = all(v == versions[0] for v in versions)
+            problems.append(f"the caption of {name} appears {len(versions)} times; keep one" if same else f"{len(versions)} different captions are numbered {name}; give each item its own number")
+    for words, items in worded.items():
+        if len(items) > 1:
+            names = " and ".join(f"{_NAMES[s]} {n}" for s, n in items)
+            problems.append(f"{names} have the same caption (\u201c{' '.join(words[:8])}...\u201d); each needs its own")
+    return problems
+
+
+def _document_files(venue: Venue, values: dict[str, str], roles: tuple[str, ...]) -> list[tuple[str, Path]]:
+    from .requirements_check import _existing, _fields_for, _paths
+
+    out = [(f.id, p) for role in roles for f in _fields_for(venue, role) for p in _existing(_paths(f, values)) if p.suffix.lower() in _DOCUMENT_SUFFIXES]
+    return list(dict.fromkeys(out))
+
+
+def _duplicate_caption_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    files = _document_files(venue, values, ("manuscript", "figures", "tables", "supplementary"))
+    if not files:
+        raise NotApplicable("no manuscript file to read")
+    issues: list[Issue] = []
+    total = 0
+    read = 0
+    for field_id, path in files:
+        found = _file_captions(path)
+        if found is None:
+            continue
+        read += 1
+        total += len(found)
+        issues += [Issue(WARNING, field_id, f"{path.name}: {p}") for p in duplicate_caption_problems(found)]
+    if not read:
+        raise Unchecked("could not read the text of " + ", ".join(p.name for _, p in files))
+    if not total:
+        raise NotApplicable("found no figure or table captions")
+    return Outcome(issues, "" if issues else f"{total} caption(s), each with its own number and text")
+
+
+def _missing_caption_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    from .requirements_check import _existing, _fields_for, _paths
+
+    found, field_id = _manuscript_mentions(venue, values)
+    issues: list[Issue] = []
+    captioned: dict[str, set[int]] = {"figure": set(), "table": set()}
+    no_caption: dict[str, set[int]] = {"figure": set(), "table": set()}
+    for _, path in _document_files(venue, values, ("manuscript", "figures", "tables")):
+        doc = document.get(path)
+        if doc.is_tex and doc.tex_source is not None:
+            for series, number, caption, name in _tex_float_captions(doc.tex_source):
+                if caption is None:
+                    kind = "table" if series.endswith("table") else "figure"
+                    no_caption.setdefault(series, set()).add(number)
+                    issues.append(Issue(WARNING, field_id, f"{path.name}: the {kind} environment '{name}' has no \\caption"))
+        for caption in _file_captions(path) or []:
+            captioned.setdefault(caption.series, set()).add(caption.number)
+    cited = {key: {m.number for m in found if m.series == key and not m.caption} for key in captioned}
+    seen = sum(map(len, captioned.values())) + len(issues)
+    for key, role, word in (("figure", "figures", "figure"), ("table", "tables", "table")):
+        attached = [p for f in _fields_for(venue, role) for p in _existing(_paths(f, values)) if p.suffix.lower() not in _NO_OWN_CAPTION]
+        named = {int(m.group(1)) for m in (_FILE_NUMBER.search(p.stem) for p in attached) if m}
+        seen += len(attached) + len(cited.get(key, ()))
+        expected = named - captioned[key]
+        if not captioned[key]:
+            expected |= cited.get(key, set())
+        expected -= no_caption.get(key, set())
+        if expected:
+            numbers = ", ".join(map(str, sorted(expected)))
+            issues.append(Issue(WARNING, field_id, f"{_NAMES[key]} {numbers}: no caption found; a caption is a line of its own such as '{_NAMES[key]} 1. What it shows'"))
+        elif attached and not captioned[key] and not no_caption.get(key):
+            issues.append(Issue(WARNING, field_id, f"{len(attached)} {word} file(s) attached, but no {word} captions found; a caption is a line of its own such as '{_NAMES[key]} 1. What it shows'"))
+    if not seen:
+        raise NotApplicable("no figures or tables cited or attached")
+    return Outcome(issues, "" if issues else f"captions found for {len(captioned['figure'])} figure(s) and {len(captioned['table'])} table(s)")
 
 
 def _legend_checks(checks: Checks, venue: Venue, values: dict[str, str], found, field_id: str) -> None:

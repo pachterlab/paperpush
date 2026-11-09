@@ -183,3 +183,130 @@ def test_email_deferred_to_title_page_rule(tmp_path, rules):
     ms = _docx(tmp_path, ["Title", "Abstract", "Text."])
     status, detail_or_msg, detail = _run({"manuscript_file": ms})["front_matter.contact_email"]
     assert status == report.NOT_APPLICABLE and "guidelines.title_page" in detail
+
+
+# --- keywords -----------------------------------------------------------------------------------
+
+KEYWORDS = Field(id="keywords", label="Keywords", type="text")
+KEYWORD_VENUE = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT, KEYWORDS])
+
+
+def _text(tmp_path: Path, content: str, name: str = "ms.txt") -> str:
+    path = tmp_path / name
+    path.write_text(content, encoding="utf-8")
+    return str(path)
+
+
+def test_keywords_warned_when_absent_even_without_venue_rules(tmp_path):
+    status, message, _ = _run({"manuscript_file": _text(tmp_path, "A title\n\nAbstract\n\nWe did it.\n")}, KEYWORD_VENUE)["front_matter.keywords"]
+    assert status == report.WARNING and "no keywords" in message and "ms.txt" in message
+
+
+def test_keywords_in_the_sub_pass(tmp_path):
+    values = {"manuscript_file": _text(tmp_path, "A title\n"), "keywords": "mice; genomics"}
+    status, _, detail = _run(values, KEYWORD_VENUE)["front_matter.keywords"]
+    assert status == report.PASSED and "the .sub" in detail
+
+
+@pytest.mark.parametrize(
+    "name, content",
+    [
+        ("ms.txt", "A title\n\nKeywords: mice, genomics\n"),
+        ("ms.txt", "A title\n\nKey words\nmice\n"),
+        ("ms.txt", "We did it. Keywords: mice\n"),
+        ("ms.txt", "Index Terms\u2014mice\n"),
+        ("ms.md", "# A title\n\n**Keywords:** mice\n"),
+        ("ms.tex", "\\documentclass{article}\n\\begin{document}\n\\keywords{mice}\nText.\n\\end{document}\n"),
+        ("ms.tex", "\\documentclass{article}\n\\begin{document}\n\\begin{IEEEkeywords}mice\\end{IEEEkeywords}\n\\end{document}\n"),
+    ],
+)
+def test_keywords_in_the_manuscript_pass(tmp_path, name, content):
+    status, _, detail = _run({"manuscript_file": _text(tmp_path, content, name)}, KEYWORD_VENUE)["front_matter.keywords"]
+    assert status == report.PASSED and name in detail
+
+
+def test_the_word_keywords_in_prose_does_not_count(tmp_path):
+    status, _, _ = _run({"manuscript_file": _text(tmp_path, "A title\n\nWe searched the keywords in the corpus.\n")}, KEYWORD_VENUE)["front_matter.keywords"]
+    assert status == report.WARNING
+
+
+def test_keywords_not_applicable_without_a_file():
+    assert _run({}, KEYWORD_VENUE)["front_matter.keywords"][0] == report.NOT_APPLICABLE
+
+
+# --- where the abstract ends when there is no Introduction --------------------------------------
+
+from paperpush import document  # noqa: E402
+
+PROSE_ABSTRACT = "We trained a model on mice and it worked well."
+BODY = "The body of the paper starts here."
+
+
+def _abstract(tmp_path: Path, content: str, name: str = "ms.txt", sub: str = "") -> str:
+    path = tmp_path / name
+    path.write_text(content, encoding="utf-8")
+    return fm.manuscript_abstract(document.get(path), sub)[0]
+
+
+@pytest.mark.parametrize("heading", ["Materials and methods", "Methods", "Results", "2. Results and Discussion", "METHODS", "Discussion:"])
+def test_prose_abstract_ends_at_the_first_body_section(tmp_path, heading):
+    found = _abstract(tmp_path, f"Abstract\n\n{PROSE_ABSTRACT}\n\n{heading}\n\n{BODY}\n")
+    assert PROSE_ABSTRACT in found and BODY not in found
+
+
+def test_short_prose_abstract_in_markdown(tmp_path):
+    found = _abstract(tmp_path, f"# Title\n\n## Abstract\n\n{PROSE_ABSTRACT}\n\n## Materials and methods\n\n{BODY}\n", "ms.md")
+    assert PROSE_ABSTRACT in found and BODY not in found
+
+
+def test_any_marked_heading_of_the_same_level_ends_the_abstract(tmp_path):
+    found = _abstract(tmp_path, f"# Title\n\n## Abstract\n\n{PROSE_ABSTRACT}\n\n## Mouse husbandry\n\n{BODY}\n", "ms.md")
+    assert PROSE_ABSTRACT in found and BODY not in found
+
+
+def test_a_lower_level_heading_does_not_end_the_abstract(tmp_path):
+    found = _abstract(tmp_path, f"# Title\n\n## Abstract\n\n{PROSE_ABSTRACT}\n\n### Some note\n\nMore of it.\n\n## Mouse husbandry\n\n{BODY}\n", "ms.md")
+    assert "More of it." in found and BODY not in found
+
+
+def test_word_heading_styles_end_the_abstract(tmp_path):
+    from zipfile import ZipFile
+
+    def para(style: str, text: str) -> str:
+        props = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ""
+        return f"<w:p>{props}<w:r><w:t>{text}</w:t></w:r></w:p>"
+
+    path = tmp_path / "ms.docx"
+    body = para("Heading1", "Abstract") + para("", PROSE_ABSTRACT) + para("Heading1", "Mouse husbandry") + para("", BODY)
+    with ZipFile(path, "w") as archive:
+        archive.writestr("word/document.xml", f"<w:document><w:body>{body}</w:body></w:document>")
+    found = fm.manuscript_abstract(document.get(path))[0]
+    assert PROSE_ABSTRACT in found and BODY not in found
+
+
+def test_structured_abstract_keeps_its_labels_and_ends_at_the_repeat(tmp_path):
+    text = f"Abstract\n\nBackground\n\nWe asked.\n\nMethods\n\nWe did.\n\nResults\n\nWe found.\n\nConclusions\n\nIt works.\n\nMethods\n\n{BODY}\n"
+    found = _abstract(tmp_path, text)
+    assert "It works." in found and BODY not in found
+
+
+def test_structured_abstract_with_other_labels_is_not_cut_short(tmp_path):
+    text = "Abstract\n\nContext\n\nA long history of work on this.\n\nObjective\n\nTo test it.\n\nDesign\n\nA cohort.\n\nResults\n\nWe found it.\n\nConclusions\n\nIt works.\n"
+    assert "It works." in _abstract(tmp_path, text)
+
+
+def test_structured_abstract_ends_at_a_body_section_after_its_conclusions(tmp_path):
+    text = f"Abstract\n\nBackground\n\nWe asked.\n\nFindings\n\nWe found.\n\nConclusions\n\nIt works.\n\nDiscussion\n\n{BODY}\n"
+    found = _abstract(tmp_path, text)
+    assert "It works." in found and BODY not in found
+
+
+def test_sub_abstract_marks_the_end_of_an_unmarked_one(tmp_path):
+    found = _abstract(tmp_path, f"Abstract\n\n{PROSE_ABSTRACT}\n\nMouse husbandry\n\n{BODY}\n", sub=PROSE_ABSTRACT)
+    assert PROSE_ABSTRACT in found and BODY not in found
+
+
+def test_introduction_still_ends_the_abstract_first(tmp_path):
+    text = f"Abstract\n\nBackground\n\nWe asked.\n\nResults\n\nWe found.\n\nIntroduction\n\n{BODY}\n"
+    found = _abstract(tmp_path, text)
+    assert "We found." in found and BODY not in found

@@ -308,7 +308,9 @@ def _body_text(path: Path) -> str:
 def _heading_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> list[Issue]:
     """WARN on a required section or declaration whose heading is not found."""
     required_sections = list(reqs.sections.required or [])
-    required_statements = list(reqs.statements.required or [])
+    # rigor.trial_registration covers this one: it applies only to trials and
+    # looks for the registry ID itself, which a heading does not show.
+    required_statements = [s for s in (reqs.statements.required or []) if s != "clinical_trial_registration"]
     if not required_sections and not required_statements:
         return []
     found = manuscript_headings(path)

@@ -15,7 +15,7 @@ from tests.conftest import _build_docx, _build_pdf
 MANUSCRIPT = Field(id="manuscript_file", label="Manuscript", type="file")
 VENUE = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT])
 IDS = [f"prose.{name}" for name in pc._CHECKS]
-ALL_IDS = set(IDS) | {f"prose.{pc.REPETITION}", "prose.numbers", "prose.conventions", "prose.acronyms"}
+ALL_IDS = set(IDS) | {f"prose.{pc.REPETITION}", "prose.numbers", "prose.conventions", "prose.acronyms", "prose.heading_case"}
 
 needs_codespell = pytest.mark.skipif(
     pc.misspellings() is None, reason="codespell is not installed"

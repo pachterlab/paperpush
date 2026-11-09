@@ -84,8 +84,77 @@ _ABSTRACT_END = re.compile(
     r"graphical\s+abstract|highlights|background\s+and\s+summary|one[- ]sentence\s+summary|teaser)\b[ \t]*[:.\u2014-]?[ \t]*$",
     re.IGNORECASE | re.MULTILINE,
 )
+# A line of its own naming a part of a structured abstract or of the paper: the two share "Methods" and "Results".
+_ABSTRACT_LABEL = re.compile(
+    r"^[ \t]*(?:\d+\.?[ \t]+|[IVX]+\.[ \t]+)?(materials\s+and\s+methods|methods\s+and\s+materials|results\s+and\s+discussion|methods?|results?|discussions?|conclusions?(?:\s+and\s+relevance)?|"
+    r"background|context|importance|objectives?|purpose|aims?|rationale|design|setting|participants|interventions?|exposures?|measurements|main\s+outcomes?(?:\s+and\s+measures?)?|findings|interpretation|relevance|limitations)\b[ \t]*[:.\u2014-]?[ \t]*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_BODY_SECTIONS = frozenset({"methods", "results", "discussion", "conclusion"})
+# Fewer words than this before the first label is not prose: a structured abstract opens with its first label.
+_PROSE_LEAD_WORDS = 4
 # Longest stretch read as the abstract when nothing marks its end.
 _ABSTRACT_MAX_CHARS = 4000
+
+
+def _canonical_label(label: str) -> str:
+    """"Materials and Methods" and "Method" -> "methods"; "Results and discussion" -> "results"; "Conclusions" -> "conclusion"."""
+    words = re.sub(r"\s+", " ", label.lower())
+    for name in ("results", "methods", "discussion", "conclusion"):
+        if name.rstrip("s") in words:
+            return name
+    return words
+
+
+def _end_at_label(rest: str) -> int | None:
+    """Where a section label in ``rest`` ends the abstract, or None.
+
+    Prose before the first label means an unstructured abstract, so the first
+    section of the paper ends it. A structured abstract opens with a label, and
+    ends at a label it has already used or a section of the paper after its
+    conclusions.
+    """
+    labels = [(_canonical_label(m.group(1)), m.start()) for m in _ABSTRACT_LABEL.finditer(rest)]
+    if not labels:
+        return None
+    if len(rest[: labels[0][1]].split()) >= _PROSE_LEAD_WORDS:
+        return next((pos for name, pos in labels if name in _BODY_SECTIONS), None)
+    seen: set[str] = set()
+    for name, pos in labels:
+        if name in seen or (name in _BODY_SECTIONS and "conclusion" in seen):
+            return pos
+        seen.add(name)
+    return None
+
+
+def _end_at_marked_heading(rest: str, doc: document.Document) -> int | None:
+    """Where the next heading the file marks at the abstract's level or above starts in ``rest``, or None.
+
+    Section labels are left to :func:`_end_at_label`, since a structured
+    abstract's may be marked at the same level as "Abstract".
+    """
+    from .manuscript import cased_headings, normalize_heading
+
+    if not (doc.is_markdown or doc.is_docx):
+        return None
+    marked = [(int(level[1:]), normalize_heading(text)) for level, text in cased_headings(doc.path) or [] if re.fullmatch(r"h\d", level)]
+    start = next((i for i, (_, text) in enumerate(marked) if text in ("abstract", "summary")), None)
+    if start is None:
+        return None
+    following = next((text for level, text in marked[start + 1 :] if level <= marked[start][0]), None)
+    if following is None or _ABSTRACT_LABEL.fullmatch(following):
+        return None
+    return next((m.start() for m in re.finditer(r"^.*$", rest, re.MULTILINE) if normalize_heading(m.group(0)) == following), None)
+
+
+def _end_without_introduction(rest: str, doc: document.Document, sub_abstract: str) -> int:
+    """Where the abstract ends in ``rest``, the text after its heading, when no Introduction or similar heading ends it."""
+    ends = [_end_at_label(rest), _end_at_marked_heading(rest, doc)]
+    words = re.findall(r"[A-Za-z0-9]+", sub_abstract)
+    if len(words) >= 8:
+        last = re.search(r"\W+".join(re.escape(w) for w in words[-6:]) + r"\S*", rest, re.IGNORECASE)
+        ends.append(last.end() if last else None)
+    return min((end for end in ends if end is not None), default=len(rest))
 
 
 def manuscript_abstract(doc: document.Document, sub_abstract: str = "") -> tuple[str, bool] | None:
@@ -93,7 +162,8 @@ def manuscript_abstract(doc: document.Document, sub_abstract: str = "") -> tuple
 
     LaTeX source: the ``abstract`` environment (or ``\\abstract{...}``), kept
     raw so ``\\cite`` can be seen. Otherwise the text after an "Abstract"
-    heading, up to the Introduction, the keywords line, or a similar heading;
+    heading, up to the Introduction, the keywords line, or a similar heading
+    or, with none of those, the end :func:`_end_without_introduction` finds;
     failing a heading, the passage the ``.sub``'s abstract opens and closes with.
     """
     if doc.is_tex and doc.tex_source:
@@ -107,7 +177,7 @@ def manuscript_abstract(doc: document.Document, sub_abstract: str = "") -> tuple
     if heading is not None:
         rest = text[heading.end() : heading.end() + _ABSTRACT_MAX_CHARS]
         end = _ABSTRACT_END.search(rest)
-        return (rest[: end.start()] if end else rest), False
+        return rest[: end.start() if end else _end_without_introduction(rest, doc, sub_abstract)], False
     words = re.findall(r"[A-Za-z0-9]+", sub_abstract)
     if len(words) >= 8:
         start = re.search(r"\W+".join(re.escape(w) for w in words[:6]), text, re.IGNORECASE)
@@ -198,6 +268,38 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("front_matter.abstract_citations", "Abstract cites no references", FRONT_MATTER, _abstract_citations_check, venue, values)
     checks.run("front_matter.structured_abstract", "Abstract structured with the required headings", FRONT_MATTER, _structured_check, venue, values)
     checks.run("front_matter.contact_email", "Manuscript gives a contact e-mail address", FRONT_MATTER, _email_check, venue, values)
+    checks.run("front_matter.keywords", "Keywords given in the .sub or the manuscript", FRONT_MATTER, _keywords_check, venue, values)
+
+
+# A "Keywords" label (at a line's start, or anywhere when followed by a colon or dash), or LaTeX's \\keywords{} and keyword environments.
+_KEYWORDS_LABEL = re.compile(
+    r"^[\s*_#>]*(?:key[\s-]*words?|key\s+terms|index\s+terms)\b|\b(?:key[\s-]*words?|index\s+terms)\s*[:\u2014\u2013-]|\\(?:begin\s*\{\s*)?(?:IEEE)?keywords?\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _keywords_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    from .requirements_check import _existing, _fields_for, _paths
+
+    fields = _fields_for(venue, "keywords")
+    if any(str(values.get(f.id, "")).strip() for f in fields):
+        return Outcome([], "keywords given in the .sub")
+    files = [(f, p) for role in ("manuscript", "title_page") for f in _fields_for(venue, role) for p in _existing(_paths(f, values))]
+    if not files:
+        raise NotApplicable("no keywords in the .sub and no manuscript file to read")
+    read = []
+    for _, path in files:
+        doc = document.get(path)
+        whole = "\n".join(t for t in (doc.tex_source, doc.text) if t)
+        if not whole:
+            continue
+        if _KEYWORDS_LABEL.search(whole):
+            return Outcome([], f"keywords listed in {path.name}")
+        read.append(path.name)
+    if not read:
+        raise Unchecked("could not read " + ", ".join(p.name for _, p in files))
+    field_id = fields[0].id if fields else files[0][0].id
+    return Outcome([Issue(WARNING, field_id, f"no keywords in the .sub or in {', '.join(read)}; most venues and indexing services ask for them, so add 3-6 terms that say what the paper is about")])
 
 
 def _rules(venue: Venue, values: dict[str, str]):

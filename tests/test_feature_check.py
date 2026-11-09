@@ -56,6 +56,7 @@ def test_reader_checks_are_queued(tmp_path):
     assert {task.id for task in checks.ai_tasks} == {
         "ai.details.ethics", "ai.details.declarations", "ai.details.author_details",
         "ai.details.abstract_reporting", "ai.details.supplementary", "ai.details.trademarks",
+        "ai.details.misplaced_content", "ai.details.heading_content", "ai.details.nih_grant_numbers",
     }
 
 

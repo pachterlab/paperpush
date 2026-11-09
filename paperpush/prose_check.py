@@ -743,6 +743,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("prose.numbers", "Numbers of 10 or more in digits, thousands grouped one way", PROSE, style_check._numbers_check, venue, values)
     checks.run("prose.conventions", "Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)", PROSE, style_check._conventions_check, venue, values)
     checks.run("prose.acronyms", "Acronyms spelled out at first use", PROSE, style_check._acronym_check, venue, values)
+    checks.run("prose.heading_case", "Headings of the same level capitalized one way", PROSE, style_check._heading_case_check, venue, values)
     task = style_check.ai_prose_task(venue, values)
     if task is not None:
         checks.needs_ai(task)
