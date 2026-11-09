@@ -39,6 +39,10 @@
           "description": "Hidden from listings but still reachable by get_venue.",
           "type": "boolean"
         },
+        "publisher": {
+          "description": "Slug of the venue's publisher, as listed under $publishers in manuscript_requirements.json (e.g. elsevier, springer_nature). Its house rules (the publisher:<slug> entry) back the venue's own: a rule the venue's guidelines do not state falls back to the publisher's, reported as a warning. Empty for a venue with no publisher, or one whose publisher is not listed.",
+          "type": "string"
+        },
         "site_url": {
           "description": "Public homepage URL.",
           "type": "string"

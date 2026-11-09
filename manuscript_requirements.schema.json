@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://paperpush.org/schemas/manuscript_requirements.schema.json",
   "title": "paperpush manuscript requirements database",
-  "description": "Schema for manuscript_requirements.json. The top-level object maps a venue slug to what its author guidelines require of the manuscript, grouped into shared sections (manuscript, title_page, abstract, keywords, sections, statements, figures, tables, supplementary, references, cover_letter, upload). Generated from the dataclasses in paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate.",
+  "description": "Schema for manuscript_requirements.json. The top-level object maps a venue slug to what its author guidelines require of the manuscript, grouped into shared sections (manuscript, title_page, abstract, keywords, sections, statements, figures, tables, supplementary, references, cover_letter, upload). $publishers holds each publisher's house rules, which back the rules of every venue that names that publisher in venues.json. Generated from the dataclasses in paperpush/requirements.py; run scripts/gen_venues_schema.py to regenerate.",
   "type": "object",
   "properties": {
     "$schema": {
@@ -32,6 +32,16 @@
         }
       },
       "additionalProperties": false
+    },
+    "$publishers": {
+      "type": "object",
+      "description": "The publishers whose house rules can back a venue's own, keyed by publisher slug (a venue names one with `publisher` in venues.json). Each publisher's house rules are its `rules`, which paperpush loads as the entry `publisher:<slug>`.",
+      "propertyNames": {
+        "pattern": "^[a-z0-9_]+$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/publisher"
+      }
     }
   },
   "patternProperties": {
@@ -201,6 +211,17 @@
           ],
           "description": "Size caps on the submission's uploads as a whole."
         },
+        "revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/revision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What a revised manuscript is sent with: the marked copy and the response to reviewers."
+        },
         "notes": {
           "description": "Venue-wide rules that fit no section.",
           "items": {
@@ -348,6 +369,17 @@
           ],
           "description": "Size caps on the submission's uploads as a whole."
         },
+        "revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/revision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What a revised manuscript is sent with: the marked copy and the response to reviewers."
+        },
         "notes": {
           "type": "array",
           "items": {
@@ -355,6 +387,35 @@
           }
         }
       },
+      "additionalProperties": false
+    },
+    "publisher": {
+      "properties": {
+        "name": {
+          "description": "Display name, e.g. 'Springer Nature'.",
+          "type": "string"
+        },
+        "site_url": {
+          "description": "URL of the publisher's author guidelines (its house rules), or its homepage.",
+          "type": "string"
+        },
+        "crossref_names": {
+          "description": "Publisher names as Crossref records them (e.g. 'Elsevier BV'), for finding the publisher of a journal paperpush does not list from its ISSN.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "parent": {
+          "description": "Slug of the publisher this one is an imprint of (Cell Press: elsevier). Informational; the house rules chain through `inherits`.",
+          "type": "string"
+        },
+        "rules": {
+          "$ref": "#/$defs/venue",
+          "description": "The publisher's house rules: the rules it states for all its journals, with the same keys as a venue entry. They back the rules of every venue whose venues.json entry names this publisher; `inherits` may name another publisher's rules as `publisher:<slug>`. Empty when paperpush holds none."
+        }
+      },
+      "type": "object",
       "additionalProperties": false
     },
     "manuscript": {
@@ -1149,6 +1210,71 @@
           ],
           "description": "Declarations the venue accepts but does not require."
         },
+        "ai_use_if_used": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Use of generative AI (LLMs, image generators) must be disclosed when there was any. To require a statement whether or not AI was used, list ai_use in required instead."
+        },
+        "ai_use_locations": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "methods",
+                  "acknowledgements",
+                  "statement",
+                  "supplementary",
+                  "figure_captions"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where in the manuscript the AI-use disclosure may go; any one of them will do: methods, acknowledgements, statement (a section of its own), supplementary (the supplementary material), figure_captions (the legend of each AI-touched figure). Unset: anywhere."
+        },
+        "ai_use_cover_letter": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The AI-use disclosure must also be made in the cover letter."
+        },
+        "ai_copyediting_exempt": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "AI used only to improve language, grammar, or spelling (copy editing) need not be disclosed."
+        },
+        "ai_authorship_prohibited": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "AI tools (ChatGPT, LLMs) may not be listed as authors."
+        },
         "notes": {
           "anyOf": [
             {
@@ -1756,6 +1882,44 @@
             }
           ],
           "description": "Per-file size cap that applies to every upload, in MB."
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rules with no structured key."
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "revision": {
+      "properties": {
+        "marked_manuscript": {
+          "anyOf": [
+            {
+              "enum": [
+                "none",
+                "red_text",
+                "highlight",
+                "track_changes",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the changes are marked in the marked-up copy of a revised manuscript: none (no marked copy wanted), red_text, highlight, track_changes (Word Track Changes), or other (described in notes). Unset: not stated (paperpush-respond-to-reviewers defaults to red_text)."
         },
         "notes": {
           "anyOf": [
