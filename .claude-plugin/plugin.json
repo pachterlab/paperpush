@@ -1,6 +1,6 @@
 {
   "name": "paperpush",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Skills for paperpush: autofill a submission from the manuscript, validate it against the venue's guidelines, submit it, debug a stalled portal run, and add venues.",
   "author": {
     "name": "Pachter Lab",

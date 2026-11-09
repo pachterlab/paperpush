@@ -2,31 +2,31 @@
 
 <!-- [![Documentation Status](https://readthedocs.org/projects/paperpush/badge/?version=latest)](https://paperpush.readthedocs.io/en/latest/?badge=latest) -->
 
-Prepare manuscripts for submission to preprint servers, journals, and conferences with just a few commands. No need to spend hours verifying manuscript files for journal compliance and filling out submission portal forms manually. Just provide a manuscript directory and submission venue of interest, and PaperPush will validate the documents and fill out the submission portal for you.
+Prepare manuscripts for submission to preprint servers, journals, and conferences with just a few commands.
 
 PaperPush provides the following services:
-- A standardized system to share all data submitted to a journal/conference
+- A standardized system to share all metadata submitted to a venue (the .sub file)
 <!-- BEGIN VALIDATION CHECK COUNT -->
 - Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 131 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
 <!-- END VALIDATION CHECK COUNT -->
-- A central database of journal/conference manuscript requirements
+- A central database of journal/conference manuscript requirements and submission data
 - Automated and fast submission portal filling with deterministic scripts
 - Free, open-source, actively-maintained, and never stores your data
 
 ## tl;dr
 
-Workflow to create the manuscript metadata (.sub) file, validate against author guidelines, and fill out the submission portal. Follow your favorite path:
+Choose your favorite mode: AI agent skills, website, or command line. All modes support venue-specific metadata collection, venue-tailored checking, and submission portal filling for supported venues.
 
-### Claude Code (other AI agents listed below):
+### AI agent skills:
 
-#### Install
+#### Install in Claude Code (other AI agents listed below)
 - `/plugin marketplace add pachterlab/paperpush`
-- `/plugin install paperpush@paperpush`
+- (In a new session): `/plugin install paperpush@paperpush`
 
-#### Venue-specific metadata collection, tailored checking, and submission portal filling for a supported venue
+#### Venue-specific metadata collection, venue-tailored checking, and submission portal filling for a supported venue
 - `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.`
 
-#### Venue-specific metadata collection and tailored checking for an unsupported venue
+#### Venue-specific metadata collection and venue-tailored checking for an unsupported venue
 - `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE_NAME with PaperPush.`
 
 #### General manuscript checking
@@ -40,6 +40,8 @@ Workflow to create the manuscript metadata (.sub) file, validate against author 
 
 
 ### Website: 
+
+#### Venue-specific metadata collection, venue-tailored checking, and submission portal filling for a supported venue
 - Visit [paperpush.onrender.com](https://paperpush.onrender.com)
 - Select the VENUE (or upload a .sub file)
   - For general manuscript checks, select "General"
@@ -48,7 +50,8 @@ Workflow to create the manuscript metadata (.sub) file, validate against author 
 - Click the blue "Share" button to share the editable form with co-authors (or download and share the .sub file)
 - (If available) Click the "Fill out submission portal automatically" button and follow the instructions
 
-### CLI: 
+### Command line interface: 
+#### Venue-specific metadata collection, venue-tailored checking, and submission portal filling for a supported venue
 - To install:
   - `pip install paperpush["all"]`  # Recommended — for AI API usage, MCP server, local web deployment, and additional manuscript validation checks
   - `playwright install chromium`  # Required for `submit`
@@ -329,7 +332,7 @@ Here are a few possibilities, in order of decreasing ease of resolution:
 *Can I still use PaperPush if my venue is not listed?*
 Yes! PaperPush can still validate manuscript files with up to 125 general validation checks. You can do this in the following ways:
 - AI agent: Run the skill `/paperpush-validate Validate my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.` for general checks, or `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE_NAME with PaperPush.` for venue-specific checks in which the agent can retrieve guidelines from the venue's website.
-- Web app: Choose the "General" venue option and upload your manuscript files/directory for general checks.
+- Website: Choose the "General" venue option and upload your manuscript files/directory for general checks.
 - CLI: Run `paperpush validate --manuscript MANUSCRIPT --issn ISSN` (or `--publisher NAME`) to check against the journal's publisher's house rules, when paperpush has them (`paperpush publishers`); what they catch is reported as warnings. Run `paperpush validate --manuscript MANUSCRIPT ...` for general checks, or `paperpush subfile general` for a .sub with the files and metadata every venue asks for (title, abstract, keywords, authors, manuscript, figures, supplements, cover letter, ...), then fill it in and `paperpush validate general.sub.txt`.
 
 
