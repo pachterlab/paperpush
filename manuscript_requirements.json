@@ -48,7 +48,10 @@
         "Bibliography",
         "Literature Cited",
         "Works Cited",
-        "References and Notes"
+        "References and Notes",
+        "References Cited",
+        "Reference List",
+        "Cited References"
       ],
       "Limitations of the study": [
         "Limitations of the Study",
@@ -12198,6 +12201,16 @@
       "max_display_items": 10,
       "double_spacing": true,
       "page_numbers": false,
+      "main_text_end_headings": [
+        "Acknowledgments",
+        "Acknowledgements",
+        "Code Availability",
+        "Data Availability",
+        "Data Sharing",
+        "Supplemental Materials",
+        "Supplementary Materials",
+        "Disclosures"
+      ],
       "font": "Arial, Calibri, or Times New Roman",
       "font_size_pt": 11,
       "single_file": false,
@@ -12298,7 +12311,6 @@
       "max_count": 6,
       "legends_location": "after_references",
       "placement": "combined_file",
-      "min_font_size_pt": 12,
       "notes": [
         "New submissions: figures combined into one text document in citation order with each legend after its figure. Revisions: figures uploaded individually as PSD, TIF, AI, or EPS (PNG not accepted), 300 dpi, 3 to 7 inches wide; graphs and illustrations 1200 dpi.",
         "No more than four components (a to d) per figure; collage labels in sans-serif bold at 12 pt or larger.",
