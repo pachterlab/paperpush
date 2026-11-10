@@ -5653,6 +5653,7 @@
         ".pdf"
       ],
       "placement": "separate_files",
+      "print_grayscale": true,
       "notes": [
         "Each figure must be supplied as a separate file, in a vector graphic format that can handle embedded fonts -- EPS or vector PDF only; the journal-specific instructions do not mention raster formats or dpi requirements.",
         "The online version is published in color but the print version is converted to grayscale; figures must remain understandable in grayscale (e.g. avoid referring to colors in the running text)."
@@ -19030,6 +19031,250 @@
         "The cover letter gives details of any third-party data cited as personal communication, and the corresponding author confirms permission was obtained for each.",
         "The submitting author must disclose in the cover letter (and provide copies of) all related or similar preprints, dissertations, manuscripts, and papers by the same authors, with a concise explanation of how the submission differs."
       ]
+    }
+  },
+  "jiim": {
+    "source_urls": [
+      "https://link.springer.com/journal/10278/submission-guidelines"
+    ],
+    "retrieved": "2026-11-10",
+    "article_type_field": "article_type",
+    "notes": [
+      "Manuscripts are submitted online via Editorial Manager at https://www.editorialmanager.com/jdim/default.aspx.",
+      "Papers reporting validation and implementation of informatics technologies take precedence over papers that only describe image processing algorithms, stand-alone evaluations of image analysis tools, or technologies without validation or implementation.",
+      "Research using The Cancer Imaging Archive (TCIA) must include a link (e.g. a TCIA DOI) to the imaging data used in the analysis.",
+      "Preprint posting is allowed; disclose preprint details (DOI and licence) on submission.",
+      "Suggested reviewers need an institutional email address each (or another means of verifying identity, given in the submission letter); a mix of countries and institutions is strongly recommended.",
+      "Prospective clinical trials (phase II to IV) must be registered; the trial registration number and date (plus 'retrospectively registered' if applicable) go as the last line of the abstract.",
+      "Reporting guidelines from the EQUATOR Network (CONSORT, STROBE, PRISMA, STARD, TRIPOD, CARE, etc.) are recommended."
+    ],
+    "manuscript": {
+      "formats": [
+        ".docx",
+        ".doc",
+        ".tex"
+      ],
+      "page_numbers": true,
+      "anonymized": true,
+      "template_required": false,
+      "language": "English",
+      "notes": [
+        "Double-blind review: submit two versions, a full version with all author names and affiliations and a blinded manuscript with no author names or affiliations in the text or on the title page; self-identifying citations and references should be avoided or left blank.",
+        "Manuscripts are submitted in Word (.docx or .doc; the Word template has been withdrawn); manuscripts with mathematical content can also be submitted in LaTeX, with no subfolders for figures or bibliography files.",
+        "Use a normal, plain font (e.g. 10-point Times Roman), italics for emphasis, automatic page numbering, a single column, no field functions, tab stops (not spaces) for indents, the table function for tables, and the equation editor or MathType for equations.",
+        "Use no more than three levels of displayed headings.",
+        "Abbreviations should be defined at first mention and used consistently thereafter.",
+        "Use footnotes, never endnotes; footnotes must not consist solely of a reference citation or contain bibliographic details, figures, or tables.",
+        "Acknowledgments of people, grants and funds go in a separate section on the title page, with funding organizations named in full.",
+        "Authors whose native language is not English should have the manuscript checked for linguistic accuracy by a native English speaker."
+      ]
+    },
+    "title_page": {
+      "required_items": [
+        "title",
+        "authors",
+        "affiliations",
+        "corresponding_author",
+        "corresponding_email",
+        "funding",
+        "competing_interests"
+      ],
+      "separate_file": true,
+      "notes": [
+        "The title should be concise and informative.",
+        "Affiliations give institution, (department), city, (state) and country; include the 16-digit ORCID of each author if available.",
+        "The Funding and Competing Interests statements (and Author Contributions, plus Ethics approval and consent statements for human/animal studies) go on the separate title page under the heading 'Statements and Declarations'; submissions without the required statements are returned as incomplete."
+      ]
+    },
+    "abstract": {
+      "max_words": 250,
+      "min_words": 150,
+      "no_abbreviations": true,
+      "notes": [
+        "The abstract should not contain any undefined abbreviations or unspecified references."
+      ]
+    },
+    "keywords": {
+      "min": 4,
+      "max": 6
+    },
+    "sections": {
+      "required": [
+        "Abstract",
+        "Introduction",
+        "Methods",
+        "Results",
+        "Discussion",
+        "Conclusions"
+      ],
+      "order": [
+        "Abstract",
+        "Introduction",
+        "Methods",
+        "Results",
+        "Discussion",
+        "Conclusions"
+      ],
+      "notes": [
+        "Research articles are arranged as Abstract, Introduction, Materials and Methods, Results, Discussion, Conclusions, Acknowledgements (acknowledgements go on the title page)."
+      ]
+    },
+    "statements": {
+      "required": [
+        "funding",
+        "competing_interests"
+      ],
+      "optional": [
+        "author_contributions",
+        "ethics_approval",
+        "consent_to_participate",
+        "consent_to_publish",
+        "clinical_trial_registration"
+      ],
+      "ai_use_if_used": true,
+      "ai_copyediting_exempt": true,
+      "ai_authorship_prohibited": true,
+      "notes": [
+        "Studies involving humans and/or animals must include Ethics approval (naming the committee and reference number, or the exemption and its reasons), Consent to participate, and Consent to publish statements.",
+        "Use of an LLM must be documented in the Methods section (or, without one, a suitable alternative part); follow Springer's policy on generative AI images.",
+        "Author Contributions statements are encouraged, not required."
+      ]
+    },
+    "figures": {
+      "vector_formats": [
+        ".eps"
+      ],
+      "min_dpi": 300,
+      "min_dpi_line_art": 1200,
+      "min_dpi_combination": 600,
+      "single_column_width_mm": 84,
+      "double_column_width_mm": 174,
+      "max_width_mm": 174,
+      "max_height_mm": 234,
+      "color_mode": [
+        "RGB"
+      ],
+      "min_font_size_pt": 8,
+      "max_font_size_pt": 12,
+      "font": "Helvetica or Arial",
+      "multipanel_labels": "lowercase letters (a, b, c)",
+      "color_charge": true,
+      "notes": [
+        "The preferred format is EPS for vector graphics and TIFF for halftones; MS Office files are also acceptable. Name figure files Fig plus the number (e.g. Fig1.eps) and indicate the graphics program used.",
+        "Figures should be submitted separately from the text if possible, sized to the column width (39, 84, 129 or 174 mm wide, at most 234 mm high).",
+        "Lines must be at least 0.1 mm (0.3 pt) wide; vector graphics must embed their fonts; color art is RGB, 8 bits per channel.",
+        "Lettering is consistently sized (about 2-3 mm, 8-12 pt) with minimal variance, no effects such as shading or outline letters, and a contrast ratio of at least 4.5:1; do not put titles or captions in the figure files.",
+        "Captions go in the manuscript text file, begin with 'Fig.' and the number in bold, have no punctuation after the number or at the end, and identify all elements of the figure.",
+        "Use scale bars for magnification; use patterns instead of or in addition to colors; if figures are printed in black and white, do not refer to color in captions.",
+        "Color is free online; color in print carries a contribution towards the extra costs."
+      ]
+    },
+    "tables": {
+      "editable": true,
+      "notes": [
+        "Tables are numbered with Arabic numerals, cited in consecutive order, and each has a caption (title); previously published material is cited at the end of the caption.",
+        "Table footnotes use superscript lower-case letters (or asterisks for significance values) beneath the table body."
+      ]
+    },
+    "supplementary": {
+      "notes": [
+        "Supply supplementary material in standard formats: text and presentations as PDF, spreadsheets as .csv or .xlsx, video as avi, wmv, mp4, mov, mpg, etc. (16:9 or 4:3, at most 2 GB); several files may be collected in a .zip or .gz.",
+        "Each supplementary file includes the article title, journal name, author names, and the corresponding author's affiliation and email.",
+        "Cite supplementary files in the text as 'Online Resource' (e.g. Online Resource 3), name them consecutively (ESM_3.mpg), and give each a concise caption.",
+        "Software provided for readers' use must be included in the submission with a user manual for installation and use."
+      ]
+    },
+    "references": {
+      "style": "Numbered in order of first citation: all authors' names and initials: full article title. Journal (Index Medicus abbreviation) Volume: first-last pages, year (e.g. Zaidel M, Hopper K, Iyriboz T: Interactive web-based radiology teaching file. J Digit Imaging 12:203-204, 1999)",
+      "numbered": true,
+      "include_titles": true,
+      "unpublished_allowed": false,
+      "notes": [
+        "References are numbered consecutively in order of first citation, including those in tables and figure legends; only works cited in the text and already accepted for publication may be listed.",
+        "List names and initials of all authors; electronic publications give the DOI and publication date; web sources give the URL and the date accessed."
+      ]
+    },
+    "revision": {
+      "marked_manuscript": "track_changes",
+      "notes": [
+        "Revised manuscripts should be prepared with tracked changes indicating all revisions; upload only the tracked-changes version (a clean version is not required)."
+      ]
+    },
+    "article_types": {
+      "Original Research": {
+        "notes": [
+          "Hypothesis-driven research relevant to the journal's aims and scope."
+        ]
+      },
+      "Experience Report": {
+        "sections": {
+          "required": [
+            "Abstract",
+            "Background",
+            "Methods",
+            "Results",
+            "Discussion",
+            "Conclusions"
+          ],
+          "order": [
+            "Abstract",
+            "Background",
+            "Methods",
+            "Results",
+            "Discussion",
+            "Conclusions"
+          ]
+        },
+        "manuscript": {
+          "notes": [
+            "Describes a group's experience with a new technology or method, or a novel use of an existing one; the discussion covers how the methods are superior to previous ones."
+          ]
+        }
+      },
+      "Technical Note": {
+        "sections": {
+          "required": [
+            "Abstract",
+            "Background",
+            "Methods",
+            "Results",
+            "Discussion",
+            "Conclusions"
+          ],
+          "order": [
+            "Abstract",
+            "Background",
+            "Methods",
+            "Results",
+            "Discussion",
+            "Conclusions"
+          ]
+        },
+        "manuscript": {
+          "notes": [
+            "Technical notes or tutorials describe how the authors accomplished a particular task in a novel way; the discussion covers how the methods are superior to previous ones."
+          ]
+        }
+      },
+      "Review": {
+        "sections": {
+          "required": [
+            "Abstract",
+            "Introduction",
+            "Discussion"
+          ],
+          "order": [
+            "Abstract",
+            "Introduction",
+            "Discussion"
+          ]
+        },
+        "manuscript": {
+          "notes": [
+            "Reviews or tutorials based on an extensive literature review, arranged as Abstract, Background or Introduction, Review, Discussion, Summary, Acknowledgements."
+          ]
+        }
+      }
     }
   }
 }

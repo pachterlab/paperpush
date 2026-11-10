@@ -1518,6 +1518,17 @@
           ],
           "description": "Color figures carry a charge."
         },
+        "print_grayscale": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The print edition shows figures in grayscale, so colors that differ only in hue merge (figures.grayscale checks this; color_charge implies it)."
+        },
         "placement": {
           "anyOf": [
             {

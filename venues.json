@@ -1101,5 +1101,21 @@
       "genetics",
       "bioinformatics"
     ]
+  },
+  "jiim": {
+    "name": "JIIM",
+    "full_name": "Journal of Imaging Informatics in Medicine",
+    "venue_type": "journal",
+    "anonymous": true,
+    "publisher": "springer_nature",
+    "site_url": "https://link.springer.com/journal/10278",
+    "submission_guide": "https://link.springer.com/journal/10278/submission-guidelines",
+    "description": "Official peer-reviewed journal of the Society for Imaging Informatics in Medicine (SIIM), covering research and practice in clinical, engineering, and information technologies across medical imaging environments (formerly the Journal of Digital Imaging).",
+    "keywords": [
+      "radiology",
+      "medicine",
+      "machine learning",
+      "computer science"
+    ]
   }
 }
