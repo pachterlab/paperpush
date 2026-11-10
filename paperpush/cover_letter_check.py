@@ -51,7 +51,7 @@ _MONTHS = {name.lower(): i for i, name in enumerate(calendar.month_name) if name
 _MONTHS.update({name.lower(): i for i, name in enumerate(calendar.month_abbr) if name})
 _MONTHS["sept"] = 9
 _MONTH = r"(?P<mon>January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\.?"
-_DAY = r"(?P<day>\d{1,2})(?:st|nd|rd|th)?"
+_DAY = r"(?P<day>\d{1,2})(?:st|nd|rd|th|\.)?"
 _YEAR = r"(?P<year>(?:19|20)\d{2})"
 _DATE_PATTERNS = (
     ("mdy", re.compile(rf"\b{_MONTH}\s+{_DAY},?\s+{_YEAR}\b", re.IGNORECASE)),
@@ -133,6 +133,11 @@ def letterhead(text: str) -> str:
     return "\n".join(text.splitlines()[:_LETTERHEAD_LINES])
 
 
+def _month_span(readings: list[date]) -> bool:
+    """Whether ``readings`` are a whole month (a letter dated "November 2026"), not two alternatives."""
+    return len(readings) == 2 and (readings[0].year, readings[0].month) == (readings[1].year, readings[1].month) and readings[0].day == 1 and readings[1].day == calendar.monthrange(readings[1].year, readings[1].month)[1]
+
+
 def date_issue(
     field_id: str,
     name: str,
@@ -159,6 +164,14 @@ def date_issue(
                 WARNING,
                 field_id,
                 f"{name} is dated {written}, {-max(ages)} days in the future; check the date",
+            )
+        ], ""
+    if not _month_span(readings) and not any(-_FUTURE_GRACE_DAYS <= age <= max_age_days for age in ages):
+        return [
+            Issue(
+                WARNING,
+                field_id,
+                f"{name} is dated {written}, which reads as {' or '.join(r.isoformat() for r in readings)}; neither is within {max_age_days} days of submission -- update the date",
             )
         ], ""
     if len(readings) > 1:
@@ -253,6 +266,10 @@ _CITATION_CONTEXT = re.compile(
     r"\bpublished\b|\bpreviously\b|\bearlier\b|\bprior\s+work\b|\bet\s+al\b|\breported\s+in\b|\bdescribed\s+in\b|\bshown\s+in\b|\(\s*(?:19|20)\d{2}\s*\)",
     re.IGNORECASE,
 )
+# "has not been published elsewhere" says nothing about earlier work.
+_NOT_PUBLISHED = re.compile(r"\b(?:not|never)\s+(?:\w+\s+){0,3}?published(?:\s+(?:previously|before|earlier|elsewhere))?|\bpreviously\s+unpublished\b", re.IGNORECASE)
+# What stands before a one-word venue name ("to Nature", "Dear Cell editors", "*Science*").
+_ONE_WORD_CUE = re.compile(r"(?:\b(?:to|in|of|for|at|by|with|from|Dear|journal)\s+(?:the\s+)?|[*_\"'(])$", re.IGNORECASE)
 _SENTENCE = re.compile(r"[^.!?\n]+(?:[.!?]+|\n|$)")
 _YEAR_SUFFIX = re.compile(r"\s+(?:19|20)\d{2}$")
 
@@ -275,6 +292,18 @@ def _name_pattern(name: str) -> re.Pattern[str]:
     flags = re.IGNORECASE if len(name.split()) > 1 else 0
     body = r"\s+".join(re.escape(w) for w in name.split())
     return re.compile(rf"(?<![\w-]){body}(?![\w-])", flags)
+
+
+def _addressed(sentence: str, m: re.Match[str]) -> bool:
+    """Whether a one-word venue name at ``m`` is the venue, not a capitalized word ("Cell atlases", "Computer Science", "Academy of Science")."""
+    before = sentence[: m.start()]
+    cue = _ONE_WORD_CUE.search(before)
+    if cue is None:
+        return False
+    if cue.group(0).lower().startswith("of"):
+        previous = re.search(r"(\w+)\s+$", before[: cue.start()])
+        return not (previous and previous.group(1)[0].isupper() and not re.fullmatch(r"(?i)editors?|readers?|readership", previous.group(1)))
+    return True
 
 
 def _mask(text: str, names: list[str]) -> str:
@@ -302,12 +331,12 @@ def other_venue_mentions(text: str, venue: Venue, others: list[Venue]) -> list[t
     found: list[tuple[str, str]] = []
     seen: set[str] = set()
     for sentence in _SENTENCE.findall(masked):
-        if not _SUBMISSION_CONTEXT.search(sentence) or _CITATION_CONTEXT.search(sentence):
+        if not _SUBMISSION_CONTEXT.search(sentence) or _CITATION_CONTEXT.search(_NOT_PUBLISHED.sub(" ", sentence)):
             continue
         rest = sentence
         for name in candidates:
             pattern = _name_pattern(name)
-            if pattern.search(rest):
+            if any(len(name.split()) > 1 or _addressed(rest, m) for m in pattern.finditer(rest)):
                 key = name.lower()
                 if key not in seen:
                     seen.add(key)

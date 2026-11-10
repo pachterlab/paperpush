@@ -47,7 +47,7 @@ MIN_SIMILARITY = 0.85
 MIN_STATEMENT_WORDS = 6
 # Free-text .sub fields that restate a manuscript section, by id pattern.
 _STATEMENT_FIELDS = re.compile(r"data_availability(?!_links)|code_availability|competing_interest|conflict_of_interest|declaration_of_interest|author_contribution|acknowledg|funding_statement|ethics_statement|significance|author_summary|lay_summary")
-_KEYWORDS = re.compile(r"(?:^|\n)\s*(?:key\s*words|keywords|index\s+terms)\s*[:.\u2014-]?\s*(.+(?:\n(?![A-Z][a-z]+\s*\n).+)?)", re.IGNORECASE)
+_KEYWORDS = re.compile(r"(?:^|\n)\s*(?:key\s*words(?:\s+and\s+phrases)?|index\s+terms)\s*[:.\u2014-]?\s*(.+(?:\n(?![A-Z][a-z]+\s*\n).+)?)", re.IGNORECASE)
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _ORCID = re.compile(r"\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b")
 
@@ -64,7 +64,7 @@ def _manuscript(venue: Venue, values: dict[str, str]) -> tuple[Field, Path, docu
 
 def _text(doc: document.Document) -> str:
     text = doc.text
-    if text is None:
+    if text is None or not text.strip():
         raise Unchecked(f"could not read {doc.path.name} as text")
     return text
 
@@ -74,11 +74,17 @@ def _front(doc: document.Document) -> str:
     from .manuscript import _tex_to_text, title_page_text
 
     front = title_page_text(doc.pdf if doc.is_tex and doc.pdf is not None else doc.path)
-    if front is None:
+    if front is None or not front.strip():
         raise Unchecked(f"could not read the first pages of {doc.path.name}")
     if doc.is_tex and doc.pdf is None:
-        front = _tex_to_text(front)
+        # Keep the "_" of an address that markup removal would turn into a space.
+        front = _tex_to_text(_join_subscripts(front).replace("\\_", "\ue000")).replace("\ue000", "_")
     return document.normalize(front)
+
+
+def _join_subscripts(source: str) -> str:
+    """LaTeX with a formula's digits or letters kept in their word: ``CO$_2$`` is CO2 when typeset."""
+    return re.sub(r"(?<=\w)\$[_^]\{?([A-Za-z0-9]+)\}?\$", r"\1", source)
 
 
 def locate(needle: list[str], hay: list[str]) -> tuple[float, int | None, int]:
@@ -174,6 +180,8 @@ def _title_check(venue: Venue, values: dict[str, str], by_id: dict[str, Field]) 
     found = manuscript_title(doc)
     if issues and found and document.tokens(found) != document.tokens(title):
         issues[0] = Issue(WARNING, "title", issues[0].message + f"; the manuscript's title reads '{found}'")
+    elif not issues and found and _is_cut_short(document.tokens(title), document.tokens(found)):
+        issues.append(Issue(WARNING, "title", f"the title in the .sub stops short of the manuscript's, which reads '{found}'"))
     for fid in ("running_title", "short_title"):
         short = values.get(fid, "").strip()
         if short and fid in by_id:
@@ -181,6 +189,12 @@ def _title_check(venue: Venue, values: dict[str, str], by_id: dict[str, Field]) 
             if match and document.tokens(match.group(1)) != document.tokens(short):
                 issues.append(Issue(WARNING, fid, f"{by_id[fid].label} in the .sub ('{short}') differs from the manuscript's ('{match.group(1).strip()}')"))
     return Outcome(issues, detail)
+
+
+def _is_cut_short(short: list[str], whole: list[str]) -> bool:
+    """Whether ``short`` is ``whole`` with words missing from one end or the other."""
+    extra = len(whole) - len(short)
+    return extra > 0 and any(whole[i : i + len(short)] == short for i in range(extra + 1))
 
 
 def manuscript_title(doc: document.Document) -> str | None:
@@ -229,9 +243,64 @@ def _abstract_check(venue: Venue, values: dict[str, str], by_id: dict[str, Field
 
         m = re.search(r"\\begin\s*\{\s*abstract\s*\}(.*?)\\end\s*\{\s*abstract\s*\}", doc.tex_source, re.DOTALL)
         if m:
-            text = _tex_to_text(m.group(1))
+            text = _tex_to_text(_join_subscripts(m.group(1)))
     issues, detail = compare_passage("the abstract", "abstract", values["abstract"], document.tokens(text), path.name)
+    if not issues:
+        issues = _abstract_cut_short(values["abstract"], doc, path)
+        detail = "" if issues else detail
     return Outcome(issues, detail)
+
+
+def _abstract_cut_short(abstract: str, doc: document.Document, path: Path) -> list[Issue]:
+    """A warning when the .sub's abstract is only the start (or end) of the manuscript's."""
+    from .front_matter_check import manuscript_abstract
+    from .manuscript import _tex_to_text
+
+    found = manuscript_abstract(doc)
+    if found is None:
+        return []
+    passage, is_latex = found
+    # Without a heading after it, the "abstract" runs on to the end of the text.
+    if not is_latex and (doc.text or "").rstrip().endswith(passage.strip()):
+        return []
+    whole = document.tokens(_tex_to_text(_join_subscripts(passage)) if is_latex else passage)
+    short = document.tokens(abstract)
+    if len(whole) - len(short) > max(5, 0.1 * len(whole)) and _is_cut_short(short, whole):
+        return [Issue(WARNING, "abstract", f"the abstract in the .sub is {len(short)} words, but the one in {path.name} is {len(whole)}: the .sub has only part of it")]
+    return []
+
+
+_NAME_SUFFIX = re.compile(r"(?:jr|sr|ii|iii|iv)\.?")
+_NOT_A_PERSON = re.compile(r"(?i)universit|institut|department|college|school|hospital|cent(?:er|re)\b|laborator|\blab\b")
+
+
+def _given_name_beside(front: str, start: int, end: int, given: str) -> bool:
+    """Whether ``given`` (or its initial) sits next to the surname at ``front[start:end]``.
+
+    Before it, within the same name (at most three words back, not past a
+    comma, "and", or an affiliation mark), or after it, in "Smith, John" or
+    "Smith, J." form.
+    """
+    initial = re.escape(given[0])
+    name_so_far = re.split(r"[,;&*\u2020\u2021\d]|\band\b", front[max(0, start - 60) : start])[-1]
+    if any(word.startswith(given[0]) for word in name_so_far.split()[-3:]):
+        return True
+    return bool(re.match(rf"\s*,?\s*(?:{re.escape(given.rstrip('.'))}(?![a-z])|{initial}\.)", front[end : end + 40]))
+
+
+def _names_only_in_byline(front: str, names: list[str]) -> list[str]:
+    """People on a line that lists the .sub's authors and nobody but people, whom the .sub leaves out."""
+    surnames = {document.fold(n).replace(",", " ").split()[-1] for n in names if n.split()}
+    extra: dict[str, None] = {}
+    for line in front.splitlines():
+        items = [re.sub(r"[\d*\u2020\u2021]+", "", item).strip() for item in re.split(r"[,;&]|\band\b", line)]
+        items = [item for item in items if item]
+        looks_like_names = len(items) >= 2 and all(2 <= len(item.split()) <= 5 and item.split()[0][0].isupper() and item.split()[-1][0].isupper() and not _NOT_A_PERSON.search(item) for item in items)
+        if looks_like_names and any(document.fold(item).split()[-1] in surnames for item in items):
+            for item in items:
+                if document.fold(item).split()[-1] not in surnames:
+                    extra.setdefault(item, None)
+    return list(extra)
 
 
 def _authors_check(venue: Venue, values: dict[str, str]) -> Outcome:
@@ -253,14 +322,14 @@ def _authors_check(venue: Venue, values: dict[str, str]) -> Outcome:
     positions: list[tuple[str, int]] = []
     missing: list[str] = []
     for author, name in names:
-        parts = [p for p in re.split(r"\s+", document.fold(name).replace(".", ". ")) if p]
+        parts = [p.rstrip(",") for p in re.split(r"\s+", document.fold(name).replace(".", ". ")) if p]
+        while len(parts) > 2 and _NAME_SUFFIX.fullmatch(parts[-1]):
+            parts.pop()
         surname = parts[-1]
         given = parts[0] if len(parts) > 1 else ""
         found = None
         for m in re.finditer(rf"(?<![a-z]){re.escape(surname)}(?![a-z])", front):
-            before = front[max(0, m.start() - 45) : m.start()]
-            after = front[m.end() : m.end() + 30]
-            if not given or re.search(rf"(?<![a-z]){re.escape(given[0])}", before + " " + after):
+            if not given or _given_name_beside(front, m.start(), m.end(), given):
                 found = m.start()
                 break
         if found is None:
@@ -269,6 +338,9 @@ def _authors_check(venue: Venue, values: dict[str, str]) -> Outcome:
             positions.append((name, found))
     if missing:
         issues.append(Issue(WARNING, field.id, f"author(s) {', '.join(missing)} in the .sub not found on the first pages of {path.name}"))
+    extra = _names_only_in_byline(front_raw, [name for _, name in names])
+    if extra:
+        issues.append(Issue(WARNING, field.id, f"the first pages of {path.name} list author(s) the .sub does not: {', '.join(extra)}"))
     for (first, i), (second, j) in zip(positions, positions[1:]):
         if j < i:
             issues.append(Issue(WARNING, field.id, f"the .sub lists {first} before {second}, but the manuscript lists {second} first; keep the author order the same"))
@@ -297,7 +369,9 @@ def manuscript_keywords(doc: document.Document) -> list[str] | None:
     m = _KEYWORDS.search(text)
     if not m:
         return None
-    line = m.group(1).split("\n")[0] if "\n" in m.group(1) and not re.search(r"[,;\u00b7\u2022]\s*$", m.group(1).split("\n")[0]) else m.group(1)
+    first, _, second = m.group(1).partition("\n")
+    # The second line continues the list after a separator or in lower case ("neural\nnetworks").
+    line = m.group(1) if re.search(r"[,;\u00b7\u2022]\s*$", first) or second[:1].islower() else first
     return [k.strip(" .") for k in re.split(r"[,;\u00b7\u2022|]", line.replace("\n", " ")) if k.strip(" .")]
 
 
@@ -308,6 +382,7 @@ def _keywords_check(venue: Venue, values: dict[str, str], by_id: dict[str, Field
     _, path, doc = _manuscript(venue, values)
     found = manuscript_keywords(doc)
     if not found:
+        _text(doc)  # an unreadable file has not been shown to lack one
         raise NotApplicable(f"{path.name} prints no keyword list to compare with")
     sub = [k.strip() for k in re.split(r"[,;\n]", values[fid]) if k.strip()]
     norm = lambda k: " ".join(document.tokens(k))  # noqa: E731
@@ -330,7 +405,13 @@ def _statements_check(venue: Venue, values: dict[str, str]) -> Outcome:
     if not fields:
         raise NotApplicable("no statement in the .sub long enough to compare")
     _, path, doc = _manuscript(venue, values)
-    hay = document.tokens(_text(doc))
+    text = _text(doc)
+    if doc.is_tex and doc.pdf is None and doc.tex_source:
+        # Reducing LaTeX to words stops at the bibliography; the declarations often follow it.
+        from .manuscript import _TEX_BIBLIOGRAPHY, _TEX_REFERENCE_SECTION, _tex_to_text
+
+        text = _tex_to_text(_TEX_REFERENCE_SECTION.sub(" ", _TEX_BIBLIOGRAPHY.sub(" ", doc.tex_source)))
+    hay = document.tokens(text)
     issues: list[Issue] = []
     matched = []
     for f in fields:
@@ -371,6 +452,8 @@ _LIMIT_WORDS = re.compile(
     re.IGNORECASE,
 )
 _RANGE = re.compile(r"^\s*(?:[\u2013-]|to)\s*\d")
+_PROSE_BEFORE_COUNT = re.compile(r"\b(?:of|in|with|from|across|by|on|for|see|shown|the|these|those|contained|used|wrote)\s*$", re.IGNORECASE)
+_COUNT_LABEL = re.compile(r"\b(?:abstract|text|manuscript|body|total|words?|length|article|paper|count|approx\w*|about|ca)\b|[:=~]", re.IGNORECASE)
 # Word counts of parts this check does not measure.
 _UNMEASURED_WORD_COUNT = re.compile(
     r"legend|caption|method|reference|title|character|summary|significance|highlight|keyword|supplement",
@@ -443,6 +526,9 @@ def stated_counts(front: str) -> list[tuple[str, int, str]]:
                 continue
             number = _count_value(m.group(1))
             words_after = re.match(r"\s*words?\b", right, re.IGNORECASE)
+            # "an essay of 500 words", "shown in two figures": prose, not a stated count.
+            if _PROSE_BEFORE_COUNT.search(label_end) or (words_after and not _COUNT_LABEL.search(label_end) and label_end.strip()):
+                continue
             if words_after or re.search(r"\bwords?\b|word\s*count", label_end, re.IGNORECASE) and re.search(r"[:=]\s*$", left):
                 quote = _tidy(label_end + m.group(0) + (words_after.group(0) if words_after else ""))
                 if re.search(r"\babstract\b", label_end, re.IGNORECASE):
@@ -533,7 +619,7 @@ def _title_page_source(venue: Venue, values: dict[str, str]) -> tuple[Field, Pat
         if "title_page" in f.id and f.type in ("file", "filelist"):
             for path in _existing(_paths(f, values)):
                 text = document.get(path).text
-                if text is not None:
+                if text is not None and text.strip():
                     return f, path, document.normalize(text)
     files = manuscript_files(venue, values)
     if not files:

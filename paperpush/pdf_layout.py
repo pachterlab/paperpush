@@ -16,6 +16,7 @@ once (see :func:`available`).
 from __future__ import annotations
 
 import logging
+import math
 import re
 from dataclasses import dataclass
 from functools import lru_cache
@@ -67,6 +68,12 @@ class Glyph:
     render: int
     in_figure: bool
     figure: int = 0
+    # Fill opacity from the graphics state (PDF ``ca``); 0 paints nothing.
+    alpha: float = 1.0
+    # Text set at an angle: its direction in degrees, and (distance across the
+    # baseline, start, end along it). ``baseline`` is None for upright text.
+    angle: float = 0.0
+    baseline: tuple[float, float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -75,7 +82,9 @@ class ImageBox:
 
     ``figure`` is the 1-based index of the Form XObject (in
     :attr:`Page.figure_boxes`) it was drawn in. The effective resolution of the
-    image as printed is ``pixels / (box width in points / 72)``.
+    image as printed is ``pixels / (width in points / 72)``. ``width_pt`` and
+    ``height_pt`` are the image's own sides on the page: a turned image's
+    bounding box has them swapped (or, at an angle, larger than either).
     """
 
     x0: float
@@ -86,11 +95,17 @@ class ImageBox:
     height_px: int
     name: str
     figure: int = 0
+    width_pt: float = 0.0
+    height_pt: float = 0.0
+
+    @property
+    def placed_width(self) -> float:
+        return self.width_pt or self.x1 - self.x0
 
     @property
     def dpi(self) -> float | None:
-        width_in = (self.x1 - self.x0) / 72.0
-        height_in = (self.y1 - self.y0) / 72.0
+        width_in = self.placed_width / 72.0
+        height_in = (self.height_pt or self.y1 - self.y0) / 72.0
         if width_in <= 0 or height_in <= 0 or not self.width_px or not self.height_px:
             return None
         return min(self.width_px / width_in, self.height_px / height_in)
@@ -136,6 +151,8 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
         from pdfminer.layout import LTChar, LTCurve, LTFigure, LTImage, LTPage
         from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
         from pdfminer.pdfpage import PDFPage
+        from pdfminer.pdftypes import resolve1
+        from pdfminer.psparser import literal_name
     except ImportError:
         logger.debug("pdfminer.six not installed; skipping glyph-level PDF checks")
         return None
@@ -144,6 +161,7 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
         """Aggregator that also records each glyph's text rendering mode."""
 
         render_mode = 0
+        fill_alpha = 1.0
 
         def render_string(self, textstate, seq, ncs, graphicstate):
             self.render_mode = int(getattr(textstate, "render", 0) or 0)
@@ -154,13 +172,51 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
             item = self.cur_item._objs[-1] if self.cur_item._objs else None
             if isinstance(item, LTChar):
                 item.paperpush_render = self.render_mode
+                item.paperpush_alpha = self.fill_alpha
+                item.paperpush_fontsize = fontsize
             return advance
+
+    class _Interpreter(PDFPageInterpreter):
+        """Interpreter that also follows the fill opacity set through ``gs``, which pdfminer ignores."""
+
+        def init_resources(self, resources):
+            super().init_resources(resources)
+            self.paperpush_extgstate = resolve1((resources or {}).get("ExtGState")) or {}
+            self.paperpush_alphas = []
+
+        def do_q(self):
+            self.paperpush_alphas.append(self.device.fill_alpha)
+            super().do_q()
+
+        def do_Q(self):
+            if self.paperpush_alphas:
+                self.device.fill_alpha = self.paperpush_alphas.pop()
+            super().do_Q()
+
+        def do_gs(self, name):
+            try:
+                state = resolve1(self.paperpush_extgstate.get(literal_name(name))) or {}
+                alpha = resolve1(state.get("ca"))
+                if isinstance(alpha, (int, float)):
+                    self.device.fill_alpha = float(alpha)
+            except Exception:
+                logger.debug("could not read graphics state %s", name, exc_info=True)
 
     def walk(item, figure: int, out: list[Glyph], backgrounds: list, images: list, boxes: list) -> None:
         in_figure = figure > 0
         for obj in item:
             if isinstance(obj, LTChar):
                 cs = getattr(getattr(obj, "ncs", None), "name", "") or ""
+                # LTChar.size is the height of the glyph's bounding box, which
+                # for turned text is mostly its advance, not its size.
+                size, angle, baseline = float(obj.size), 0.0, None
+                a, b, c, d, e, f = obj.matrix
+                run = math.hypot(a, b)
+                if run and abs(b) > 1e-3 * run:
+                    size = float(getattr(obj, "paperpush_fontsize", 0) or 0) * math.hypot(c, d) or size
+                    ux, uy = a / run, b / run
+                    along = e * ux + f * uy
+                    angle, baseline = round(math.degrees(math.atan2(b, a)), 1), (f * ux - e * uy, along, along + obj.adv * run)
                 out.append(
                     Glyph(
                         text=obj.get_text(),
@@ -168,13 +224,16 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
                         y0=obj.y0,
                         x1=obj.x1,
                         y1=obj.y1,
-                        size=float(obj.size),
+                        size=size,
                         font=str(obj.fontname),
                         fill=_fill(obj.graphicstate),
                         colorspace=str(cs),
                         render=getattr(obj, "paperpush_render", 0),
+                        alpha=getattr(obj, "paperpush_alpha", 1.0),
                         in_figure=in_figure,
                         figure=figure,
+                        angle=angle,
+                        baseline=baseline,
                     )
                 )
             elif isinstance(obj, LTFigure):
@@ -184,8 +243,10 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
             elif isinstance(obj, LTImage):
                 backgrounds.append(obj.bbox)
                 width_px, height_px = (getattr(obj, "srcsize", None) or (0, 0))[:2]
+                # pdfminer draws each image in its own unit-square LTFigure, whose matrix places it.
+                a, b, c, d = item.matrix[:4] if isinstance(item, LTFigure) else (0, 0, 0, 0)
                 try:
-                    images.append(ImageBox(*obj.bbox, int(width_px or 0), int(height_px or 0), str(getattr(obj, "name", "")), figure))
+                    images.append(ImageBox(*obj.bbox, int(width_px or 0), int(height_px or 0), str(getattr(obj, "name", "")), figure, math.hypot(a, b), math.hypot(c, d)))
                 except (TypeError, ValueError):
                     pass
             elif isinstance(obj, LTCurve) and getattr(obj, "fill", False):
@@ -200,9 +261,10 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
         with path.open("rb") as fh:
             manager = PDFResourceManager()
             device = _Device(manager, laparams=None)
-            interpreter = PDFPageInterpreter(manager, device)
+            interpreter = _Interpreter(manager, device)
             for number, pdfpage in enumerate(PDFPage.get_pages(fh, maxpages=max_pages), start=1):
                 try:
+                    device.fill_alpha = 1.0
                     interpreter.process_page(pdfpage)
                     layout: LTPage = device.get_result()
                 except Exception:
@@ -241,6 +303,13 @@ def read_pages(path: Path, max_pages: int = MAX_PAGES) -> list[Page] | None:
     return None if pages is None else list(pages)
 
 
+def _gap(before: Glyph, after: Glyph) -> float:
+    """The distance between two neighbouring glyphs along their baseline."""
+    if before.baseline and after.baseline:
+        return after.baseline[1] - before.baseline[2]
+    return after.x0 - before.x1
+
+
 def join_glyphs(glyphs) -> str:
     """The text of glyphs on one line (sorted by x), with spaces where the gaps are.
 
@@ -250,7 +319,7 @@ def join_glyphs(glyphs) -> str:
     out: list[str] = []
     previous = None
     for g in glyphs:
-        if previous is not None and g.x0 - previous.x1 > 0.2 * max(g.size, previous.size) and not g.text.isspace():
+        if previous is not None and _gap(previous, g) > 0.2 * max(g.size, previous.size) and not g.text.isspace():
             out.append(" ")
         out.append(g.text)
         previous = g

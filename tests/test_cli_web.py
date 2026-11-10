@@ -52,10 +52,17 @@ def test_web_refuses_a_missing_file(served, tmp_path, capsys):
     assert served == []
 
 
-def test_web_refuses_a_file_without_a_venue(served, tmp_path, capsys):
+def test_web_opens_a_sub_without_a_venue_as_general(served, tmp_path):
     sub = tmp_path / "notes.sub"
     sub.write_text("title: hello\n", encoding="utf-8")
-    assert main(["web", str(sub)]) == 1
+    assert main(["web", str(sub)]) == 0
+    assert len(served) == 1
+
+
+def test_web_refuses_a_file_that_is_not_a_sub(served, tmp_path, capsys):
+    other = tmp_path / "notes.txt"
+    other.write_text("title: hello\n", encoding="utf-8")
+    assert main(["web", str(other)]) == 1
     assert "@venue" in capsys.readouterr().err
     assert served == []
 

@@ -53,20 +53,23 @@ def _reference_order(venue: Venue, values: dict[str, str], alphabetical: bool, c
     parts = _split(doc.text or "")
     if parts is None:
         raise Unchecked(f"could not isolate the reference list in {path.name}")
-    body = _fold(parts[0])
+    from .bibliography_check import _unwrap
+
+    body = _unwrap(_fold(parts[0]))
     if bib.mode == "numbered":
         if venue_other_order and not (rules and rules.numbered is True):
             raise NotApplicable("the venue specifies another reference ordering")
-        from .bibliography_check import _BRACKET, _first_surname, _numbers
+        from .bibliography_check import _first_surname, _numbers, citation_groups
 
         issues: list[Issue] = []
+        surnames = [_fold(_first_surname(ref.authors)) for ref in bib.refs]
+        alpha_ok = all(surnames) and surnames == sorted(surnames)
         if alphabetical:
-            surnames = [_fold(_first_surname(ref.authors)) for ref in bib.refs]
-            if not all(surnames) or surnames != sorted(surnames):
+            if not alpha_ok:
                 issues.append(Issue(WARNING, "", f"{path.name}: numbered references are not alphabetized by first author's surname"))
         first_seen: list[str] = []
-        for match in _BRACKET.finditer(body):
-            for number in _numbers(match.group(1)):
+        for group in citation_groups(body, max(int(ref.key) for ref in bib.refs)):
+            for number in _numbers(group):
                 key = str(number)
                 if key not in first_seen:
                     first_seen.append(key)
@@ -75,7 +78,8 @@ def _reference_order(venue: Venue, values: dict[str, str], alphabetical: bool, c
                 return Outcome(issues, "numbered citation order could not be measured; alphabetical order checked")
             raise Unchecked(f"could not read at least two numbered citations in {path.name} to determine first-citation order")
         listed = [ref.key for ref in bib.refs if ref.key in first_seen]
-        if (citation_order or not alphabetical) and first_seen != listed:
+        # With no rule either way, an alphabetical numbered list (BibTeX's plain style) is fine.
+        if (citation_order or (not alphabetical and not alpha_ok)) and first_seen != listed:
             issues.append(Issue(WARNING, "", f"{path.name}: numbered references are not listed in order of first citation"))
         return Outcome(issues, "numbered reference order checked")
     if bib.mode != "author-year":
@@ -119,7 +123,7 @@ def _word_file_cleanliness(venue: Venue, values: dict[str, str]) -> Outcome:
                 xml = "\n".join(archive.read(name).decode("utf-8", "replace") for name in names if name.startswith("word/") and name.endswith(".xml"))
         except (OSError, zipfile.BadZipFile, KeyError) as exc:
             raise Unchecked(f"could not inspect {path.name}: {exc}") from exc
-        if re.search(r"<w:(?:ins|del|moveFrom|moveTo|delText|cellIns|cellDel)\b", xml):
+        if re.search(r"<w:(?:ins|del|moveFrom|moveTo|delText|cellIns|cellDel|rPrChange|pPrChange|sectPrChange|tblPrChange|tcPrChange|trPrChange)\b", xml):
             issues.append(Issue(WARNING, "", f"{path.name} contains tracked changes; accept or reject them before submission if the venue requires a clean file"))
         if re.search(r"(?:ADDIN\s+EN\.CITE|ADDIN\s+ENDNOTE|EndNote\.Cite|\{[^{}]{1,100}\s+#\d+\})", xml, re.IGNORECASE):
             issues.append(Issue(WARNING, "", f"{path.name} contains live or temporary EndNote citations; check whether the venue requires plain-text citations"))

@@ -26,6 +26,7 @@ attached raster files, and where the figures are placed (``placement``,
 from __future__ import annotations
 
 import logging
+import math
 import re
 import statistics
 import tempfile
@@ -78,10 +79,13 @@ class Figure:
     dpi: float | None = None  # as printed / placed
     dpi_from_metadata: bool = False
     print_width_mm: float | None = None
+    file_width_mm: float | None = None  # the file's own size, unscaled (vector files, Word pictures)
+    file_height_mm: float | None = None
     mode: str = ""
     line_art: bool = False
     texts: list[Text] = field(default_factory=list)
     page: int = 0  # page of the manuscript, for an embedded figure
+    offset: int = 0  # where a Word picture's drawing starts in document.xml
     number: int | None = None  # figure number, when known
     image_path: Path | None = None  # a viewable image file, for the AI checks
 
@@ -91,10 +95,12 @@ def _print_width_mm(rules: FigureRules) -> float | None:
 
 
 def _figure_number(path: Path, label: str, index: int) -> int:
-    for text in (label, path.stem):
-        match = re.search(r"(?:fig(?:ure)?)?[\s_-]*(\d{1,2})(?!\d)", text, re.IGNORECASE)
-        if match:
-            return int(match.group(1))
+    # A number after "fig" first, then one standing alone: not part of a year, nor a version or supplementary number.
+    for pattern in (r"fig(?:ure)?[\s_.-]*(\d{1,2})(?!\d)", r"(?<![\dvs])(\d{1,2})(?!\d)"):
+        for text in (label, path.stem):
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return int(match.group(1))
     return index
 
 
@@ -117,7 +123,7 @@ def _raster_figure(path: Path, field_id: str, rules: FigureRules, number: int) -
                 except (TypeError, ValueError, IndexError):
                     pass
             small = img.copy()
-            small.thumbnail((400, 400))
+            small.thumbnail((400, 400), Image.NEAREST)  # resampling would invent greys
             colours = small.convert("RGB").getcolors(maxcolors=LINE_ART_COLOURS)
             fig.line_art = colours is not None
     except Exception as exc:  # noqa: BLE001 -- any unreadable image
@@ -135,16 +141,19 @@ def _raster_figure(path: Path, field_id: str, rules: FigureRules, number: int) -
 
 def _texts_from_glyphs(glyphs, scale: float) -> list[Text]:
     """Group glyphs into runs (same baseline, close together) of printed lettering."""
-    rows: dict[float, list] = {}
+    from .pdf_layout import _gap
+
+    rows: dict[tuple[float, float], list] = {}
     for g in glyphs:
         if g.text.strip():
-            rows.setdefault(round(g.y0 * 2) / 2, []).append(g)
+            key = (g.angle, round(g.baseline[0] * 2) / 2) if g.baseline else (0.0, round(g.y0 * 2) / 2)
+            rows.setdefault(key, []).append(g)
     texts: list[Text] = []
-    for y, row in rows.items():
-        row.sort(key=lambda g: g.x0)
+    for row in rows.values():
+        row.sort(key=lambda g: g.baseline[1] if g.baseline else g.x0)
         run = [row[0]]
         for g in row[1:]:
-            if g.x0 - run[-1].x1 > 1.5 * max(g.size, run[-1].size):
+            if _gap(run[-1], g) > 1.5 * max(g.size, run[-1].size):
                 texts.append(_text(run, scale))
                 run = [g]
             else:
@@ -174,6 +183,7 @@ def _pdf_figure(path: Path, field_id: str, rules: FigureRules, number: int) -> F
     max_mm = _print_width_mm(rules)
     scale = min(1.0, (max_mm / MM_PER_INCH * 72) / width_pt) if max_mm else 1.0
     fig.print_width_mm = width_pt * scale / 72 * MM_PER_INCH
+    fig.file_width_mm, fig.file_height_mm = width_pt / 72 * MM_PER_INCH, page.height / 72 * MM_PER_INCH
     fig.texts = _texts_from_glyphs(page.glyphs, scale)
     images = [im for im in page.images if im.dpi]
     if images and not fig.texts:
@@ -188,15 +198,60 @@ def _pdf_figure(path: Path, field_id: str, rules: FigureRules, number: int) -> F
     return fig
 
 
-def _svg_length(value: str | None) -> float | None:
-    """An SVG length in CSS pixels (1/96 in)."""
+def _svg_length(value: str | None, em: float | None = None) -> float | None:
+    """An SVG length in CSS pixels (1/96 in).
+
+    ``em`` is what a relative length (em, ex, %) is relative to; without one, such a length is None.
+    """
     if not value:
         return None
-    match = re.match(r"\s*(-?\d*\.?\d+)\s*(px|pt|mm|cm|in|pc)?", value)
+    match = re.match(r"\s*(-?\d*\.?\d+)\s*(px|pt|mm|cm|in|pc|rem|em|ex|%)?", value, re.IGNORECASE)
     if not match:
         return None
     number = float(match.group(1))
-    return number * {"px": 1.0, None: 1.0, "pt": 96 / 72, "mm": 96 / 25.4, "cm": 96 / 2.54, "in": 96.0, "pc": 16.0}[match.group(2)]
+    unit = match.group(2).lower() if match.group(2) else None
+    if unit in ("em", "ex", "%", "rem"):
+        if em is None:
+            return None
+        return number * {"em": em, "ex": em / 2, "%": em / 100, "rem": 16.0}[unit]
+    return number * {"px": 1.0, None: 1.0, "pt": 96 / 72, "mm": 96 / 25.4, "cm": 96 / 2.54, "in": 96.0, "pc": 16.0}[unit]
+
+
+def _css_declarations(text: str) -> dict[str, str]:
+    """``{property: value}`` of a CSS declaration list, the ``font`` shorthand expanded."""
+    out = {k.strip().lower(): v.strip() for k, v in (item.split(":", 1) for item in text.split(";") if ":" in item)}
+    shorthand = re.search(r"(?:^|\s)(\d*\.?\d+(?:px|pt|mm|cm|in|pc|rem|em|ex|%)?)(?:/\S+)?\s+(.+)$", out.get("font", ""))
+    if shorthand:
+        out.setdefault("font-size", shorthand.group(1))
+        out.setdefault("font-family", shorthand.group(2))
+        if re.search(r"\bbold\b|\b[789]00\b", out["font"][: shorthand.start()]):
+            out.setdefault("font-weight", "bold")
+    return out
+
+
+def _svg_css(root) -> list[tuple[str, dict[str, str]]]:
+    """The simple rules of the SVG's ``<style>`` blocks: (selector, declarations), classes last so they win."""
+    rules: list[tuple[str, dict[str, str]]] = []
+    for node in root.iter():
+        if node.tag.rsplit("}", 1)[-1] == "style" and node.text:
+            for selectors, body in re.findall(r"([^{}]+)\{([^{}]*)\}", re.sub(r"/\*.*?\*/", "", node.text, flags=re.DOTALL)):
+                rules.extend((s.strip(), _css_declarations(body)) for s in selectors.split(","))
+    return sorted(rules, key=lambda rule: "." in rule[0])
+
+
+def _svg_zoom(transform: str | None) -> float:
+    """How much a ``transform`` scales text vertically."""
+    zoom = 1.0
+    for name, args in re.findall(r"(scale|matrix)\s*\(([^)]*)\)", transform or ""):
+        try:
+            values = [float(v) for v in re.split(r"[\s,]+", args.strip()) if v]
+        except ValueError:
+            continue
+        if name == "scale" and values:
+            zoom *= abs(values[-1])
+        elif name == "matrix" and len(values) == 6:
+            zoom *= math.hypot(values[2], values[3])
+    return zoom
 
 
 def _svg_figure(path: Path, field_id: str, rules: FigureRules, number: int) -> Figure:
@@ -211,7 +266,10 @@ def _svg_figure(path: Path, field_id: str, rules: FigureRules, number: int) -> F
     if root is None:
         fig.kind = "other"
         return fig
-    view = [float(v) for v in re.split(r"[\s,]+", root.get("viewBox", "").strip()) if v] if root.get("viewBox") else []
+    try:
+        view = [float(v) for v in re.split(r"[\s,]+", root.get("viewBox", "").strip()) if v] if root.get("viewBox") else []
+    except ValueError:
+        view = []
     width_px = _svg_length(root.get("width")) or (view[2] if len(view) == 4 else None)
     if not width_px:
         fig.kind = "other"
@@ -221,22 +279,31 @@ def _svg_figure(path: Path, field_id: str, rules: FigureRules, number: int) -> F
     width_mm = width_px / 96 * MM_PER_INCH
     scale = min(1.0, max_mm / width_mm) if max_mm else 1.0
     fig.print_width_mm = width_mm * scale
+    height_px = _svg_length(root.get("height")) or (view[3] * user_to_px if len(view) == 4 else None)
+    fig.file_width_mm, fig.file_height_mm = width_mm, height_px / 96 * MM_PER_INCH if height_px else None
+    rules = _svg_css(root)
 
-    def walk(node, size: float | None, family: str, weight: str) -> None:
-        style = dict(item.split(":", 1) for item in (node.get("style") or "").split(";") if ":" in item)
-        style = {k.strip(): v.strip() for k, v in style.items()}
-        size = _svg_length(style.get("font-size") or node.get("font-size")) or size
+    def walk(node, size: float, family: str, weight: str, zoom: float) -> None:
+        tag = node.tag.rsplit("}", 1)[-1]
+        classes = (node.get("class") or "").split()
+        style: dict[str, str] = {}
+        for selector, declarations in rules:
+            name, _, cls = selector.partition(".")
+            if name in ("", "*", tag) and (not cls or cls in classes):
+                style.update(declarations)
+        style.update(_css_declarations(node.get("style") or ""))
+        size = _svg_length(style.get("font-size") or node.get("font-size"), size) or size
         family = style.get("font-family") or node.get("font-family") or family
         weight = style.get("font-weight") or node.get("font-weight") or weight
-        tag = node.tag.rsplit("}", 1)[-1]
+        zoom *= _svg_zoom(node.get("transform"))
         if tag in ("text", "tspan") and (node.text or "").strip() and size:
-            pt = size * user_to_px * 72 / 96 * scale
+            pt = size * zoom * user_to_px * 72 / 96 * scale
             font = family.split(",")[0].strip().strip("'\"") + ("-Bold" if weight in ("bold", "700", "800", "900") else "")
             fig.texts.append(Text(node.text.strip(), pt, font, 0.0, 0.0))
         for child in node:
-            walk(child, size, family, weight)
+            walk(child, size, family, weight, zoom)
 
-    walk(root, 16.0, "sans-serif", "normal")
+    walk(root, 16.0, "sans-serif", "normal", 1.0)
     return fig
 
 
@@ -286,7 +353,7 @@ def _embedded_pdf(doc: document.Document, field_id: str) -> list[Figure]:
         taken: set[int] = set()
         n = 0
         for image in page.images:
-            width_pt = image.x1 - image.x0
+            width_pt = image.placed_width
             if width_pt < MIN_EMBEDDED_WIDTH_PT or image.dpi is None:
                 continue
             n += 1
@@ -342,14 +409,15 @@ def _embedded_docx(doc: document.Document, field_id: str) -> list[Figure]:
         data = doc.docx_media(name)
         if data is None:
             continue
-        fig = Figure(f"{doc.path.name} picture {n} ({Path(name).name})", doc.path, field_id, False, "raster")
-        fig.print_width_mm = width_in * MM_PER_INCH
+        fig = Figure(f"{doc.path.name} picture {n} ({Path(name).name})", doc.path, field_id, False, "raster", offset=drawing.start())
+        fig.print_width_mm = fig.file_width_mm = width_in * MM_PER_INCH
+        fig.file_height_mm = int(extent.group(2)) / _EMU_PER_INCH * MM_PER_INCH
         try:
             with Image.open(io.BytesIO(data)) as img:
                 fig.width_px, fig.height_px, fig.mode = img.width, img.height, img.mode
                 fig.dpi = img.width / width_in
                 small = img.copy()
-                small.thumbnail((400, 400))
+                small.thumbnail((400, 400), Image.NEAREST)  # resampling would invent greys
                 fig.line_art = small.convert("RGB").getcolors(maxcolors=LINE_ART_COLOURS) is not None
                 if scratch is None:
                     scratch = Path(tempfile.mkdtemp(prefix="paperpush-docx-figures-"))
@@ -443,8 +511,11 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
 def _dpi_check(inv: _Inventory, rules: FigureRules, where: str) -> Outcome:
     issues: list[Issue] = []
     measured: list[float] = []
+    unknown: list[str] = []
     for fig in inv.figures:
         if fig.dpi is None:
+            if fig.kind == "raster" or fig.path.suffix.lower() in RASTER:
+                unknown.append(fig.name)
             continue
         minimum = rules.min_dpi_line_art if fig.line_art and rules.min_dpi_line_art else rules.min_dpi or rules.min_dpi_line_art
         measured.append(fig.dpi)
@@ -458,8 +529,11 @@ def _dpi_check(inv: _Inventory, rules: FigureRules, where: str) -> Outcome:
             else:
                 where_from = ""
             issues.append(Issue(WARNING, fig.field_id, f"{fig.name} is {fig.dpi:.0f} dpi{where_from} ({fig.width_px} px wide); the author guidelines ask for at least {minimum} dpi for {kind}"))
+    why = f"could not tell the resolution of {', '.join(unknown[:4])}: the image records no dpi, or could not be read, and the guidelines give no print width to work it out from"
     if not measured:
-        raise Unchecked(f"no raster images among the {where}; vector figures have no resolution to check")
+        raise Unchecked(why if unknown else f"no raster images among the {where}; vector figures have no resolution to check")
+    if unknown:
+        issues.append(Issue(WARNING, "", why, unchecked=True))
     return Outcome(issues, f"{len(measured)} raster figure(s) in the {where}, lowest {min(measured):.0f} dpi")
 
 
@@ -479,6 +553,8 @@ def _raster_ai_task(checks: Checks, inv: _Inventory, rules: FigureRules) -> int:
         wants.append(f"the typeface is {rules.font}")
     if rules.multipanel_labels:
         wants.append(f"multi-panel figures label their panels {rules.multipanel_labels}")
+    if not wants:
+        return 0
     lines = []
     files: list[str] = []
     for fig in rasters:
@@ -527,33 +603,48 @@ def _raster_panels_task(checks: Checks, inv: _Inventory, cites: dict[int, set[st
 
 # A sentence ends at . ! or ? followed by a capital, except after "Fig.", "et al.", "e.g." and the like.
 _SENTENCE_END = re.compile(r"(?<!\bFig)(?<!\bFigs)(?<!\bal)(?<!e\.g)(?<!i\.e)(?<!\bvs)(?<!\bref)(?<!\brefs)(?<!\bSuppl)(?<!\bSupp)(?<!\bno)(?<!\bEq)[.!?](?=\s+[A-Z(\[])")
-_MAX_SENTENCE_CHARS = 400
+_MAX_SENTENCE_CHARS = 800
 _MAX_SENTENCES_PER_FIGURE = 8
 _MAX_LEGEND_CHARS = 1500
 
 
-def _sentence_around(text: str, ends: list[int], start: int, end: int) -> tuple[int, int]:
-    """The span of the sentence holding ``text[start:end]``, capped at a few hundred characters."""
+def _sentence_around(text: str, ends: list[int], start: int, end: int, *, paragraphs: bool = False) -> tuple[int, int]:
+    """The span of the sentence holding ``text[start:end]``, capped at whole words a few hundred characters out.
+
+    ``paragraphs``: a line of ``text`` is a paragraph, so a sentence stops at a
+    line break (and a heading above it is left out).
+    """
     import bisect
 
     i = bisect.bisect_left(ends, start)
     left = ends[i - 1] + 1 if i else 0
     right = next((e + 1 for e in ends[i:] if e >= end), len(text))
-    left = max(left, start - _MAX_SENTENCE_CHARS // 2)
-    right = min(right, end + _MAX_SENTENCE_CHARS // 2)
+    if paragraphs:
+        left = max(left, text.rfind("\n", 0, start) + 1)
+        line_end = text.find("\n", end)
+        right = min(right, line_end if line_end >= 0 else len(text))
+    if start - left > _MAX_SENTENCE_CHARS // 2:
+        left = start - _MAX_SENTENCE_CHARS // 2
+        while left < start and not text[left - 1].isspace():
+            left += 1
+    if right - end > _MAX_SENTENCE_CHARS // 2:
+        right = end + _MAX_SENTENCE_CHARS // 2
+        while right > end and not text[right].isspace():
+            right -= 1
     return left, right
 
 
-def figure_descriptions(text: str) -> tuple[dict[int, str], dict[int, list[tuple[str, set[str]]]]]:
+def figure_descriptions(text: str, *, paragraphs: bool = False) -> tuple[dict[int, str], dict[int, list[tuple[str, set[str]]]]]:
     """What ``text`` says about each main figure.
 
     Returns the legends (figure number -> legend text) and, per figure, the
     sentences that cite it with the panel letters each one cites:
-    ``{2: [("Survival fell (Fig. 2b).", {"b"}), ...]}``.
+    ``{2: [("Survival fell (Fig. 2b).", {"b"}), ...]}``. ``paragraphs``: each
+    line of ``text`` is a whole paragraph (a Word file).
     """
     from .citation_check import legends, mentions, panel_mentions
 
-    found_legends = {number: legend for number, _, legend in legends(text)}
+    found_legends = {number: legend for number, _, legend in legends(text, paragraphs=paragraphs)}
     ends = [m.start() for m in _SENTENCE_END.finditer(text)]
     panels = panel_mentions(text, "figure")
     sentences: dict[int, list[tuple[str, set[str]]]] = {}
@@ -561,7 +652,7 @@ def figure_descriptions(text: str) -> tuple[dict[int, str], dict[int, list[tuple
     for m in mentions(text):
         if m.series != "figure" or m.caption:
             continue
-        span = _sentence_around(text, ends, m.pos, m.pos + len(m.text))
+        span = _sentence_around(text, ends, m.pos, m.pos + len(m.text), paragraphs=paragraphs)
         if (m.number, span[0]) in seen:
             continue
         seen.add((m.number, span[0]))
@@ -574,7 +665,7 @@ def figure_descriptions(text: str) -> tuple[dict[int, str], dict[int, list[tuple
 def _content_task(checks: Checks, venue: Venue, values: dict[str, str], inv: _Inventory) -> None:
     """Queue the AI check that each figure, and each of its panels, shows what its legend and the text say."""
     from .ai_validate import AiTask
-    from .citation_check import tex_legends
+    from .citation_check import _document_files, legends, tex_legends
     from .requirements_check import manuscript_files
 
     manuscripts = manuscript_files(venue, values)
@@ -584,7 +675,7 @@ def _content_task(checks: Checks, venue: Venue, values: dict[str, str], inv: _In
         doc = document.get(path)
         text = doc.text
         if text:
-            got_legends, got_sentences = figure_descriptions(text)
+            got_legends, got_sentences = figure_descriptions(text, paragraphs=doc.is_docx)
             for number, legend in got_legends.items():
                 found_legends.setdefault(number, legend)
             for number, items in got_sentences.items():
@@ -592,6 +683,11 @@ def _content_task(checks: Checks, venue: Venue, values: dict[str, str], inv: _In
         if doc.is_tex and doc.pdf is None and doc.tex_source:
             for number, _, legend in tex_legends(doc.tex_source):
                 found_legends.setdefault(number, legend)
+    # Figures combined in their own document carry their legends with them.
+    for _, path in _document_files(venue, values, ("figures",)):
+        doc = document.get(path)
+        for number, _, legend in legends(doc.text or "", paragraphs=doc.is_docx):
+            found_legends.setdefault(number, legend)
     numbers = sorted(set(found_legends) | set(sentences))
     if not numbers:
         return
@@ -655,6 +751,11 @@ def _content_task(checks: Checks, venue: Venue, values: dict[str, str], inv: _In
     )
 
 
+def _outlined(inv: _Inventory) -> list[str]:
+    """Vector figures with no readable text: any lettering they have is drawn as shapes."""
+    return [f.name for f in inv.figures if f.kind == "vector" and not f.texts]
+
+
 def _text_size_check(checks: Checks, inv: _Inventory, rules: FigureRules, where: str) -> Outcome:
     issues: list[Issue] = []
     smallest: list[float] = []
@@ -677,7 +778,10 @@ def _text_size_check(checks: Checks, inv: _Inventory, rules: FigureRules, where:
     queued = _raster_ai_task(checks, inv, rules)
     others = [f.name for f in inv.figures if f.kind == "other"]
     if others:
-        issues.append(Issue(WARNING, "", f"cannot read the lettering of {', '.join(others[:4])} (not a PDF, SVG, or raster image); check its size by hand", unchecked=True))
+        issues.append(Issue(WARNING, "", f"cannot read the lettering of {', '.join(others[:4])} (unreadable, or not a PDF, SVG, or raster image); check its size by hand", unchecked=True))
+    outlined = _outlined(inv)
+    if outlined and smallest:
+        issues.append(Issue(WARNING, "", f"no lettering to measure in {', '.join(outlined[:4])} (its text may be outlined to shapes); check its size by hand", unchecked=True))
     if not smallest:
         raise Unchecked(f"no vector lettering to measure in the {where}" + (f"; {queued} raster figure(s) are queued for the AI check" if queued else ""))
     detail = f"{len(smallest)} vector figure(s) measured, smallest text {min(smallest):.1f} pt" + (f"; {queued} raster figure(s) need the AI check" if queued else "")
@@ -713,6 +817,9 @@ def _font_check(checks: Checks, inv: _Inventory, rules: FigureRules, where: str)
         raise Unchecked(f"no vector lettering whose font can be read in the {where}" + (f"; {queued} raster figure(s) are queued for the AI check" if queued else ""))
     from .layout_check import font_family
 
+    outlined = _outlined(inv)
+    if outlined:
+        issues.append(Issue(WARNING, "", f"no lettering to read in {', '.join(outlined[:4])} (its text may be outlined to shapes); check its typeface by hand", unchecked=True))
     families = sorted({font_family(name)[0] for name in used})
     return Outcome(issues, f"fonts used: {', '.join(families[:6])}" + (f"; {queued} raster figure(s) need the AI check" if queued else ""))
 
@@ -748,14 +855,18 @@ def _labels(fig: Figure) -> list[Text]:
     # Labels run a, b, c...: keep them only when they start at 'a' and there are two or more.
     if len(letters) < 2 or letters[0] != "a":
         return []
-    return candidates
+    # A letter past the run (an axis's 'N') is a label only if styled like panel a.
+    letter = lambda t: _PANEL.match(t.text.strip()).group(1)  # noqa: E731
+    run = set(_label_run(set(letters)))
+    anchor = max((t for t in candidates if letter(t).lower() == "a"), key=lambda t: (t.bold, t.size))
+    return [t for t in candidates if letter(t).lower() in run or (letter(t).isupper() == letter(anchor).isupper() and t.bold == anchor.bold)]
 
 
 def _wanted_case(rule: str) -> str | None:
     lower = rule.lower()
-    if re.search(r"upper|capital|\(A, B", rule) or re.search(r"\bA/B/C\b|\bA, B, C\b", rule):
+    if re.search(r"upper|capital", lower) or re.search(r"\(A, B|\bA/B/C\b|\bA, B, C\b|\(A\),\s*\(B\)", rule):
         return "upper"
-    if re.search(r"lower", lower) or re.search(r"\(a, b|\ba, b, c\b|\ba\), b\)", rule):
+    if re.search(r"lower", lower) or re.search(r"\(a, b|\ba, b, c\b|\ba\), b\)|\(a\),\s*\(b\)", rule):
         return "lower"
     return None
 
@@ -789,7 +900,10 @@ def _lettering_check(checks: Checks, venue: Venue, values: dict[str, str], inv: 
             continue
         labels = _labels(fig)
         if not labels:
-            if fig.number is not None and len(cites.get(fig.number, set())) >= 2:
+            if not fig.texts:
+                if len(cites.get(fig.number, set())) >= 2:
+                    issues.append(Issue(WARNING, fig.field_id, f"{fig.name}: no text to read for its panel labels (it may be outlined to shapes); check them by hand", unchecked=True))
+            elif fig.number is not None and len(cites.get(fig.number, set())) >= 2:
                 issues.append(Issue(WARNING, fig.field_id, f"{fig.name}: the text cites panels {', '.join(sorted(cites[fig.number]))} of Figure {fig.number}, but no panel labels were found in the figure"))
             continue
         labelled += 1
@@ -824,18 +938,23 @@ def _lettering_check(checks: Checks, venue: Venue, values: dict[str, str], inv: 
 COLORBLIND_TITLE = "Figure colours distinguishable with red-green colour blindness"
 
 
-def _figure_drawings(venue: Venue, values: dict[str, str], inv: _Inventory) -> list:
-    """The figures' colours, as :class:`~paperpush.colorblind.Drawing` items."""
+def _figure_drawings(venue: Venue, values: dict[str, str], inv: _Inventory, unread: list[str] | None = None) -> list:
+    """The figures' colours, as :class:`~paperpush.colorblind.Drawing` items.
+
+    The names of figures whose colours could not be read are added to ``unread``.
+    """
     from . import colorblind
     from .requirements_check import manuscript_files
 
     drawings: list[colorblind.Drawing] = []
+    unread = [] if unread is None else unread
 
     def add(make, *args) -> None:
         try:
             drawings.extend(make(*args))
         except Exception:  # noqa: BLE001 -- one unreadable figure does not stop the rest
-            logger.debug("could not read the colours of %s", args[-1], exc_info=True)
+            logger.debug("could not read the colours of %s", args[1], exc_info=True)
+            unread.append(str(args[1]))
 
     def raster(path: Path, name: str, field_id: str) -> list:
         return [colorblind.Drawing(name, colorblind.image_file_colours(path), raster=True, field_id=field_id)]
@@ -860,6 +979,8 @@ def _figure_drawings(venue: Venue, values: dict[str, str], inv: _Inventory) -> l
                 add(svg, fig.path, fig.name, fig.field_id)
             elif fig.image_path is not None:  # a picture inside a Word file of figures
                 add(raster, fig.image_path, fig.name, fig.field_id)
+            else:  # a format with no colours to read here (EPS, EMF, ...)
+                unread.append(fig.name)
         return drawings
     for fld, path in manuscript_files(venue, values):
         doc = document.get(path)
@@ -867,22 +988,32 @@ def _figure_drawings(venue: Venue, values: dict[str, str], inv: _Inventory) -> l
             for fig in inv.figures:
                 if fig.path == path and fig.image_path is not None:
                     add(raster, fig.image_path, fig.name, fld.id)
+                elif fig.path == path:
+                    unread.append(fig.name)
         elif doc.pdf is not None:
             add(pdf, doc.pdf, path.name, fld.id, True)
     return drawings
 
 
 def _colorblind_check(venue: Venue, values: dict[str, str], inv: _Inventory) -> Outcome:
-    drawings = _figure_drawings(venue, values, inv)
+    unread: list[str] = []
+    drawings = _figure_drawings(venue, values, inv, unread)
     checked = [d for d in drawings if d.colours is not None]
     photos = len(drawings) - len(checked)
+    could_not = f"could not read the colours of {', '.join(unread[:4])}"
     if not drawings:
+        if unread:
+            raise Unchecked(could_not)
         raise NotApplicable(inv.why_empty or "no figures found")
     if not checked:
+        if unread:
+            raise Unchecked(could_not)
         if photos:
             raise NotApplicable(f"the {photos} figure image(s) are photographs or micrographs, not charts, so their colours were not compared")
         raise Unchecked("could not read the colours of the figures")
     issues: list[Issue] = []
+    if unread:
+        issues.append(Issue(WARNING, "", could_not, unchecked=True))
     for d in checked:
         pairs = d.confusions()
         if not pairs:
@@ -909,7 +1040,7 @@ def _color_mode_check(inv: _Inventory, rules: FigureRules) -> list[Issue]:
     if not rasters:
         raise NotApplicable("no raster figure files to read a colour mode from")
     for fig in rasters:
-        mode = {"L": "GRAYSCALE", "LA": "GRAYSCALE", "1": "GRAYSCALE", "P": "RGB", "RGB": "RGB", "RGBA": "RGB", "CMYK": "CMYK"}.get(fig.mode, fig.mode.upper())
+        mode = {"L": "GRAYSCALE", "LA": "GRAYSCALE", "1": "GRAYSCALE", "I": "GRAYSCALE", "F": "GRAYSCALE", "I;16": "GRAYSCALE", "I;16B": "GRAYSCALE", "I;16L": "GRAYSCALE", "I;16N": "GRAYSCALE", "P": "RGB", "RGB": "RGB", "RGBA": "RGB", "CMYK": "CMYK"}.get(fig.mode, fig.mode.upper())
         if mode not in allowed and not (mode == "GRAYSCALE" and {"RGB", "CMYK"} & allowed):
             issues.append(Issue(WARNING, fig.field_id, f"{fig.name} is {mode.lower()}; the author guidelines accept {', '.join(rules.color_mode or [])}"))
     return issues
@@ -917,16 +1048,25 @@ def _color_mode_check(inv: _Inventory, rules: FigureRules) -> list[Issue]:
 
 def _dimensions_check(inv: _Inventory, rules: FigureRules) -> list[Issue]:
     issues = []
-    sized = [f for f in inv.figures if f.kind == "raster" and f.dpi_from_metadata and f.dpi]
-    if not sized:
-        raise Unchecked("no figure file records its resolution, so its print size is unknown")
-    for fig in sized:
-        width_mm = fig.width_px / fig.dpi * MM_PER_INCH
-        height_mm = fig.height_px / fig.dpi * MM_PER_INCH
+    unknown: list[str] = []
+    sized = 0
+    for fig in inv.figures:
+        if fig.file_width_mm:
+            width_mm, height_mm, at = fig.file_width_mm, fig.file_height_mm, ""
+        elif fig.kind == "raster" and fig.dpi_from_metadata and fig.dpi:
+            width_mm, height_mm, at = fig.width_px / fig.dpi * MM_PER_INCH, fig.height_px / fig.dpi * MM_PER_INCH, f" at {fig.dpi:.0f} dpi"
+        else:
+            unknown.append(fig.name)
+            continue
+        sized += 1
         if rules.max_width_mm and width_mm > rules.max_width_mm * 1.02:
-            issues.append(Issue(WARNING, fig.field_id, f"{fig.name} is {width_mm:.0f} mm wide at {fig.dpi:.0f} dpi; the author guidelines allow at most {rules.max_width_mm:g} mm"))
-        if rules.max_height_mm and height_mm > rules.max_height_mm * 1.02:
-            issues.append(Issue(WARNING, fig.field_id, f"{fig.name} is {height_mm:.0f} mm tall at {fig.dpi:.0f} dpi; the author guidelines allow at most {rules.max_height_mm:g} mm"))
+            issues.append(Issue(WARNING, fig.field_id, f"{fig.name} is {width_mm:.0f} mm wide{at}; the author guidelines allow at most {rules.max_width_mm:g} mm"))
+        if rules.max_height_mm and height_mm and height_mm > rules.max_height_mm * 1.02:
+            issues.append(Issue(WARNING, fig.field_id, f"{fig.name} is {height_mm:.0f} mm tall{at}; the author guidelines allow at most {rules.max_height_mm:g} mm"))
+    if not sized:
+        raise Unchecked("no figure file records its resolution or size, so its print size is unknown")
+    if unknown:
+        issues.append(Issue(WARNING, "", f"{', '.join(unknown[:4])} record no resolution, so print size is unknown", unchecked=True))
     return issues
 
 
@@ -961,7 +1101,17 @@ def _placement_check(venue: Venue, values: dict[str, str], inv: _Inventory, plac
     if placement in ("end", "end_of_manuscript"):
         pages = [f.page for f in embedded if f.page]
         doc = document.get(files[0][1])
+        if doc.is_docx:
+            refs_at = _docx_references_offset(doc)
+            placed = [f.offset for f in embedded if f.offset]
+            if refs_at is None:
+                issues.append(Issue(WARNING, "", f"could not find the reference list in {files[0][1].name}, so the figures' position was not checked", unchecked=True))
+            elif placed and min(placed) < refs_at:
+                issues.append(Issue(WARNING, "", f"a figure appears before the references in {files[0][1].name}; the author guidelines ask for figures at the end of the manuscript"))
+            return Outcome(issues, f"{len(embedded)} figure(s) in the manuscript")
         refs_page = _references_page(doc)
+        if pages and not refs_page:
+            issues.append(Issue(WARNING, "", f"could not find the reference list in {files[0][1].name}, so the figures' position was not checked", unchecked=True))
         if pages and refs_page and min(pages) < refs_page:
             issues.append(Issue(WARNING, "", f"a figure appears on page {min(pages)} of {files[0][1].name}, before the references (page {refs_page}); the author guidelines ask for figures at the end of the manuscript"))
         return Outcome(issues, f"{len(embedded)} figure(s) in the manuscript")
@@ -998,6 +1148,16 @@ def figure_file_count(path: Path) -> int:
     if path.suffix.lower() == ".docx" and path.is_file():
         return max(len(_embedded_docx(document.get(path), "")), 1)
     return 1
+
+
+def _docx_references_offset(doc: document.Document) -> int | None:
+    """Where the references heading's paragraph starts in document.xml, or None."""
+    from .manuscript import _REFERENCE_HEADING
+
+    for para in re.finditer(r"<w:p[ >].*?</w:p>", doc.docx_part("word/document.xml") or "", re.DOTALL):
+        if _REFERENCE_HEADING.search("".join(re.findall(r"<w:t(?: [^>]*)?>([^<]*)</w:t>", para.group(0))).strip()):
+            return para.start()
+    return None
 
 
 def _references_page(doc: document.Document) -> int | None:

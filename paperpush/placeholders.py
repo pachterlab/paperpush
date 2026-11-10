@@ -21,19 +21,22 @@ import re
 from pathlib import Path
 
 from .database import Venue
-from .validate import WARNING, Issue, NotApplicable, Outcome
+from .validate import WARNING, Issue, NotApplicable, Outcome, Unchecked, unchecked
 
 _UNITS = r"(?:%|‰|-?fold|mg|µg|μg|ng|kg|g|ml|mL|µl|μl|µL|μL|mM|µM|μM|nM|nm|µm|μm|mm|cm|kb|bp|°C|h|hr|hrs|min|s|days?|weeks?|months?|years?|participants|patients|subjects|samples|cells|mice|rats)"
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # Numbers not filled in. "XX" alone is a karyotype, so it counts only beside a unit or an equals sign.
     # "XXX"/"xxx" standing alone (not in an e-mail address, URL, or word); "Xxx" is a gene name.
-    ("placeholder text", re.compile(r"(?<![\w.@/-])(?:XXX+|xxx+)(?![\w@/]|-\d)")),
-    ("number placeholder", re.compile(rf"(?<![\w.])(?:[XY]\.[XY]+|XX(?=\s*{_UNITS}\b|\s*%))|(?<![\w])(?:[nNpP]|OR|HR|RR|CI)\s*[=<>]\s*(?:X+|\?+|#+)(?![\w])|\b(?:19|20)XX\b|\(\s*\?{2,}\s*\)")),
+    ("placeholder text", re.compile(r"(?<![\w.@/-])(?<!\d,)(?<!Vol\. )(?<!Volume )(?:XXX+|xxx+)(?![\w@/]|-\d|\s+(?:International|Annual|Congress|Conference|Symposium|Meeting|Workshop|Colloquium|General\s+Assembly|syndrome|karyotype)\b)")),
+    ("number placeholder", re.compile(rf"(?<![\w.])(?:[XY]\.[XY]+(?=\s*{_UNITS}\b|\s*[%)±]|\s*$)|(?:(?<=[=<>~]\s)|(?<=[=<>~])|(?<=was\s)|(?<=were\s)|(?<=is\s)|(?<=are\s)|(?<=mean\s)|(?<=median\s))[XY]\.[XY]+|XX(?=\s*{_UNITS}\b|\s*%))|(?<![\w])(?:[nNpP]|OR|HR|RR|CI)\s*[=<>]\s*(?:X+|\?+|#+)(?![\w])|\b(?:19|20)XX\b|\(\s*\?{2,}\s*\)")),
     ("citation placeholder", re.compile(r"\[\s*(?:refs?|references?|citations?(?: needed)?|cite|CITE|REF|REFS|\?+|#+)\s*\]|\((?:refs?|REF|cite|citation needed)\)|\bcitation needed\b", re.IGNORECASE)),
     ("figure or table placeholder", re.compile(r"\b(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?s?\.?|Tables?)\s+(?:S?X{1,2}|#+|TBD)(?![\w])")),
-    ("to-do note", re.compile(r"\b(?:TODO|FIXME|TBD|TBC|TKTK)\b|\[\s*(?:insert|add|update|fill in|to be (?:added|completed|confirmed))\b[^\]]{0,60}\]|<\s*(?:insert|add)\b[^>]{0,60}>|\binsert (?:text|figure|table|reference|citation|name|date|here)\b", re.IGNORECASE)),
+    ("to-do note", re.compile(r"\b(?-i:TODO|FIXME|TBD|TBC(?!\s+(?:domains?|family|proteins?))|TKTK)\b|\b(?:todo|fixme)\s*:|\[\s*(?:insert|add|update|fill in|to be (?:added|completed|confirmed))\b[^\]]{0,60}\]|<\s*(?:insert|add)\b[^>]{0,60}>|\binsert (?:text|figure|table|reference|citation|name|date|here)\b", re.IGNORECASE)),
     ("template placeholder", re.compile(r"\[\s*(?:Editor(?:'s)? name|Journal name|Name of (?:the )?(?:editor|journal)|Author names?|Your name|Date|Title|Affiliation|Institution|Manuscript title|First Last|Name)\s*\]|\blorem ipsum\b", re.IGNORECASE)),
 ]
+# "XX mice" beside "XY mice" is the karyotype, not a number left to fill in.
+_XX_NOUN = re.compile(r"\s*(?:participants|patients|subjects|samples|cells|mice|rats)\b")
+_KARYOTYPE = re.compile(r"(?<![\w.])XY(?![\w.])|karyotyp|sex\s+chromosome|\b4[5-9],\s*X", re.IGNORECASE)
 _TEX_TODO = re.compile(r"\\(?:todo|fixme|missingfigure|TODO|FIXME)\b\s*(?:\[[^\]]*\])?\s*\{?")
 _TEX_HIGHLIGHT = re.compile(r"\\(?:hl|colorbox\s*\{\s*yellow\s*\})\s*\{")
 _TEX_TODO_PACKAGES = re.compile(r"\\usepackage\s*(?:\[[^\]]*\])?\s*\{[^}]*\b(?:todonotes|fixme)\b")
@@ -59,11 +62,22 @@ def _excerpt(text: str, start: int, end: int) -> str:
     return " ".join(text[a:b].split())
 
 
+def _not_a_placeholder(text: str, m: re.Match[str]) -> bool:
+    """Whether a hit is ordinary science: a karyotype, or an acronym the paper defines ("tick-borne disease (TBD)")."""
+    if m.group(0) == "XX":
+        return bool(_XX_NOUN.match(text, m.end()) and _KARYOTYPE.search(text))
+    if m.group(0) in ("TBD", "TBC"):
+        from .style_check import _expansion
+
+        return any(_expansion(text[max(0, d.start() - 80) : d.start()], m.group(0)) for d in re.finditer(rf"\(\s*{m.group(0)}s?\s*\)", text))
+    return False
+
+
 def scan_text(text: str) -> list[tuple[str, str]]:
     """``(kind, description)`` for each kind of placeholder in ``text``: the first two hits and a count."""
     found: list[tuple[str, str]] = []
     for kind, pattern in _PATTERNS:
-        hits = list(pattern.finditer(text))
+        hits = [m for m in pattern.finditer(text) if not _not_a_placeholder(text, m)]
         if not hits:
             continue
         shown = "; ".join(f"\"{' '.join(m.group(0).split())}\" in \"...{_excerpt(text, m.start(), m.end())}...\"" for m in hits[:2])
@@ -95,7 +109,7 @@ def check(venue: Venue, values: dict[str, str]) -> Outcome:
     if not files:
         raise NotApplicable("no manuscript, title page, cover letter, or supplementary text file to read")
     issues: list[Issue] = []
-    unread: list[str] = []
+    unread: list[tuple[str, str]] = []
     for field_id, path in files:
         doc = document.get(path)
         found: list[tuple[str, str]] = []
@@ -109,13 +123,17 @@ def check(venue: Venue, values: dict[str, str]) -> Outcome:
                     shown = "; ".join(f'"{_excerpt(source, m.start(), m.end() + 50)}"' for m in hits[:2])
                     found.append((kind, shown + (f" (and {len(hits) - 2} more)" if len(hits) > 2 else "")))
         text = doc.text
-        if text is None and not found:
-            unread.append(path.name)
+        extras = _word_extras(doc) if doc.is_docx else []
+        if not (text or "").strip() and not found and not extras:  # unreadable, or a scanned PDF with no text
+            unread.append((field_id, path.name))
             continue
         found.extend(scan_text(text or ""))
-        if doc.is_docx:
-            found.extend(("Word leftovers", extra) for extra in _word_extras(doc))
+        found.extend(("Word leftovers", extra) for extra in extras)
         for kind, excerpt in found:
             issues.append(Issue(WARNING, field_id, f"{path.name}: {kind}: {excerpt}" if kind != "Word leftovers" else f"{path.name}: {excerpt}; remove before submission"))
-    detail = f"read {len(files) - len(unread)} file(s)" + (f"; could not read {', '.join(unread)}" if unread else "")
+    names = ", ".join(name for _, name in unread)
+    if len(unread) == len(files):
+        raise Unchecked(f"could not read any text from {names}")
+    issues.extend(unchecked(field_id, f"could not read any text from {name}; its placeholders were not checked") for field_id, name in unread)
+    detail = f"read {len(files) - len(unread)} file(s)" + (f"; could not read {names}" if unread else "")
     return Outcome(issues, detail)

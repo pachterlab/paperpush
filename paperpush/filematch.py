@@ -31,6 +31,7 @@ from .database import Venue
 
 # Standard names per kind of document, lower case, no separators.
 KEYWORDS: dict[str, tuple[str, ...]] = {
+    "title_page": ("titlepage",),
     "cover_letter": ("cover", "coverletter", "letter", "lettertoeditor", "editorletter"),
     "declaration": ("declaration", "declarations", "competing", "interests", "conflict", "conflicts", "coi", "disclosure", "disclosures", "declarationofinterest"),
     "supplement": ("supplement", "supplementary", "supplemental", "supp", "suppl", "supps", "si", "sm", "esm", "appendix", "appendices", "additional", "extended", "suppinfo", "supportinginformation"),
@@ -42,9 +43,10 @@ KEYWORDS: dict[str, tuple[str, ...]] = {
 }
 
 # Precedence when a path matches several kinds.
-ORDER = ("cover_letter", "declaration", "supp_table", "supplement", "table", "figure", "combined", "source", "manuscript")
+ORDER = ("title_page", "cover_letter", "declaration", "supp_table", "supplement", "table", "figure", "combined", "source", "manuscript")
 
 KIND_LABELS = {
+    "title_page": "a title page",
     "cover_letter": "a cover letter",
     "declaration": "a declaration of interests",
     "supp_table": "a supplementary table",
@@ -58,6 +60,7 @@ KIND_LABELS = {
 
 # Upload fields per kind, in preference order.
 TARGETS: dict[str, tuple[str, ...]] = {
+    "title_page": ("title_page_file", "title_page"),
     "manuscript": ("manuscript_file", "pdf_file", "manuscript", "combined_pdf"),
     "combined": ("combined_pdf",),
     "cover_letter": ("cover_letter", "cover_letter_file"),
@@ -73,6 +76,12 @@ IMAGE_EXTS = {".tif", ".tiff", ".png", ".jpg", ".jpeg", ".eps", ".svg", ".ai", "
 DOCUMENT_EXTS = {".pdf", ".docx", ".doc", ".tex", ".odt", ".rtf"}
 
 _WORD = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+")
+
+
+_EXACT = {"letter", "table", "tables", "cover"}
+
+# ``FigS1``, ``Table_S2``, ``S3_Fig``: a capital S and a number mean a supplementary item.
+_SUPP_NUMBERED = re.compile(r"(?i:fig(?:ure)?s?|tab(?:le)?s?|tbl)[\s_.-]*S\d|(?<![A-Za-z])S\d+[\s_.-]*(?i:fig|tab)")
 
 
 def edit_distance(a: str, b: str, limit: int) -> int:
@@ -91,7 +100,12 @@ def edit_distance(a: str, b: str, limit: int) -> int:
 
 
 def _tolerance(keyword: str) -> int:
-    """Typos allowed: none for short names (``fig``, ``si``), one from 5 letters, two from 9."""
+    """Typos allowed: none for short names (``fig``, ``si``), one from 5 letters, two from 9.
+
+    None either for the names one letter from everyday words (``better``, ``stable``, ``lover``).
+    """
+    if keyword in _EXACT:
+        return 0
     return 0 if len(keyword) < 5 else 1 if len(keyword) < 9 else 2
 
 
@@ -106,6 +120,8 @@ def _kinds_in(ws: list[str]) -> set[str]:
         for kind, names in KEYWORDS.items():
             if any(edit_distance(w, k, _tolerance(k)) <= _tolerance(k) for k in names):
                 found.add(kind)
+    if "title_page" in found:
+        return {"title_page"}
     if "supplement" in found and "table" in found:
         found.add("supp_table")
     return found
@@ -124,6 +140,10 @@ def kinds_of(path: str) -> list[str]:
     """
     p = PurePosixPath(path.replace("\\", "/"))
     found = _kinds_in(_part_words(p.stem))
+    if _SUPP_NUMBERED.search(p.stem):
+        found.add("supplement")
+        if "table" in found:
+            found.add("supp_table")
     if not found:
         for folder in reversed(p.parts[:-1]):
             found = _kinds_in(_part_words(folder)) - _NAME_ONLY
@@ -160,8 +180,7 @@ class MatchResult:
 
 
 def _accepts(f, name: str) -> bool:
-    ext = PurePosixPath(name).suffix.lower()
-    return not f.accept or ext in {a.lower() for a in f.accept}
+    return not f.accept or name.lower().endswith(tuple(a.lower() for a in f.accept))
 
 
 def match_files(venue: Venue, paths: list[str]) -> MatchResult:

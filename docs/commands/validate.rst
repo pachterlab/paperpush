@@ -8,13 +8,8 @@ check manuscript files without a ``.sub``, with or without a venue (see
 
 .. code-block:: text
 
-   usage: paperpush validate [-h] [-v] [-q] [--dont-check-links]
-                             [--dont-check-for-sensitive-info]
-                             [--dont-check-references]
-                             [--dont-check-manuscript] [--anonymous]
-                             [--dont-check-hidden-text]
-                             [--dont-check-openreview-profiles]
-                             [--arxiv-latex-cleaner] [--initial-submission]
+   usage: paperpush validate [-h] [-v] [-q] [--disable-CHECK ...] [--enable-CHECK ...] [--anonymous]
+                             [--initial-submission]
                              [-o [OUT]] [--overwrite] [--cover-letter-max-age DAYS]
                              [--show-errors-only] [--hide-warnings]
                              [--hide-unchecked] [--colorblind]
@@ -37,6 +32,7 @@ Synopsis
    paperpush validate biorxiv.sub.txt
    paperpush validate biorxiv.sub.txt -o              # also save biorxiv_validation.pdf
    paperpush validate biorxiv.sub.txt --ai            # also run the AI checks via an API
+   paperpush validate biorxiv.sub.txt --disable-prose # turn off any check, or family of checks
    paperpush validate nature.sub.txt --initial-submission  # errors become warnings
    paperpush validate --manuscript main.tex --figures fig1.png fig2.png   # no .sub, no venue
    paperpush validate --venue nature --manuscript main.pdf --cover-letter cover.docx
@@ -67,7 +63,9 @@ files). What runs depends on what else is given:
 ``.sub`` and file flags
    Every check, as usual. Each flag replaces the path the ``.sub`` gives for
    that file, which is handy for checking a new draft without editing the
-   ``.sub``. ``--venue``, if given, must match the ``.sub``'s venue.
+   ``.sub``. ``--venue``, if given, must match the ``.sub``'s ``@venue:`` line;
+   a ``.sub`` with no such line is checked against ``--venue``, or without it
+   the general checks.
 
 ``--venue VENUE`` and file flags, no ``.sub``
    The files are checked against the venue's author guidelines: formats,
@@ -124,10 +122,64 @@ What it checks
 
 This is a summary, grouped as in ``paperpush validate --help``.
 :doc:`../validation-checks` lists every check in detail, with its severity and
-the flag that controls it.
+how to turn it off.
 
 Checks that run without AI
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Bibliography** (:ref:`vc-bibliography`)
+
+- Every reference cited; every citation in the reference list
+- Self-citations within limits (at most 15, and at most 80% of a list of 5 or
+  more)
+- BibTeX entries complete, closed, and with unique keys
+
+**Figure and table citations** (:ref:`vc-citations`)
+
+- Main, supplementary, and Extended Data figures and tables first cited in
+  order
+- Every one cited
+- None cited that is missing
+
+**Submission and manuscript consistency** (:ref:`vc-consistency`; compared word for word)
+
+- Title
+- Abstract
+- Authors (names, order, e-mails, ORCID iDs)
+- Keywords
+- Statements
+
+**Cover letter** (:ref:`vc-cover-letter`)
+
+- Addressed to the target venue
+- Dated within the last 7 days
+
+**Additional manuscript details** (:ref:`vc-placeholders`, :ref:`vc-bibliography`)
+
+- No placeholders, to-do notes, comments, or highlighting left in the files
+- Word files have no tracked changes or EndNote fields
+- Affiliation numbers after author names are superscripted
+- Reference list is alphabetical or follows first citation
+
+**Figures** (:ref:`vc-figures`; the attached figure files, or the figures
+embedded in the manuscript when none are attached)
+
+- Minimum resolution (dpi, with a separate line-art threshold)
+- Lettering within the size range and in the required typeface, in vector
+  figures
+- Panels labeled in the required style (case, bold) and every cited panel
+  present
+- Color mode (RGB, CMYK, grayscale) matches the guidelines
+- Within the guidelines' maximum width and height
+- Placed where the guidelines ask
+- Legends within the length limit and placed where the guidelines ask
+
+**Files** (:ref:`vc-files`, :ref:`vc-length`)
+
+- Files exist
+- Accepted types and sizes
+- Combined upload size within the portal's limit
+- Manuscript within the portal's word and page limits
 
 **Submission form** (:ref:`vc-fields`, :ref:`vc-choices`)
 
@@ -140,32 +192,13 @@ Checks that run without AI
 - URLs
 - Author list (parses, with exactly one corresponding author)
 
-**Files** (:ref:`vc-files`, :ref:`vc-length`)
+**Abstract and front matter** (:ref:`vc-front-matter`)
 
-- Files exist
-- Accepted types and sizes
-- Combined upload size within the portal's limit
-- Manuscript within the portal's word and page limits
+- No citations in the abstract (the ``.sub``'s and the manuscript's)
+- Structured-abstract headings, when the venue asks for them
+- A contact e-mail address in the manuscript
 
-**Integrity**
-
-- Reachable links (:ref:`vc-links`)
-- Reference DOIs point at the right paper (:ref:`vc-references`)
-- References without a DOI match a registered work; preprints that have been
-  published, and old arXiv versions (:ref:`vc-reference-search`)
-- Secrets and private data (:ref:`vc-sensitive`)
-- Hidden text and prompt injection (:ref:`vc-hidden-text`)
-- Anonymity, for double-blind venues (:ref:`vc-anonymity`)
-- Each author has an active OpenReview profile matching their name and email
-  domain, for OpenReview venues (:ref:`vc-openreview`):
-  every author has an Open Review ID (a warning for each one that doesn't,
-  even if their name matches a single profile); the ID exists and its
-  profile is active (errors); the name in the ``.sub`` matches the profile;
-  and the profile lists a current position, carries the author's email
-  suffixes, and has DBLP and expertise for reciprocal reviewers. Needs the
-  login stored by ``paperpush login VENUE``.
-
-**Guidelines** (:ref:`vc-guidelines`, measured against
+**Venue guidelines** (:ref:`vc-guidelines`, measured against
 ``manuscript_requirements.json``; see :doc:`requirements`)
 
 - Manuscript format and size
@@ -188,7 +221,26 @@ Checks that run without AI
 - Page layout matches a compiled copy of the venue's template
   (:ref:`vc-template`)
 
-**Layout** (:ref:`vc-layout`)
+**Integrity and external sources**
+
+- Reachable links (:ref:`vc-links`)
+- Reference DOIs point at the right paper (:ref:`vc-references`)
+- References without a DOI match a registered work; preprints that have been
+  published, and old arXiv versions (:ref:`vc-reference-search`)
+- Secrets and private data, and what ``arxiv_latex_cleaner`` would strip from
+  LaTeX source (:ref:`vc-sensitive`)
+- Hidden text and prompt injection (:ref:`vc-hidden-text`)
+- Anonymity, for double-blind venues (:ref:`vc-anonymity`)
+- Each author has an active OpenReview profile matching their name and email
+  domain, for OpenReview venues (:ref:`vc-openreview`):
+  every author has an Open Review ID (a warning for each one that doesn't,
+  even if their name matches a single profile); the ID exists and its
+  profile is active (errors); the name in the ``.sub`` matches the profile;
+  and the profile lists a current position, carries the author's email
+  suffixes, and has DBLP and expertise for reciprocal reviewers. Needs the
+  login stored by ``paperpush login VENUE``.
+
+**Page layout** (:ref:`vc-layout`)
 
 - Uses the venue's Word template or LaTeX class (detected from the file)
 - Page size and margins match the guidelines
@@ -196,47 +248,6 @@ Checks that run without AI
 - Text is double-spaced
 - Lines numbered continuously; pages numbered
 - Spelling follows the required English variant (US or UK)
-
-**Figures** (:ref:`vc-figures`; the attached figure files, or the figures
-embedded in the manuscript when none are attached)
-
-- Minimum resolution (dpi, with a separate line-art threshold)
-- Lettering within the size range and in the required typeface, in vector
-  figures
-- Panels labeled in the required style (case, bold) and every cited panel
-  present
-- Color mode (RGB, CMYK, grayscale) matches the guidelines
-- Within the guidelines' maximum width and height
-- Placed where the guidelines ask
-- Legends within the length limit and placed where the guidelines ask
-
-**Citation order** (:ref:`vc-citations`)
-
-- Main, supplementary, and Extended Data figures and tables first cited in
-  order
-- Every one cited
-- None cited that is missing
-
-**.sub vs paper** (:ref:`vc-consistency`; compared word for word)
-
-- Title
-- Abstract
-- Authors (names, order, e-mails, ORCID iDs)
-- Keywords
-- Statements
-
-**Abstract and front matter** (:ref:`vc-front-matter`)
-
-- No citations in the abstract (the ``.sub``'s and the manuscript's)
-- Structured-abstract headings, when the venue asks for them
-- A contact e-mail address in the manuscript
-
-**Reference list** (:ref:`vc-bibliography`)
-
-- Every reference cited; every citation in the reference list
-- Self-citations within limits (at most 15, and at most 80% of a list of 5 or
-  more)
-- BibTeX entries complete, closed, and with unique keys
 
 **Prose** (:ref:`vc-prose`; a mechanical proofread, not a grammar check)
 
@@ -253,8 +264,18 @@ embedded in the manuscript when none are attached)
 - Acronyms spelled out once, at first use (in the abstract and again in the
   main text)
 
-Checks that need AI
-^^^^^^^^^^^^^^^^^^^
+**Rigor and reproducibility** (:ref:`vc-rigor`)
+
+- Cell lines authenticated, tested for mycoplasma, and not known to be
+  misidentified
+- Blinding, randomization, sample size, exclusions, and sex reported for animal
+  and human studies
+- Antibodies, cell lines, and organisms carry RRIDs that resolve
+- Reported test statistics agree with their p values (statcheck)
+- A clinical trial gives a trial registry ID
+
+Checks that require AI
+^^^^^^^^^^^^^^^^^^^^^^
 
 These run with ``--ai``, or through an agent with ``--ai-tasks`` /
 ``--ai-results``; otherwise they are listed as not checked (:ref:`vc-ai`).
@@ -274,7 +295,8 @@ Guideline rules no check reads are listed as **not implemented**.
 
 The link, reference, sensitive-information, manuscript, hidden-text, and
 OpenReview passes make network requests or read every uploaded file; each can
-be turned off with its ``--dont-check-*`` flag below.
+be turned off, like any other check, with ``--disable-<CHECK>`` (see
+:ref:`vc-disable`).
 
 Arguments
 ---------
@@ -284,8 +306,8 @@ Arguments
    files are named with the flags below (see :ref:`validate-files`).
 
 ``--venue VENUE``
-   With no ``.sub``: check the named files against this venue's author
-   guidelines. Without it, only the general checks run.
+   Check the named files, or a ``.sub`` with no ``@venue:`` line, against this
+   venue's author guidelines. Without it, only the general checks run.
 
 ``--manuscript FILE``, ``--title-page FILE``, ``--cover-letter FILE``
    The manuscript, a separate title page, and the cover letter. Each replaces
@@ -299,32 +321,26 @@ Arguments
    Instead of printing the report, open the ``.sub`` in the paperpush web page
    on this computer and run the checks there. You can fix fields and
    re-validate, and every edit is saved to the file. With ``--ai`` the AI checks
-   run too. Needs ``pip install 'paperpush[web]'``.
+   run too. ``--reference-check-extended`` is not available with ``--web``.
+   Needs ``pip install 'paperpush[web]'``.
 
-``--dont-check-links``
-   Skip probing the URLs cited in the uploaded files. Avoids network requests.
+``--disable-<CHECK>``
+   Turn a check off; repeat for more. ``<CHECK>`` is a check ID from
+   :ref:`the full list <vc-check-list>`, such as
+   ``--disable-ai.consistency`` or ``--disable-bibliography.age``, or the
+   start of one, for that whole family: ``--disable-prose``,
+   ``--disable-ai.notes``. ``--disable-references`` turns off every reference
+   lookup, and ``--disable-manuscript`` everything that reads the manuscript
+   against the guidelines, along with compiling LaTeX and the AI checks. A
+   disabled check is listed as not checked, never as passed. See
+   :ref:`vc-disable` for the rules, and for what the older ``--dont-check-*``
+   flags became. ``<CHECK>`` can also be comma-separated names
+   (``--disable-prose,ai.notes``) or a text file of names
+   (``--disable-checks.txt``).
 
-``--dont-check-references``
-   Skip resolving the references' DOIs through ``doi.org``, and the registry
-   searches for references without a DOI and for newer versions (Crossref,
-   OpenAlex, arXiv, bioRxiv), and the research-resource lookups of the rigor
-   checks (RRIDs in SciCrunch, cell lines in Cellosaurus). Avoids network
-   requests.
-
-``--dont-check-for-sensitive-info``
-   Skip scanning the uploaded files for information not meant to be published.
-
-``--dont-check-manuscript``
-   Skip measuring the uploads against the venue's author guidelines. Also
-   skips compiling a LaTeX manuscript for its page count.
-
-``--dont-check-hidden-text``
-   Skip looking for white, invisible, microscopic, or off-page text. See
-   :ref:`vc-hidden-text`.
-
-``--dont-check-openreview-profiles``
-   Skip looking up the authors' OpenReview profiles (OpenReview venues only).
-   Avoids network requests. See :ref:`vc-openreview`.
+``--enable-<CHECK>``
+   Run only these checks; the rest are listed as not checked. ``<CHECK>`` is
+   given as for ``--disable-<CHECK>``. See :ref:`vc-enable`.
 
 ``--anonymous``
    Check the submission for information that identifies its authors, as for a
@@ -332,19 +348,6 @@ Arguments
    AAAI) get this check automatically. Linked anonymous.4open.science
    repositories are fetched and scanned too, which needs network access. See
    :ref:`vc-anonymity`.
-
-``--arxiv-latex-cleaner``
-   Run `arxiv_latex_cleaner
-   <https://github.com/google-research/arxiv-latex-cleaner>`_ on the LaTeX
-   source first, then validate the cleaned copies. Applies to every ``.tex``
-   upload (the cleaner runs on its whole directory) and every ``.zip``,
-   ``.tar``, ``.tar.gz``, or ``.tgz`` bundle that contains a ``.tex`` file.
-   The cleaner strips comments and drops unreferenced and auxiliary files.
-   Cleaned copies are written next to the originals, as ``paper/`` →
-   ``paper_arXiv/`` and ``source.zip`` → ``source_arXiv.zip``, replacing any
-   earlier output. The originals and the ``.sub`` are not changed, so point the
-   ``.sub`` at the cleaned copies to submit them. Needs the optional package:
-   ``pip install "paperpush[validate]"``.
 
 ``--initial-submission``
    Validate the file as an initial submission: every error is reported as a
@@ -437,7 +440,11 @@ Arguments
    read, offline, to find which AI checks apply. Combine it with ``--ai``,
    ``--ai-tasks``, or ``--ai-results``; on its own it lists the AI checks as
    needing AI. The report carries no ready-to-submit verdict, and it cannot be
-   combined with ``--dont-check-manuscript`` or ``--web``.
+   combined with ``--disable-manuscript`` or ``--web``.
+
+``--disable-<CHECK>``, ``--anonymous``, ``--initial-submission``,
+``--cover-letter-max-age``, ``--references-alphabetical``, and
+``--references-citation-order`` work on :doc:`submit` too.
 
 Plus the common ``-v/--verbose`` and ``-q/--quiet`` logging flags. Use ``-v``
 to see the checks as they run.
@@ -459,7 +466,13 @@ Run the field and file checks alone, with no network access:
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub.txt --dont-check-links --dont-check-references
+   paperpush validate biorxiv.sub.txt --disable-integrity.links --disable-references
+
+Skip the prose checks and one check that does not apply to your paper:
+
+.. code-block:: bash
+
+   paperpush validate biorxiv.sub.txt --disable-prose --disable-bibliography.age
 
 List only what must be fixed:
 
@@ -486,12 +499,6 @@ Re-run just the AI checks, e.g. after fixing a figure:
 .. code-block:: bash
 
    paperpush validate biorxiv.sub.txt --ai-only --ai-results results.json
-
-Clean arXiv LaTeX source and check the result:
-
-.. code-block:: bash
-
-   paperpush validate arxiv.sub.txt --arxiv-latex-cleaner
 
 See also
 --------

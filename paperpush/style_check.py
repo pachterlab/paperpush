@@ -62,21 +62,27 @@ _NUMBER_WORD = "|".join(sorted(list(_TENS) + list(_UNITS) + list(_SCALES), key=l
 _NUMBER_PHRASE = re.compile(rf"(?<![\w-])(?:{_NUMBER_WORD})(?:(?:-|\s+|\s+and\s+)(?:{_NUMBER_WORD}))*(?![\w])", re.IGNORECASE)
 # Words that, after the phrase, make it something other than a count: "twenty-first", "ten-fold" is fine as "10-fold".
 _ORDINAL_AFTER = re.compile(r"-(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)\b", re.IGNORECASE)
+# "twenty first century"; not "ten first-year students" or a "thirty second interval".
+_ORDINAL_SPACED = re.compile(r"\s+(?:first|second(?=\s+centur)|third|fourth|fifth|sixth|seventh|eighth|ninth)\b", re.IGNORECASE)
 # Abbreviations whose full stop does not end a sentence.
-_NOT_SENTENCE_END = {"al", "fig", "figs", "eq", "eqs", "ref", "refs", "no", "nos", "vs", "approx", "resp", "cf", "ca", "sec", "ch", "vol", "pp", "dr", "st", "mr", "ms", "suppl", "supp", "e.g", "i.e", "et"}
+_NOT_SENTENCE_END = {"jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec", "max", "avg", "al", "fig", "figs", "eq", "eqs", "ref", "refs", "no", "nos", "vs", "approx", "resp", "cf", "ca", "sec", "ch", "vol", "pp", "dr", "st", "mr", "ms", "suppl", "supp", "e.g", "i.e", "et"}
 # Digits opening a sentence: "... ended. 15 patients were ...".
 _DIGIT_START = re.compile(r"(\S+?)([.!?])([\"')\]\u201d]*)\s+(\d[\d,.]*)\s+(?=[a-z])")
 
 
 def words_to_number(phrase: str) -> int | None:
-    """``"twenty-five"`` -> 25, ``"one hundred and twelve"`` -> 112; None if it does not parse."""
+    """``"twenty-five"`` -> 25, ``"one hundred and twelve"`` -> 112; None if it does not parse or is not one number ("ten-eleven", "fifty-fifty")."""
     total = current = 0
     for word in re.split(r"[-\s]+", phrase.lower()):
         if word in ("and", ""):
             continue
         if word in _UNITS:
+            if current % 10:
+                return None
             current += _UNITS[word]
         elif word in _TENS:
+            if current % 100:
+                return None
             current += _TENS[word]
         elif word in _SCALES:
             current = (current or 1) * _SCALES[word]
@@ -130,6 +136,8 @@ def spelled_numbers(paragraph: str) -> list[str]:
         value = words_to_number(phrase)
         if value is None or value < 10 or _sentence_start(paragraph, start):
             continue
+        if value >= 20 and value % 10 == 0 and _ORDINAL_SPACED.match(paragraph, end):
+            continue
         found.append(f"{_snippet(paragraph, start, end, _mark)} (write {_digits(value)})")
     return found
 
@@ -169,6 +177,23 @@ _LABEL_BEFORE = re.compile(
 )
 
 
+# The name right before a number that belongs to it: "Hoechst 33342", "ATCC 25922", "NovaSeq 6000", "CA 90089".
+_NAME_BEFORE = re.compile(r"(?<![\w-])([A-Z][\w-]*)(,?)[ \t\u00a0]+$")
+_PRODUCTS = frozenset("Hoechst Tween Triton Lipofectamine Trizol Brij".split())
+# "At week 12 150 patients" is two numbers, not 12,150.
+_TIMEPOINT_BEFORE = re.compile(r"\b(?:weeks?|days?|months?|years?|hours?|visits?|cycles?|groups?|arms?|cohorts?|passages?|stages?|lanes?|batch(?:es)?|n)\s*=?\s*$", re.IGNORECASE)
+
+
+def _named_number(paragraph: str, start: int) -> bool:
+    """Whether the unseparated number at ``start`` is part of a product, strain, or postal name."""
+    lo = max(0, start - 30)
+    m = _NAME_BEFORE.search(paragraph[lo:start])
+    if m is None or (m.group(2) and not re.fullmatch(r"[A-Z]{2}", m.group(1))):
+        return False
+    word = m.group(1)
+    return word in _PRODUCTS or any(c.isupper() or c.isdigit() for c in word[1:]) or not _sentence_start(paragraph, lo + m.start(1))
+
+
 @dataclass
 class _Num:
     snippet: str
@@ -202,6 +227,10 @@ def numbers_in(paragraph: str) -> list[_Num]:
             continue
         if style == "none" and len(digits) == 4 and 1900 <= int(digits) <= 2099:
             continue  # a year
+        if style == "none" and _named_number(paragraph, m.start()):
+            continue
+        if style == "space" and not re.search(f"[{_THIN}]", whole) and _TIMEPOINT_BEFORE.search(paragraph[max(0, m.start() - 15) : m.start()]):
+            continue
         if _LABEL_BEFORE.search(paragraph[max(0, m.start() - 15) : m.start()]):
             continue
         found.append(_Num(_snippet(paragraph, m.start(), m.end(), _mark), len(digits), style))
@@ -273,9 +302,9 @@ def thousands_grouping(paragraphs: list[str], separator: Optional[str] = None, g
 
 # Every spelling of "i.e."/"e.g.", well-formed or not, and what follows it.
 _IE_EG = re.compile(r"(?<![\w.])(i\.?\s?e|e\.?\s?g)(\.?)(?![\w])(,?)")
-_ET_AL_BAD = re.compile(r"\bet\.\s?al\b\.?|\bet al(?![.\w])|\bet\.al\b\.?")
-# The same, for a venue that writes "et al" with no full stop: only the misplaced stops.
-_ET_AL_BAD_NO_PERIOD = re.compile(r"\bet\.\s?al\b\.?|\bet\.al\b\.?")
+_ET_AL_BAD = re.compile(r"\bet\.\s?al\b\.?|\bet al(?![.\w]|[*_]+\.)|\bet\.al\b\.?")
+# The same, for a venue that writes "et al" with no full stop: the misplaced stops, and a stop that does not end the sentence.
+_ET_AL_BAD_NO_PERIOD = re.compile(r"\bet\.\s?al\b\.?|\bet\.al\b\.?|\bet al\.(?=\s*[,;:\[(]|\s+[a-z\d])")
 _VS = re.compile(r"(?<![\w.])vs(\.?)(?![\w])")
 # "Fig. 2" / "Figure 2" / "Figs. 2-3" / "Figures 2 and 3", not prefixed by Supplementary (that series has its own form).
 _FIG_WORD = re.compile(r"(?<![\w.])(Figs?\.|Figures?)(?=\s*S?\d)")
@@ -322,6 +351,8 @@ def conventions(paragraphs: list[str], *, hyphens: bool = True, et_al_period: Op
     for p in paragraphs:
         for m in _IE_EG.finditer(p):
             core, dot, comma = m.group(1), m.group(2), m.group(3)
+            if " " in core and "." not in core:
+                continue  # two letters ("variables i e"), not "i. e."
             proper = core in ("i.e", "e.g") and dot == "."
             snippet = _snippet(p, m.start(), m.end(), _mark)
             if not proper:
@@ -443,6 +474,8 @@ def _scan_acronyms(paragraphs: list[str]) -> dict[str, _Acro]:
             continue
         defined_here = {(m.group(1), m.start(1)) for m in _DEFINITION.finditer(p)}
         for acr, pos in sorted(defined_here, key=lambda x: x[1]):
+            if acr in _KNOWN or _ROMAN.fullmatch(acr) or len(acr) > 8:
+                continue  # its uses are not counted either: "(USA)", "(III)"
             entry = found.setdefault(acr, _Acro())
             entry.definitions.append((i, pos))
             expansion = _expansion(p[: p.rfind("(", 0, pos)], acr)
@@ -485,9 +518,9 @@ def acronyms(body: list[str], abstract: list[str] | None = None) -> Acronyms:
             meanings = list(dict.fromkeys(a.expansions + (abs_found[acr].expansions if acr in abs_found else [])))
             if len(meanings) > 1:
                 out.conflicting.append(f"'{acr}' (" + ", ".join(f"'{m}'" for m in meanings) + ")")
-            elif len(a.definitions) > 1:
+            elif len(a.definitions) > 1 and a.expansions:
                 out.redefined.append(f"'{acr}' ({len(a.definitions)} times)")
-            if a.uses == 0:  # only the definition: the acronym is never used
+            if a.uses == 0 and a.expansions:  # only the definition: the acronym is never used
                 out.rarely_used.append(f"'{acr}'")
         elif acr in abs_found and abs_found[acr].definitions and a.uses:
             out.abstract_only.append(f"'{acr}' (first used in {a.snippet})")
@@ -768,7 +801,7 @@ def _heading_case_check(venue: Venue, values: dict[str, str]) -> Outcome:
 AI_PROSE_ID = "ai.prose"
 AI_PROSE_TITLE = "Spelling, grammar, and tense (read by AI)"
 _AI_PROSE = (
-    "Proofread the manuscript's prose (not the reference list, math, code, or tables of numbers). Look for:\n"
+    "Proofread the prose of these files: the manuscript and, when listed, the title page and cover letter (not the reference list, math, code, or tables of numbers). Look for:\n"
     "1. Spelling mistakes and typos, including real words in the wrong place ('form' for 'from', 'than' for 'then') and {spelling}. "
     "Gene, protein, software, and other proper names are not misspellings.\n"
     "2. Grammar: subject-verb agreement, missing or doubled words, wrong articles (a/an/the) or prepositions, dangling modifiers, run-on sentences, comma splices, and sentences that do not parse.\n"
@@ -784,11 +817,13 @@ def ai_prose_task(venue: Venue, values: dict[str, str]):
     """The AI task for what a pattern cannot judge: typos beyond a list, grammar, and tense."""
     from .ai_validate import AiTask
     from .requirements import get_requirements, resolve
-    from .requirements_check import manuscript_files
+    from .requirements_check import _existing, _fields_for, _paths, manuscript_files
 
     files = [str(p) for _, p in manuscript_files(venue, values)]
     if not files:
         return None
+    files += [str(p) for role in ("title_page", "cover_letter") for f in _fields_for(venue, role) for p in _existing(_paths(f, values)) if p.suffix.lower() in (".docx", ".pdf", ".tex", ".txt", ".md")]
+    files = list(dict.fromkeys(files))
     base = get_requirements(venue.slug)
     language = (resolve(base, values).manuscript.language or "").strip() if base is not None else ""
     if language and language.lower() != "english":

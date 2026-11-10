@@ -62,11 +62,13 @@ def given(files: Mapping[str, Paths]) -> bool:
     return any(_as_list(files.get(key)) for key, _, _ in FILE_ROLES)
 
 
-def validate_command(venue: Optional[str], files: Mapping[str, Paths]) -> str:
-    """The ``paperpush validate`` command that checks ``files`` (no .sub) for ``venue``."""
+def validate_command(venue: Optional[str], files: Mapping[str, Paths], *, subfile: str = "") -> str:
+    """The ``paperpush validate`` command that checks ``files`` for ``venue``, or on top of ``subfile``."""
     import shlex
 
     parts = ["paperpush", "validate"]
+    if subfile:
+        parts.append(subfile)
     if venue:
         parts += ["--venue", venue]
     for key, _, _ in FILE_ROLES:

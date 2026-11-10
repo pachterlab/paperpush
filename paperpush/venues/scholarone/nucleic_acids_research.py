@@ -24,7 +24,7 @@ from playwright.sync_api import sync_playwright
 
 from ...database import get_venue
 from ...manuscript import manuscript_text
-from ...validate import parse_authors
+from ...validate import _multichoice_items, parse_authors
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
 from ..common import session_path as _session_path
 from ..recovery import guard, step, unrecovered
@@ -310,7 +310,8 @@ def _answer_declarations(page, values: dict) -> None:
         _check_custom_checkbox(page, field_id)
 
     # Data-deposition matrix: Yes for each selected type, No for the rest.
-    selected = {item.strip().lower() for item in (values.get("data_deposition_types", "") or "").split(",") if item.strip()}
+    deposition_field = next(f for f in get_venue("nucleic_acids_research").fields if f.id == "data_deposition_types")
+    selected = {item.lower() for item in _multichoice_items(deposition_field, values.get("data_deposition_types", "") or "")}
     for label, field_id in DATA_DEPOSITION_ROWS:
         _check_yes_no(page, field_id, label.lower() in selected)
 

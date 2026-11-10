@@ -23,8 +23,8 @@ name) and reports:
 * the same profile listed twice, and no reciprocal reviewer at all.
 
 OpenReview challenges anonymous API clients, so the lookup signs in with the
-login ``paperpush login <venue>`` stored. Without one the check is skipped
-with a note.
+login ``paperpush login <venue>`` stored. Without one the check is reported as
+not run, with a note.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ import logging
 import re
 import urllib.parse
 from dataclasses import dataclass
-from functools import lru_cache
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,14 @@ class Problem:
     error: bool
     field: str
     message: str
+    # The message says the lookup did not happen, rather than that it found something.
+    unchecked: bool = False
+
+
+# Signed-in sessions, kept for a while so a long-lived server reuses one. Only a
+# success is remembered: a network failure says nothing about the next attempt.
+TOKEN_TTL_SECONDS = 3600.0
+_tokens: dict[tuple[str, str], tuple[str, float]] = {}
 
 
 def _request(method: str, path: str, *, token: str | None = None, body: dict | None = None) -> tuple[int, dict | None]:
@@ -76,15 +84,21 @@ def _request(method: str, path: str, *, token: str | None = None, body: dict | N
         return 0, None
 
 
-@lru_cache(maxsize=4)
 def _login(username: str, password: str) -> tuple[str | None, str]:
     """``(token, reason)``: a session token, or None with why it could not be had."""
+    cached = _tokens.get((username, password))
+    if cached is not None and time.monotonic() < cached[1]:
+        return cached[0], ""
     status, payload = _request("POST", "/login", body={"id": username, "password": password})
     if status == 200 and payload and payload.get("token"):
+        _tokens[(username, password)] = (payload["token"], time.monotonic() + TOKEN_TTL_SECONDS)
         return payload["token"], ""
     if status == 0:
         return None, "OpenReview could not be reached"
     return None, "OpenReview rejected the stored login"
+
+
+_login.cache_clear = _tokens.clear  # type: ignore[attr-defined]
 
 
 def _token(venue_slug: str) -> tuple[str | None, str]:
@@ -104,7 +118,9 @@ def _token(venue_slug: str) -> tuple[str | None, str]:
 
 
 def _norm(name: str) -> str:
-    return re.sub(r"\s+", " ", name).strip().casefold()
+    from . import document
+
+    return re.sub(r"\s+", " ", document.fold(name)).strip()
 
 
 def _names(profile: dict) -> list[str]:
@@ -171,13 +187,13 @@ def applies(venue) -> bool:
 
 def check(venue, values: dict[str, str], *, today: _dt.date | None = None) -> list[Problem]:
     """Every OpenReview-profile problem in the ``.sub``'s author lists."""
-    from .validate import parse_authors
+    from .validate import NotApplicable, parse_authors
 
     year = (today or _dt.date.today()).year
     fields = _authorlist_fields(venue)
     rows = [(f, a) for f in fields for a in parse_authors(values.get(f.id, ""), f.fields)]
-    if not rows:
-        return []
+    if not any(str(a.get(ID_COLUMN, "")).strip() or str(a.get("name", "")).strip() for _, a in rows):
+        raise NotApplicable("no authors with a name or Open Review ID to look up")
     problems: list[Problem] = []
 
     authors_field = next((f for f in fields if "author" in f.id.lower()), None)
@@ -190,13 +206,13 @@ def check(venue, values: dict[str, str], *, today: _dt.date | None = None) -> li
 
     token, reason = _token(venue.slug)
     if token is None:
-        problems.append(Problem(False, "", f"OpenReview profile check skipped: {reason}"))
+        problems.append(Problem(False, "", f"OpenReview profile check skipped: {reason}", unchecked=True))
         return problems
 
     ids = sorted({str(a.get(ID_COLUMN, "")).strip() for _, a in rows if str(a.get(ID_COLUMN, "")).strip().startswith("~")})
     by_id = _fetch_by_ids(ids, token)
     if by_id is None:
-        problems.append(Problem(False, "", "OpenReview profile check skipped: the profile lookup failed"))
+        problems.append(Problem(False, "", "OpenReview profile check skipped: the profile lookup failed", unchecked=True))
         return problems
 
     seen: dict[str, str] = {}
@@ -217,7 +233,7 @@ def check(venue, values: dict[str, str], *, today: _dt.date | None = None) -> li
         elif name:
             result = _search_name(name, token)
             if result is None:
-                problems.append(Problem(False, field.id, f"{who}: the OpenReview name search failed; not checked"))
+                problems.append(Problem(False, field.id, f"{who}: the OpenReview name search failed; not checked", unchecked=True))
                 continue
             exact, total = result
             suffixes = [s for s in re.split(r"[,\s]+", str(author.get("email_suffixes", ""))) if s]

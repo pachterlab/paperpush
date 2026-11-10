@@ -13,7 +13,7 @@ Scientific Preprints"*, IEEE S&P 2026, arXiv:2604.20927, and arXiv's recommended
 sanitiser ``arxiv_latex_cleaner``.)
 
 This module is the sensitive-info back end for ``paperpush validate`` (which
-runs it by default; ``--dont-check-for-sensitive-info`` opts out).
+runs it by default; ``--disable-integrity.sensitive`` opts out).
 It is deliberately venue-agnostic: the secret / EXIF / metadata / editable-link
 detectors apply to *any* file a journal accepts, and the LaTeX-specific checks
 (source comments, junk/dangling auxiliary files) simply switch on when the
@@ -28,15 +28,21 @@ leak the value into a terminal, a log file, or CI output.
 
 from __future__ import annotations
 
+import bz2
+import gzip
+import html
 import io
 import logging
+import lzma
 import re
 import tarfile
+import tempfile
 import zipfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, NamedTuple
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -47,6 +53,8 @@ MAX_TEXT_BYTES = 5 * 1024 * 1024
 # Cap how many archive members we inspect, so a pathological bundle can't hang
 # the check. Reported when hit so the truncation is never silent.
 MAX_ARCHIVE_MEMBERS = 2000
+# How deep an archive inside an archive is followed.
+MAX_ARCHIVE_DEPTH = 3
 
 # Text scanning is not gated on an extension allow-list: any file that is not an
 # image, archive, or PDF is decoded as candidate text and dropped by _decode() if
@@ -60,6 +68,12 @@ ARCHIVE_EXTS = {".zip", ".tar", ".gz", ".tgz", ".tar.gz", ".bz2", ".tbz2", ".xz"
 # LaTeX source extensions -- the presence of any of these turns on the
 # comment scan and makes the junk-file check meaningful.
 LATEX_EXTS = {".tex", ".ltx", ".cls", ".sty", ".bib"}
+# Zip-of-XML documents: their text is read out of the XML parts.
+OFFICE_EXTS = {".docx", ".pptx", ".xlsx", ".docm", ".pptm", ".xlsm", ".odt", ".ods", ".odp"}
+# Formats that may hold text but that this module cannot open; reported, not skipped.
+OPAQUE_EXTS = {".doc", ".ppt", ".xls", ".7z", ".rar"}
+# Category of a finding that says a file went unread, so the scan is not a pass.
+NOT_SCANNED = "not scanned"
 
 # Auxiliary / editor / VCS files that do not help compile a paper but routinely
 # ride along inside a source bundle and leak drafts, build paths, or history.
@@ -116,13 +130,16 @@ class Finding:
 # so the report can point at "an AWS key" without echoing it.
 
 _SECRET_PATTERNS: list[tuple[str, re.Pattern[str], int]] = [
-    ("private key", re.compile(r"-----BEGIN (?:RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----"), 0),
-    ("AWS access key", re.compile(r"\b(AKIA[0-9A-Z]{16})\b"), 1),
+    ("private key", re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----"), 0),
+    ("AWS access key", re.compile(r"\b((?:AKIA|ASIA)[0-9A-Z]{16})\b"), 1),
     ("Google API key", re.compile(r"\b(AIza[0-9A-Za-z_\-]{35})\b"), 1),
-    ("GitHub token", re.compile(r"\b(gh[pousr]_[0-9A-Za-z]{36,255})\b"), 1),
+    ("GitHub token", re.compile(r"\b(gh[pousr]_[0-9A-Za-z]{36,255}|github_pat_[0-9A-Za-z_]{22,255})\b"), 1),
+    ("GitLab token", re.compile(r"\b(glpat-[0-9A-Za-z_\-]{20,})"), 1),
+    ("Hugging Face token", re.compile(r"\b(hf_[0-9A-Za-z]{30,})\b"), 1),
+    ("bearer token", re.compile(r"(?i)\bbearer\s+([0-9A-Za-z._~+/\-]{20,}=*)"), 1),
     ("Slack token", re.compile(r"\b(xox[baprs]-[0-9A-Za-z-]{10,})\b"), 1),
     ("Stripe key", re.compile(r"\b((?:sk|rk)_live_[0-9A-Za-z]{16,})\b"), 1),
-    ("OpenAI/Anthropic key", re.compile(r"\b(sk-(?:ant-)?[0-9A-Za-z_\-]{20,})\b"), 1),
+    ("OpenAI/Anthropic key", re.compile(r"\b(sk-(?!learn\b)(?:ant-)?[0-9A-Za-z_\-]{20,})\b"), 1),
     ("JSON Web Token", re.compile(r"\b(eyJ[0-9A-Za-z_\-]{10,}\.[0-9A-Za-z_\-]{10,}\.[0-9A-Za-z_\-]{10,})\b"), 1),
     # Generic "secret = value" / "password: value". Requires quotes or an
     # 8+-char value so a prose sentence ("the password requirements...") or an
@@ -130,8 +147,9 @@ _SECRET_PATTERNS: list[tuple[str, re.Pattern[str], int]] = [
     (
         "hardcoded credential",
         re.compile(r"""(?ix)
-            \b(?:pass(?:word|wd|phrase)?|secret|api[_-]?key|access[_-]?key|
-               auth[_-]?token|client[_-]?secret|private[_-]?token)\b
+            (?<![a-z0-9])                   # "_" may precede: OPENAI_API_KEY, DB_PASSWORD
+            (?:pass(?:word|wd|phrase)?|secret|api(?:\\?[_-])?key|access(?:\\?[_-])?key|
+               (?:auth|access|api|hf|github)(?:\\?[_-])?token|client(?:\\?[_-])?secret|private(?:\\?[_-])?token)\b
             [ \t]*[:=][ \t]*                # separator, no line break -- the
                                             # value must sit on the same line
             (?P<val>"[^"\n]{6,}"|'[^'\n]{6,}'|[^\s"'#,;]{8,})
@@ -152,6 +170,17 @@ _EDITABLE_LINK = re.compile(r"https?://docs\.google\.com/(?:document|spreadsheet
 _LATEX_NOTE = re.compile(r"(?i)\b(TODO|FIXME|XXX|HACK|WTF|REVIEWER|CONFIDENTIAL|DO NOT|REMOVE THIS|placeholder)\b")
 
 
+# A value on the right of "password =" that is code or a template, not a credential.
+_PLACEHOLDER_VALUE = re.compile(r"(?i)^(?:<.*>|\$.*|%.*|\{\{?.*\}?\}|none|null|true|false)$|your[_-]|change[_-]?me|x{4,}|placeholder|redacted")
+_CODE_VALUE = re.compile(r"[(\[]|^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+$")
+
+
+def _is_placeholder_credential(value: str) -> bool:
+    quoted = value[:1] in "\"'"
+    bare = value.strip("\"'")
+    return bool(_PLACEHOLDER_VALUE.search(bare)) or (not quoted and bool(_CODE_VALUE.search(bare)))
+
+
 def _mask(secret: str) -> str:
     """Redact a matched secret to a short, non-reversible hint.
 
@@ -167,11 +196,38 @@ def _mask(secret: str) -> str:
     return f"{secret[:4]}…{secret[-2:]}"
 
 
+_EDITABLE_ID = re.compile(r"(/d/)([\w\-]+)")
+_URL_USERINFO = re.compile(r"(?<=://)[^/\s@]+@")
+
+
+def _redact(text: str) -> str:
+    """``text`` with every credential in it masked, for quoting it in a finding."""
+    for _, pattern, group in _SECRET_PATTERNS:
+
+        def mask(match: re.Match[str], group: int = group) -> str:
+            raw = match.group(group) or match.group(0)
+            return match.group(0).replace(raw, _mask(raw))
+
+        text = pattern.sub(mask, text)
+    return text
+
+
+def _strip_userinfo(url: str) -> str:
+    """``url`` without a ``user:password@`` (or ``token@``) part."""
+    return _URL_USERINFO.sub("", url)
+
+
+def _not_scanned(where: str, why: str, prefix: str = "") -> Finding:
+    return Finding(where, NOT_SCANNED, f"{prefix}could not be scanned ({why}); inspect it by hand before submitting")
+
+
 def _iter_secret_findings(where: str, text: str) -> Iterator[Finding]:
     """Yield credential / editable-link findings for one blob of text."""
     seen: set[tuple[str, str]] = set()
     for label, pattern, group in _SECRET_PATTERNS:
         for match in pattern.finditer(text):
+            if label == "hardcoded credential" and _is_placeholder_credential(match.group("val")):
+                continue
             raw = match.group(group) or match.group(0)
             key = (label, raw)
             if key in seen:
@@ -182,7 +238,9 @@ def _iter_secret_findings(where: str, text: str) -> Iterator[Finding]:
         link = match.group(0)
         # An /edit or default sharing link grants access; a /d/ID without a mode
         # is still worth flagging since arXiv's study found many were editable.
-        yield Finding(where, "editable document link", f"editable web-document link exposed: {link}")
+        # The document id is the capability, so it is masked like a key.
+        shown = _EDITABLE_ID.sub(lambda m: m.group(1) + _mask(m.group(2)), link)
+        yield Finding(where, "editable document link", f"editable web-document link exposed: {shown}")
 
 
 def _iter_latex_findings(where: str, text: str) -> Iterator[Finding]:
@@ -201,7 +259,7 @@ def _iter_latex_findings(where: str, text: str) -> Iterator[Finding]:
             continue
         total += 1
         if _LATEX_NOTE.search(comment):
-            snippet = comment.strip()
+            snippet = _redact(comment.strip())
             if len(snippet) > 80:
                 snippet = snippet[:77] + "..."
             yield Finding(where, "LaTeX note comment", f"line {lineno}: % {snippet}")
@@ -239,6 +297,8 @@ def _decode(data: bytes) -> str | None:
     objects); such blobs are left to the EXIF/PDF paths instead of being scanned
     as text.
     """
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return data.decode("utf-16", errors="replace")
     if b"\x00" in data[:1024]:
         return None
     try:
@@ -250,8 +310,54 @@ def _decode(data: bytes) -> str | None:
 # --- per-format scanners ---------------------------------------------------
 
 
+def _office_parts(data: bytes) -> list[tuple[str, str]] | None:
+    """``(part name, plain text)`` of each XML part of an Office file, or None if it cannot be opened."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            parts: list[tuple[str, str]] = []
+            for info in zf.infolist():
+                name = info.filename
+                if info.file_size > MAX_TEXT_BYTES or not name.lower().endswith((".xml", ".rels")) or "theme/" in name:
+                    continue
+                xml = zf.read(info).decode("utf-8", errors="replace")
+                if name.endswith(".rels"):
+                    # Hyperlink targets, which appear nowhere in the document text.
+                    parts.append((name, "\n".join(_OFFICE_TARGET.findall(xml))))
+                    continue
+                text = _OFFICE_BREAK.sub("\n", _OFFICE_SPACE.sub(" ", xml))
+                parts.append((name, html.unescape(_OFFICE_TAG.sub("", text))))
+            return parts
+    except Exception:
+        logger.debug("could not open an Office file", exc_info=True)
+        return None
+
+
+_OFFICE_TARGET = re.compile(r'Target="([^"]+)"')
+_OFFICE_SPACE = re.compile(r"<w:(?:tab|br|cr)\b[^>]*/>")
+_OFFICE_BREAK = re.compile(r"</(?:w:p|a:p|text:p|text:h|si|c|row)>")
+_OFFICE_TAG = re.compile(r"<[^>]+>")
+
+
+def _scan_office(where: str, data: bytes) -> Iterator[Finding]:
+    parts = _office_parts(data)
+    if parts is None:
+        yield _not_scanned(where, "not a readable Office file")
+        return
+    yield from _iter_secret_findings(where, "\n".join(text for _, text in parts))
+
+
+@contextmanager
+def _member_file(name: str, data: bytes) -> Iterator[Path]:
+    """``data`` as a temporary file that has the extension(s) of ``name``."""
+    with tempfile.TemporaryDirectory(prefix="paperpush-scan-") as folder:
+        path = Path(folder) / ("member" + "".join(Path(name).suffixes[-2:]))
+        path.write_bytes(data)
+        yield path
+
+
 def _scan_text_blob(where: str, data: bytes, *, is_latex: bool) -> Iterator[Finding]:
     if len(data) > MAX_TEXT_BYTES:
+        yield _not_scanned(where, f"larger than {MAX_TEXT_BYTES // (1024 * 1024)} MB")
         return
     text = _decode(data)
     if text is None:
@@ -314,43 +420,69 @@ def _dms_to_deg(dms) -> float | None:
     return d + m / 60.0 + s / 3600.0
 
 
-def _pdf_text(path: Path) -> str:
-    """Extract the concatenated text layer of a PDF (``""`` on any failure).
+class PdfRead(NamedTuple):
+    """A PDF's text layer, why it could not be read (or None), and its page count."""
 
-    Shared by the secret scan and the GitHub-link scan so a PDF is parsed the
-    same way for both; missing pypdf or an unreadable file yields ``""`` rather
-    than raising.
-    """
+    text: str
+    problem: str | None
+    pages: int
+
+
+def _read_pdf(path: Path) -> PdfRead:
+    """Extract the concatenated text layer of a PDF, saying so when it cannot be read."""
     try:
         from pypdf import PdfReader
+        from pypdf.errors import FileNotDecryptedError
     except Exception:
         logger.debug("pypdf not available; skipping PDF text extraction of %s", path)
-        return ""
+        return PdfRead("", "pypdf is not installed", 0)
     try:
         reader = PdfReader(str(path))
+        pages = list(reader.pages)
+    except FileNotDecryptedError:
+        return PdfRead("", "password-protected", 0)
     except Exception:
         logger.debug("could not parse PDF %s for text extraction; skipping", path, exc_info=True)
-        return ""
+        return PdfRead("", "not a readable PDF", 0)
     parts: list[str] = []
-    for page in reader.pages:
+    failed = 0
+    for page in pages:
         try:
             parts.append(page.extract_text() or "")
         except Exception:
             logger.debug("could not extract text from a page of %s; skipping page", path, exc_info=True)
-            continue
-    return "\n".join(parts)
+            failed += 1
+    return PdfRead("\n".join(parts), f"{failed} of {len(pages)} pages could not be read" if failed else None, len(pages))
+
+
+def _pdf_text(path: Path) -> str:
+    """The concatenated text layer of a PDF (``""`` on any failure).
+
+    Shared by the secret scan and the GitHub-link scan so a PDF is parsed the
+    same way for both.
+    """
+    return _read_pdf(path).text
 
 
 def _pdf_metadata_text(path: Path) -> dict[str, str]:
-    """Return the PDF ``/Info`` dictionary as ``{key: str(value)}`` (``{}`` on failure)."""
+    """The PDF's ``/Info`` dictionary and XMP creators as ``{key: str(value)}`` (``{}`` on failure)."""
     try:
         from pypdf import PdfReader
 
-        meta = PdfReader(str(path)).metadata or {}
+        reader = PdfReader(str(path))
+        out = {str(k): str(v) for k, v in dict(reader.metadata or {}).items() if v}
     except Exception:
         logger.debug("could not read PDF metadata from %s; skipping", path, exc_info=True)
         return {}
-    return {str(k): str(v) for k, v in dict(meta).items() if v}
+    try:
+        xmp = reader.xmp_metadata
+        creators = [str(c) for c in (xmp.dc_creator or []) if c] if xmp is not None else []
+    except Exception:
+        logger.debug("could not read XMP metadata from %s; skipping", path, exc_info=True)
+        creators = []
+    if creators:
+        out["/XMP dc:creator"] = ", ".join(creators)
+    return out
 
 
 def _scan_pdf(where: str, path: Path) -> Iterator[Finding]:
@@ -360,9 +492,11 @@ def _scan_pdf(where: str, path: Path) -> Iterator[Finding]:
     layer, and its ``/Info`` metadata often carries author names, the LaTeX
     source path, or the producing tool -- worth a look on the same pass.
     """
-    text = _pdf_text(path)
-    if text:
-        yield from _iter_secret_findings(where, text)
+    read = _read_pdf(path)
+    if read.problem:
+        yield _not_scanned(where, read.problem)
+    if read.text:
+        yield from _iter_secret_findings(where, read.text)
     for key, value in _pdf_metadata_text(path).items():
         yield from _iter_secret_findings(f"{where} [metadata {key}]", value)
 
@@ -377,20 +511,25 @@ def _scan_archive(where: str, path: Path) -> Iterator[Finding]:
     scan; on top of that, member *names* are checked for junk/VCS files that do
     not belong in a published source bundle.
     """
-    try:
-        members = _iter_archive_members(path)
-    except Exception:
-        logger.debug("could not open archive %s", path, exc_info=True)
-        return
     count = 0
     truncated = False
-    for name, data in members:
-        count += 1
-        if count > MAX_ARCHIVE_MEMBERS:
-            truncated = True
-            break
-        yield from _scan_member(f"{where}:{name}", name, data)
-        yield from _junk_member_finding(where, name)
+    unread: list[str] = []
+    try:
+        for name, data in _iter_archive_members(path):
+            count += 1
+            if count > MAX_ARCHIVE_MEMBERS:
+                truncated = True
+                break
+            if data is UNREAD:
+                unread.append(name)
+            else:
+                yield from _scan_member(f"{where}:{name}", name, data)
+            yield from _junk_member_finding(where, name)
+    except Exception as exc:
+        logger.debug("could not read archive %s", path, exc_info=True)
+        yield _not_scanned(where, f"the archive could not be read to its end: {type(exc).__name__}")
+    if unread:
+        yield _not_scanned(where, _unread_summary(unread))
     if truncated:
         yield Finding(
             where,
@@ -399,10 +538,22 @@ def _scan_archive(where: str, path: Path) -> Iterator[Finding]:
         )
 
 
+def _unread_summary(names: list[str]) -> str:
+    shown = ", ".join(names[:3]) + (", ..." if len(names) > 3 else "")
+    return f"{len(names)} archive entr{'y' if len(names) == 1 else 'ies'} too large or unreadable: {shown}"
+
+
 def _scan_member(where: str, name: str, data: bytes) -> Iterator[Finding]:
     suffix = Path(name).suffix.lower()
     if suffix in IMAGE_EXTS:
         yield from _scan_image_blob(where, data)
+    elif suffix in OFFICE_EXTS:
+        yield from _scan_office(where, data)
+    elif suffix in OPAQUE_EXTS:
+        yield _not_scanned(where, f"{suffix} files cannot be read")
+    elif suffix == ".pdf" and data:
+        with _member_file(name, data) as pdf:
+            yield from _scan_pdf(where, pdf)
     else:
         # Treat anything not obviously an image as candidate text; _decode drops
         # binary blobs. is_latex keys the comment scan off the member extension.
@@ -419,8 +570,39 @@ def _junk_member_finding(where: str, name: str) -> Iterator[Finding]:
         yield Finding(where, "unnecessary file", f"build/auxiliary file in bundle: {name}")
 
 
-def _iter_archive_members(path: Path) -> Iterator[tuple[str, bytes]]:
-    """Yield ``(member_name, bytes)`` for a zip or tar archive."""
+class _Unread(bytes):
+    """Empty contents of an archive member that was too large or could not be read."""
+
+
+UNREAD = _Unread()
+
+
+def _expanded(name: str, data: bytes, depth: int) -> Iterator[tuple[str, bytes]]:
+    """One archive member and, for an archive inside it, the members of that (``outer!inner``)."""
+    if data is UNREAD or Path(name).suffix.lower() not in ARCHIVE_EXTS:
+        yield name, data
+        return
+    if depth >= MAX_ARCHIVE_DEPTH:
+        yield name, UNREAD
+        return
+    yield name, b""  # name still checked for junk
+    if not data:
+        return
+    try:
+        with _member_file(name, data) as nested:
+            for inner, inner_data in _iter_archive_members(nested, depth + 1):
+                yield f"{name}!{inner}", inner_data
+    except Exception:
+        logger.debug("could not read nested archive %s", name, exc_info=True)
+        yield name, UNREAD
+
+
+def _iter_archive_members(path: Path, depth: int = 0) -> Iterator[tuple[str, bytes]]:
+    """Yield ``(member_name, bytes)`` for an archive, following archives inside it.
+
+    A zip, a tar (compressed or not), or one gzip/bzip2/xz-compressed file. A
+    member too large to read, or unreadable, comes back as :data:`UNREAD`.
+    """
     if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as zf:
             for info in zf.infolist():
@@ -428,13 +610,14 @@ def _iter_archive_members(path: Path) -> Iterator[tuple[str, bytes]]:
                     yield info.filename, b""
                     continue
                 if info.file_size > MAX_TEXT_BYTES:
-                    yield info.filename, b""  # name still checked for junk
+                    yield info.filename, UNREAD  # name still checked for junk
                     continue
                 try:
-                    yield info.filename, zf.read(info)
+                    data = zf.read(info)
                 except Exception:
                     logger.debug("could not read zip member %s from %s; scanning name only", info.filename, path, exc_info=True)
-                    yield info.filename, b""
+                    data = UNREAD
+                yield from _expanded(info.filename, data, depth)
         return
     if tarfile.is_tarfile(path):
         with tarfile.open(path) as tf:
@@ -443,16 +626,22 @@ def _iter_archive_members(path: Path) -> Iterator[tuple[str, bytes]]:
                     yield member.name, b""
                     continue
                 if member.size > MAX_TEXT_BYTES:
-                    yield member.name, b""
+                    yield member.name, UNREAD
                     continue
                 try:
                     fh = tf.extractfile(member)
-                    yield member.name, fh.read() if fh else b""
+                    data = fh.read() if fh else b""
                 except Exception:
                     logger.debug("could not read tar member %s from %s; scanning name only", member.name, path, exc_info=True)
-                    yield member.name, b""
+                    data = UNREAD
+                yield from _expanded(member.name, data, depth)
         return
-    raise ValueError(f"not a supported archive: {path}")
+    opener = {".gz": gzip.open, ".bz2": bz2.open, ".xz": lzma.open}.get(path.suffix.lower())
+    if opener is None:
+        raise ValueError(f"not a supported archive: {path}")
+    with opener(path, "rb") as fh:
+        data = fh.read(MAX_TEXT_BYTES + 1)
+    yield from _expanded(path.stem, UNREAD if len(data) > MAX_TEXT_BYTES else data, depth)
 
 
 # --- optional bandit pass on Python sources --------------------------------
@@ -509,6 +698,8 @@ def _scan_python_with_bandit(where: str, path: Path) -> Iterator[Finding]:
         # Focus on the credential-relevant checks so bandit doesn't flood the
         # report with generic lint (asserts, subprocess use, etc.).
         if test_id in {"B105", "B106", "B107", "B108", "B324", "B501"}:
+            # B105-B107 quote the password they found.
+            text = re.sub(r"'[^']*'", "'****'", text) if test_id in {"B105", "B106", "B107"} else _redact(text)
             yield Finding(where, "bandit", f"line {lineno}: {text} [{test_id}]")
 
 
@@ -521,8 +712,9 @@ def scan_file(path: Path) -> list[Finding]:
     Dispatches on the file's extension: images get the EXIF scan, PDFs the
     text+metadata scan, archives are expanded and their members scanned, and
     everything text-like gets the secret / editable-link scan plus (for LaTeX
-    source) the comment scan. Any per-file error is swallowed to a debug log so
-    one unreadable attachment never aborts validation.
+    source) the comment scan. A file that cannot be read is reported as a
+    :data:`NOT_SCANNED` finding, so one unreadable attachment neither aborts the
+    scan nor passes as clean.
     """
     findings: list[Finding] = []
     try:
@@ -536,13 +728,20 @@ def scan_file(path: Path) -> list[Finding]:
             findings.extend(_scan_pdf(name, path))
         elif suffix in IMAGE_EXTS:
             findings.extend(_scan_image_blob(name, path.read_bytes()))
+        elif suffix in OFFICE_EXTS:
+            findings.extend(_scan_office(name, path.read_bytes()))
+        elif suffix in OPAQUE_EXTS:
+            findings.append(_not_scanned(name, f"{suffix} files cannot be read"))
         else:
             data = path.read_bytes()
             findings.extend(_scan_text_blob(name, data, is_latex=suffix in LATEX_EXTS))
             if suffix == ".py":
                 findings.extend(_scan_python_with_bandit(name, path))
-    except OSError:
+    except FileNotFoundError:
+        logger.debug("%s vanished before the sensitive-info scan", path)  # the file checks report it
+    except Exception as exc:
         logger.debug("could not read %s for sensitive-info scan", path, exc_info=True)
+        findings.append(_not_scanned(path.name, type(exc).__name__))
     return findings
 
 
@@ -606,6 +805,8 @@ _URL_TRAILING = ".,);:]}'\"”’>"
 
 # github.com/owner/repo, for the code-availability nudge and for wording a
 # broken github link as a private/removed repo rather than a generic dead link.
+# Other places a paper's code is linked from, including the anonymized mirror double-blind venues use.
+_CODE_HOST_RE = re.compile(r"(?i)\b(?:gitlab\.com|bitbucket\.org|codeberg\.org|anonymous\.4open\.science/r)/\S+")
 _GITHUB_RE = re.compile(r"(?i)github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38})?)/([A-Za-z0-9._\-]+)")
 # github.com/<x> paths that are site sections, not user/org accounts.
 _GITHUB_RESERVED_OWNERS = {
@@ -714,12 +915,12 @@ def _broken_link_finding(where: str, url: str) -> Finding:
         return Finding(
             where,
             "private repository",
-            f"GitHub link {url} is not publicly accessible (private, renamed, or removed); " "make the repository public before submitting so reviewers and readers can reach it",
+            f"GitHub link {_redact(url)} is not publicly accessible (private, renamed, or removed); " "make the repository public before submitting so reviewers and readers can reach it",
         )
-    return Finding(where, "broken link", f"link {url} is not reachable (returned 404/gone); check the URL before submitting")
+    return Finding(where, "broken link", f"link {_redact(url)} is not reachable (returned 404/gone); check the URL before submitting")
 
 
-def scan_links(paths: Iterable[Path], *, check_access: bool = True) -> list[Finding]:
+def scan_links(paths: Iterable[Path], *, check_access: bool = True, stats: dict | None = None) -> list[Finding]:
     """Report URLs in the manuscript files that an anonymous reader can't reach.
 
     Collects every http(s) URL from the text of the submission files
@@ -731,12 +932,17 @@ def scan_links(paths: Iterable[Path], *, check_access: bool = True) -> list[Find
     The probes are pure network waits, so they run on a small thread pool --
     a link-heavy bibliography would otherwise dominate validation's runtime.
     Findings stay in the order the URLs were encountered.
+
+    ``stats``, if given, is filled with ``probed`` (how many URLs were probed)
+    and ``unanswered`` (those with no definite answer), so a caller can tell a
+    clean scan from one that could not look.
     """
     urls: dict[str, str] = {}
     for path in _dedup_paths(paths):
         for where, text in _iter_text_blobs(path):
             for url in _find_urls(text):
-                urls.setdefault(url, where)
+                # Credentials in a URL are never sent anywhere or printed.
+                urls.setdefault(_strip_userinfo(url), where)
 
     if not check_access:
         return []
@@ -752,6 +958,9 @@ def scan_links(paths: Iterable[Path], *, check_access: bool = True) -> list[Find
         # map() keeps results aligned with `checked`, so findings stay ordered.
         reachable = list(pool.map(lambda item: _url_is_reachable(item[0]), checked))
 
+    if stats is not None:
+        stats["probed"] = len(checked)
+        stats["unanswered"] = [_redact(url) for (url, _), ok in zip(checked, reachable) if ok is None]
     return [_broken_link_finding(where, url) for (url, where), ok in zip(checked, reachable) if ok is False]
 
 
@@ -767,7 +976,7 @@ def scan_missing_code_link(paths: Iterable[Path]) -> list[Finding]:
     for path in _dedup_paths(paths):
         for _, text in _iter_text_blobs(path):
             scanned_any_text = True
-            if any(_find_github_repos(text)):
+            if any(_find_github_repos(text)) or _CODE_HOST_RE.search(text):
                 return []
     if not scanned_any_text:
         return []
@@ -775,7 +984,7 @@ def scan_missing_code_link(paths: Iterable[Path]) -> list[Finding]:
         Finding(
             "submission",
             "missing code link",
-            "no GitHub repository link found in the manuscript files; if the paper has " "associated code, add a link to its public repository",
+            "no code repository link found in the manuscript files; if the paper has " "associated code, add a link to its public repository",
         )
     ]
 
@@ -784,8 +993,8 @@ def _iter_text_blobs(path: Path) -> Iterator[tuple[str, str]]:
     """Yield ``(where, text)`` for every text-decodable blob in a file.
 
     Mirrors :func:`scan_file`'s dispatch but only for text: a plain source/text
-    file, a PDF's extracted text, and the text members of an archive. Images and
-    binary blobs yield nothing. Used by the GitHub-link scan, which cares about
+    file, a PDF's or Office file's text, and the same for the members of an
+    archive. Images and binary blobs yield nothing. Used by the GitHub-link scan, which cares about
     URLs in prose rather than the format-specific secret/EXIF passes.
 
     Bibliographies and LaTeX class/style/bibstyle files (``LINK_SCAN_SKIP_EXTS``)
@@ -809,12 +1018,22 @@ def _iter_text_blobs(path: Path) -> Iterator[tuple[str, str]]:
                 msuffix = Path(mname).suffix.lower()
                 if msuffix in IMAGE_EXTS or msuffix in LINK_SCAN_SKIP_EXTS or len(data) > MAX_TEXT_BYTES:
                     continue
-                text = _decode(data)
+                if msuffix == ".pdf" and data:
+                    with _member_file(mname, data) as pdf:
+                        text = _pdf_text(pdf)
+                    if text:
+                        yield f"{name}:{mname}", text
+                    continue
+                text = _office_blob_text(data) if msuffix in OFFICE_EXTS else _decode(data)
                 if text is not None:
                     yield f"{name}:{mname}", text
         elif suffix == ".pdf":
             text = _pdf_text(path)
             if text:
+                yield name, text
+        elif suffix in OFFICE_EXTS:
+            text = _office_blob_text(path.read_bytes())
+            if text is not None:
                 yield name, text
         elif suffix not in IMAGE_EXTS and suffix not in LINK_SCAN_SKIP_EXTS:
             data = path.read_bytes()
@@ -822,5 +1041,10 @@ def _iter_text_blobs(path: Path) -> Iterator[tuple[str, str]]:
                 text = _decode(data)
                 if text is not None:
                     yield name, text
-    except OSError:
+    except Exception:
         logger.debug("could not read %s for link scan", path, exc_info=True)
+
+
+def _office_blob_text(data: bytes) -> str | None:
+    parts = _office_parts(data)
+    return None if parts is None else "\n".join(text for _, text in parts)

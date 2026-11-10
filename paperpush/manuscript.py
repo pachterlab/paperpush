@@ -38,10 +38,12 @@ import atexit
 import html
 import logging
 import os
+import posixpath
 import re
 import shutil
 import subprocess
 import tempfile
+import unicodedata
 import zipfile
 import zlib
 from pathlib import Path
@@ -58,7 +60,7 @@ _MD_HEADING_OPEN = r"(?:#{1,6}[ \t]+)?(?:\*\*|__)?"
 _MD_HEADING_CLOSE = r"(?:\*\*|__)?(?:[ \t]+#+)?(?:[ \t]*\{[#.][^{}\n]*\})?"
 
 _REFERENCE_HEADING = re.compile(
-    r"^\s*" + _MD_HEADING_OPEN + r"(?:\d+\.?\s+|[ivxlcIVXLC]+\.?\s+)?" r"(references(?:\s+and\s+notes)?|bibliography|literature\s+cited|works\s+cited)" r"\s*:?" + _MD_HEADING_CLOSE + r"\s*$",
+    r"^\s*" + _MD_HEADING_OPEN + r"(?:\d+\.?\s+|[ivxlcIVXLC]+\.?\s+)?" r"(references(?:\s+and\s+notes|\s+cited)?|reference\s+list|cited\s+references|bibliography|literature\s+cited|works\s+cited)" r"\s*:?" + _MD_HEADING_CLOSE + r"\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 
@@ -147,29 +149,69 @@ def _strip_tex_comments(raw: str) -> str:
     return "\n".join(out_lines)
 
 
-def _tex_to_text(raw: str) -> str:
+_TEX_ACCENTS = {"'": "\u0301", "`": "\u0300", "^": "\u0302", '"': "\u0308", "~": "\u0303", "=": "\u0304", ".": "\u0307", "u": "\u0306", "v": "\u030c", "H": "\u030b", "c": "\u0327", "k": "\u0328", "r": "\u030a", "d": "\u0323", "b": "\u0331"}
+_TEX_ACCENT_BASE = r"(?:\\[ij](?![a-zA-Z])|[A-Za-z])"
+_TEX_ACCENT_SYMBOL = re.compile(r"(?<!\\)\\(['`^\"~=.])\s*(?:\{\s*(" + _TEX_ACCENT_BASE + r")\s*\}|(" + _TEX_ACCENT_BASE + r"))")
+_TEX_ACCENT_LETTER = re.compile(r"(?<!\\)\\([uvHckrdb])(?:\s*\{\s*(" + _TEX_ACCENT_BASE + r")\s*\}|\s+(" + _TEX_ACCENT_BASE + r"))")
+_TEX_LETTERS = {"o": "\u00f8", "O": "\u00d8", "l": "\u0142", "L": "\u0141", "ss": "\u00df", "aa": "\u00e5", "AA": "\u00c5", "ae": "\u00e6", "AE": "\u00c6", "oe": "\u0153", "OE": "\u0152"}
+_TEX_LETTER = re.compile(r"(?<!\\)\\(ss|aa|AA|ae|AE|oe|OE|o|O|l|L)(?![a-zA-Z])(?:\{\}|[ \t]+)?")
+_TEX_BRACED_LETTER = re.compile(r"\{([^\x00-\x7f])\}")
+
+
+def _tex_accent(match: re.Match[str]) -> str:
+    base = (match.group(2) or match.group(3)).lstrip("\\")
+    return unicodedata.normalize("NFC", base + _TEX_ACCENTS[match.group(1)])
+
+
+def decode_tex_accents(text: str) -> str:
+    """LaTeX accent and letter macros as the characters they print.
+
+    ``Jos\\'e`` becomes ``Jos\u00e9``, ``M\\"{u}ller`` ``M\u00fcller``, ``S{\\o}rensen``
+    ``S\u00f8rensen``; a discretionary hyphen (``\\-``) is removed.
+    """
+    text = _TEX_ACCENT_SYMBOL.sub(_tex_accent, text)
+    text = _TEX_ACCENT_LETTER.sub(_tex_accent, text)
+    text = _TEX_LETTER.sub(lambda m: _TEX_LETTERS[m.group(1)], text)
+    text = re.sub(r"(?<!\\)\\-", "", text)
+    return _TEX_BRACED_LETTER.sub(r"\1", text)
+
+
+# Commands whose braced argument names something (a key, a file) instead of being prose.
+_TEX_NON_PROSE = re.compile(r"\\(?:[a-zA-Z]*cite[a-zA-Z]*\*?|(?:eq|auto|page|name|c|C|v)?ref|label|url|href|includegraphics\*?|input|include|bibliography|addbibresource|bibliographystyle|bibitem|[vh]space\*?)\s*(?:\[[^\]]*\]\s*)*\{[^{}]*\}")
+# What the preamble says that a reader sees.
+_TEX_PREAMBLE_TEXT = re.compile(r"\\(?:title|author)\s*(?:\[[^\]]*\])?\s*\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}")
+_TEX_BEGIN_DOCUMENT = re.compile(r"\\begin\s*\{\s*document\s*\}")
+
+
+def _tex_to_text(raw: str, keep_bibliography: bool = False) -> str:
     """Reduce LaTeX source to countable words, dropping the bibliography.
 
-    Comments are removed, the source is cut at the first bibliography marker
-    (``\\bibliography``, ``thebibliography``, or a References section), and the
-    remaining control words, control symbols, and math/grouping punctuation are
-    replaced with spaces so only ordinary words remain.
+    Comments are removed, accents decoded, the preamble reduced to its title and
+    authors, the source cut at the first bibliography marker (``\\bibliography``,
+    ``thebibliography``, or a References section) unless ``keep_bibliography``,
+    and the remaining control words, control symbols, and math/grouping
+    punctuation replaced with spaces so only ordinary words remain.
     """
-    text = _strip_tex_comments(raw)
-    cut = len(text)
-    for pattern in (_TEX_BIBLIOGRAPHY, _TEX_REFERENCE_SECTION):
-        match = pattern.search(text)
-        if match:
-            cut = min(cut, match.start())
-    text = text[:cut]
+    text = decode_tex_accents(_strip_tex_comments(raw))
+    begin = _TEX_BEGIN_DOCUMENT.search(text)
+    if begin:
+        text = "\n".join(m.group(0) for m in _TEX_PREAMBLE_TEXT.finditer(text[: begin.start()])) + "\n" + text[begin.end() :]
+    if not keep_bibliography:
+        cut = len(text)
+        for pattern in (_TEX_BIBLIOGRAPHY, _TEX_REFERENCE_SECTION):
+            match = pattern.search(text)
+            if match:
+                cut = min(cut, match.start())
+        text = text[:cut]
+    text = _TEX_NON_PROSE.sub(" ", text)
     # Structural commands whose braced argument is a name, not prose, so the name
-    # (e.g. the "article" of \documentclass{article}) is not miscounted as a word.
+    # (e.g. the "article" of \\documentclass{article}) is not miscounted as a word.
     text = re.sub(
         r"\\(?:documentclass|usepackage|begin|end)\s*(?:\[[^\]]*\])?\s*\{[^}]*\}",
         " ",
         text,
     )
-    # Control words (\section, \textbf, ...) and control symbols (\\, \&, \{).
+    # Control words (\\section, \\textbf, ...) and control symbols (\\\\, \\&, \\{).
     text = re.sub(r"\\[a-zA-Z@]+\*?", " ", text)
     text = re.sub(r"\\[^a-zA-Z]", " ", text)
     # Remaining grouping/math punctuation carries no words of its own.
@@ -181,33 +223,12 @@ def _zip_tex_text(path: Path) -> str | None:
     """Concatenate the LaTeX sources inside a ``.zip`` bundle, or None.
 
     arXiv and some venues accept a zipped LaTeX source tree in place of a PDF.
-    The ``.tex`` members are concatenated (main file first when one is obvious)
-    and reduced like a single source. Returns None when the archive holds no
-    ``.tex`` file.
+    The root ``.tex`` is read with its ``\\input`` files in place (see
+    :func:`_raw_tex_source`) and reduced like a single source. Returns None when
+    the archive holds no ``.tex`` file.
     """
-    try:
-        with zipfile.ZipFile(path) as zf:
-            tex_names = [n for n in zf.namelist() if n.lower().endswith(".tex")]
-            if not tex_names:
-                return None
-            # Read a likely main file first so a references section near its end
-            # truncates the rest; "main"/"manuscript"/"ms" are common names.
-            tex_names.sort(
-                key=lambda n: (
-                    not re.search(r"\b(main|manuscript|ms|paper)\b", n, re.IGNORECASE),
-                    n,
-                )
-            )
-            sources = []
-            for name in tex_names:
-                try:
-                    sources.append(zf.read(name).decode("utf-8", "replace"))
-                except KeyError:
-                    continue
-    except (zipfile.BadZipFile, OSError) as exc:
-        logger.debug("Could not read LaTeX bundle %s: %s", path, exc)
-        return None
-    return _tex_to_text("\n".join(sources))
+    source = _raw_tex_source(path)
+    return _tex_to_text(source) if source else None
 
 
 # --- DOCX ------------------------------------------------------------------
@@ -215,6 +236,10 @@ def _zip_tex_text(path: Path) -> str | None:
 _W_TAB = re.compile(r"<w:tab\b[^>]*/>")
 _W_BREAK = re.compile(r"<w:(?:br|cr)\b[^>]*/>")
 _XML_TAG = re.compile(r"<[^>]+>")
+# Parts of document.xml Word never shows as text: field codes (EndNote's and
+# Zotero's run to pages), tracked deletions and moves, and the fallback copy of a text box.
+_W_HIDDEN = re.compile(r"<w:(instrText|delInstrText|delText)\b[^>]*>.*?</w:\1>|<w:moveFrom\b[^>]*>.*?</w:moveFrom>|<mc:Fallback\b[^>]*>.*?</mc:Fallback>", re.DOTALL)
+_W_TABLE = re.compile(r"<w:tbl>.*?</w:tbl>", re.DOTALL)
 _XML_ENTITIES = {"&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'"}
 
 
@@ -296,14 +321,15 @@ def _number_list_paragraphs(xml: str, numbering_xml: str | None) -> str:
     return _W_PPR.sub(number, xml)
 
 
-def docx_to_text(path: Path) -> str | None:
+def docx_to_text(path: Path, drop_tables: bool = False) -> str | None:
     """Extract paragraph text from a ``.docx`` file with the standard library.
 
     A ``.docx`` is a zip whose ``word/document.xml`` holds the body. Each
     paragraph (``</w:p>``) becomes a line and each run of text (``<w:t>``) its
     content, so a references heading on its own paragraph stays on its own line.
     A paragraph of an automatically numbered list starts with its number
-    ("1. "), as Word shows it.
+    ("1. "), as Word shows it. Field codes and tracked deletions are left out;
+    so are tables, with ``drop_tables``.
     """
     try:
         with zipfile.ZipFile(path) as zf:
@@ -315,6 +341,9 @@ def docx_to_text(path: Path) -> str | None:
     except (zipfile.BadZipFile, KeyError, OSError) as exc:
         logger.debug("Could not read DOCX %s: %s", path, exc)
         return None
+    xml = _W_HIDDEN.sub("", xml)
+    if drop_tables:
+        xml = _W_TABLE.sub("", xml)
     xml = _number_list_paragraphs(xml, numbering)
     xml = xml.replace("</w:p>", "\n")
     xml = _W_TAB.sub(" ", xml)
@@ -436,9 +465,53 @@ def _pdf_pages_stdlib(path: Path) -> list[str] | None:
     return pages or None
 
 
+_LINE_TAIL = re.compile(r"\s*(\d{1,6})\s*$")
+
+
+def _line_number_chain(tails: list[re.Match[str] | None], start: int, value: int, step: int) -> dict[int, str]:
+    """``{line index: number}`` of the numbers continuing ``value`` by ``step`` from line ``start``."""
+    picked = {start: str(value)}
+    for index in range(start + 1, len(tails)):
+        tail = tails[index]
+        if tail is not None and tail.group(1).endswith(str(value + step)):
+            value += step
+            picked[index] = str(value)
+    return picked
+
+
+def _strip_line_numbers(page: str) -> str:
+    """A page's text without the review line numbers extraction appends to its lines.
+
+    pypdf reads a line-numbered manuscript as "1 Introduction10", "References64",
+    which no heading matcher recognises. A number is a line number only as part
+    of a run climbing by 1 (or by 5, for every-fifth-line numbering) down the page.
+    """
+    lines = page.split("\n")
+    tails = [_LINE_TAIL.search(line) for line in lines]
+    written = sum(1 for line in lines if line.strip())
+    if sum(1 for t in tails if t) < 4:
+        return page
+    best: dict[int, str] = {}
+    for start, tail in list(enumerate(tails))[:20]:
+        if tail is None:
+            continue
+        digits = tail.group(1)
+        for value in {int(digits[k:]) for k in range(len(digits))}:
+            for step, needed in ((1, max(8, written // 2)), (5, max(4, written // 10))):
+                chain = _line_number_chain(tails, start, value, step)
+                indices = sorted(chain)
+                if len(chain) >= needed and len(chain) > len(best) and (step == 1 or all(3 <= b - a <= 8 for a, b in zip(indices, indices[1:]))):
+                    best = chain
+    for index, number in best.items():
+        tail = tails[index]
+        lines[index] = lines[index][: tail.end(1) - len(number)].rstrip()
+    return "\n".join(lines)
+
+
 def _pdf_pages(path: Path) -> list[str] | None:
     """Per-page text of a PDF, preferring pypdf and falling back to stdlib."""
-    return _pdf_pages_pypdf(path) or _pdf_pages_stdlib(path)
+    pages = _pdf_pages_pypdf(path) or _pdf_pages_stdlib(path)
+    return None if pages is None else [_strip_line_numbers(page) for page in pages]
 
 
 # --- Markdown --------------------------------------------------------------
@@ -598,17 +671,16 @@ def manuscript_text(path: Path) -> str | None:
         except OSError:
             return None
     if suffix == ".tex":
-        try:
-            return _tex_to_text(path.read_text("utf-8", "replace"))
-        except OSError:
-            return None
+        source = _raw_tex_source(path)
+        return None if source is None else _tex_to_text(source)
     if suffix == ".zip":
         return _zip_tex_text(path)
     if suffix == ".docx":
         return docx_to_text(path)
     if suffix == ".pdf":
         pages = _pdf_pages(path)
-        return None if pages is None else "\n".join(pages)
+        # A scanned PDF has pages but no text: it is unreadable, not empty.
+        return None if pages is None or not any(p.strip() for p in pages) else "\n".join(pages)
     return None
 
 
@@ -669,6 +741,12 @@ def total_words(path: Path) -> int | None:
     entire document rather than only the main text. None means the format could
     not be measured, just as there.
     """
+    if path.suffix.lower() in (".tex", ".zip"):
+        source = _raw_tex_source(path)
+        if not source:
+            return None
+        bib = _cited_bib_entries(path, source) or []
+        return _word_count(_tex_to_text(source, keep_bibliography=True)) + sum(_word_count(_BIB_MARKUP.sub(" ", entry)) for entry in bib)
     text = manuscript_text(path)
     if text is None:
         return None
@@ -884,7 +962,7 @@ def _as_pdf(path: Path) -> Path | None:
 # --- structure: headings, references, title page ---------------------------
 
 # A LaTeX sectioning command and its title argument (one level of nested braces).
-_TEX_SECTION = re.compile(r"\\(?:part|chapter|section|subsection|subsubsection|paragraph)\*?\s*(?:\[[^\]]*\])?\s*\{((?:[^{}]|\{[^{}]*\})*)\}")
+_TEX_SECTION = re.compile(r"\\(?:part|chapter|section|subsection|subsubsection|paragraph|bmhead)\*?\s*(?:\[[^\]]*\])?\s*\{((?:[^{}]|\{[^{}]*\})*)\}")
 # Leading section designators a heading line may carry: "2.", "II.", "A.", "2.1".
 _HEADING_PREFIX = re.compile(r"^\s*(?:#{1,6}\s+)?(?:(?:\d+(?:\.\d+)*\.?|[ivxlcIVXLC]+\.|[A-Z]\.)\s+)?")
 # Longest line that can still be a heading, in words.
@@ -898,7 +976,7 @@ def normalize_heading(line: str) -> str:
     residual markup, so ``"2. Materials and Methods:"`` and ``"MATERIALS AND
     METHODS"`` both become ``"materials and methods"``.
     """
-    return heading_text(line).lower()
+    return heading_text(line).lower().replace(" & ", " and ")
 
 
 def heading_text(line: str) -> str:
@@ -906,6 +984,7 @@ def heading_text(line: str) -> str:
     text = _MD_HEADING_ATTRS.sub("", line.strip())
     text = re.sub(r"^(\*\*|__)(.*)\1$", r"\2", text.strip())
     text = re.sub(r"[ \t]+#+$", "", _HEADING_PREFIX.sub("", text, count=1))
+    text = re.sub(r"\\label\s*\{[^{}]*\}", "", text).replace("\\&", "&")
     text = re.sub(r"\\[a-zA-Z@]+\*?", " ", text)
     text = re.sub(r"[{}]", "", text)
     text = text.rstrip(" .:;-\u2013\u2014")
@@ -913,17 +992,55 @@ def heading_text(line: str) -> str:
     return text.strip()
 
 
+_TEX_INPUT = re.compile(r"\\(?:input|include|subfile)\s*(?:\{\s*([^{}]+?)\s*\}|[ \t]+([^\s{}\\]+))")
+
+
+def _expand_tex(source: str, read, seen: tuple[str, ...] = ()) -> str:
+    """Comment-stripped ``source`` with each ``\\input``/``\\include`` replaced by the file it names."""
+
+    def expand(match: re.Match[str]) -> str:
+        name = (match.group(1) or match.group(2)).strip()
+        for candidate in (name, name + ".tex"):
+            text = None if candidate in seen or len(seen) > 32 else read(candidate)
+            if text is not None:
+                return _expand_tex(text, read, seen + (candidate,))
+        return match.group(0)
+
+    return _TEX_INPUT.sub(expand, _strip_tex_comments(source))
+
+
 def _raw_tex_source(path: Path) -> str | None:
-    """The comment-stripped LaTeX source of a ``.tex`` file or ``.zip`` bundle."""
+    """The comment-stripped LaTeX source of a ``.tex`` file or ``.zip`` bundle, accents decoded.
+
+    ``\\input`` and ``\\include`` are followed from the root file, so the source
+    reads as the compiled document does. A bundle with no ``\\documentclass`` is
+    its ``.tex`` files joined.
+    """
     suffix = path.suffix.lower()
     try:
         if suffix == ".tex":
-            return _strip_tex_comments(path.read_text("utf-8", "replace"))
+
+            def read_file(name: str) -> str | None:
+                target = path.parent / name
+                return target.read_text("utf-8", "replace") if target.is_file() else None
+
+            return decode_tex_accents(_expand_tex(path.read_text("utf-8", "replace"), read_file))
         if suffix == ".zip":
             with zipfile.ZipFile(path) as zf:
                 names = [n for n in zf.namelist() if n.lower().endswith(".tex")]
-                names.sort(key=lambda n: (not re.search(r"\b(main|manuscript|ms|paper)\b", n, re.IGNORECASE), n))
-                return "\n".join(_strip_tex_comments(zf.read(n).decode("utf-8", "replace")) for n in names)
+                names.sort(key=lambda n: (not re.search(r"\b(main|manuscript|ms|paper)\b", n, re.IGNORECASE), n.count("/"), n))
+                members = set(zf.namelist())
+                texts = {n: zf.read(n).decode("utf-8", "replace") for n in names}
+                root = next((n for n in names if _DOCUMENTCLASS.search(_strip_tex_comments(texts[n]))), None)
+                if root is None:
+                    return decode_tex_accents("\n".join(_strip_tex_comments(texts[n]) for n in names))
+                base = posixpath.dirname(root)
+
+                def read_member(name: str) -> str | None:
+                    member = posixpath.normpath(posixpath.join(base, name))
+                    return zf.read(member).decode("utf-8", "replace") if member in members else None
+
+                return decode_tex_accents(_expand_tex(texts[root], read_member))
     except (OSError, zipfile.BadZipFile) as exc:
         logger.debug("Could not read LaTeX source %s: %s", path, exc)
     return None
@@ -943,12 +1060,15 @@ def headings(path: Path) -> list[str] | None:
         source = _raw_tex_source(path)
         if source is None:
             return None
-        found = [normalize_heading(m.group(1)) for m in _TEX_SECTION.finditer(source)]
+        marked = [(m.start(), normalize_heading(m.group(1))) for m in _TEX_SECTION.finditer(source)]
         # Statements are often set as \paragraph{} or as bold run-in text
         # (\textbf{Data availability.}) rather than sections; include those.
         for m in re.finditer(r"\\(?:textbf|textit|emph|noindent\s*\\textbf)\s*\{([^{}]{3,60})\}", source):
-            found.append(normalize_heading(m.group(1)))
-        return [h for h in found if h]
+            marked.append((m.start(), normalize_heading(m.group(1))))
+        # Parts a class sets with an environment or macro of their own.
+        for pattern, name in _TEX_IMPLICIT_HEADINGS:
+            marked += [(m.start(), name) for m in pattern.finditer(source)]
+        return [h for _, h in sorted(marked, key=lambda item: item[0]) if h]
     if path.suffix.lower() in MARKDOWN_SUFFIXES:
         try:
             marked = markdown_headings(path.read_text("utf-8", "replace"))
@@ -963,19 +1083,40 @@ def headings(path: Path) -> list[str] | None:
     found = []
     for line in text.splitlines():
         stripped = line.strip()
-        if not stripped or len(stripped.split()) > _HEADING_MAX_WORDS:
+        if not stripped:
             continue
-        # A sentence ending in a full stop is prose, not a heading -- but a
-        # run-in heading ("Data availability. The data are...") is caught by
-        # taking the text before the first sentence break too.
-        head = normalize_heading(stripped)
+        head = normalize_heading(stripped) if len(stripped.split()) <= _HEADING_MAX_WORDS else ""
         if head:
             found.append(head)
-        if "." in stripped[:-1]:
-            first = normalize_heading(stripped.split(".", 1)[0])
+        # A sentence ending in a full stop is prose, not a heading -- but a
+        # run-in heading ("Data availability. The data are...", "Funding: NIH")
+        # is caught by taking the text before the first break too.
+        run_in = _run_in_heading(stripped)
+        if run_in:
+            first = normalize_heading(run_in[0])
             if first and first != head:
                 found.append(first)
     return found
+
+
+# The label of a run-in heading, and where a heading matcher should look for it.
+_RUN_IN_BREAK = re.compile(r"(.+?)[.:](?=\s|$)")
+
+
+def _run_in_heading(line: str) -> tuple[str, int] | None:
+    """``(label, offset just past it)`` when ``line`` opens with a short label ending in ``.`` or ``:``."""
+    body = _HEADING_PREFIX.sub("", line, count=1)
+    match = _RUN_IN_BREAK.match(body)
+    if match is None or len(match.group(1).split()) > _HEADING_MAX_WORDS:
+        return None
+    return match.group(1), len(line) - len(body) + match.end()
+
+
+_TEX_IMPLICIT_HEADINGS = (
+    (re.compile(r"\\begin\s*\{\s*abstract\s*\}|\\abstract\s*\{"), "abstract"),
+    (re.compile(r"\\begin\s*\{\s*(?:acknowledge?ments?|acks)\s*\}|\\acknowledge?ments?\b|\\acknow\s*\{"), "acknowledgements"),
+    (_TEX_BIBLIOGRAPHY, "references"),
+)
 
 
 
@@ -1065,36 +1206,21 @@ def section_word_counts(path: Path, wordings: dict[str, str]) -> dict[str, int] 
     "Results" before the body's), the last one is the section. Returns None
     when the file cannot be read as text.
     """
-    def _canonical(heading: str) -> str | None:
-        heading = re.sub(r"^\d+\W*", "", heading)
-        return wordings.get(heading)
-
-    marks: list[tuple[int, int, str | None]] = []  # (heading start, body start, canonical)
+    marks: list[tuple[int, int, str]]  # (heading start, body start, canonical)
     if path.suffix.lower() in (".tex", ".zip"):
         source = _raw_tex_source(path)
         if source is None:
             return None
         cut = min((m.start() for p in (_TEX_BIBLIOGRAPHY, _TEX_REFERENCE_SECTION) if (m := p.search(source))), default=len(source))
         source = source[:cut]
-        for m in _TEX_SECTION.finditer(source):
-            name = _canonical(normalize_heading(m.group(1)))
-            if name:
-                marks.append((m.start(), m.end(), name))
+        marks = _tex_section_marks(source, wordings)
         count = lambda a, b: _word_count(_tex_to_text(source[a:b]))  # noqa: E731
     else:
         text = manuscript_text(path)
         if text is None:
             return None
-        text = truncate_at_references(text)
-        offset = 0
-        for line in text.splitlines(keepends=True):
-            stripped = line.strip()
-            if stripped and len(stripped.split()) <= _HEADING_MAX_WORDS:
-                name = _canonical(normalize_heading(stripped))
-                if name:
-                    marks.append((offset, offset + len(line), name))
-            offset += len(line)
-        source = text
+        source = truncate_at_references(text)
+        marks = _text_section_marks(source, wordings)
         count = lambda a, b: _word_count(source[a:b])  # noqa: E731
     counts: dict[str, int] = {}
     for i, (_, body, name) in enumerate(marks):
@@ -1103,38 +1229,272 @@ def section_word_counts(path: Path, wordings: dict[str, str]) -> dict[str, int] 
     return counts
 
 
+def _canonical_heading(heading: str, wordings: dict[str, str]) -> str | None:
+    return wordings.get(re.sub(r"^\d+\W*", "", heading))
+
+
+def _tex_section_marks(source: str, wordings: dict[str, str]) -> list[tuple[int, int, str]]:
+    """``(heading start, body start, canonical)`` of each known section heading of LaTeX source."""
+    marks = []
+    for m in _TEX_SECTION.finditer(source):
+        name = _canonical_heading(normalize_heading(m.group(1)), wordings)
+        if name:
+            marks.append((m.start(), m.end(), name))
+    return marks
+
+
+def _text_section_marks(text: str, wordings: dict[str, str]) -> list[tuple[int, int, str]]:
+    """``(heading start, body start, canonical)`` of each known heading of extracted text, run-in labels included."""
+    marks = []
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        name = None
+        if stripped and len(stripped.split()) <= _HEADING_MAX_WORDS:
+            name = _canonical_heading(normalize_heading(stripped), wordings)
+        if name:
+            marks.append((offset, offset + len(line), name))
+        elif stripped:
+            run_in = _run_in_heading(stripped)
+            name = _canonical_heading(normalize_heading(run_in[0]), wordings) if run_in else None
+            if name:
+                start = offset + len(line) - len(line.lstrip())
+                marks.append((start, start + run_in[1], name))
+        offset += len(line)
+    return marks
+
+
+def structured_abstract_labels(names: list[str | None]) -> set[int]:
+    """Which of ``names`` (canonical headings in order, None for other lines) are a structured abstract's labels.
+
+    A structured abstract repeats the body's headings ("Background", "Results"),
+    and its labels come straight after the Abstract heading. They run until the
+    first section seen a second time, which starts the body.
+    """
+    start = next((i for i, name in enumerate(names) if name == "Abstract"), None)
+    if start is None or not any(names[start + 1 : start + 3]):
+        return set()
+    seen: set[str] = set()
+    labels: set[int] = set()
+    for index in range(start + 1, len(names)):
+        name = names[index]
+        if not name:
+            continue
+        if name in seen:
+            return labels
+        seen.add(name)
+        labels.add(index)
+    return set()
+
+
+# Headings that hold legends or tables, and the captions that stand in for them.
+_EXCLUSION_HEADINGS = {"figure legends": "@legends", "figure legend": "@legends", "figure captions": "@legends", "legends": "@legends", "legends to figures": "@legends", "legends for figures": "@legends", "table legends": "@legends", "tables": "@tables"}
+_CAPTION_LINE = re.compile(r"^[ \t]*(?:(?:Supplementary|Extended\s+Data)\s+)?(?:Fig(?:ure)?\.?|Table)\s+S?\d+[a-z]?\s*[.:|]", re.IGNORECASE | re.MULTILINE)
+_TABLE_MENTION = re.compile(r"\bTables?\s+S?\d", re.IGNORECASE)
+_DISPLAY_MENTION = re.compile(r"\b(?:Tables?|Fig(?:ure)?s?\.?)\s+S?\d", re.IGNORECASE)
+_MD_TABLE_ROW = re.compile(r"^[ \t]*\|.*\|[ \t]*$", re.MULTILINE)
+_TEX_ENV_ABSTRACT = re.compile(r"\\begin\s*\{\s*abstract\s*\}.*?\\end\s*\{\s*abstract\s*\}", re.DOTALL)
+_TEX_ENV_TABLE = re.compile(r"\\begin\s*\{\s*table\*?\s*\}.*?\\end\s*\{\s*table\*?\s*\}", re.DOTALL)
+_TEX_CAPTION = re.compile(r"\\caption\*?\s*(?:\[[^\]]*\])?\s*\{")
+_TEX_ABSTRACT_MACRO = re.compile(r"\\abstract\s*\{")
+
+
+def _tex_group_end(source: str, opening: int) -> int:
+    """The offset just past the brace group opening at ``opening``."""
+    depth = 0
+    for index in range(opening, len(source)):
+        char = source[index]
+        if char == "{" and source[index - 1] != "\\":
+            depth += 1
+        elif char == "}" and source[index - 1] != "\\":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    return len(source)
+
+
+def _section_spans(marks: list[tuple[int, int, str]], limit: int) -> dict[str, list[tuple[int, int]]]:
+    """The ``(start, end)`` of each known section, by canonical name; an abstract keeps its labels."""
+    labels = structured_abstract_labels([name for _, _, name in marks])
+    spans: dict[str, list[tuple[int, int]]] = {}
+    for index, (start, _, name) in enumerate(marks):
+        if index in labels:
+            continue
+        following = index + 1
+        while following in labels and name == "Abstract":
+            following += 1
+        spans.setdefault(name, []).append((start, marks[following][0] if following < len(marks) else limit))
+    return spans
+
+
+# Canonical headings of the body of a paper, as opposed to its front matter.
+_BODY_SECTIONS = frozenset({"Background", "Methods", "Results", "Discussion", "Conclusions"})
+
+
+def words_excluding(path: Path, wordings: dict[str, str], parts: dict[str, str], endings: tuple[str, ...] = (), whole: bool = False) -> tuple[int, list[str]] | None:
+    """The word count with the venue's excluded parts left out, and the parts that could not be found.
+
+    ``parts`` maps each excluded part, as the guidelines name it, to a canonical
+    section in ``wordings`` or to a kind of content: ``@references``, ``@front``
+    (title and authors), ``@titles`` (headings), ``@legends``, ``@tables``,
+    ``@figures``, or ``@supplement``. A part mapped to None cannot be found. The
+    count runs to the end of the main text, or of the file with ``whole``. Returns
+    None when the file cannot be read as text.
+    """
+    wordings = {**_EXCLUSION_HEADINGS, **wordings}
+    kinds = set(parts.values())
+    is_tex = path.suffix.lower() in (".tex", ".zip")
+    is_pdf = path.suffix.lower() == ".pdf"
+    has_tables = has_captions = False
+    spans: list[tuple[int, int]] = []
+    if is_tex:
+        source = _raw_tex_source(path)
+        if not source:
+            return None
+        marks = _tex_section_marks(source, wordings)
+        end = len(source)
+        has_references = bool(_TEX_BIBLIOGRAPHY.search(source) or _TEX_REFERENCE_SECTION.search(source))
+        abstract = [m.span() for m in _TEX_ENV_ABSTRACT.finditer(source)] + [(m.start(), _tex_group_end(source, m.end() - 1)) for m in _TEX_ABSTRACT_MACRO.finditer(source)]
+        has_captions = has_tables = True
+        if "@tables" in kinds:
+            spans += [m.span() for m in _TEX_ENV_TABLE.finditer(source)]
+        if "@legends" in kinds or "@figures" in kinds:
+            spans += [(m.start(), _tex_group_end(source, m.end() - 1)) for m in _TEX_CAPTION.finditer(source)]
+    else:
+        text = docx_to_text(path, drop_tables=True) if path.suffix.lower() == ".docx" and "@tables" in kinds else manuscript_text(path)
+        if text is None:
+            return None
+        source = text
+        marks = _text_section_marks(source, wordings)
+        ending = main_text_end(source, endings)
+        # A venue's own end heading can come first; the reference list is still left out with what follows it.
+        has_references = bool(_REFERENCE_HEADING.search(source))
+        end = len(source) if whole or ending is None else ending.start()
+        abstract = []
+        if not is_pdf:
+            # A Word caption is one paragraph, a line; Markdown and text paragraphs end at a blank line.
+            stop = "\n" if path.suffix.lower() == ".docx" else "\n\n"
+            for m in _CAPTION_LINE.finditer(source):
+                has_captions = True
+                if "@legends" in kinds or "@figures" in kinds:
+                    close = source.find(stop, m.start())
+                    spans.append((m.start(), len(source) if close < 0 else close))
+        has_tables = "@tables" in kinds and path.suffix.lower() == ".docx" and len(source) != len(manuscript_text(path) or "")
+        for m in _MD_TABLE_ROW.finditer(source) if "@tables" in kinds else ():
+            has_tables = True
+            spans.append(m.span())
+    by_name = _section_spans(marks, end if is_tex else len(source))
+    if abstract:
+        by_name.setdefault("Abstract", []).extend(abstract)
+    missing: list[str] = []
+    for part, kind in parts.items():
+        if kind is None:
+            missing.append(part)
+        elif kind == "@references":
+            if not has_references:
+                missing.append(part)
+        elif kind == "@front":
+            if marks or abstract:
+                spans.append((0, min([marks[0][0]] * bool(marks) + [a for a, _ in abstract])))
+            else:
+                missing.append(part)
+        elif kind == "@titles":
+            spans += [(start, body) for start, body, _ in marks]
+        elif kind == "@legends":
+            spans += by_name.get("@legends", [])
+            if not (is_tex or has_captions or "@legends" in by_name or not _DISPLAY_MENTION.search(source)):
+                missing.append(part)
+        elif kind == "@tables":
+            spans += by_name.get("@tables", [])
+            if not (is_tex or has_tables or "@tables" in by_name or not _TABLE_MENTION.search(source)):
+                missing.append(part)
+        elif kind == "@supplement":
+            spans += by_name.get("Supplementary information", [])
+        elif kind != "@figures":
+            if kind in by_name:
+                spans += by_name[kind]
+                # Leaving the abstract out of a body count leaves out the title block above it too.
+                if kind == "Abstract" and not is_tex:
+                    first = next(m for m in marks if m[2] == "Abstract")
+                    if not any(m[0] < first[0] and m[2] in _BODY_SECTIONS for m in marks):
+                        spans.append((0, first[0]))
+            else:
+                missing.append(part)
+    kept: list[str] = []
+    position = 0
+    for start, stop in sorted(spans):
+        if start > position:
+            kept.append(source[position:min(start, end)])
+        position = max(position, stop)
+    kept.append(source[position:end] if position < end else "")
+    remainder = "\n".join(kept)
+    if is_tex:
+        return _word_count(truncate_at_references(_tex_to_text(remainder, keep_bibliography=whole), () if whole else endings)), missing
+    return _word_count(remainder), missing
+
+
 # One reference entry in an extracted reference list: "1. ", "[1] ", "1) ".
 _NUMBERED_REF = re.compile(r"^\s*(?:\[(\d{1,4})\]|(\d{1,4})[.)])\s+\S", re.MULTILINE)
 # An author-year entry: starts with a capitalised surname and holds a year.
-_AUTHOR_YEAR_REF = re.compile(r"^[A-Z][^\n]{3,200}?\(?(?:19|20)\d{2}[a-z]?\)?[.,:]", re.MULTILINE)
+# "Smith J, 2021.", "Smith J (2021). Title", Springer's "Smith J (2021) Title"; not a
+# wrapped line that opens with a journal and its volume ("Nature 12, 1-9 (2021).").
+_AUTHOR_YEAR_REF = re.compile(r"^(?![A-Z][\w.&]*(?:[ \t]+[A-Z][\w.&]*){0,4}[ \t]+\d{1,4}[ \t]*[,:(;])[A-Z][^\n]{3,200}?(?:\((?:19|20)\d{2}[a-z]?\)[.,:;]?(?=\s)|(?:19|20)\d{2}[a-z]?\)?[.,:])", re.MULTILINE)
 _BIB_ENTRY = re.compile(r"^\s*@(?!string\b|comment\b|preamble\b)[A-Za-z]+\s*[{(]", re.MULTILINE | re.IGNORECASE)
 
 
-def _bib_entry_count(main_tex: Path, source: str) -> int | None:
-    """Entries in the ``.bib`` files a LaTeX source names, or None if none found."""
-    names: list[str] = []
-    for m in re.finditer(r"\\(?:bibliography|addbibresource)\s*\{([^}]*)\}", source):
-        names.extend(n.strip() for n in m.group(1).split(","))
-    if not names:
-        return None
-    total = 0
+_TEX_CITATION = re.compile(r"\\[a-zA-Z]*cite[a-zA-Z]*\*?\s*(?:\[[^\]]*\]\s*)*\{([^{}]*)\}")
+_BIB_KEY = re.compile(r"@[A-Za-z]+\s*[{(]\s*([^,\s]+)")
+_BIB_MARKUP = re.compile(r"@[A-Za-z]+\s*[{(]\s*[^,\s]+\s*,|\b[A-Za-z_-]+\s*=|[{}\"]")
+
+
+def _cited_bib_entries(main_tex: Path, source: str) -> list[str] | None:
+    """The entries of the ``.bib`` files a LaTeX source names that it actually cites.
+
+    Every entry under ``\\nocite{*}`` or when no citation command is found at all
+    (nothing tells the used entries apart). None when no ``.bib`` file is found, or
+    the source's citations match nothing a ``.bib`` file holds, so the caller does
+    not take that for an empty list.
+    """
+    names = [n.strip() for m in re.finditer(r"\\(?:bibliography|addbibresource)\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}", source) for n in m.group(1).split(",")]
+    entries: list[str] = []
     found = False
     for name in names:
         candidate = main_tex.parent / (name if name.lower().endswith(".bib") else name + ".bib")
         try:
-            total += len(_BIB_ENTRY.findall(candidate.read_text("utf-8", "replace")))
-            found = True
+            text = candidate.read_text("utf-8", "replace")
         except OSError:
             continue
-    return total if found else None
+        found = True
+        entries += [e.strip() for e in re.split(r"\n\s*(?=@[A-Za-z]+\s*[{(])", text) if _BIB_ENTRY.match(e)]
+    if not found:
+        return None
+    cited = {key.strip() for m in _TEX_CITATION.finditer(source) for key in m.group(1).split(",")}
+    if not cited or "*" in cited:
+        return entries
+    used = []
+    for entry in entries:
+        key = _BIB_KEY.match(entry)
+        if key and key.group(1) in cited:
+            used.append(entry)
+    return used or None
+
+
+def _numbered_starts(tail: str) -> list[re.Match[str]]:
+    """The numbered-entry matches of a reference list, or [] when it is not a numbered list.
+
+    A wrapped author-year entry can leave "2021." at the start of a line, so a
+    list counts as numbered only with two or more entries starting near 1.
+    """
+    matches = list(_NUMBERED_REF.finditer(tail))
+    numbers = [int(m.group(1) or m.group(2)) for m in matches]
+    return matches if len(numbers) >= 2 and min(numbers) <= 5 else []
 
 
 def reference_count(path: Path) -> int | None:
     """Approximate number of entries in the manuscript's reference list, or None.
 
     LaTeX: the ``\\bibitem`` entries of an inline bibliography, else the
-    entries of the ``.bib`` file(s) the source names (an upper bound: unused
-    entries count too). PDF/Word: the numbered entries after the references
+    entries of the ``.bib`` file(s) the source cites. PDF/Word: the numbered entries after the references
     heading, else the author-year entries. None when no reference list is
     found, so the caller does not treat "unmeasured" as "within limit".
     """
@@ -1146,7 +1506,8 @@ def reference_count(path: Path) -> int | None:
         if items:
             return items
         if path.suffix.lower() == ".tex":
-            return _bib_entry_count(path, source)
+            entries = _cited_bib_entries(path, source)
+            return None if entries is None else len(entries)
         return None
     text = manuscript_text(path)
     if text is None:
@@ -1155,14 +1516,16 @@ def reference_count(path: Path) -> int | None:
     if match is None:
         return None
     tail = text[match.end() :]
-    numbered = _NUMBERED_REF.findall(tail)
+    end = _AFTER_REFERENCES.search(tail)
+    if end:
+        tail = tail[: end.start()]
+    numbered = _numbered_starts(tail)
     if numbered:
         # Use the highest number rather than the match count: a line-wrapped
         # entry can hide its number from the line-anchored pattern.
-        highest = max(int(a or b) for a, b in numbered)
+        highest = max(int(m.group(1) or m.group(2)) for m in numbered)
         return max(highest, len(numbered)) if highest <= len(numbered) * 3 else len(numbered)
-    author_year = len(_AUTHOR_YEAR_REF.findall(tail))
-    return author_year or None
+    return len(_AUTHOR_YEAR_REF.findall(tail)) or None
 
 
 # Where a reference list ends in extracted text: a figure/table caption or a
@@ -1190,16 +1553,7 @@ def reference_entries(path: Path) -> list[str] | None:
         if items:
             return items
         if path.suffix.lower() == ".tex":
-            names = [n.strip() for m in re.finditer(r"\\(?:bibliography|addbibresource)\s*\{([^}]*)\}", source) for n in m.group(1).split(",")]
-            entries: list[str] = []
-            for name in names:
-                bib = path.parent / (name if name.lower().endswith(".bib") else name + ".bib")
-                try:
-                    text = bib.read_text("utf-8", "replace")
-                except OSError:
-                    continue
-                entries += [e.strip() for e in re.split(r"\n\s*(?=@[A-Za-z]+\s*[{(])", text) if _BIB_ENTRY.match(e)]
-            return entries or None
+            return _cited_bib_entries(path, source)
         return None
     text = doc.text
     if text is None:
@@ -1211,9 +1565,7 @@ def reference_entries(path: Path) -> list[str] | None:
     end = _AFTER_REFERENCES.search(tail)
     if end:
         tail = tail[: end.start()]
-    starts = [m.start() for m in _NUMBERED_REF.finditer(tail)]
-    if len(starts) < 2:
-        starts = [m.start() for m in _AUTHOR_YEAR_REF.finditer(tail)]
+    starts = [m.start() for m in _numbered_starts(tail)] or [m.start() for m in _AUTHOR_YEAR_REF.finditer(tail)]
     if not starts:
         return None
     bounds = starts + [len(tail)]
@@ -1252,7 +1604,7 @@ def title_page_text(path: Path) -> str | None:
         pages = _pdf_pages(path)
         if pages is None:
             return None
-        return "\n".join(pages[:2])
+        return "\n".join(pages[:2]) if any(p.strip() for p in pages[:2]) else None
     text = manuscript_text(path)
     if text is None:
         return None

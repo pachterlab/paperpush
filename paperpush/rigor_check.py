@@ -47,7 +47,7 @@ from typing import Optional
 from .ai_validate import AiTask
 from .database import Venue
 from .requirements import get_requirements, resolve
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome
+from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +77,20 @@ def _texts(venue: Venue, values: dict[str, str], roles: tuple[str, ...] = ("manu
     return out
 
 
+def _no_text(venue: Venue, values: dict[str, str], roles: tuple[str, ...], what: str) -> Exception:
+    """What to raise when ``_texts`` found nothing: not checked if a file is attached (a scanned PDF), else not applicable."""
+    from .requirements_check import _existing, _fields_for, _paths
+
+    names = [p.name for role in roles for field in _fields_for(venue, role) for p in _existing(_paths(field, values))]
+    if names:
+        return Unchecked(f"could not read any text from {', '.join(dict.fromkeys(names))}")
+    return NotApplicable(f"no {what} to read")
+
+
 def _text_or_skip(venue: Venue, values: dict[str, str]) -> list[tuple[str, str, str]]:
     texts = _texts(venue, values)
     if not texts:
-        raise NotApplicable("no manuscript or supplementary text to read")
+        raise _no_text(venue, values, ("manuscript", "supplementary"), "manuscript or supplementary text")
     return texts
 
 
@@ -89,7 +99,9 @@ def _text_or_skip(venue: Venue, values: dict[str, str]) -> list[tuple[str, str, 
 
 _VENDORS = r"(?:Abcam|Cell\s+Signal(?:l)?ing(?:\s+Technology)?|CST|Thermo(?:\s*Fisher)?|Invitrogen|BioLegend|Santa\s+Cruz|Sigma(?:-Aldrich)?|Merck|Millipore|R&D\s+Systems|BD\s+(?:Biosciences|Pharmingen)|Proteintech|Novus|Bio-Rad|Jackson\s+ImmunoResearch|eBioscience|Miltenyi|Dako|Agilent|Abnova|GeneTex|Synaptic\s+Systems|Bethyl|Active\s+Motif|Diagenode|Leica|Vector\s+Laboratories|Rockland|Tonbo|Developmental\s+Studies\s+Hybridoma\s+Bank|DSHB|Antibodies-online|Atlas\s+Antibodies|Addgene)"
 _CATALOG = r"(?:cat(?:alog(?:ue)?)?\.?\s*(?:no\.?|#|number)|clone\s+[A-Z0-9][\w.-]*|#\s*\w*\d)"
-_ANTIBODY = re.compile(rf"(?i:\banti-?[A-Za-z0-9][\w/-]*\b|\bantibod(?:y|ies)\b)(?=[^.\n]{{0,160}}(?:{_VENDORS}|(?i:{_CATALOG})))")
+# "anti-GFP" and "antiGFP", not the words "antibiotics", "antifade", "anti-inflammatory".
+_NOT_ANTIBODY = r"(?!(?i:bod|biotic|fade|inflammat|cancer|tumou?r|oxid|viral|retroviral|bacterial|microbial|fungal|malarial|coagul|depress|psychotic|hypertens|diabet|apopto|aging|ageing|parallel|sense|correl|diuretic|convuls|epilept|thrombotic|proliferat|metasta|angiogen|fouling|ser(?:um|a)\b|gen\b))"
+_ANTIBODY = re.compile(rf"(?:(?i:\banti-)|(?i:\banti)(?=[A-Z0-9])){_NOT_ANTIBODY}[A-Za-z0-9][\w/-]*\b(?=[^.\n]{{0,160}}(?:{_VENDORS}|(?i:{_CATALOG})))|(?i:\bantibod(?:y|ies)\b)(?=[^.\n]{{0,160}}(?:{_VENDORS}|(?i:{_CATALOG})))")
 _CELL_LINES = (
     "HEK293T", "HEK293", "HEK-293", "293T", "HeLa", "A549", "MCF-7", "MCF7", "HepG2", "Hep G2", "Jurkat", "K562", "K-562", "U2OS", "U-2 OS",
     "HCT116", "HCT 116", "SH-SY5Y", "NIH/3T3", "NIH3T3", "NIH 3T3", "PC-3", "PC3", "LNCaP", "MDA-MB-231", "MDA-MB-468", "Caco-2", "THP-1",
@@ -107,7 +119,33 @@ _SOFTWARE = re.compile(r"\b(ImageJ|Fiji|GraphPad\s+Prism|Prism\s+\d+|MATLAB|SPSS
 RRID = re.compile(r"\bRRID\s*:?\s*((?:AB|CVCL|SCR|IMSR_[A-Z]+|BDSC|ZFIN_[\w-]+|ZDB-[\w-]+|MGI|RGD|WB-STRAIN|Addgene|NXR|BCBC|MMRRC|SAMN|DGGR|FlyBase|SciRes|nlx|nif|OMICS|CGC|TSC|AGSC|MSR)_?[\w:.-]*\w)", re.IGNORECASE)
 
 
-_UNIT_BREAK = re.compile(r"\n|(?<=[.!?])\s+(?=[A-Z(])")
+# Blank lines, table rows, and sentence ends. A single line break is usually a PDF's line wrap, and "Cat. No. ab290" is one sentence.
+_UNIT_BREAK = re.compile(r"\n\s*\n|\|[ \t]*\n|\n(?=[^\n]*\t)|(?<=[.!?])(?<!(?i:\bcat\.))(?<!(?i:\bno\.))(?<!(?i:\bnos\.))(?<!(?i:\binc\.))(?<!(?i:\bltd\.))(?<!(?i:\bco\.))(?<!(?i:\bcorp\.))(?<!(?i:\bref\.))\s+(?=[A-Z(])")
+
+# Cell-line names that are also a supplementary figure ("Figure S2"), a principal
+# component ("PC3"), a unit ("KB"), initials, or a surname: named only when the
+# text calls them cells.
+_AMBIGUOUS_CELL_LINES = frozenset({"S2", "PC3", "KB", "BJ", "Ramos", "Raji", "Daudi", "WISH", "Vero"})
+_CALLED_CELLS = re.compile(r"(?:(?:,\s*(?:and\s+|or\s+)?|\s+and\s+|\s+or\s+|/)[\w()/-]+){0,4}\s*(?:cells?\b|cell\s+lines?\b)|\s*\(\s*(?:ATCC|RRID|CVCL|DSMZ|ECACC)", re.IGNORECASE)
+_CELLS_BEFORE = re.compile(r"\bcell\s+lines?\b[^.]{0,80}$|\bcells?\s*\(?$", re.IGNORECASE)
+_LIST_JOINT = re.compile(r"\s*(?:,\s*(?:and\s+|or\s+)?|and\s+|or\s+|/)\s*")
+_FIGURE_BEFORE = re.compile(r"(?:\bfig(?:ure)?s?\.?|\btables?)\s*$", re.IGNORECASE)
+
+
+def _cell_line_matches(text: str) -> list[re.Match[str]]:
+    """The listed cell lines named in ``text``, leaving out names that are something else here."""
+    out = []
+    matches = list(_CELL_LINE.finditer(text))
+    for i, m in enumerate(matches):
+        if m.group(1) in _AMBIGUOUS_CELL_LINES:
+            before = text[max(0, m.start() - 120) : m.start()]
+            # "DU145, PC3, and LNCaP": listed beside a name that can only be a cell line.
+            neighbours = [(matches[j], text[min(m.end(), matches[j].end()) : max(m.start(), matches[j].start())]) for j in (i - 1, i + 1) if 0 <= j < len(matches)]
+            listed = any(n.group(1) not in _AMBIGUOUS_CELL_LINES and _LIST_JOINT.fullmatch(gap) for n, gap in neighbours)
+            if _FIGURE_BEFORE.search(before) or not (listed or _CALLED_CELLS.match(text, m.end()) or _CELLS_BEFORE.search(before)):
+                continue
+        out.append(m)
+    return out
 
 
 def _resource_spans(text: str) -> list[tuple[str, str, int, int]]:
@@ -121,8 +159,8 @@ def _resource_spans(text: str) -> list[tuple[str, str, int, int]]:
         # Name the antibody by its own words ("anti-GFP"), or the words just before "antibody".
         name = m.group(0) if not m.group(0).lower().startswith("antibod") else " ".join(text[max(0, m.start() - 25) : m.end()].split("\n")[-1].split()[-3:])
         spans.append(("antibody", name, m.start(), m.end()))
-    for pattern, kind in ((_CELL_LINE, "cell line"), (_GENERIC_CELL_LINE, "cell line"), (_STRAIN, "organism"), (_SOFTWARE, "software")):
-        for m in pattern.finditer(text):
+    for matches, kind in ((_cell_line_matches(text), "cell line"), (_GENERIC_CELL_LINE.finditer(text), "cell line"), (_STRAIN.finditer(text), "organism"), (_SOFTWARE.finditer(text), "software")):
+        for m in matches:
             spans.append((kind, m.group(1), m.start(), m.end()))
     spans.sort(key=lambda s: s[2])
     # Drop a span inside another (a listed cell line also caught by the generic pattern).
@@ -257,7 +295,7 @@ def _cell_lines_check(venue: Venue, values: dict[str, str], online: bool) -> Out
     lines: dict[str, str] = {}
     whole = "\n".join(t for _, _, t in texts)
     for field_id, _, text in texts:
-        for m in _CELL_LINE.finditer(text):
+        for m in _cell_line_matches(text):
             lines.setdefault(" ".join(m.group(1).split()), field_id)
         for m in _GENERIC_CELL_LINE.finditer(text):
             lines.setdefault(m.group(1), field_id)
@@ -287,6 +325,12 @@ def _cell_lines_check(venue: Venue, values: dict[str, str], online: bool) -> Out
 
 _ANIMALS = re.compile(r"(?i)\b(?:mice|mouse|rats?|zebrafish|primates?|macaques?|rabbits?|pigs?|piglets|dogs|sheep|ferrets|hamsters|guinea\s+pigs|animals)\b")
 _HUMANS = re.compile(r"(?i)\b(?:participants|patients|volunteers|human\s+subjects|respondents|cohort|enrolled|recruited)\b")
+# The host of an antibody ("rabbit anti-LC3", "goat anti-mouse", "mouse monoclonal") is not a study animal.
+_HOSTS = r"(?:mouse|mice|rats?|rabbits?|pigs?|guinea\s+pigs?|hamsters?|sheep|dogs|goats?|donkeys?|chickens?)"
+_ANTIBODY_HOST = re.compile(rf"(?i)\b{_HOSTS}(?=[\s-]+(?:anti\b|anti-|monoclonal|polyclonal|IgG|IgM|IgA|secondary|primary|antibod))|\banti-{_HOSTS}\b|(?<=\()\s*{_HOSTS}\s*(?=[,;])")
+# Telling a study of animals or people from a mention of them.
+_ANIMAL_STUDY = re.compile(r"(?i)\b(?:mice|mouse|rats?|zebrafish|primates?|macaques?|rabbits?|pigs?|piglets|dogs|sheep|ferrets|hamsters|guinea\s+pigs|animals)\s+(?:were|was|received|underwent|aged|weighing|per\s+(?:group|cage))\b|\bIACUC\b|\banimal\s+(?:care|ethics|welfare|experiments?|stud(?:y|ies)|procedures?|protocols?)\b|\beuthani[sz]|\bsacrific|\bhoused\b")
+_HUMAN_STUDY = re.compile(r"(?i)\b(?:enrolled|recruit(?:ed|ment)|(?:informed\s+)?consent(?:ed)?|(?:participants|patients|subjects|individuals)\s+(?:were|who)|cohort\s+(?:of|study|included|comprised)|volunteers|respondents|ethics\s+(?:committee|board|approval)|institutional\s+review\s+board|IRB)\b")
 _DESIGN: dict[str, re.Pattern[str]] = {
     "blinding": re.compile(r"(?i)\bblind(?:ed|ing|ly)?\b|\bmask(?:ed|ing)\b(?=[^.]{0,60}\b(?:group|treatment|allocation|condition|genotype|outcome|assessor|investigator))|\b(?:un)?aware\s+of\s+(?:the\s+)?(?:group|treatment|genotype|allocation)|\bopen[- ]label\b"),
     "randomization": re.compile(r"(?i)\brandomi[sz](?:ed|ation|ing)\b|\brandom(?:ly)?\s+(?:assign|allocat)\w*|\ballocat\w+\s+(?:at\s+)?random\w*|\brandom\s+allocation\b"),
@@ -303,14 +347,21 @@ _DESIGN_HINTS = {
 }
 
 
+_REVIEW_TYPE = re.compile(r"(?i)\breview\b|\bmeta-?analys[ie]s\b")
+_REVIEW_TITLE = re.compile(r"(?i)\b(?:systematic|scoping|narrative|umbrella|literature|rapid|mapping)\s+review\b|\bmeta-?analys[ie]s\b")
+
+
 def _design_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    if _REVIEW_TYPE.search(values.get("article_type", "")) or _REVIEW_TITLE.search(values.get("title", "")):
+        raise NotApplicable("a review reports no experiment or participants of its own")
     texts = _text_or_skip(venue, values)
     whole = "\n".join(t for _, _, t in texts)
     from .manuscript import truncate_at_references
 
     body = truncate_at_references(whole)
-    animals = len(_ANIMALS.findall(body))
-    humans = len(_HUMANS.findall(body))
+    without_hosts = _ANTIBODY_HOST.sub(" ", body)
+    animals = len(_ANIMALS.findall(without_hosts)) if _ANIMAL_STUDY.search(without_hosts) else 0
+    humans = len(_HUMANS.findall(body)) if _HUMAN_STUDY.search(body) else 0
     # A passing mention ("as in mouse studies") is not a study of animals or people.
     if animals < 3 and humans < 3:
         raise NotApplicable("no study of animals or human participants described")
@@ -422,7 +473,8 @@ def p_value(test: str, stat: float, df1: float | None = None, df2: float | None 
 
 
 _NUM = r"[-−–]?\s?(?:\d+(?:\.\d+)?|\.\d+)"
-_P = r"p\s*([<>=≤≥])\s*(0?\.\d+|1(?:\.0+)?|\d(?:\.\d+)?\s*[x×]\s*10\s*[-−–]\s*\d+|\d(?:\.\d+)?e[-−–]\d+)"
+# Scientific notation first, so the "1" of "1.5 × 10-5" is not read as p = 1. The exponent may be "10-5", "10^-5", "10^{-5}", "10⁻⁵", or what is left of LaTeX's "\times 10^{-5}".
+_P = r"p\s*([<>=≤≥])\s*(\d(?:\.\d+)?\s*(?:[x×]|\\times)?\s*10\s*\^?\s*\{?\s*[-−–⁻]\s*[\d⁰¹²³⁴⁵⁶⁷⁸⁹]+|\d(?:\.\d+)?e[-−–]\d+|0?\.\d+|1(?:\.0+)?(?!\d|\.\d))"
 _STAT_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("t", re.compile(rf"\bt\s*\(\s*(\d+(?:\.\d+)?)\s*\)\s*=\s*({_NUM})\s*[,;]\s*{_P}", re.IGNORECASE)),
     ("F", re.compile(rf"\bF\s*\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*\)\s*=\s*({_NUM})\s*[,;]\s*{_P}", re.IGNORECASE)),
@@ -432,17 +484,32 @@ _STAT_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 ]
 
 
+_SUPERSCRIPTS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻", "0123456789-")
+_SCIENTIFIC = re.compile(r"10\s*\^?\s*\{?\s*[-−–⁻]|e[-−–]", re.IGNORECASE)
+_ONE_TAILED = re.compile(r"(?i)\b(?:one|1)[- ]?(?:tailed|sided)\b|(?<![\w-])directional\b")
+_SENTENCE_BREAK = re.compile(r"[.!?]\s+(?=[A-Z(])")
+
+
 def _num(text: str) -> float:
-    text = text.replace("−", "-").replace("–", "-").replace(" ", "")
-    m = re.match(r"(\d(?:\.\d+)?)[x×]10-(\d+)", text)
+    text = re.sub(r"[\s^{}]", "", text.translate(_SUPERSCRIPTS).replace("−", "-").replace("–", "-").replace("\\times", "x"))
+    m = re.fullmatch(r"(\d(?:\.\d+)?)[xX×]?10-(\d+)", text)
     if m:
-        return float(m.group(1)) * 10 ** -int(m.group(2))
+        return float(f"{m.group(1)}e-{m.group(2)}")
     return float(text)
 
 
 def _decimals(text: str) -> int:
     text = text.strip().lstrip("-−– ")
-    return len(text.split(".", 1)[1]) if "." in text and "e" not in text.lower() and "x" not in text.lower() and "×" not in text else 0
+    return len(text.split(".", 1)[1]) if "." in text and not _SCIENTIFIC.search(text) else 0
+
+
+def _p_unit(text: str, value: float) -> float:
+    """Half a unit in the last place of a reported p value, the error its rounding allows."""
+    if not _SCIENTIFIC.search(text):
+        decimals = _decimals(text)
+        return 0.5 * 10**-decimals if decimals else 0.0
+    mantissa = re.match(r"\d(?:\.(\d+))?", text.strip())
+    return 0.5 * 10 ** (math.floor(math.log10(value)) - len(mantissa.group(1) or "")) if value > 0 and mantissa else 0.0
 
 
 def reported_results(text: str) -> list[dict]:
@@ -470,9 +537,11 @@ def reported_results(text: str) -> list[dict]:
                 hi_stat = min(hi_stat, 0.999999)
             p_hi, p_lo = p_value(test, lo_stat, df1, df2), p_value(test, hi_stat, df1, df2)
             computed = p_value(test, mag, df1, df2)
-            sentence_start = text.rfind(".", 0, m.start())
-            one_tailed = bool(re.search(r"(?i)one[- ](?:tailed|sided)", text[max(0, sentence_start) : m.end() + 40]))
-            out.append({"test": test, "text": " ".join(m.group(0).split()), "comparison": comp, "reported": reported, "p_decimals": _decimals(p_s), "computed": computed, "range": (p_lo, p_hi), "one_tailed": one_tailed})
+            head = max(0, m.start() - 600)
+            breaks = list(_SENTENCE_BREAK.finditer(text, head, m.start()))
+            sentence_start = breaks[-1].end() if breaks else head
+            one_tailed = bool(_ONE_TAILED.search(text[sentence_start : m.end() + 40]))
+            out.append({"test": test, "text": " ".join(m.group(0).split()), "comparison": comp, "reported": reported, "p_decimals": _decimals(p_s), "p_unit": _p_unit(p_s, reported), "computed": computed, "range": (p_lo, p_hi), "one_tailed": one_tailed})
     return out
 
 
@@ -482,8 +551,7 @@ def _consistent(r: dict, lo: float, hi: float) -> bool:
         return lo < rep or (comp == "≤" and lo <= rep)
     if comp in (">", "≥"):
         return hi > rep or (comp == "≥" and hi >= rep)
-    unit = 0.5 * 10 ** -r["p_decimals"] if r["p_decimals"] else 0.0
-    return lo - unit <= rep <= hi + unit
+    return lo - r["p_unit"] <= rep <= hi + r["p_unit"]
 
 
 def judge(r: dict) -> str:
@@ -493,7 +561,7 @@ def judge(r: dict) -> str:
         return "ok"
     alpha = 0.05
     rep, comp = r["reported"], r["comparison"]
-    reported_sig = rep < alpha or (rep == alpha and comp in ("<", "≤"))
+    reported_sig = rep < alpha or (rep == alpha and comp in ("<", "≤", "="))  # p = .05 counts as significant, as in statcheck
     computed_sig = (lo / 2 if r["one_tailed"] else lo) < alpha
     return "decision error" if reported_sig != computed_sig else "inconsistent"
 
@@ -536,7 +604,8 @@ _SELF_TRIAL = re.compile(
     # assigned to conditions" in a behavioural experiment does not count.
     r"|\b(?:patients|participants|subjects|volunteers)\b[^.]{0,60}\b(?:randomly\s+(?:assigned|allocated)|randomi[sz]ed)\b[^.]{0,120}\b(?:placebo|treatment|therapy|drug|dose|intervention|standard\s+of\s+care|usual\s+care|vaccine)\b"
 )
-_REVIEW_KIND = r"(?:systematic\s+review|meta-?analysis|scoping\s+review|narrative\s+review|review)"
+# Not an "institutional review board", "ethics review", or "chart review".
+_REVIEW_KIND = r"(?:systematic\s+review|meta-?analysis|scoping\s+review|narrative\s+review|(?<!institutional\s)(?<!ethics\s)(?<!ethical\s)(?<!peer\s)(?<!peer-)(?<!chart\s)(?<!safety\s)(?<!internal\s)review(?!\s+(?:boards?|committees?|panels?)\b))"
 _SELF_REVIEW = re.compile(rf"(?i)\b(?:this|our|the\s+present|the\s+current)\s+{_WORDS}{{0,3}}?{_REVIEW_KIND}\b|\bwe\s+(?:conducted|performed|carried\s+out|undertook|present|report)\s+(?:a|an)\s+{_WORDS}{{0,3}}?{_REVIEW_KIND}\b")
 _REVIEW_TITLE = re.compile(r"(?i)\b(?:systematic\s+review|meta-?analysis|scoping\s+review)\b")
 _NOT_A_STUDY = re.compile(r"(?i)\b(?:review|editorial|commentary|comment|perspective|viewpoint|opinion|essay)\b")
@@ -568,7 +637,7 @@ def _trial_registration_check(venue: Venue, values: dict[str, str]) -> Outcome:
 
     texts = _texts(venue, values, roles=("manuscript", "title_page"))
     if not texts:
-        raise NotApplicable("no manuscript text to read")
+        raise _no_text(venue, values, ("manuscript", "title_page"), "manuscript text")
     body = "\n".join(truncate_at_references(text) for _, _, text in texts)
     found = list(dict.fromkeys(" ".join(m.group(0).split()) for m in TRIAL_ID.finditer(body)))
     if found:

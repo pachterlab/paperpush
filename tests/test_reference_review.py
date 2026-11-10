@@ -17,7 +17,7 @@ VENUE = Venue(slug="review_test", name="Review Test", fields=[Field(id="manuscri
 def _run(tmp_path, body, *, full=False):
     path = tmp_path / "paper.md"
     path.write_text(body, encoding="utf-8")
-    checks = Checks(options={"reference_check_full": full})
+    checks = Checks(options={"reference_check_extended": full})
     reference_review.run_checks(checks, VENUE, {"manuscript_file": str(path)})
     return {r.id: r for r in checks.results}, checks.ai_tasks
 
@@ -52,9 +52,14 @@ References
 2. Roe, A. Other cells. Journal of Cells (2023).
 """, full=True)
     assert results["bibliography.age"].status == report.PASSED
-    assert {t.id for t in tasks} == {"ai.reference_source.1", "ai.reference_journal.1"}
-    assert "abstract or full paper" in tasks[0].instructions
-    assert "authoritative index" in tasks[1].instructions
+    by_id = {t.id: t for t in tasks}
+    assert set(by_id) == {"ai.reference_source.1", "ai.reference_primary.1", "ai.reference_journal.1"}
+    assert "abstract or full paper" in by_id["ai.reference_source.1"].instructions
+    assert "authoritative index" in by_id["ai.reference_journal.1"].instructions
+    primary = by_id["ai.reference_primary.1"].instructions
+    assert "full text" in primary and "report unclear" in primary
+    assert "one step only" in primary
+    assert "consider citing it directly" in primary
 
 
 def test_unreadable_reference_list_is_not_a_pass(tmp_path):
@@ -68,10 +73,10 @@ def test_full_flag_reaches_report_and_ai_only(tmp_path):
     path = tmp_path / "paper.md"
     path.write_text("Introduction\n\nCells grow [1, 2].\n\nReferences\n\n1. Doe, J. Cell growth. Journal of Cells (2024).\n2. Roe, A. Other cells. Journal of Cells (2023).\n")
     sub = SubFile(venue=VENUE.slug, values={"manuscript_file": str(path)})
-    flags = dict(check_links=False, check_references=False, check_sensitive=False, check_openreview=False, reference_check_full=True)
+    flags = dict(check_links=False, check_references=False, check_sensitive=False, check_openreview=False, reference_check_extended=True)
     full = validate_report(sub, VENUE, **flags)
     only = validate_report(sub, VENUE, ai_only=True, **flags)
-    assert {task.id for task in full.ai_tasks} >= {"ai.reference_source.1", "ai.reference_journal.1"}
-    assert {task.id for task in only.ai_tasks} >= {"ai.reference_source.1", "ai.reference_journal.1"}
+    assert {task.id for task in full.ai_tasks} >= {"ai.reference_source.1", "ai.reference_primary.1", "ai.reference_journal.1"}
+    assert {task.id for task in only.ai_tasks} >= {"ai.reference_source.1", "ai.reference_primary.1", "ai.reference_journal.1"}
     assert any(result.id == "bibliography.density" for result in full.results)
     assert not any(result.id == "bibliography.density" for result in only.results)

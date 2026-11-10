@@ -355,7 +355,7 @@ misspellings, repetitive word choice, numbers of 10 or more in digits,
 abbreviations written one way, acronyms spelled out at first use), queuing
 spelling, grammar, and tense as the AI check `ai.prose`. Warnings from this
 pass are heuristics over extracted text and images: relay them to the user as
-things to confirm, not as blockers. `--dont-check-manuscript` skips the pass.
+things to confirm, not as blockers. `--disable-manuscript` skips the pass.
 
 Files can be validated without a `.sub`: `paperpush validate --manuscript FILE
 [--title-page FILE] [--cover-letter FILE] [--figures FILE ...] [--tables FILE
@@ -425,7 +425,7 @@ since a leak can get a paper desk-rejected.
 
 ## Other desk-reject checks validate runs
 
-- **Hidden text / prompt injection** (every venue; `--dont-check-hidden-text`
+- **Hidden text / prompt injection** (every venue; `--disable-integrity.hidden_text`
   skips it). White, invisible, microscopic, or off-page text in the PDF,
   LaTeX, or Word uploads. Hidden text that instructs an AI reviewer is an
   **error**. Tell the user exactly what was found and where, and never add such
@@ -434,11 +434,12 @@ since a leak can get a paper desk-rejected.
   `pip install 'paperpush[validate]'`, because the checks did not run.
 - **Uncleaned arXiv LaTeX source** (arXiv and venues that submit through it;
   part of the sensitive-info scan). If validate warns that the source still has
-  comments or unneeded files, offer `paperpush validate --arxiv-latex-cleaner`:
-  it writes cleaned copies next to the originals (`paper_arXiv/`,
-  `source_arXiv.zip`) and validates those. It does not edit the .sub, so point
-  the upload fields at the cleaned copies before submitting. Needs
-  `pip install 'paperpush[validate]'`.
+  comments or unneeded files, offer the `paperpush-fix` skill, which applies
+  `arxiv_latex_cleaner` after reviewing its output. `validate` never changes
+  files: with `pip install 'paperpush[validate]'` its `integrity.latex_cleaner`
+  check runs the cleaner on a temporary copy of the LaTeX uploads (any venue)
+  and reports what would change. Review that list rather than applying it
+  blindly: the cleaner can drop a file whose path a macro builds.
 - **Modified template** (venues whose `manuscript_requirements.json` entry has
   `manuscript.template_layout`, e.g. ICLR). The manuscript PDF's margins, body
   font, line spacing, running head, and review line numbers are measured
@@ -447,7 +448,7 @@ since a leak can get a paper desk-rejected.
   `\vspace`. Warnings start with `template:`. Changing the paper's layout is the
   author's call: report these to the user rather than editing their source.
 - **OpenReview profiles** (OpenReview venues: ICLR, AAAI;
-  `--dont-check-openreview-profiles` skips it). Each author is looked up
+  `--disable-integrity.openreview` skips it). Each author is looked up
   through the OpenReview API using the stored `paperpush login`. Reported:
   a missing Open Review ID (always a warning, even when the name matches one
   profile), missing, ambiguous, or inactive profiles, name or email-suffix mismatches, no

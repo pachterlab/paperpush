@@ -26,13 +26,15 @@ list so the author sees one combined, actionable summary:
 from __future__ import annotations
 
 import logging
+import re
 import urllib.parse
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional
+from typing import Annotated, Any, Iterable, Literal, Optional
 
 from pydantic import AfterValidator, BeforeValidator, ConfigDict, ValidationError, create_model
 
+from . import check_ids
 from .database import Field, Venue, accepted_options, options_command
 from .subfile import SubFile
 
@@ -139,6 +141,44 @@ def parse_authors(value: str, fields: list[str] | None = None) -> list[dict]:
     return authors
 
 
+def _usable_path(raw: str) -> Optional[Path]:
+    """``raw`` as an expanded path, or None when the system cannot even look it up.
+
+    A value such as ``~nosuchuser/a.pdf`` or a paragraph pasted into a file field
+    raises out of ``expanduser`` or ``exists``; such a value is reported as a bad
+    path by the per-field file check instead of ending the whole validation.
+    """
+    try:
+        path = Path(raw.strip()).expanduser()
+        path.exists()
+    except (RuntimeError, OSError, ValueError):
+        return None
+    return path
+
+
+def _without_unusable_paths(venue: Venue, values: dict[str, str]) -> dict[str, str]:
+    """``values`` minus the upload paths :func:`_usable_path` rejects, for the checks that read files."""
+    out = dict(values)
+    for field in venue.fields:
+        raw = out.get(field.id, "")
+        if not raw.strip():
+            continue
+        if field.type == "file" and _usable_path(raw) is None:
+            out[field.id] = ""
+        elif field.type == "filelist":
+            out[field.id] = "\n".join(line for line in raw.splitlines() if not line.strip() or _usable_path(line.split("|", 1)[0]) is not None)
+    return out
+
+
+def _accepts_name(name: str, accept: list[str]) -> bool:
+    """Whether ``name`` ends in one of ``accept`` (which may be multi-part, like ``.tar.gz``)."""
+    return name.lower().endswith(tuple(s.lower() for s in accept))
+
+
+# A page object, not the page tree (``/Type /Pages``).
+_PDF_PAGE_OBJECT = re.compile(rb"/Type\s*/Page(?![A-Za-z])")
+
+
 def _check_pdf(path: Path, field_id: str) -> list[Issue]:
     """Lightweight, dependency-free sanity checks on a PDF manuscript."""
     issues: list[Issue] = []
@@ -165,7 +205,7 @@ def _check_pdf(path: Path, field_id: str) -> list[Issue]:
             )
         )
     # Rough page count: count page objects. Good enough to flag a 0-page file.
-    pages = data.count(b"/Type /Page") + data.count(b"/Type/Page")
+    pages = len(_PDF_PAGE_OBJECT.findall(data))
     if pages == 0:
         # PDF 1.5+ can keep its page objects in compressed object streams.
         try:
@@ -181,7 +221,10 @@ def _check_pdf(path: Path, field_id: str) -> list[Issue]:
 
 def _check_file_field(field: Field, raw: str) -> list[Issue]:
     issues: list[Issue] = []
-    path = Path(raw.strip()).expanduser()
+    path = _usable_path(raw)
+    if path is None:
+        issues.append(Issue(ERROR, field.id, f"not a usable file path: {raw.strip()[:120]}"))
+        return issues
     if not path.exists():
         issues.append(Issue(ERROR, field.id, f"file not found: {path}"))
         return issues
@@ -189,7 +232,7 @@ def _check_file_field(field: Field, raw: str) -> list[Issue]:
         issues.append(Issue(ERROR, field.id, f"not a regular file: {path}"))
         return issues
     if field.accept:
-        if path.suffix.lower() not in {s.lower() for s in field.accept}:
+        if not _accepts_name(path.name, field.accept):
             issues.append(
                 Issue(
                     WARNING,
@@ -202,7 +245,9 @@ def _check_file_field(field: Field, raw: str) -> list[Issue]:
             size = path.stat().st_size
         except OSError:
             size = None
-        if size is not None and size > field.max_file_size_mb * BYTES_PER_MB:
+        if size is None:
+            issues.append(unchecked(field.id, f"could not read the size of {path.name}; the {field.max_file_size_mb:g} MB per-file limit for {field.label} was not checked"))
+        elif size > field.max_file_size_mb * BYTES_PER_MB:
             issues.append(
                 Issue(
                     ERROR,
@@ -304,12 +349,15 @@ def _annotation_for(field: Field, custom_validator=None):
     return Optional[annotation]
 
 
-# One built pydantic model per venue slug; the field schema is static.
-_MODELS: dict[str, Any] = {}
+# One built pydantic model per field list. Keyed on the fields as well as the
+# slug: named files can add an upload field to a venue, and a long-running server
+# sees the venue data change, so the same slug can carry different fields.
+_MODELS: dict[tuple[str, str], Any] = {}
 
 
 def _model_for(venue: Venue):
-    model = _MODELS.get(venue.slug)
+    key = (venue.slug, repr(venue.fields))
+    model = _MODELS.get(key)
     if model is None:
         # Lazy import to avoid a module-load cycle (a venue runner imports this
         # module for parse_authors). Venue-specific field validators extend the
@@ -329,7 +377,7 @@ def _model_for(venue: Venue):
             __config__=ConfigDict(extra="forbid"),
             **definitions,
         )
-        _MODELS[venue.slug] = model
+        _MODELS[key] = model
     return model
 
 
@@ -404,8 +452,8 @@ def _iter_upload_paths(venue: Venue, values: dict[str, str]):
         for candidate in candidates:
             if not candidate:
                 continue
-            path = Path(candidate).expanduser()
-            if path.is_file():
+            path = _usable_path(candidate)
+            if path is not None and path.is_file():
                 yield path
 
 
@@ -420,12 +468,12 @@ def _upload_size_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     if not venue.max_upload_mb:
         return []
     total = 0
+    unread: list[str] = []
     for path in _iter_upload_paths(venue, values):
         try:
             total += path.stat().st_size
         except OSError:
-            # Unreadable files are reported by the per-field checks; ignore here.
-            continue
+            unread.append(path.name)
     limit_bytes = venue.max_upload_mb * BYTES_PER_MB
     if total > limit_bytes:
         total_mb = total / BYTES_PER_MB
@@ -436,7 +484,32 @@ def _upload_size_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
                 f"total upload size is {total_mb:.1f} MB, over {venue.slug}'s " f"{venue.max_upload_mb:g} MB limit; reduce file sizes or split the submission",
             )
         ]
+    if unread:
+        return [unchecked("", f"could not read the size of {', '.join(unread)}; the {venue.max_upload_mb:g} MB combined limit was not checked")]
     return []
+
+
+def _multichoice_items(field: Field, raw: str) -> list[str]:
+    """The entries of a comma-separated ``multichoice`` value.
+
+    An option may itself hold commas (``Association study (GWAS, EWAS)``), so
+    known options are matched whole, longest first; anything else ends at the
+    next comma.
+    """
+    known = sorted((o for o in accepted_options(field) if o), key=len, reverse=True)
+    items: list[str] = []
+    rest = raw.strip()
+    while rest:
+        for option in known:
+            if rest.startswith(option) and (not rest[len(option) :].strip() or rest[len(option) :].lstrip().startswith(",")):
+                items.append(option)
+                rest = rest[len(option) :]
+                break
+        else:
+            head, _, rest = rest.partition(",")
+            items.append(head.strip())
+        rest = rest.lstrip(", \t\r\n")
+    return [item for item in items if item]
 
 
 def _count_items(field: Field, raw: str) -> int:
@@ -448,7 +521,7 @@ def _count_items(field: Field, raw: str) -> int:
     non-empty line.
     """
     if field.type == "multichoice":
-        return sum(1 for c in raw.split(",") if c.strip())
+        return len(_multichoice_items(field, raw))
     return sum(1 for line in raw.splitlines() if line.strip())
 
 
@@ -503,7 +576,13 @@ def _is_http_url(value: str) -> bool:
     location. Enough to reject a bare word, a ``doi:...`` string, or a link with
     no scheme without attempting full RFC 3986 validation.
     """
-    parsed = urllib.parse.urlsplit(value.strip())
+    text = value.strip()
+    if any(c.isspace() for c in text):
+        return False
+    try:
+        parsed = urllib.parse.urlsplit(text)
+    except ValueError:  # e.g. an unbalanced "[" in the host
+        return False
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
@@ -548,6 +627,16 @@ def _resolve_conditional(scalar: int | None, by, values: dict[str, str]) -> int 
     return scalar
 
 
+def _manuscript_limits(field: Field, values: dict[str, str]) -> tuple[int | None, int | None, int | None, int | None]:
+    """A manuscript field's resolved limits: words before references, pages before references, total words, total pages."""
+    return (
+        _resolve_conditional(field.max_words_before_refs, field.max_words_before_refs_by, values),
+        _resolve_conditional(field.max_pages_before_refs, field.max_pages_before_refs_by, values),
+        _resolve_conditional(field.max_words, field.max_words_by, values),
+        _resolve_conditional(field.max_pages, field.max_pages_by, values),
+    )
+
+
 def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> list[Issue]:
     """Flag a manuscript whose length runs past its word or page limit.
 
@@ -563,16 +652,13 @@ def _check_manuscript_length(field: Field, raw: str, values: dict[str, str]) -> 
     without fixed pagination -- the limit is reported as unchecked (a WARNING)
     rather than assumed satisfied or violated.
     """
-    word_before = _resolve_conditional(field.max_words_before_refs, field.max_words_before_refs_by, values)
-    page_before = _resolve_conditional(field.max_pages_before_refs, field.max_pages_before_refs_by, values)
-    word_total = _resolve_conditional(field.max_words, field.max_words_by, values)
-    page_total = _resolve_conditional(field.max_pages, field.max_pages_by, values)
+    word_before, page_before, word_total, page_total = _manuscript_limits(field, values)
     if all(limit is None for limit in (word_before, page_before, word_total, page_total)):
         return []
-    path = Path(raw.strip()).expanduser()
-    if not path.is_file():
-        # A missing/!regular file is already reported by _check_file_field.
-        return []
+    path = _usable_path(raw)
+    if path is None or not path.is_file():
+        # The error itself comes from _check_file_field; this says the limit went unmeasured.
+        return [unchecked(field.id, f"could not measure {raw.strip()[:120]} (no such file), so {field.label}'s length limit was not checked")]
 
     from . import manuscript
 
@@ -656,32 +742,47 @@ def _findings_to_issues(findings) -> list[Issue]:
     A file-scoped finding names its file in the message (``... (in main.tex)``);
     a submission-level one (``where == "submission"``) is shown as-is.
     """
+    from .sensitive import NOT_SCANNED
+
     issues: list[Issue] = []
     for finding in findings:
+        not_scanned = finding.category == NOT_SCANNED
         if finding.where and finding.where != "submission":
-            issues.append(Issue(WARNING, "", f"{finding.detail} (in {finding.where})"))
+            issues.append(Issue(WARNING, "", f"{finding.detail} (in {finding.where})", unchecked=not_scanned))
         else:
-            issues.append(Issue(WARNING, "", finding.detail))
+            issues.append(Issue(WARNING, "", finding.detail, unchecked=not_scanned))
     return issues
 
 
-def _link_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
+def _link_issues(venue: Venue, values: dict[str, str]) -> Outcome:
     """Flag URLs in the manuscript files that an anonymous reader can't reach.
 
     Scans the referenced upload files (and archive/PDF text) for http(s) links
     and reports the ones that are definitively broken -- a 404/gone page, or a
     still-private GitHub repository. Runs by default (disable with
-    ``--dont-check-links``) and makes network requests; unreachable-but-
-    inconclusive links (timeouts, bot blocks) are left unreported.
+    ``--disable-integrity.links``) and makes network requests. Links that get no
+    answer (timeouts, bot blocks, no network) are not reported as broken, but
+    they are said to be unverified, so the check never reads as passed when it
+    could not look.
     """
     from . import sensitive
 
     paths = _upload_paths_or_skip(venue, values)
     logger.info("Checking %d upload file(s) for unreachable links (%s)", len(paths), venue.slug)
-    return _findings_to_issues(sensitive.scan_links(paths))
+    stats: dict = {}
+    issues = _findings_to_issues(sensitive.scan_links(paths, stats=stats))
+    probed, unanswered = stats.get("probed", 0), stats.get("unanswered", [])
+    if probed and len(unanswered) == probed and not issues:
+        raise Unchecked(f"none of the {probed} link(s) in the files could be reached (no network, or the sites did not answer)")
+    if unanswered:
+        issues.append(unchecked("", f"{len(unanswered)} of {probed} link(s) got no answer and were not verified: {_listed(unanswered)}"))
+    unread = [path.name for path in paths if path.suffix.lower() in (".pdf", ".docx") and not any(True for _ in sensitive._iter_text_blobs(path))]
+    if unread:
+        issues.append(unchecked("", f"no text could be read from {_listed(unread)}, so any links in it were not checked"))
+    return Outcome(issues, f"probed {probed} link(s)" if probed else "found no links in the files")
 
 
-def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | None = None, resolved: dict | None = None) -> list[Issue]:
+def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | None = None, resolved: dict | None = None, coverage: dict | None = None) -> list[Issue]:
     """Flag references whose DOI does not match the work they cite.
 
     Reads the submission's bibliography whichever way it ships it -- the ``.bib``
@@ -690,23 +791,38 @@ def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | No
     doi.org, and reports the ones that are malformed, duplicated, unregistered,
     or registered to a different title/author/year, which is the signature of a
     DOI copied from the wrong row. Runs by default (disable with
-    ``--dont-check-references``) and makes network requests; anything
+    ``--disable-references``) and makes network requests; anything
     inconclusive is left unreported. The retracted works it finds are not
     reported here: they go into ``retracted``, for :func:`_retraction_issues`.
     ``resolved`` is filled with the registry records of the DOIs that check out,
-    for :func:`_reference_version_issues`.
+    for :func:`_reference_version_issues`. ``coverage`` is filled with how many
+    DOIs got an answer: none is unchecked, some is a note saying which were not.
     """
     from . import references
 
     paths = _upload_paths_or_skip(venue, values)
     logger.info("Checking %d upload file(s) for reference DOI problems (%s)", len(paths), venue.slug)
-    findings = references.scan_references(paths, resolved_out=resolved)
+    coverage = {} if coverage is None else coverage
+    findings = references.scan_references(paths, resolved_out=resolved, coverage_out=coverage)
     if retracted is not None:
         retracted.extend(f for f in findings if f.category == references.RETRACTED)
-    return _findings_to_issues([f for f in findings if f.category != references.RETRACTED])
+    issues = _findings_to_issues([f for f in findings if f.category not in (references.RETRACTED, references.TRUNCATED)])
+    return _with_coverage(issues, coverage)
 
 
-def _retraction_issues(venue: Venue, values: dict[str, str], retracted: list | None) -> list[Issue]:
+def _with_coverage(issues: list[Issue], coverage: dict | None) -> list[Issue]:
+    """``issues`` plus a note on the DOIs not looked up; :class:`Unchecked` if nothing was and nothing is reported."""
+    from . import references
+
+    note = references.coverage_note(coverage or {})
+    if not note:
+        return issues
+    if references.nothing_looked_up(coverage) and not issues:
+        raise Unchecked(note)
+    return issues + [unchecked("", note)]
+
+
+def _retraction_issues(venue: Venue, values: dict[str, str], retracted: list | None, coverage: dict | None = None) -> list[Issue]:
     """Report the cited works whose DOI record carries a retraction notice.
 
     The notices come with the DOI lookups :func:`_reference_issues` already
@@ -716,7 +832,7 @@ def _retraction_issues(venue: Venue, values: dict[str, str], retracted: list | N
     _upload_paths_or_skip(venue, values)
     if retracted is None:
         raise Unchecked("the reference DOI lookup did not finish")
-    return _findings_to_issues(retracted)
+    return _with_coverage(_findings_to_issues(retracted), coverage)
 
 
 @dataclass
@@ -724,6 +840,7 @@ class _ReferenceContext:
     """What the reference checks share: the DOI lookups feed the search, and both feed the version check."""
 
     resolved: dict = field(default_factory=dict)
+    coverage: dict = field(default_factory=dict)
     refs: list | None = None
     files: list[str] = field(default_factory=list)
     search: object = None
@@ -746,7 +863,7 @@ def _bibliography_refs(venue: Venue, values: dict[str, str], ctx: _ReferenceCont
     from . import reference_search, references
 
     paths = _upload_paths_or_skip(venue, values)
-    entries = references.collect_entries(paths)
+    entries = references.printed_entries(paths)
     ctx.files = [str(p) for p in paths if p.suffix.lower() in references.BIB_EXTS]
     from .requirements_check import manuscript_files
 
@@ -773,7 +890,7 @@ def _ai_files(paths: list[str]) -> list[str]:
     return readable or unique
 
 
-def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> Outcome:
+def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _ReferenceContext, retracted: list | None = None) -> Outcome:
     """Search the registries for every reference without a DOI (see :mod:`paperpush.reference_search`).
 
     A ``.bib`` journal or conference entry no registry can match is reported,
@@ -781,9 +898,9 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
     A matched entry with no DOI is told the DOI. Near misses, unindexed kinds of
     work (books, software, ...), and reference-list entries read from a PDF or
     Word file are listed as unverified and queued for ``ai.unverified_references``.
-    Makes network requests; runs with the DOI check (``--dont-check-references``).
+    Makes network requests; runs with the DOI check (``--disable-references``).
     """
-    from . import ai_validate, reference_search
+    from . import ai_validate, reference_search, references
 
     refs = _bibliography_refs(venue, values, ctx)
     if not refs:
@@ -793,7 +910,11 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
         return Outcome([], f"all {len(refs)} references have a DOI (checked by the DOI check)")
     result = reference_search.search_references(refs)
     ctx.search = result
-    issues = _findings_to_issues(result.findings)
+    # A retracted work found by its title belongs with the ones found by DOI.
+    moved = [f for f in result.findings if retracted is not None and f.category == references.RETRACTED]
+    if retracted is not None:
+        retracted.extend(moved)
+    issues = _findings_to_issues([f for f in result.findings if f not in moved])
 
     suggestions = result.suggestions
     if suggestions:
@@ -891,9 +1012,11 @@ def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     findings = sensitive.scan_paths(paths)
     findings.extend(sensitive.scan_missing_code_link(paths))
 
-    issues = _findings_to_issues(findings)
+    # Suggestions, not problems: a paper with no secrets in it should pass this check.
+    notes = [f.detail for f in findings if f.category in ("missing code link", "bandit not installed")]
+    issues = _findings_to_issues([f for f in findings if f.category not in ("missing code link", "bandit not installed")])
     issues.extend(_arxiv_cleaner_reminder(venue, findings))
-    return issues
+    return Outcome(issues, "; ".join(notes))
 
 
 def _anonymity_issues(venue: Venue, values: dict[str, str], *, check_repos: bool = True) -> list[Issue]:
@@ -910,9 +1033,11 @@ def _anonymity_issues(venue: Venue, values: dict[str, str], *, check_repos: bool
     """
     from . import anonymity
 
-    paths = list(_iter_upload_paths(venue, values))
+    # Reviewers do not see a title page or cover letter; the authors' names belong there.
+    reviewer_values = {k: v for k, v in values.items() if not anonymity.EDITOR_ONLY_FIELDS.search(k)}
+    paths = list(_iter_upload_paths(venue, reviewer_values))
     terms = anonymity.identity_terms(venue, values)
-    field_texts = {f.label or f.id: values[f.id] for f in venue.fields if f.type in ("text", "textarea") and values.get(f.id, "").strip()}
+    field_texts = {f.label or f.id: reviewer_values[f.id] for f in venue.fields if f.type in ("text", "textarea") and reviewer_values.get(f.id, "").strip()}
     if not paths and not field_texts:
         raise NotApplicable("no files attached and no free-text fields filled in")
     logger.info("Checking %d upload file(s) for identifying information (%s, %d identity term(s))", len(paths), venue.slug, len(terms))
@@ -927,16 +1052,20 @@ def _hidden_text_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     text that instructs a reviewer or language model is an ERROR -- conferences
     treat it as an ethics violation -- and other hidden prose, or visible text
     addressed to an AI reviewer, is a WARNING. Runs by default (disable with
-    ``--dont-check-hidden-text``); makes no network requests.
+    ``--disable-integrity.hidden_text``); makes no network requests.
     """
-    from . import hidden_text
+    from . import hidden_text, pdf_layout
 
     paths = _upload_paths_or_skip(venue, values)
     logger.info("Checking %d upload file(s) for hidden text (%s)", len(paths), venue.slug)
     issues: list[Issue] = []
     for finding in hidden_text.scan_paths(paths):
         level = ERROR if finding.is_error else WARNING
-        issues.append(Issue(level, "", f"{finding.detail} (in {finding.where})"))
+        issues.append(Issue(level, "", f"{finding.detail} (in {finding.where})", unchecked=finding.category == hidden_text.NOT_SCANNED))
+    if not pdf_layout.available():
+        pdfs = [path.name for path in paths if path.suffix.lower() == ".pdf"]
+        if pdfs and not issues:
+            raise Unchecked(f"{_listed(pdfs)} could not be scanned for hidden text: reading a PDF needs pdfminer.six (`{pdf_layout.INSTALL_HINT}`)")
     return issues
 
 
@@ -979,14 +1108,14 @@ def _openreview_profile_issues(venue: Venue, values: dict[str, str]) -> list[Iss
     login (see :mod:`paperpush.openreview_profiles`): a missing, ambiguous, or
     inactive profile, a name mismatch, no current position, email suffixes the
     profile does not carry. Runs by default (disable with
-    ``--dont-check-openreview-profiles``) and needs network access.
+    ``--disable-integrity.openreview``) and needs network access.
     """
     from . import openreview_profiles
 
     if not openreview_profiles.applies(venue):
         return []
     logger.info("Checking OpenReview author profiles (%s)", venue.slug)
-    return [Issue(ERROR if p.error else WARNING, p.field, f"openreview: {p.message}") for p in openreview_profiles.check(venue, values)]
+    return [Issue(ERROR if p.error else WARNING, p.field, f"openreview: {p.message}", unchecked=p.unchecked) for p in openreview_profiles.check(venue, values)]
 
 
 def _manuscript_requirement_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
@@ -996,7 +1125,7 @@ def _manuscript_requirement_issues(venue: Venue, values: dict[str, str]) -> list
     which reads ``manuscript_requirements.json`` -- the companion to
     ``submission_forms.json`` that records what the guidelines demand of the manuscript
     itself (formats, length, sections, statements, title page, figures,
-    references). Runs by default (disable with ``--dont-check-manuscript``).
+    references). Runs by default (disable with ``--disable-manuscript``).
     Reads and, for LaTeX, compiles the manuscript; makes no network requests.
     """
     from .requirements_check import check_manuscript_requirements
@@ -1009,15 +1138,8 @@ def _manuscript_requirement_issues(venue: Venue, values: dict[str, str]) -> list
 _UNCLEANED_LATEX = {"LaTeX comments", "LaTeX note comment", "unnecessary file"}
 
 
-def _arxiv_cleaner_reminder(venue: Venue, findings) -> list[Issue]:
-    """Remind an arXiv submitter to sanitise their LaTeX source, if it looks unclean.
-
-    arXiv publishes the uploaded source, so leftover comments and build/VCS junk
-    become public. When the venue is arXiv (or an arXiv-based alias) and the scan
-    turned up any of those, emit one reminder to run ``arxiv_latex_cleaner``.
-    Their absence is treated as "already cleaned", so a sanitised submission
-    stays quiet.
-    """
+def _submits_through_arxiv(venue: Venue) -> bool:
+    """True for arXiv and the venues that submit through it."""
     from . import venues
 
     try:
@@ -1025,7 +1147,22 @@ def _arxiv_cleaner_reminder(venue: Venue, findings) -> list[Issue]:
     except Exception:
         logger.debug("Could not resolve submission base for %s; using slug as-is", venue.slug, exc_info=True)
         base = venue.slug
-    if base != "arxiv":
+    return base == "arxiv"
+
+
+def _arxiv_cleaner_reminder(venue: Venue, findings) -> list[Issue]:
+    """Remind an arXiv submitter to sanitise their LaTeX source, if it looks unclean.
+
+    arXiv publishes the uploaded source, so leftover comments and build/VCS junk
+    become public. When the venue is arXiv (or an arXiv-based alias) and the scan
+    turned up any of those, emit one reminder to run ``arxiv_latex_cleaner``.
+    Their absence is treated as "already cleaned", so a sanitised submission
+    stays quiet. With the package installed, ``integrity.latex_cleaner`` says
+    exactly what it would change, so this reminder would only repeat it.
+    """
+    from . import latex_cleaner
+
+    if latex_cleaner.available() or not _submits_through_arxiv(venue):
         return []
     if not any(f.category in _UNCLEANED_LATEX for f in findings):
         return []
@@ -1033,9 +1170,39 @@ def _arxiv_cleaner_reminder(venue: Venue, findings) -> list[Issue]:
         Issue(
             WARNING,
             "",
-            "arXiv publishes your uploaded LaTeX source publicly; run arxiv_latex_cleaner on " "your source to strip the comments and unneeded files above before submitting " "(`paperpush validate --arxiv-latex-cleaner` does this and validates the result)",
+            "arXiv publishes your uploaded LaTeX source publicly; run arxiv_latex_cleaner on " "your source to strip the comments and unneeded files above before submitting " "(`pip install 'paperpush[validate]'` lets validate preview it, and the paperpush-fix skill applies it)",
         )
     ]
+
+
+_LATEX_CLEANER_ADVICE = "Validate changed nothing. The paperpush-fix skill applies the cleaner after checking its output, because it can drop a file whose path a macro builds or cut a % inside verbatim."
+
+
+def _latex_cleaner_issues(venue: Venue, values: dict[str, str]) -> "Outcome":
+    """Report what ``arxiv_latex_cleaner`` would change in the LaTeX uploads.
+
+    Cleans temporary copies only and compares them with the originals (see
+    :mod:`paperpush.latex_cleaner`). A WARNING where the source goes public
+    (arXiv and the venues submitting through it), a note in the check's detail
+    elsewhere. Runs by default when the package is installed (disable with
+    ``--disable-integrity.latex_cleaner``); makes no network requests.
+    """
+    from . import latex_cleaner
+
+    sources = [path for path in _iter_upload_paths(venue, values) if latex_cleaner.is_latex_source(path)]
+    if not sources:
+        raise NotApplicable("no LaTeX source among the uploads")
+    if not latex_cleaner.available():
+        raise Unchecked(f"previewing the LaTeX cleanup needs arxiv_latex_cleaner (`{latex_cleaner.INSTALL_HINT}`)")
+    logger.info("Previewing arxiv_latex_cleaner on %d LaTeX upload(s) (%s)", len(sources), venue.slug)
+    previews, failures = latex_cleaner.preview(sources)
+    issues = [Issue(WARNING, "", f"arxiv_latex_cleaner could not process {path.name}: {reason}", unchecked=True) for path, reason in failures]
+    if not previews:
+        return Outcome(issues, "" if failures else "arxiv_latex_cleaner would change nothing")
+    if _submits_through_arxiv(venue):
+        issues += [Issue(WARNING, "", f"{p.describe()}; arXiv publishes the uploaded source. {_LATEX_CLEANER_ADVICE}") for p in previews]
+        return Outcome(issues)
+    return Outcome(issues, f"{'; '.join(p.describe() for p in previews)}. {_LATEX_CLEANER_ADVICE}")
 
 
 class NotApplicable(Exception):
@@ -1082,6 +1249,11 @@ class PublisherFallback:
         return f" ({self.publisher} house rule; {self.venue}'s own guidelines do not state it, so check that it applies)"
 
 
+# Disabled alone, these still run, unreported: the checks after them read what they find.
+_REFERENCE_CHECK_IDS = ("integrity.dois", "integrity.unmatched_references", "integrity.retractions", "integrity.reference_versions")
+_FEEDS_LATER_CHECKS = frozenset(_REFERENCE_CHECK_IDS[:2])
+
+
 class Checks:
     """Runs checks and keeps one :class:`~paperpush.report.CheckResult` each.
 
@@ -1092,10 +1264,13 @@ class Checks:
     broken heuristic never hides the rest of the report.
     """
 
-    def __init__(self, options: dict | None = None) -> None:
+    def __init__(self, options: dict | None = None, disabled: Iterable[str] = (), enabled: Iterable[str] = ()) -> None:
         from . import report
 
         self._report = report
+        # Canonical names from --disable-NAME and --enable-NAME (see paperpush.check_ids).
+        self.disabled: tuple[str, ...] = tuple(disabled)
+        self.enabled: tuple[str, ...] = tuple(check_ids.expand_enabled(enabled))
         self.results: list = []
         self.ai_tasks: list = []
         # Settings the check modules read (e.g. ``cover_letter_max_age_days``).
@@ -1168,8 +1343,23 @@ class Checks:
         labelled = [i if i.unchecked or (i.field, i.message) in own_keys else replace(i, level=WARNING, message=i.message + fallback.suffix) for i in out.issues]
         return Outcome(labelled, out.detail)
 
+    def disabled_by(self, check_id: str) -> str:
+        """What switches ``check_id`` off, as the report words it, or ``""`` when it runs."""
+        return check_ids.off_reason(check_id, self.disabled, self.enabled)
+
+    def _runs_unreported(self, check_id: str) -> bool:
+        """Whether a switched-off check must run anyway, for what depends on it; its result is dropped."""
+        if check_id in _FEEDS_LATER_CHECKS:
+            return True
+        # The manuscript checks queue many of the AI tasks, so an --enable list
+        # naming AI checks needs them. A check named by --disable stays off.
+        wants_ai = any(n == "ai" or n.startswith("ai.") for n in self.enabled)
+        return wants_ai and check_id.split(".")[0] not in check_ids.NON_MANUSCRIPT_FAMILIES and not check_ids.most_specific(check_id, self.disabled)
+
     def run(self, check_id: str, title: str, category: str, fn, *args, **kwargs):
         report = self._report
+        if self.disabled_by(check_id) and not self._runs_unreported(check_id):
+            return self.record(check_id, title, category, report.UNCHECKED)
         try:
             out = fn(*args, **kwargs)
         except NotApplicable as exc:
@@ -1184,7 +1374,8 @@ class Checks:
             out = Outcome([])
         elif isinstance(out, list):
             out = Outcome(out)
-        if self.publisher_fallback is not None and not self._rerunning and any(not i.unchecked for i in out.issues):
+        # The integrity checks read no guideline rule, and many of them go to the network: a re-run could not change their findings' source.
+        if self.publisher_fallback is not None and not self._rerunning and not check_id.startswith("integrity.") and any(not i.unchecked for i in out.issues):
             out = self._label_publisher_issues(fn, args, kwargs, out)
         return self.record(check_id, title, category, _status_for(out.issues), issues=out.issues, detail=out.detail)
 
@@ -1193,7 +1384,13 @@ class Checks:
 
         stamped = [replace(i, check=i.check or check_id) for i in (issues or [])]
         result = self._report.CheckResult(id=check_id, title=title, category=category, status=status, issues=stamped, detail=detail, source=source)
-        self.results.append(result)
+        off = self.disabled_by(check_id)
+        if off and status != self._report.NOT_APPLICABLE:
+            # The report says it was switched off; the caller still gets what a
+            # check in _FEEDS_LATER_CHECKS really found.
+            self.results.append(self._report.CheckResult(id=check_id, title=title, category=category, status=self._report.UNCHECKED, detail=f"switched off ({off})"))
+        else:
+            self.results.append(result)
         return result
 
     def needs_ai(self, task) -> None:
@@ -1310,7 +1507,7 @@ def validate(
     check_sensitive: bool = True,
     check_links: bool = True,
     check_references: bool = True,
-    reference_check_full: bool = False,
+    reference_check_extended: bool = False,
     check_manuscript: bool = True,
     check_anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
@@ -1319,6 +1516,8 @@ def validate(
     cover_letter_max_age_days: int = 7,
     references_alphabetical: bool = False,
     references_citation_order: bool = False,
+    disable: Iterable[str] = (),
+    enable: Iterable[str] = (),
 ) -> list[Issue]:
     """Return all issues found in ``subfile`` against ``venue``.
 
@@ -1335,7 +1534,7 @@ def validate(
         check_sensitive=check_sensitive,
         check_links=check_links,
         check_references=check_references,
-        reference_check_full=reference_check_full,
+        reference_check_extended=reference_check_extended,
         check_manuscript=check_manuscript,
         check_anonymous=check_anonymous,
         check_hidden_text=check_hidden_text,
@@ -1344,6 +1543,8 @@ def validate(
         cover_letter_max_age_days=cover_letter_max_age_days,
         references_alphabetical=references_alphabetical,
         references_citation_order=references_citation_order,
+        disable=disable,
+        enable=enable,
     ).issues()
 
 
@@ -1354,7 +1555,7 @@ def validate_report(
     check_sensitive: bool = True,
     check_links: bool = True,
     check_references: bool = True,
-    reference_check_full: bool = False,
+    reference_check_extended: bool = False,
     check_manuscript: bool = True,
     check_anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
@@ -1369,6 +1570,8 @@ def validate_report(
     progress=None,
     files_only: bool = False,
     notes: Optional[list[str]] = None,
+    disable: Iterable[str] = (),
+    enable: Iterable[str] = (),
 ):
     """Run every check on ``subfile`` and return a :class:`~paperpush.report.ValidationReport`.
 
@@ -1421,6 +1624,15 @@ def validate_report(
     (default on; network) looks up each author's OpenReview profile for venues
     submitted through OpenReview (see :func:`_openreview_profile_issues`).
 
+    ``disable`` switches checks off by name, as ``--disable-NAME`` does on the
+    command line: a check ID, the dotted start of one (``prose``), or a group
+    (``references``, ``manuscript``; see :mod:`paperpush.check_ids`). An
+    unknown name raises ValueError. A disabled check does not run, and is
+    reported as unchecked, with the name that turned it off. ``enable`` takes
+    the same names and runs only those checks; the rest are reported as
+    unchecked. A check both name goes with the more specific one. Either can
+    give comma-separated names or the path of a text file listing them.
+
     ``initial_submission`` validates the file as an initial submission: every
     error is reported as a warning instead, so nothing blocks it. It is meant
     for venues whose guidelines let the initial submission be in any format
@@ -1457,6 +1669,18 @@ def validate_report(
 
     if check_anonymous is None:
         check_anonymous = venue.anonymous
+    disable, enable = check_ids.select(disable, enable)
+    enable = check_ids.expand_enabled(enable)
+    check_manuscript = check_manuscript and check_ids.reads_manuscript(disable, enable)
+
+    def switched_off(*ids: str) -> bool:
+        return all(check_ids.off_reason(i, disable, enable) for i in ids)
+
+    lookups = check_references and "references" not in disable
+    # With every reference check off, nothing needs the lookups they share. An
+    # --enable list can still want the AI task those lookups queue.
+    check_references = lookups and not (switched_off(*_REFERENCE_CHECK_IDS) and (not enable or switched_off("ai.unverified_references")))
+    check_registries = lookups and not (enable and switched_off("rigor.rrids", "rigor.cell_lines"))
     logger.info(
         "Validating %s: %d field(s) (sensitive-scan=%s, link-check=%s, reference-check=%s, manuscript-check=%s, anonymity-check=%s, hidden-text-check=%s, openreview-check=%s)",
         venue.slug,
@@ -1469,10 +1693,16 @@ def validate_report(
         check_hidden_text,
         check_openreview,
     )
+    # Paths the system cannot look up stay in the form checks, which report them,
+    # and are hidden from every check that opens files.
+    form_values = subfile.values
+    subfile = replace(subfile, values=_without_unusable_paths(venue, subfile.values))
     values = subfile.values
-    if reference_check_full and not check_manuscript:
-        raise ValueError("reference_check_full needs check_manuscript to read citation contexts")
-    checks = Checks(options={"cover_letter_max_age_days": cover_letter_max_age_days, "reference_check_full": reference_check_full, "references_alphabetical": references_alphabetical, "references_citation_order": references_citation_order, "check_registries": check_references})
+    if ai is not None and not check_manuscript:
+        raise ValueError("the AI checks need check_manuscript: the manuscript checks decide which AI checks apply")
+    if reference_check_extended and not check_manuscript:
+        raise ValueError("reference_check_extended needs check_manuscript to read citation contexts")
+    checks = Checks(options={"cover_letter_max_age_days": cover_letter_max_age_days, "reference_check_extended": reference_check_extended, "references_alphabetical": references_alphabetical, "references_citation_order": references_citation_order, "check_registries": check_registries}, disabled=disable, enabled=enable)
     checks.use_publisher_fallback(venue, subfile.values)
     if ai_only:
         if not check_manuscript:
@@ -1487,6 +1717,7 @@ def validate_report(
         (check_references, "Reference DOIs"),
         (check_references, "Reference search"),
         (check_sensitive, "Sensitive information"),
+        (True, "LaTeX source"),
         (check_anonymous, "Anonymity"),
         (check_hidden_text, "Hidden text"),
         (openreview_applies and check_openreview, "OpenReview profiles"),
@@ -1501,13 +1732,13 @@ def validate_report(
     def _form_checks() -> None:
         if files_only:
             # No .sub: check just the named files, and say the form was not.
-            uploads = replace(venue, fields=[f for f in venue.fields if f.type in ("file", "filelist") and values.get(f.id, "").strip()])
-            _field_checks(checks, uploads, values)
+            uploads = replace(venue, fields=[f for f in venue.fields if f.type in ("file", "filelist") and form_values.get(f.id, "").strip()])
+            _field_checks(checks, uploads, form_values)
             checks.results = [r for r in checks.results if not r.id.startswith("form.")]
             checks.record("form", "Submission form checked (needs a .sub file)", form, report.NOT_APPLICABLE, detail="no .sub file, so the form's fields were not checked (only the files named)")
         else:
             checks.run("form.schema", "Field values have the right type and known field ids", form, _schema_issues, venue, values)
-            _field_checks(checks, venue, values)
+            _field_checks(checks, venue, form_values)
         checks.run("files.total_size", "Combined upload size within the portal's limit", "Files", _total_size_check, venue, values)
 
     bar.run("Submission form", _form_checks)
@@ -1516,26 +1747,27 @@ def validate_report(
     if check_links:
         bar.run("Links", checks.run, "integrity.links", "Links cited in the files are reachable", integrity, _link_issues, venue, values)
     else:
-        _record_switched_off(checks, "integrity.links", "Links cited in the files are reachable", integrity, venue, values, "switched off (--dont-check-links)")
+        _record_switched_off(checks, "integrity.links", "Links cited in the files are reachable", integrity, venue, values, "switched off (--disable-integrity.links)")
     retractions_title = "No cited work has been retracted"
     unmatched_title = "References without a DOI match a registered work"
     versions_title = "References cite the journal article, or the latest preprint"
     if check_references:
         retracted: list = []
         ref_ctx = _ReferenceContext()
-        dois = bar.run("Reference DOIs", checks.run, "integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values, retracted, ref_ctx.resolved)
-        checks.run("integrity.retractions", retractions_title, integrity, _retraction_issues, venue, values, None if dois.status == report.UNCHECKED else retracted)
-        bar.run("Reference search", checks.run, "integrity.unmatched_references", unmatched_title, integrity, _unmatched_reference_issues, venue, values, ref_ctx)
+        dois = bar.run("Reference DOIs", checks.run, "integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values, retracted, ref_ctx.resolved, ref_ctx.coverage)
+        bar.run("Reference search", checks.run, "integrity.unmatched_references", unmatched_title, integrity, _unmatched_reference_issues, venue, values, ref_ctx, retracted)
+        checks.run("integrity.retractions", retractions_title, integrity, _retraction_issues, venue, values, None if dois.status == report.UNCHECKED else retracted, ref_ctx.coverage)
         checks.run("integrity.reference_versions", versions_title, integrity, _reference_version_issues, venue, values, ref_ctx)
         for task in ref_ctx.ai_tasks:
             checks.needs_ai(task)
     else:
         for check_id, title in (("integrity.dois", "Reference DOIs match the works they cite"), ("integrity.retractions", retractions_title), ("integrity.unmatched_references", unmatched_title), ("integrity.reference_versions", versions_title)):
-            _record_switched_off(checks, check_id, title, integrity, venue, values, "switched off (--dont-check-references)")
+            _record_switched_off(checks, check_id, title, integrity, venue, values, "switched off (--disable-references)")
     if check_sensitive:
         bar.run("Sensitive information", checks.run, "integrity.sensitive", "No secrets or private information in the files", integrity, _sensitive_issues, venue, values)
     else:
-        checks.record("integrity.sensitive", "No secrets or private information in the files", integrity, report.UNCHECKED, detail="switched off (--dont-check-for-sensitive-info)")
+        checks.record("integrity.sensitive", "No secrets or private information in the files", integrity, report.UNCHECKED, detail="switched off (--disable-integrity.sensitive)")
+    bar.run("LaTeX source", checks.run, "integrity.latex_cleaner", "Nothing for arxiv_latex_cleaner to strip from the LaTeX source", integrity, _latex_cleaner_issues, venue, values)
     if check_anonymous:
         bar.run("Anonymity", checks.run, "integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, _anonymity_issues, venue, values)
     else:
@@ -1543,8 +1775,8 @@ def validate_report(
     if check_hidden_text:
         bar.run("Hidden text", checks.run, "integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, _hidden_text_issues, venue, values)
     else:
-        checks.record("integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, report.UNCHECKED, detail="switched off (--dont-check-hidden-text)")
-    pdf_reader = _pdf_reader_issues(venue, values, check_hidden_text=check_hidden_text, check_manuscript=check_manuscript)
+        checks.record("integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, report.UNCHECKED, detail="switched off (--disable-integrity.hidden_text)")
+    pdf_reader = _pdf_reader_issues(venue, values, check_hidden_text=check_hidden_text and not checks.disabled_by("integrity.hidden_text"), check_manuscript=check_manuscript)
     if pdf_reader:
         checks.record("integrity.pdf_reader", "PDF text extractor (pdfminer.six) installed, which the PDF-based checks need", integrity, report.UNCHECKED, issues=[replace_unchecked(i) for i in pdf_reader])
     if not openreview_applies:
@@ -1554,7 +1786,7 @@ def validate_report(
     elif check_openreview:
         bar.run("OpenReview profiles", checks.run, "integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, _openreview_profile_issues, venue, values)
     else:
-        checks.record("integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, report.UNCHECKED, detail="switched off (--dont-check-openreview-profiles)")
+        checks.record("integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, report.UNCHECKED, detail="switched off (--disable-integrity.openreview)")
 
     if check_manuscript:
         from . import requirements_check
@@ -1562,7 +1794,7 @@ def validate_report(
         _run_manuscript_stages(bar, checks, venue, values)
         requirements_check.not_implemented(checks, venue, values)
     else:
-        checks.record("guidelines", "Author-guideline checks ran (needs a venue with recorded guidelines)", "Guidelines", report.UNCHECKED, detail="switched off (--dont-check-manuscript)")
+        checks.record("guidelines", "Author-guideline checks ran (needs a venue with recorded guidelines)", "Guidelines", report.UNCHECKED, detail="switched off (--disable-manuscript)")
 
     from . import ai_validate
 
@@ -1627,10 +1859,30 @@ def replace_unchecked(issue: Issue) -> Issue:
     return replace(issue, unchecked=True)
 
 
+def _named_upload_count(venue: Venue, values: dict[str, str]) -> int:
+    """How many upload paths the values name, whether or not the files exist."""
+    count = 0
+    for field in venue.fields:
+        raw = values.get(field.id, "")
+        if field.type == "file" and raw.strip():
+            count += 1
+        elif field.type == "filelist":
+            count += sum(1 for line in raw.splitlines() if line.split("|", 1)[0].strip())
+    return count
+
+
 def _total_size_check(venue: Venue, values: dict[str, str]) -> list[Issue]:
     if not venue.max_upload_mb:
         raise NotApplicable("the portal states no combined upload limit")
-    return _upload_size_issues(venue, values)
+    named, found = _named_upload_count(venue, values), sum(1 for _ in _iter_upload_paths(venue, values))
+    if not named:
+        raise NotApplicable("no files attached")
+    if not found:
+        raise Unchecked("none of the named files could be found")
+    issues = _upload_size_issues(venue, values)
+    if found < named and not issues:
+        issues = [unchecked("", f"{named - found} of the {named} named file(s) could not be found, so the combined size is incomplete")]
+    return issues
 
 
 def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
@@ -1640,7 +1892,7 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     buckets: dict[str, list[Issue]] = {key: [] for key in ("required", "options", "counts", "lengths", "urls", "uploads", "manuscript_length", "authors", "subfields")}
     applied: set[str] = {"required"}
 
-    for field in venue.fields:
+    def check_field(field: Field) -> None:
         raw = values.get(field.id, "")
         present = bool(raw.strip())
 
@@ -1673,10 +1925,10 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
                 buckets["required"].append(Issue(ERROR, field.id, f"{field.label} is required when {trigger} {when}"))
             else:
                 buckets["required"].append(Issue(ERROR, field.id, f"{field.label} is required but empty"))
-            continue
+            return
 
         if not present:
-            continue
+            return
 
         # Option membership for the two option-bearing types. A ``choice`` holds
         # one value; a ``multichoice`` a comma-separated list, whose selection
@@ -1690,12 +1942,18 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         # not modelled in pydantic, so the ERROR is raised here; a closed
         # ``choice`` is already a ``Literal`` in the schema pass and would only be
         # reported twice. A ``text`` field with options (arXiv's primary_category,
-        # drawn from a vocabulary file) holds one value from a closed list too.
+        # drawn from a vocabulary file) holds one value from a closed list too, and
+        # a ``textarea`` with options (PLOS's classifications) one per line.
         # Options written "code (Label)" also accept the bare code.
-        if field.options and field.type in ("choice", "multichoice", "text"):
+        if field.options and field.type in ("choice", "multichoice", "text", "textarea"):
             applied.add("options")
             accepted = set(accepted_options(field))
-            chosen = [c.strip() for c in raw.split(",")] if field.type == "multichoice" else [raw.strip()]
+            if field.type == "multichoice":
+                chosen = _multichoice_items(field, raw)
+            elif field.type == "textarea":
+                chosen = [line.strip() for line in raw.splitlines()]
+            else:
+                chosen = [raw.strip()]
             for choice in chosen:
                 if not choice or choice in accepted:
                     continue
@@ -1708,7 +1966,7 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
                             f"{field.label}: '{choice}' is not in the recommended " f"list; it will be {entered}",
                         )
                     )
-                elif field.type in ("multichoice", "text"):
+                elif field.type in ("multichoice", "text", "textarea"):
                     if field.options_file:
                         valid = f"run '{options_command(venue.slug, field.id)}' to list the valid options"
                     else:
@@ -1758,7 +2016,7 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
             applied.add("uploads")
             buckets["uploads"].extend(_check_file_field(field, raw))
             length = _check_manuscript_length(field, raw, values)
-            if any(getattr(field, name) is not None for name in ("max_words", "max_words_before_refs", "max_pages", "max_pages_before_refs", "max_words_by", "max_words_before_refs_by", "max_pages_by", "max_pages_before_refs_by")):
+            if any(limit is not None for limit in _manuscript_limits(field, values)):
                 applied.add("manuscript_length")
             buckets["manuscript_length"].extend(length)
 
@@ -1784,6 +2042,16 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
             # reviewers, ...): enforce its required columns per line.
             applied.add("subfields")
             buckets["subfields"].extend(_check_subfields(field, raw))
+
+    for field in venue.fields:
+        try:
+            check_field(field)
+        except Exception as exc:  # noqa: BLE001 -- one bad value must not end the whole validation
+            logger.warning("checking field %s failed: %s", field.id, exc)
+            logger.debug("field %s traceback", field.id, exc_info=True)
+            key = "uploads" if field.type in ("file", "filelist") else "required"
+            applied.add(key)
+            buckets[key].append(unchecked(field.id, f"{field.label} could not be checked ({type(exc).__name__}: {exc}); please report this"))
 
     form = "Submission form"
     titles = {
@@ -1819,10 +2087,10 @@ def _author_name(author: dict) -> str:
 
 
 # Author columns covered by dedicated checks, so the generic per-column
-# presence check below skips them: the name identifier (handled by the
+# presence check below skips them: the name (handled by the
 # name-or-OpenReview-ID check) and the ``corresponding`` flag (a yes/no marker
 # whose empty value means "no", never "missing").
-_AUTHOR_SPECIAL = {"name", "first_name", "last_name", "open_review_id", "corresponding"}
+_AUTHOR_SPECIAL = {"name", "open_review_id", "corresponding"}
 
 
 def _check_authors(field: Field, raw: str) -> list[Issue]:
@@ -1877,6 +2145,9 @@ def _check_authors(field: Field, raw: str) -> list[Issue]:
         if "open_review_id" in columns and "author" in field.id.lower() and name_present and not a.get("open_review_id", "").strip():
             issues.append(Issue(WARNING, field.id, f"author '{who}' has no Open Review ID; every author needs an OpenReview profile, and without the ID the portal adds them by a name search that can match no profile or several (IDs look like ~Ada_Lovelace1)"))
         for col in required_cols:
+            # A line with no name at all has been reported above, and an OpenReview ID stands in for a name.
+            if col in ("first_name", "last_name") and (not _author_name(a) or a.get("open_review_id", "").strip()):
+                continue
             if not str(a.get(col, "")).strip():
                 issues.append(Issue(ERROR, field.id, f"author '{who}' is missing {col.replace('_', ' ')}"))
     if has_corresponding and not email_required_all and "email" in columns:

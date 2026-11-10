@@ -238,9 +238,11 @@ def test_repetition_stock_words_and_overused():
     filler = "However, the cells grew in the dish today. " * 6
     found = pc.repetition([filler + "Plain words follow here without anything special. " * 4])
     assert any(s.startswith("'however' 6 times") for s in found.style)
-    noisy = ["The widget moved. " * 30 + "Other text appears here with several different words to read. " * 10]
-    assert any(s.startswith("'widget'") for s in pc.repetition(noisy, topic="A paper").overused)
-    assert not any("widget" in s for s in pc.repetition(noisy, topic="A widget paper").overused)
+    noisy = ["The elegant widget moved. " * 30 + "Other text appears here with several different words to read. " * 10]
+    overused = pc.repetition(noisy, topic="A paper").overused
+    assert any(s.startswith("'elegant'") for s in overused)
+    assert not any("widget" in s for s in overused)  # a noun: the paper's subject recurs by necessity
+    assert not any("elegant" in s for s in pc.repetition(noisy, topic="An elegant paper").overused)
     assert pc.repetition(noisy).overused == []  # no topic to tell subject words from filler
 
 
@@ -250,4 +252,22 @@ def test_repetition_check_reports_and_lists_top_words(tmp_path):
     status, message, detail = _run(doc)["prose.repetition"]
     assert status == report.WARNING
     assert "1 run(s) of sentences opening with the same word" in message
-    assert "most frequent:" in detail
+    assert "words" in detail
+
+
+def test_is_modifier_keeps_adjectives_and_adverbs_only():
+    for word in ("important", "clinical", "rapidly", "significant", "large"):
+        assert pc._is_modifier(word), word
+    for word in ("studies", "devices", "patient", "hospital", "trial", "assessment", "family"):
+        assert not pc._is_modifier(word), word
+
+
+def test_top_words_leave_out_the_topic_and_nouns():
+    text = ["Rapid scanners and rapid devices gave important results. " * 6 + "The important scanners worked. " * 4]
+    found = pc.repetition(text, topic="Rapid scanners")
+    assert [w for w, _ in found.top] == ["important"]
+
+
+def test_item_labels_are_not_repeated_openings():
+    text = "Appendix S1: Search. Appendix S2: Eligibility. Appendix S3: Appraisal. Appendix S4: Devices. Appendix S5: Checklist."
+    assert pc.repetition([text]).openings == []

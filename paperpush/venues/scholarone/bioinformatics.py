@@ -20,7 +20,7 @@ import logging
 from playwright.sync_api import sync_playwright
 
 from ...database import get_venue
-from ...validate import parse_authors
+from ...validate import _multichoice_items, parse_authors
 from ..common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, hold_open, hold_open_on_failure, open_run_context
 from ..common import session_path as _session_path
 from ..recovery import GuardedPage, guard, step
@@ -289,7 +289,8 @@ def submit_bioinformatics(values: dict, headless: bool = False, debug: bool = Fa
         page.get_by_role("button", name="Save & Continue ").click()
 
         step("Keywords")
-        _add_keywords(page, _split_keywords(values["portal_keywords"]), portal=True)
+        portal_keywords_field = next(f for f in _VENUE.fields if f.id == "portal_keywords")
+        _add_keywords(page, _multichoice_items(portal_keywords_field, values["portal_keywords"]), portal=True)
         _add_keywords(page, _split_keywords(values.get("keywords", "")), portal=False)
         page.get_by_role("button", name="Save & Continue ").click()
 

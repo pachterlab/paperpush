@@ -31,7 +31,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from .database import SECTION_TITLES, Field, Venue, options_command
+from .database import GENERAL_SLUG, SECTION_TITLES, Field, Venue, options_command
 
 logger = logging.getLogger(__name__)
 
@@ -425,12 +425,16 @@ def resolve_relative_path(raw: str, base: Path) -> str:
     text = raw.strip()
     if not text:
         return raw
-    p = Path(text).expanduser()
-    if p.is_absolute():
-        return str(p)
-    beside = base / p
-    if beside.exists() or not p.exists():
-        return str(beside)
+    try:
+        p = Path(text).expanduser()
+        if p.is_absolute():
+            return str(p)
+        beside = base / p
+        if beside.exists() or not p.exists():
+            return str(beside)
+    except (RuntimeError, OSError, ValueError):
+        # Not a usable path at all; the validate file checks report it.
+        pass
     return text
 
 
@@ -466,14 +470,19 @@ def resolve_paths(sub: SubFile, base: str | Path) -> SubFile:
     return SubFile(venue=sub.venue, values=values)
 
 
-def load(path: str | Path) -> SubFile:
+def load(path: str | Path, default_venue: str | None = None) -> SubFile:
     """Read and parse a ``.sub`` file from disk.
 
-    Relative upload paths are resolved against the .sub file's own folder.
+    Relative upload paths are resolved against the .sub file's own folder. A
+    file with no ``@venue:`` line targets ``default_venue``, or without one the
+    general venue (general checks only).
     """
     path = find_subfile(path)
     logger.debug("Loading .sub file %s", path)
-    return resolve_paths(parse(path.read_text(encoding="utf-8")), path.parent)
+    sub = parse(path.read_text(encoding="utf-8"))
+    if not sub.venue:
+        sub = SubFile(venue=default_venue or GENERAL_SLUG, values=sub.values)
+    return resolve_paths(sub, path.parent)
 
 
 def find_block(text: str, key: str) -> str | None:

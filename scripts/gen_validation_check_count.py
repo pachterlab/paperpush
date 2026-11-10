@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import json
 import os
 import re
 import sys
@@ -29,6 +30,7 @@ from tests.pdf_builder import text_line, write_pdf  # noqa: E402
 
 README = ROOT / "README.md"
 DOCS = ROOT / "docs" / "validation-checks.rst"
+IDS = ROOT / "paperpush" / "validation_check_ids.json"
 START = "<!-- BEGIN VALIDATION CHECK COUNT -->"
 END = "<!-- END VALIDATION CHECK COUNT -->"
 DOCS_START = ".. BEGIN VALIDATION CHECK COUNT"
@@ -93,8 +95,9 @@ def check_catalog() -> dict[str, str]:
     catalog.update({
         "ai.cover_letter_venue": "Cover letter addressed to the target venue (when the automatic check can't decide)",
         "cover_letter.venue": "Cover letter addressed to the target venue",
-        "ai.reference_source.*": "Each cited source supports the claims that cite it (full reference check)",
-        "ai.reference_journal.*": "Each cited journal is correctly identified and indexed (full reference check)",
+        "ai.reference_source.*": "Each cited source supports the claims that cite it (only run with --reference-check-extended)",
+        "ai.reference_primary.*": "Each cited source is the original source of the claims that cite it (only run with --reference-check-extended)",
+        "ai.reference_journal.*": "Each cited journal is correctly identified and indexed (only run with --reference-check-extended)",
     })
     return {check_id: title for check_id, title in catalog.items() if not check_id.startswith("not_implemented.")}
 
@@ -110,19 +113,20 @@ def check_list(catalog: dict[str, str]) -> str:
         "consistency": "Submission and manuscript consistency", "cover_letter": "Cover letter",
         "front_matter": "Abstract and front matter", "bibliography": "Bibliography",
         "prose": "Prose", "integrity": "Integrity and external sources",
-        "details": "Additional manuscript details", "ai": "Checks requiring a reader",
+        "details": "Additional manuscript details", "ai": "Checks that require AI",
         "rigor": "Rigor and reproducibility",
     }
     by_group: dict[str, list[str]] = {}
     for check_id in sorted(catalog):
         by_group.setdefault(check_id.split(".")[0], []).append(check_id)
     number = 0
-    lines = ["All validation check types", "--------------------------", "",
-             "Each item below is a distinct report check ID. A check may be not applicable,",
-             "unable to run, or require a reader; which ones run depends on the venue, files,",
-             "and options. The two ``.*`` entries are families with one numbered check per",
-             "cited reference when ``--reference-check-full`` is used. Venue rules marked",
-             "*not implemented* are excluded.", ""]
+    lines = [".. _vc-check-list:", "", "All validation check types", "--------------------------", "",
+             "Each item below is a distinct report check ID, and the name to give",
+             "``--disable-<ID>`` to turn it off (see :ref:`vc-disable`). A check may be not",
+             "applicable, unable to run, or require AI; which ones run depends on the",
+             "venue, files, and options. The three ``.*`` entries are families with one numbered",
+             "check per cited reference when ``--reference-check-extended`` is used; disable them",
+             "without the ``.*``. Venue rules marked *not implemented* are excluded.", ""]
     for prefix, ids in by_group.items():
         lines.extend([f"**{groups.get(prefix, prefix.replace('_', ' ').title())}**", ""])
         for check_id in ids:
@@ -152,6 +156,16 @@ def replace_block(path: Path, content: str, *, check: bool, start_marker: str = 
     return False
 
 
+def write_ids(catalog: dict[str, str], *, check: bool) -> bool:
+    """Write the IDs ``validate --disable-NAME`` accepts; True when already current."""
+    content = json.dumps(sorted(check_id.removesuffix(".*") for check_id in catalog), indent=1) + "\n"
+    if IDS.exists() and IDS.read_text(encoding="utf-8") == content:
+        return True
+    if not check:
+        IDS.write_text(content, encoding="utf-8")
+    return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="fail if the documented count is stale")
@@ -161,7 +175,8 @@ def main() -> int:
     readme = f"- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — {count} distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html)."
     docs = f"PaperPush currently has **{count} distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``."
     current = [replace_block(README, readme, check=args.check), replace_block(DOCS, docs, check=args.check, start_marker=DOCS_START, end_marker=DOCS_END),
-               replace_block(DOCS, check_list(catalog), check=args.check, start_marker=LIST_START, end_marker=LIST_END)]
+               replace_block(DOCS, check_list(catalog), check=args.check, start_marker=LIST_START, end_marker=LIST_END),
+               write_ids(catalog, check=args.check)]
     print(f"{count} distinct validation check types")
     if args.check and not all(current):
         print("Documented check count is stale; run python scripts/gen_validation_check_count.py", file=sys.stderr)

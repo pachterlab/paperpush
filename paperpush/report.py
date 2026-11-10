@@ -107,6 +107,14 @@ def palette(alt_color: bool = False) -> Palette:
     return ALT_PALETTE if alt_color else DEFAULT_PALETTE
 
 
+def issue_dict(issue: "Issue") -> dict:
+    """``issue`` for JSON; ``unchecked`` is present only on a message saying a rule went unchecked."""
+    out = {"level": issue.level, "field": issue.field, "message": issue.message}
+    if getattr(issue, "unchecked", False):
+        out["unchecked"] = True
+    return out
+
+
 @dataclass
 class CheckResult:
     """What happened to one check.
@@ -132,7 +140,7 @@ class CheckResult:
         if self.source:
             out["source"] = self.source
         if self.issues:
-            out["issues"] = [{"level": i.level, "field": i.field, "message": i.message} for i in self.issues]
+            out["issues"] = [issue_dict(i) for i in self.issues]
         return out
 
 
@@ -192,7 +200,8 @@ class ValidationReport:
         return {
             "venue": self.venue,
             "subfile": self.subfile,
-            "ok": self.ok,
+            # An AI-only run did not run the deterministic checks: no verdict either way.
+            "ok": None if self.ai_only else self.ok,
             "ai": self.ai,
             "ai_error": self.ai_error,
             "counts": self.counts(),
@@ -314,7 +323,9 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
     verdict = "Ready to submit: no blocking errors." if report.ok else f"Not ready: {len(report.errors)} error(s) must be fixed before submitting."
     if report.scope:
         verdict = "No errors in the files checked." if report.ok else f"{len(report.errors)} error(s) in the files checked."
-    if report.initial_submission:
+    if report.initial_submission and report.scope:
+        verdict = f"{report.downgraded} error(s) in the files checked, shown as warnings (initial submission)." if report.downgraded else "No errors in the files checked."
+    elif report.initial_submission:
         verdict = f"Ready to submit as an initial submission: {report.downgraded} error(s) shown as warnings; fix them before the revision." if report.downgraded else "Ready to submit: no blocking errors."
     if report.ai_only:
         verdict = "AI checks only (--ai-only): the deterministic checks were not run, so this is not a verdict on whether the submission is ready."
@@ -414,7 +425,7 @@ def output_path(requested: str, subfile: str) -> Path:
     """
     stem = Path(subfile).stem or "paperpush"
     if not requested:
-        return Path(subfile).with_name(f"{stem}_validation.pdf")
+        return Path(subfile or "paperpush").with_name(f"{stem}_validation.pdf")
     path = Path(requested).expanduser()
     if path.is_dir():
         return path / f"{stem}_validation.pdf"

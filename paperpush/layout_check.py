@@ -46,6 +46,9 @@ FONT_SIZE_TOLERANCE_PT = 0.5
 # Baseline-to-baseline distance, as a multiple of the font size, from which
 # lines count as double spaced (LaTeX's \doublespacing gives ~1.95, Word's ~2.3).
 DOUBLE_SPACING_RATIO = 1.8
+# Word's single line height, as a multiple of the font size, for the fonts tall
+# enough that its 1.5 spacing would otherwise pass that ratio (Times and Arial are 1.15).
+TALL_LINE_HEIGHT = {"Calibri": 1.22, "Verdana": 1.215}
 PAGE_SIZES = {"us letter": (612.0, 792.0), "letter": (612.0, 792.0), "a4": (595.3, 841.9), "legal": (612.0, 1008.0)}
 # A page needs this many body lines before it counts toward margins and spacing.
 MIN_BODY_LINES = 12
@@ -195,7 +198,7 @@ def unembedded_fonts(path: Path) -> list[str]:
 
 # --- PDF measurement --------------------------------------------------------------
 
-_PAGE_NUMBER = re.compile(r"^(?:page\s*)?\d{1,4}(?:\s*(?:of|/)\s*\d{1,4})?$", re.IGNORECASE)
+_PAGE_NUMBER = re.compile(r"^[-\u2013\u2014]?\s*(?:page\s*)?\d{1,4}(?:\s*(?:of|/)\s*\d{1,4})?\s*[-\u2013\u2014]?$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -227,6 +230,31 @@ def _segments(glyphs, gap: float):
     return runs
 
 
+def _strip_close_line_numbers(rows: dict[float, list], body: float) -> int:
+    """Take numbers set just left of the text off their rows; returns how many.
+
+    Word puts line numbers about a quarter inch from the text, at the text's
+    size and on its baseline, too close to be a separate segment. They are told
+    from a table's index column by being a column that all the text starts right of.
+    """
+    leading: dict[float, int] = {}
+    for y, glyphs in rows.items():
+        n = 0
+        while n < min(5, len(glyphs)) and glyphs[n].text.isdigit():
+            n += 1
+        if 1 <= n <= 4 and n < len(glyphs) and glyphs[n].x0 - glyphs[n - 1].x1 > 0.8 * body:
+            leading[y] = n
+    if len(leading) < 5:
+        return 0
+    column, _ = Counter(round(rows[y][n - 1].x1) for y, n in leading.items()).most_common(1)[0]
+    numbered = {y: n for y, n in leading.items() if abs(rows[y][n - 1].x1 - column) <= 1.5}
+    if len(numbered) < 5 or any(glyphs[0].x0 < column for y, glyphs in rows.items() if y not in numbered):
+        return 0
+    for y, n in numbered.items():
+        del rows[y][:n]
+    return len(numbered)
+
+
 def measure_pdf(pages) -> PdfLayout | None:
     """Measure body text, margins, spacing, and line/page numbering from glyph pages."""
     from .template_check import _repeated_rows, _squash
@@ -251,15 +279,27 @@ def measure_pdf(pages) -> PdfLayout | None:
     for page in pages:
         rows: dict[float, list] = {}
         for g in page.glyphs:
-            if g.in_figure or not g.text.strip():
+            if g.in_figure or not g.text.strip() or g.baseline is not None:
                 continue
             rows.setdefault(round(g.y0 * 2) / 2, []).append(g)
-        body_lines: list[tuple[float, float, float]] = []  # (y, x0, x1)
-        margin_digits = 0
-        has_page_number = False
-        for y, glyphs in rows.items():
+        for glyphs in rows.values():
             glyphs.sort(key=lambda g: g.x0)
-            segments = _segments(glyphs, 2.5 * body)
+        body_lines: list[tuple[float, float, float]] = []  # (y, x0, x1)
+        margin_digits = _strip_close_line_numbers(rows, body)
+        has_page_number = False
+        segmented = {y: _segments(glyphs, 2.5 * body) for y, glyphs in rows.items()}
+        seg_text = lambda seg: "".join(g.text for g in seg).strip()  # noqa: E731
+        edge_digits = [seg for segs in segmented.values() if len(segs) > 1 for seg in (segs[0], segs[-1]) if seg_text(seg).isdigit() and len(seg_text(seg)) <= 4]
+        # Line numbers form a column; a page number in a running head stands alone.
+        in_column = lambda seg: sum(abs(o[-1].x1 - seg[-1].x1) < 2 or abs(o[0].x0 - seg[0].x0) < 2 for o in edge_digits) >= 3  # noqa: E731
+        ys = sorted(segmented)
+        band = page.height * 0.1
+        for y, segments in segmented.items():
+            # A head or foot: near the page's edge, or its outermost row, set off from the text.
+            running = y - page.y0 < band or page.y0 + page.height - y < band or (len(ys) > 1 and ((y == ys[0] and ys[1] - y > 1.5 * body) or (y == ys[-1] and y - ys[-2] > 1.5 * body)))
+            if running and len(segments) > 1 and any(_PAGE_NUMBER.match(seg_text(seg)) and not in_column(seg) for seg in (segments[0], segments[-1])):
+                has_page_number = True
+                continue
             kept = []
             for seg in segments:
                 text = "".join(g.text for g in seg).strip()
@@ -269,10 +309,8 @@ def measure_pdf(pages) -> PdfLayout | None:
                 kept.append(seg)
             if not kept:
                 continue
-            band = page.height * 0.1
             row_text = " ".join("".join(g.text for g in seg) for seg in kept).strip()
-            in_band = y - page.y0 < band or page.y0 + page.height - y < band
-            if in_band and _PAGE_NUMBER.match(re.sub(r"\s+", " ", row_text)):
+            if running and _PAGE_NUMBER.match(re.sub(r"\s+", " ", row_text)):
                 has_page_number = True
                 continue
             if len(kept) == 1 and row_text.isdigit() and len(row_text) <= 4:
@@ -356,17 +394,18 @@ def _twips(value: str | None) -> float | None:
 def safe_xml(xml: str | bytes | None):
     """Parse XML from an uploaded file, or None.
 
-    Word parts and SVG figures never need a DTD, so a document that declares
-    one (and with it, entity expansion) is refused rather than parsed; the
-    standard library parser does not fetch external entities.
+    A document that declares entities (and with them, entity expansion) is
+    refused rather than parsed. A bare ``<!DOCTYPE svg ...>``, which matplotlib
+    and others write, is harmless: the standard library parser does not fetch
+    external DTDs or entities.
     """
     if not xml:
         return None
     data = xml.encode("utf-8") if isinstance(xml, str) else xml
-    if b"<!DOCTYPE" in data[:4096].upper() or b"<!ENTITY" in data.upper():
+    if b"<!ENTITY" in data.upper():
         return None
     try:
-        return ET.fromstring(data)  # nosec B314 -- DTDs refused above; no external entities in stdlib
+        return ET.fromstring(data)  # nosec B314 -- entities refused above; no external entities in stdlib
     except ET.ParseError:
         return None
 
@@ -389,13 +428,11 @@ def measure_docx(doc: document.Document) -> DocxLayout | None:
         fonts = rpr.find(f"{_W}rFonts")
         if fonts is None:
             return None
-        name = fonts.get(f"{_W}ascii") or fonts.get(f"{_W}hAnsi")
-        if name:
-            return name
+        # A theme font overrides a named one on the same element (ECMA-376 17.3.2.26).
         themed = fonts.get(f"{_W}asciiTheme") or fonts.get(f"{_W}hAnsiTheme")
         if themed:
             return theme_fonts.get("major" if themed.startswith("major") else "minor")
-        return None
+        return fonts.get(f"{_W}ascii") or fonts.get(f"{_W}hAnsi") or None
 
     def size_of(rpr) -> float | None:
         if rpr is None:
@@ -442,14 +479,18 @@ def measure_docx(doc: document.Document) -> DocxLayout | None:
             if style.get(f"{_W}type") == "paragraph" and style.get(f"{_W}default") in ("1", "true"):
                 default_style = sid
 
-    def resolved(sid: str | None, key: str):
+    def from_style(sid: str | None, key: str):
         seen = set()
         while sid and sid in styles and sid not in seen:
             seen.add(sid)
             if styles[sid][key] is not None:
                 return styles[sid][key]
             sid = styles[sid]["based"]
-        return default[key]
+        return None
+
+    def resolved(sid: str | None, key: str):
+        found = from_style(sid, key)
+        return default[key] if found is None else found
 
     fonts: Counter = Counter()
     sizes: Counter = Counter()
@@ -464,8 +505,10 @@ def measure_docx(doc: document.Document) -> DocxLayout | None:
             if not text.strip():
                 continue
             rpr = run.find(f"{_W}rPr")
-            font = font_of(rpr) or resolved(pstyle, "font")
-            size = size_of(rpr) or resolved(pstyle, "size")
+            rstyle = rpr.find(f"{_W}rStyle") if rpr is not None else None
+            char_style = rstyle.get(f"{_W}val") if rstyle is not None else None
+            font = font_of(rpr) or from_style(char_style, "font") or resolved(pstyle, "font")
+            size = size_of(rpr) or from_style(char_style, "size") or resolved(pstyle, "size")
             if font:
                 fonts[font] += len(text)
             if size:
@@ -545,11 +588,15 @@ def measure_tex(source: str) -> TexLayout:
     font = None
     if {"times", "mathptmx", "newtxtext", "txfonts", "ptm", "tgtermes", "mathptm"} & set(packages):
         font = "Times"
-    elif {"helvet", "arial", "uarial", "tgheros"} & set(packages):
+    elif re.search(r"\\renewcommand\s*\{?\s*\\rmdefault\s*\}?\s*\{\s*ptm\s*\}", source):
+        font = "Times"
+    elif {"helvet", "arial", "uarial", "tgheros"} & set(packages) and re.search(r"\\familydefault\s*\}?\s*\{\s*\\sfdefault", source):  # these packages only set the sans family
         font = "Helvetica" if "helvet" in packages or "tgheros" in packages else "Arial"
+    elif {"mathpazo", "palatino", "newpxtext", "pxfonts", "tgpagella"} & set(packages):
+        font = "Palatino"
     elif m := re.search(r"\\setmainfont\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}", source):
         font = m.group(1).strip()
-    elif any(c in ("article", "report", "book", "amsart") for c in classes) and "fontspec" not in packages:
+    elif any(c in ("article", "report", "book", "amsart") for c in classes) and not {"fontspec", "libertine", "charter", "XCharter", "fourier", "bookman", "newcent", "kpfonts", "cmbright", "sourcesanspro", "sourceserifpro"} & set(packages):
         font = "Computer Modern"
     margins: dict[str, float] = {}
     geometry = package_options.get("geometry", "") + " " + " ".join(m.group(1) for m in re.finditer(r"\\(?:new)?geometry\s*\{([^}]*)\}", source))
@@ -561,12 +608,13 @@ def measure_tex(source: str) -> TexLayout:
         for side in sides:
             margins[side] = pts
     double = None
-    if re.search(r"\\doublespacing\b|\\setstretch\s*\{\s*(?:2|1\.[6-9])|\\linespread\s*\{\s*(?:2|1\.[6-9])", source) or "doublespacing" in package_options.get("setspace", ""):
+    stretch = r"(?:\\setstretch\s*|\\linespread\s*|\\begin\s*\{\s*spacing\s*\}\s*|\\renewcommand\s*\{?\s*\\baselinestretch\s*\}?\s*)\{\s*"
+    if re.search(r"\\doublespacing\b|" + stretch + r"(?:2|1\.[6-9])", source) or "doublespacing" in package_options.get("setspace", ""):
         double = True
-    elif re.search(r"\\onehalfspacing\b|\\singlespacing\b|\\linespread\s*\{\s*1(?:\.[0-5]\d*)?\s*\}", source):
+    elif re.search(r"\\onehalfspacing\b|\\singlespacing\b|" + stretch + r"1(?:\.[0-5]\d*)?\s*\}", source):
         double = False
-    line_numbers = bool(("lineno" in packages and re.search(r"\\linenumbers\b|\\begin\s*\{\s*linenumbers\s*\}", source)) or {"lineno", "linenumbers", "review"} & set(options))
-    page_numbers = not re.search(r"\\pagestyle\s*\{\s*empty\s*\}", source)
+    line_numbers = bool(("lineno" in packages and re.search(r"\\linenumbers\b|\\begin\s*\{\s*linenumbers\s*\}", source)) or {"lineno", "linenumbers"} & set(options) or ("review" in options and "acmart" in classes))  # only acmart's review option numbers lines
+    page_numbers = not re.search(r"\\pagestyle\s*\{\s*empty\s*\}|\\pagenumbering\s*\{\s*gobble\s*\}", source) and "nopageno" not in packages
     paper = next((o for o in options if o in ("letterpaper", "a4paper")), None) or next((o for o in ("letterpaper", "a4paper") if o in geometry), None)
     return TexLayout(classes, packages, size, font, margins, double, line_numbers, page_numbers, paper)
 
@@ -697,7 +745,8 @@ def _template(checks: Checks, field: Field, m: _Measured, reqs: ManuscriptRequir
     url = f" ({rules.template_url})" if rules.template_url else ""
     if m.tex is not None:
         if not rules.latex_class:
-            return [], f"LaTeX class {', '.join(m.tex.classes) or 'unknown'}; the guidelines name no class to compare"
+            checks.needs_ai(AiTask(id="ai.template", title="Looks prepared with the venue's template (judged from the layout when the file can't tell)", category=LAYOUT, instructions=f"The author guidelines require the venue's template{url}. Judge from the manuscript's source and layout whether it was prepared with that template. 'fail' if it plainly was not.", files=[str(m.path)]))
+            raise Unchecked(f"LaTeX class {', '.join(m.tex.classes) or 'unknown'}; the guidelines name no class to compare, so an AI check is queued")
         names = set(m.tex.classes) | set(m.tex.packages)
         wanted = rules.latex_class
         if wanted in names or any(n.startswith(wanted) for n in names):
@@ -706,9 +755,8 @@ def _template(checks: Checks, field: Field, m: _Measured, reqs: ManuscriptRequir
     if m.docx is not None:
         task = AiTask(id="ai.template", title="Looks prepared with the venue's template (judged from the layout when the file can't tell)", category=LAYOUT, instructions=f"The author guidelines require the venue's template{url}. Judge from the manuscript's layout, styles, and front matter whether it was prepared with that template. 'fail' if it plainly was not.", files=[str(m.path)])
         checks.needs_ai(task)
-        if m.docx.template:
-            return [], f"Word file attached to template '{m.docx.template}'"
-        return [], "no attached Word template recorded in the file"
+        attached = f"attached to template '{m.docx.template}'" if m.docx.template else "no attached Word template recorded in the file"
+        raise Unchecked(f"{m.path.name}: {attached}; which template made it is judged by the queued AI check")
     if m.pdf is not None:
         checks.needs_ai(AiTask(id="ai.template", title="Looks prepared with the venue's template (judged from the layout when the file can't tell)", category=LAYOUT, instructions=f"The author guidelines require the venue's {'LaTeX class ' + repr(rules.latex_class) if rules.latex_class else 'template'}{url}. Judge from the PDF's layout, fonts, headings, and front matter whether it was prepared with it. 'fail' if it plainly was not.", files=[str(m.path)]))
         raise Unchecked(f"{m.path.name} is a PDF: which template made it can only be judged by eye (an AI check is queued); upload the LaTeX source or Word file to check it directly")
@@ -789,7 +837,8 @@ def _spacing(field: Field, m: _Measured):
         if m.pdf.baseline_skip is None:
             return None, f"found no full pages of body text in {m.path.name} to measure its line spacing"
         ratio = m.pdf.baseline_skip / m.pdf.body_font
-        if ratio < DOUBLE_SPACING_RATIO:
+        family = font_family(m.pdf.body_fonts.most_common(1)[0][0])[0] if m.pdf.body_fonts else ""
+        if ratio < max(DOUBLE_SPACING_RATIO, 1.5 * TALL_LINE_HEIGHT.get(family, 0) + 0.07):
             kind = "1.5-spaced" if ratio >= 1.4 else "single-spaced"
             return [_issue(field, f"{m.path.name} looks {kind}: its lines are {m.pdf.baseline_skip:g} pt apart ({ratio:.2f} x the {m.pdf.body_font:g} pt text); the author guidelines ask for double spacing")], ""
         return [], f"lines {ratio:.2f} x the font size apart"
@@ -804,6 +853,8 @@ def _spacing(field: Field, m: _Measured):
         if not m.tex.double_spacing:
             return [_issue(field, f"{m.path.name} sets single or 1.5 spacing; the author guidelines ask for double spacing")], ""
         return [], "double spacing set in the source"
+    if m.tex is not None and not any(c in ("article", "report", "book", "amsart") for c in m.tex.classes):
+        return None, f"{m.path.name} uses the class {', '.join(m.tex.classes) or 'unknown'}, which may set the line spacing itself; compile it to measure the spacing"
     if m.tex is not None:
         return [_issue(field, f"{m.path.name} does not set double spacing (no \\doublespacing, setspace, or \\linespread); the author guidelines ask for it")], ""
     return None, ""
@@ -862,6 +913,8 @@ _SPELLINGS: list[tuple[str, str]] = [
 ]  # fmt: skip
 # Endings a stem may take and still be the same word ("colored", "centres").
 _ENDINGS = r"(?:|s|d|e|es|ed|ing|al|ally|ic|ist|ists|ation|ations|ly|r|rs|er|ers|ful|less|tic|tical|sis)"
+# Words a stem and ending above would build that are spelled the same in both variants.
+_SAME_IN_BOTH = {"analyses", "catalyses", "paralyses", "literal", "literals", "literally", "humoral", "coloration", "colorations"}
 _IZE_STEMS = ["organi", "characteri", "normali", "optimi", "recogni", "minimi", "maximi", "utili", "visuali", "summari", "randomi", "categori", "generali", "speciali", "stabili", "standardi", "emphasi", "parameteri", "regulari", "locali", "initiali", "mobili", "polymeri", "neutrali", "prioriti", "harmoni", "critici"]  # fmt: skip
 _IZE_ENDINGS = r"(?:e|es|ed|ing|ation|ations|er|ers)"
 
@@ -874,6 +927,8 @@ def spelling_counts(text: str) -> tuple[Counter, Counter, Counter, Counter]:
     ize: Counter = Counter()
     ise: Counter = Counter()
     for word, n in words.items():
+        if word in _SAME_IN_BOTH:
+            continue
         for american, british in _SPELLINGS:
             if re.fullmatch(re.escape(british) + _ENDINGS, word):
                 uk[word] += n
@@ -893,6 +948,7 @@ def spelling_counts(text: str) -> tuple[Counter, Counter, Counter, Counter]:
 
 
 def _language_check(venue: Venue, values: dict[str, str], language: str):
+    from .manuscript import truncate_at_references
     from .requirements_check import manuscript_files
 
     files = manuscript_files(venue, values)
@@ -906,7 +962,8 @@ def _language_check(venue: Venue, values: dict[str, str], language: str):
         if text is None:
             issues.append(Issue(WARNING, field.id, f"could not read {path.name} as text; its spelling variant was not checked", unchecked=True))
             continue
-        us, uk, ize, ise = spelling_counts(text)
+        # The references keep their cited titles' spelling, whatever the manuscript's.
+        us, uk, ize, ise = spelling_counts(truncate_at_references(text))
         sample = lambda c: ", ".join(w for w, _ in c.most_common(4))  # noqa: E731
         if "oxford" in lower:
             if us:

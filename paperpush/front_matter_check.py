@@ -54,14 +54,22 @@ TEX_CITE = re.compile(
 # "[3]", "[2, 5-7]", "[12–14]": whole numbers from 1, no decimals (so "[0, 1]" is an interval, not a citation).
 _BRACKET = re.compile(r"\[\s*([1-9]\d{0,3}(?:\s*[,\u2013\u2014-]\s*[1-9]\d{0,3})*)\s*\]")
 # A surname: capitalised, with a lower-case letter early on (so "NIPS 2017" or "WMT 2014" is not one).
-_NAME = r"[A-Z](?:['\u2019][A-Z]|[a-z]?[A-Z])?[a-z\u00e0-\u017f][A-Za-z'\u2019\u00c0-\u017f-]*"
+_NOT_A_NAME = r"(?!(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec|Spring|Summer|Autumn|Fall|Winter)\b)"
+_NAME = _NOT_A_NAME + r"[A-Z](?:['\u2019][A-Z]|[a-z]?[A-Z])?[a-z\u00e0-\u017f][A-Za-z'\u2019\u00c0-\u017f-]*"
 _YEAR = r"(?:19|20)\d{2}[a-z]?"
 # "(Smith et al., 2020)", "(Smith and Jones 2019; Lee 2021)", "Smith et al. (2020)", "Smith et al., 2020".
 _AUTHOR_YEAR = re.compile(
-    rf"\(\s*(?:e\.g\.,?\s*|see\s+(?:also\s+)?)?{_NAME}(?:\s+(?:et\s+al\.?|and\s+{_NAME}|&\s*{_NAME}))?,?\s+{_YEAR}(?:[^()]{{0,60}}?\))?"
+    rf"\(\s*(?:e\.g\.,?\s*|see\s+(?:also\s+)?)?{_NAME}(?:,\s*{_NAME})*(?:,?\s+(?:et\s+al\.?|and\s+{_NAME}|&\s*{_NAME}))?,?\s+{_YEAR}(?:[^()]{{0,60}}?\))?"
     rf"|\b{_NAME}\s+et\s+al\.?,?\s*\(?{_YEAR}"
     rf"|\b{_NAME}\s+(?:and|&)\s+{_NAME}\s+\({_YEAR}\)"
+    # "Smith (2020) showed", not "the Global Burden of Disease (2019)" or "the UK Census (2020)".
+    rf"|(?<!\bof\s)(?<!\bthe\s)(?<!\bin\s)(?<![A-Z]\s)\b{_NAME}\s+\({_YEAR}\)"
 )
+# Pandoc's "[@smith2020; @lee2021]".
+_PANDOC_CITE = re.compile(r"\[\s*(?:see\s+)?-?@[\w:.#$%&+?<>~/-]+(?:\s*;\s*-?@[\w:.#$%&+?<>~/-]+)*\s*\]")
+# Before a bracket: "95% CI [8, 16]". After it: "[3,3]-sigmatropic", "[1,2,4]triazole".
+_INTERVAL_BEFORE = re.compile(r"(?:\b(?:CI|CrI|IQR|intervals?|ranges?|between)|%)\s*[:=,]?\s*$", re.IGNORECASE)
+_NOMENCLATURE_AFTER = re.compile(r"-?[A-Za-z]")
 
 
 def citations_in(text: str, *, tex: bool = False) -> list[str]:
@@ -69,7 +77,8 @@ def citations_in(text: str, *, tex: bool = False) -> list[str]:
     found: list[str] = []
     if tex:
         found += [m.group(0) for m in TEX_CITE.finditer(text)]
-    found += [m.group(0) for m in _BRACKET.finditer(text)]
+    found += [m.group(0) for m in _BRACKET.finditer(text) if not (_INTERVAL_BEFORE.search(text[max(0, m.start() - 20) : m.start()]) or _NOMENCLATURE_AFTER.match(text, m.end()))]
+    found += [m.group(0) for m in _PANDOC_CITE.finditer(text)]
     found += [m.group(0) for m in _AUTHOR_YEAR.finditer(text)]
     return list(dict.fromkeys(f.strip() for f in found))
 
@@ -77,7 +86,7 @@ def citations_in(text: str, *, tex: bool = False) -> list[str]:
 # --- the manuscript's abstract -------------------------------------------------------
 
 _TEX_ABSTRACT = re.compile(r"\\begin\s*\{\s*abstract\s*\}(.*?)\\end\s*\{\s*abstract\s*\}|\\abstract\s*\{((?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*)\}", re.DOTALL)
-_ABSTRACT_HEADING = re.compile(r"^[ \t]*(?:\d+\.?\s+)?(?:abstract|summary)[ \t]*[:.\u2014-]?[ \t]*(?:\n|(?=[A-Z]))", re.IGNORECASE | re.MULTILINE)
+_ABSTRACT_HEADING = re.compile(r"^[ \t]*(?:\d+\.?\s+)?(?:abstract|summary(?![ \t]+(?:statement|points?|box)\b))[ \t]*[:.\u2014-]?[ \t]*(?:\n|(?=(?-i:[A-Z])))", re.IGNORECASE | re.MULTILINE)
 # What ends the abstract in extracted text: the next part of the front matter or the main text.
 _ABSTRACT_END = re.compile(
     r"^[ \t]*(?:\d+\.?[ \t]+|[IVX]+\.[ \t]+)?(?:introduction|key\s*words|keywords|index\s+terms|main(?:\s+text)?|significance(?:\s+statement)?|author\s+summary|"
@@ -250,7 +259,11 @@ def labelled(text: str, heading: str) -> bool:
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 # \email{...} in LaTeX source, and an address with its @ spelled out ("jdoe at uni dot edu").
 _TEX_EMAIL = re.compile(r"\\(?:email|emailAdd|ead)\s*(?:\[[^\]]*\])?\s*\{\s*[^}\s]+\s*\}")
-_SPELLED_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+\s*(?:\[at\]|\(at\)|\{at\}|\s+at\s+)\s*[A-Za-z0-9-]+(?:\s*(?:\.|\[dot\]|\(dot\)|\s+dot\s+)\s*[A-Za-z0-9-]+)+\b")
+# A bare " at " needs a lower-case host with unspaced dots: "done at UCLA. UK Biobank" is prose.
+_SPELLED_EMAIL = re.compile(
+    r"\b[A-Za-z0-9._%+-]+\s*(?:\[at\]|\(at\)|\{at\})\s*[A-Za-z0-9-]+(?:\s*(?:\.|\[dot\]|\(dot\)|\s+dot\s+)\s*[A-Za-z0-9-]+)+\b"
+    r"|\b[A-Za-z0-9._%+-]+\s+at\s+[a-z0-9-]+(?:(?:\.|\s*\[dot\]\s*|\s*\(dot\)\s*|\s+dot\s+)[a-z0-9-]+)+\b"
+)
 
 
 def emails_in(text: str) -> list[str]:

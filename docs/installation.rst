@@ -128,8 +128,9 @@ Optional extras
      modified-template check. Without it those checks skip PDFs and
      ``validate`` prints a warning saying so. Recommended if you submit to
      conferences.
-   - ``arxiv_latex_cleaner``, which ``validate --arxiv-latex-cleaner`` runs on
-     your LaTeX source before checking it.
+   - ``arxiv_latex_cleaner``, which ``validate`` runs on a temporary copy of
+     your LaTeX source to report what it would strip. Without it that check is
+     reported as not checked.
    - ``codespell``, whose list of common misspellings the prose check uses.
      Without it the spelling check is reported as not checked.
    - ``tqdm``, for the progress bar ``validate`` shows in a terminal while it

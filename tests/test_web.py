@@ -379,8 +379,10 @@ def test_live_rules_leave_limits_the_form_declares_to_the_form():
             assert not (field.max_count is not None and "max_keywords" in limits), venue.slug
 
 
-def test_validate_needs_a_venue_line(client, ws):
-    assert client.post(f"/api/workspaces/{ws}/validate", json={"text": "title: x\n"}).status_code == 400
+def test_validate_without_a_venue_line_runs_the_general_checks(client, ws):
+    res = client.post(f"/api/workspaces/{ws}/validate", json={"text": "title: x\n"})
+    assert res.status_code == 200
+    assert res.json()["venue"] == "general"
 
 
 def test_bundle_holds_the_sub_and_every_upload(client, ws):
@@ -936,6 +938,16 @@ def test_validate_web_initial_submission_ticks_the_box(tmp_path, monkeypatch, se
     assert main(["validate", "biorxiv.sub", "--web", "--initial-submission"]) == 0
     assert main(["validate", "biorxiv.sub", "--web", "--ai", "--initial-submission"]) == 0
     assert [kw["action"] for _, kw in served] == ["validate+initial", "validate-ai+initial"]
+
+
+def test_validate_web_refuses_reference_check_extended(tmp_path, monkeypatch, served, capsys):
+    from paperpush.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "biorxiv.sub").write_text(_filled_template())
+    assert main(["validate", "biorxiv.sub", "--web", "--reference-check-extended"]) == 1
+    assert "not supported with --web" in capsys.readouterr().err
+    assert served == []
 
 
 # --- shared forms ------------------------------------------------------------

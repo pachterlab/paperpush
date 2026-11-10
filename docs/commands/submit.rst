@@ -11,7 +11,9 @@ click-through, filling out the form from your ``.sub`` file.
                            [--recover {off,by-hand,ai,agent}] [--ai]
                            [--provider {anthropic,openai,google}]
                            [--model MODEL] [--recover-dir DIR]
-                           [--cdp-port PORT]
+                           [--cdp-port PORT] [--skip-validate]
+                           [--enable-network-checks]
+                           [validate's check flags, see below]
                            subfile
 
 .. important::
@@ -36,6 +38,28 @@ Before you run it, make sure you have:
 
 1. A filled ``.sub`` file that passes :doc:`validate`.
 2. Stored credentials for the venue (:doc:`login`).
+
+.. _submit-validation:
+
+Validation before the browser opens
+-----------------------------------
+
+``submit`` runs :doc:`validate`'s checks on the ``.sub`` first and stops on any
+error, with two differences that keep it quick:
+
+- The link, reference, and OpenReview lookups are skipped. Add
+  ``--enable-network-checks`` to run them.
+- The sensitive-data scan is skipped.
+
+``submit`` prints a note saying so. Run ``paperpush validate`` to see those
+results. At a double-blind venue, the anonymity check still fetches any linked
+anonymous.4open.science repositories.
+
+Every flag of ``validate`` that changes what is checked works here too, so a
+check you turned off for ``validate`` can be turned off the same way:
+``--disable-<CHECK>``, ``--enable-<CHECK>``, ``--anonymous``, ``--initial-submission``,
+``--cover-letter-max-age``, ``--references-alphabetical``, and
+``--references-citation-order``. See :doc:`validate` and :ref:`vc-disable`.
 
 Arguments
 ---------
@@ -64,6 +88,10 @@ Options
    default ``submit`` validates first and stops on any error; when it does, the
    error message suggests this flag. Use it when you have checked the errors
    and want to submit anyway.
+
+``--enable-network-checks``
+   Also run the link, reference, and OpenReview lookups before opening the
+   browser. See :ref:`submit-validation`.
 
 ``--timeout SECONDS``
    Cap how long the browser waits for any action or page load before failing.

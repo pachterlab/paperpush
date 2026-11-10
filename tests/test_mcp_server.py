@@ -552,6 +552,27 @@ def test_submit_validates_the_child_by_default(fake_launch):
     assert "--skip-validate" not in fake_launch.instances[0].command
 
 
+def test_submit_tells_the_child_what_the_preflight_was_told(fake_launch):
+    """The child validates again: without the same flags it would block on what the preflight let through."""
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    mcp_server.submit(str(VALID_SUB), disable=["prose", "bibliography.age"], network_checks=True, initial_submission=True, anonymous=False, cover_letter_max_age_days=30)
+    command = fake_launch.instances[0].command
+    for flag in ("--disable-prose", "--disable-bibliography.age", "--enable-network-checks", "--initial-submission", "--disable-integrity.anonymity"):
+        assert flag in command
+    assert command[command.index("--cover-letter-max-age") + 1] == "30"
+
+
+def test_submit_preflight_is_offline_unless_asked(fake_launch, monkeypatch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    seen = []
+    real = mcp_server.validate_subfile
+    monkeypatch.setattr(mcp_server, "validate_subfile", lambda *a, **k: seen.append(k) or real(*a, **{**k, "check_links": False, "check_references": False, "check_openreview": False}))
+    mcp_server.submit(str(VALID_SUB))
+    mcp_server.submit(str(VALID_SUB), network_checks=True)
+    assert [k["check_links"] for k in seen] == [False, True]
+    assert all(k["check_sensitive"] is False for k in seen)
+
+
 def test_submit_refuses_without_a_stored_login(no_launch):
     """Launching would stall on a password prompt with no terminal to answer it."""
     result = mcp_server.submit(str(VALID_SUB))
@@ -707,7 +728,7 @@ def test_build_server_exposes_typed_arguments():
     tool = by_name["validate_subfile"]
     # Renamed from inputSchema to input_schema in MCP SDK 2.0.
     schema = getattr(tool, "input_schema", None) or tool.inputSchema
-    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "venue", "manuscript", "title_page", "cover_letter", "figures", "tables", "supplement", "check_links", "check_sensitive", "check_references", "reference_check_full", "references_alphabetical", "references_citation_order", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "colorblind", "initial_submission", "ai_only", "cover_letter_max_age_days", "publisher", "issn", "journal"}
+    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "venue", "manuscript", "title_page", "cover_letter", "figures", "tables", "supplement", "check_links", "check_sensitive", "check_references", "reference_check_extended", "references_alphabetical", "references_citation_order", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "colorblind", "initial_submission", "ai_only", "cover_letter_max_age_days", "publisher", "issn", "journal", "disable", "enable"}
     # Files can be named instead of a .sub, so nothing is required.
     assert not schema.get("required")
 

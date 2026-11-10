@@ -5,12 +5,13 @@ description: >-
   for up to three rounds, until only the issues the author has to decide or
   fix remain. Backs up every file first, finds the editable source behind each
   file (the .tex or .docx behind a PDF), makes the mechanical fixes and the
-  small trims (an abstract a few words over its limit), rebuilds the PDF, and
+  small trims (an abstract a few words over its limit), rebuilds the PDF,
+  applies arxiv_latex_cleaner to LaTeX source after reviewing its output, and
   reports separately what it fixed, what needs the author's decision (a
   manuscript thousands of words over its limit), and what it cannot fix. Never
   ticks a confirmation or invents content. Triggers: "fix the validate
   errors", "fix what validate found", "make my sub pass validation", "clean up
-  the validation warnings", "paperpush-fix".
+  the validation warnings", "clean my LaTeX source", "paperpush-fix".
 ---
 
 # paperpush fix (Claude skill)
@@ -33,13 +34,13 @@ and only tiers 1 and 2 are edited.
 - **Whether to make edits at all.** If they asked "what can be fixed?", do a
   dry run: steps 1–3 only, then report the plan.
 - Flags they passed to validate before (`--initial-submission`,
-  `--dont-check-links`, `--anonymous`, ...). Pass the same flags in every round.
+  `--disable-integrity.links`, `--anonymous`, ...). Pass the same flags in every round.
 
 ## Step 0: back up every file you might edit
 
 Always, even when the files are in git. Before the first edit, copy the
 `.sub` and each source file you might change (`.tex` files including the
-`\input` ones, `.bib`, `.docx`, `.md`) to
+`\input` ones, `.bib`, `.docx`, `.md`, and any `.zip`/`.tar` LaTeX bundle) to
 `<sub dir>/.paperpush-backup/<YYYYmmdd-HHMMSS>/`, keeping their names (and
 their relative paths, for files in subdirectories). One backup per run,
 taken before round 1; later rounds don't back up again. Never put the backups
@@ -158,7 +159,8 @@ these:
 - `details.word_cleanliness` (tracked changes or comments left in a `.docx`):
   whether to accept or reject them is the author's call.
 - `integrity.sensitive`, `integrity.hidden_text`, `integrity.anonymity`:
-  report them with the location.
+  report them with the location. (LaTeX comments and junk files in a bundle
+  are the exception: step 5b removes them.)
 - `files.uploads` (a missing file), `guidelines.formats` (wrong file type):
   name the file to supply or the export to make.
 - `unchecked` and `not_implemented` checks: say what could not be checked
@@ -238,6 +240,75 @@ tier 3. If the `.sub` names a PDF exported from a `.docx`, you can't rebuild
 it: tell the author to export it again, and validate the `.docx` alone in
 the meantime (`paperpush validate --venue <venue> --manuscript <abs .docx>`).
 
+## Step 5b: apply arxiv_latex_cleaner, and check what it did
+
+`validate` only previews the cleaner, in the `integrity.latex_cleaner` check.
+This step is what applies it. Do it once per run, after the other edits.
+
+**When.** Look at `integrity.latex_cleaner` in round 1:
+
+- `warning` with issues (arXiv and venues that submit through it, where the
+  source goes public): apply it without asking.
+- `passed` with a `detail` saying what it "would change" (any other venue):
+  ask once, alongside the step 3b question, before any edit. Say that it
+  strips the comments from the working `.tex` files, with the copies kept in
+  the backup. If the author says no, skip this step and say so in the report.
+- `passed` with "would change nothing", or `not_applicable`: skip this step.
+- `unchecked`: the package is missing, or the cleaner failed. Tell the author
+  to `pip install 'paperpush[validate]'`, or give the reason, and list it
+  under "Can't fix here".
+
+In a dry run, report what the check says and stop.
+
+**The tool makes mistakes, so review every change.** It works by pattern
+matching. On its own it deleted a figure whose path came from a macro and cut
+`keep % this` in a `verbatim` block to `keep %`. You are the check on it.
+
+1. Copy the source to `<scratch>/latex-clean/source/`: the whole LaTeX project
+   directory (without `.git` or `.paperpush-backup`), or the unpacked bundle.
+   Never run the cleaner on the author's directory.
+2. From `<scratch>/latex-clean/`, run:
+
+   ```
+   arxiv_latex_cleaner <abs scratch>/latex-clean/source --keep_bib
+   ```
+
+   It writes `source_arXiv/` beside `source/`. Without `--keep_bib` it deletes
+   the `.bib` files.
+3. Run `diff -ru source source_arXiv` and read all of it. Check:
+   - **Every removed file.** It must really be unused. Search the remaining
+     `.tex`, `.sty`, and `.cls` files for its name and stem, and look for what
+     pattern matching misses: paths built by macros, `\graphicspath`,
+     `\input`/`\subimport` with macros, `\foreach` loops over file names,
+     `\lstinputlisting`/`\verbatiminput`, pgfplots data files, and `.bbl`,
+     `.bst`, `.cls`, `.sty` files the build reads. Keep a PDF or figure the
+     `.sub` names.
+   - **Every changed line.** The only change allowed is removing a comment or
+     a commented-out block. Restore the original line if the cleaner touched
+     a `%` in `verbatim`, `lstlisting`, `minted`, `\verb`, or a URL (`%20`),
+     an escaped `\%`, or any text that was not a comment. Restore a block it
+     removed that was live code. A trailing `%` that suppresses a line break
+     must stay.
+4. Repair `source_arXiv/`: copy back each wrongly removed file and restore
+   each wrongly changed line. Log each repair with its reason.
+5. Compile a throwaway copy of the repaired `source_arXiv/` with `latexmk
+   -pdf`, and compile a copy of `source/` the same way. The page counts must
+   match, and `pdftotext` output from the two PDFs must be the same. If they
+   differ, find the change that caused it and restore it, and if you can't,
+   skip the cleaner and move it to tier 3. With no LaTeX compiler, say in the
+   report that the build was not confirmed.
+6. Apply it. For loose `.tex` uploads, copy each changed `.tex` file (the
+   uploads and the files they `\input`) over its original and delete nothing
+   in the author's directory: other files there may not belong to the paper.
+   For a bundle, repack the repaired `source_arXiv/` to the same path, in the
+   same format, with the same top-level layout. The `.sub` doesn't change.
+
+**Afterwards.** The next validate may still list lines you restored on
+purpose, because the cleaner would change them again. That's expected: don't
+re-run this step for them, and name them in the report. Comments the cleaner
+missed, or visible notes such as `\todo{...}`, go under "Needs your decision"
+with the location. Don't delete them yourself.
+
 ## Step 6: validate again, at most three rounds
 
 ```
@@ -268,7 +339,10 @@ In this order:
 2. **Fixed**: if step 3b ran, first the formatted file, the template used
    (or "the venue's layout rules"), and its changes. Then, grouped by file,
    each fix with its check id and a short before → after. For tier 2 trims, show the full diff of the changed
-   sentences and the new count against the limit.
+   sentences and the new count against the limit. If step 5b ran, say how
+   many comment lines and files the cleaner removed, what you restored and
+   why, whether the build was confirmed, and that the original comments now
+   exist only in the backup.
 3. **Needs your decision**: tier 3 issues with a suggestion, e.g. "the
    manuscript is 10,412 words before references; the limit is 3,000. That is
    7,412 over, too much to trim without your input. The Discussion (3,900
@@ -286,6 +360,8 @@ In this order:
   references the files or registries don't support.
 - Never edit figure pixels, and never edit a PDF's text.
 - Never add hidden text or reviewer instructions anywhere.
+- Never run arxiv_latex_cleaner on the author's files directly, and never apply
+  its output without reviewing every change (step 5b).
 - Never delete a reference, figure, table, or section to get under a limit.
 - Keep task, result, and JSON files in a scratch directory, not the
   manuscript directory.

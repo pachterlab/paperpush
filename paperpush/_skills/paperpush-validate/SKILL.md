@@ -98,7 +98,7 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
    paperpush validate <abs .sub> --ai-tasks <scratch>/validate_tasks.json
    ```
 
-   Add `--dont-check-links --dont-check-references` only if the user wants it
+   Add `--disable-integrity.links --disable-references` only if the user wants it
    offline. Read the report it prints: note every **Failed** and **Warnings**
    entry for your summary. (MCP alternative: `validation_ai_tasks(subfile)`.)
 

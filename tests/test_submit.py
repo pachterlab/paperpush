@@ -568,3 +568,55 @@ def test_submit_walkthrough(slug, sub_path, capsys):
         if last_error is not None:
             raise AssertionError(f"{msg}; last error: {last_error!r}") from last_error
         raise AssertionError(msg)
+
+
+def _capture_validation(monkeypatch):
+    import importlib
+
+    seen = {}
+    ran = _stub_submit(monkeypatch)
+    validate_mod = importlib.import_module("paperpush.validate")
+    monkeypatch.setattr(validate_mod, "validate", lambda sub, venue, **kwargs: seen.update(kwargs) or [])
+    monkeypatch.setattr(venues, "login_required", lambda slug: False)
+    return seen, ran
+
+
+def test_submit_skips_network_checks_and_says_so(monkeypatch, capsys):
+    seen, _ = _capture_validation(monkeypatch)
+    main(["submit", "biorxiv.sub"])
+    assert not any(seen[key] for key in ("check_links", "check_references", "check_openreview", "check_sensitive"))
+    assert "--enable-network-checks" in capsys.readouterr().err
+
+
+def test_submit_enable_network_checks(monkeypatch, capsys):
+    seen, _ = _capture_validation(monkeypatch)
+    main(["submit", "biorxiv.sub", "--enable-network-checks"])
+    assert seen["check_links"] and seen["check_references"] and seen["check_openreview"]
+    assert seen["check_sensitive"] is False
+    assert "sensitive-data scan" in capsys.readouterr().err
+
+
+def test_submit_inherits_validates_check_flags(monkeypatch):
+    seen, _ = _capture_validation(monkeypatch)
+    main(["submit", "biorxiv.sub", "--disable-prose", "--anonymous", "--initial-submission", "--cover-letter-max-age", "30", "--references-alphabetical"])
+    assert seen["disable"] == ["prose"] and seen["check_anonymous"] is True and seen["initial_submission"] is True
+    assert seen["cover_letter_max_age_days"] == 30 and seen["references_alphabetical"] is True
+
+
+def test_submit_unknown_check_stops_before_the_browser(monkeypatch, capsys):
+    _, ran = _capture_validation(monkeypatch)
+    assert main(["submit", "biorxiv.sub", "--disable-prosee"]) == 2
+    assert "did you mean prose" in capsys.readouterr().err and not ran
+
+
+def test_every_check_flag_reaches_both_commands():
+    import argparse
+
+    from paperpush.cli import _add_check_options, build_parser
+
+    probe = argparse.ArgumentParser(add_help=False)
+    _add_check_options(probe)
+    flags = {o for action in probe._actions for o in action.option_strings}
+    commands = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction)).choices
+    for command in ("validate", "submit"):
+        assert flags <= set(commands[command]._option_string_actions), command

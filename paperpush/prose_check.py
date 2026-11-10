@@ -72,7 +72,7 @@ PDF_CHECKS = frozenset({REPEATED, SPELLING})
 TEX_CHECKS = ALL_CHECKS - {DOUBLE_SPACES}
 
 # Words that are sometimes correctly doubled ("he said that that was", "had had").
-_DOUBLING_OK = {"that", "had"}
+_DOUBLING_OK = {"that", "had", "log", "ln"}  # "a log log plot"
 # codespell entries of three letters or fewer are mostly abbreviations in a
 # scientific paper (ser, aas, ehr, hsa, nd); keep only the unmistakable ones.
 _SHORT_TYPOS = {"teh", "hte", "adn", "thn", "wih"}
@@ -221,6 +221,13 @@ def _tex_paragraphs(source: str) -> list[str]:
 
 def read(path: Path) -> _Text:
     """The prose of ``path``: its paragraphs, and the checks its format supports."""
+    out = _read(path)
+    if not out.why and not out.paragraphs:  # a scanned PDF has no text to check, which is not the same as no problems
+        out.why = f"found no text in {path.name} (is it scanned, or empty?)"
+    return out
+
+
+def _read(path: Path) -> _Text:
     doc = document.get(path)
     out = _Text(path)
     if doc.is_docx:
@@ -306,7 +313,16 @@ def double_spaces(paragraph: str) -> list[str]:
 _REPEAT = re.compile(r"(?<![\w-])([A-Za-z]+)(\s+)(\1)(?![\w-])", re.IGNORECASE)
 
 
-def repeated_words(paragraph: str) -> list[str]:
+def _table_cells(paragraph: str, m: re.Match[str]) -> bool:
+    """Whether the repeat ``m`` in a PDF's text reads as neighbouring table cells ("NA NA 34", "Female Female")."""
+    if m.group(3)[0].isupper():
+        return True
+    if m.group(1).lower() in _STOP_WORDS:
+        return False
+    return bool(re.match(r"\s+[\d.,]+(?:\s|$)", paragraph[m.end() :]) or re.search(r"(?:^|\s)[\d.,]+\s+$", paragraph[: m.start()]))
+
+
+def repeated_words(paragraph: str, *, pdf: bool = False) -> list[str]:
     """The same word twice in a row, ignoring case. Across a line break only when the second is lower case."""
     found = []
     for m in _REPEAT.finditer(paragraph):
@@ -315,6 +331,8 @@ def repeated_words(paragraph: str) -> list[str]:
             continue
         if "\n" in m.group(2) and not m.group(3)[0].islower():
             continue  # a heading followed by a sentence that starts with the same word
+        if pdf and _table_cells(paragraph, m):
+            continue
         found.append(_snippet(paragraph, m.start(), m.end()))
     return found
 
@@ -323,8 +341,12 @@ _SPACE_BEFORE = re.compile(
     r"(?<=[A-Za-z0-9)\]" + _MASK + r"\"'])( +)([,;:?!]|\.(?!\.))(?=\s|$|[\"')\]])"
 )
 _NO_SPACE_AFTER = re.compile(
-    r"(?<![\w.])([a-z]{2,})([,;])([A-Za-z]{2,})|(?<![\w.])([a-z]{3,})(\.)([A-Z][a-z]{2,})"
+    r"(?<![\w.])([a-z]{2,})([,;])([A-Za-z]{2,})|(?<![\w.])([a-z]{3,})(\.)([A-Z][a-z]{2,})(?![a-z]*[A-Z])"
 )
+
+
+# A module name before a dot is code ("torch.Tensor"), not two sentences run together.
+_CODE_MODULES = frozenset("torch numpy pandas scipy sklearn scanpy anndata keras tensorflow matplotlib seaborn jax networkx biopython".split())
 
 
 def punctuation_spacing(paragraph: str) -> list[str]:
@@ -332,19 +354,27 @@ def punctuation_spacing(paragraph: str) -> list[str]:
     masked = _URL.sub(lambda m: _MASK * len(m.group(0)), paragraph)
     found = []
     for m in _SPACE_BEFORE.finditer(masked):
+        if m.group(2) == ":" and masked[m.start() - 1].isdigit() and re.match(r"\s*\d", masked[m.end() :]):
+            continue  # a ratio set with spaces ("1 : 100")
         found.append((m.start(), _snippet(paragraph, m.start(1), m.end(2), _mark)))
     for m in _NO_SPACE_AFTER.finditer(masked):
+        if m.group(4) in _CODE_MODULES:
+            continue
         found.append((m.start(), _snippet(paragraph, m.start(), m.end(), _mark)))
     return [s for _, s in sorted(found)]
 
 
 _ENUMERATOR = re.compile(r"(?:^|(?<=[\s(]))(?:[a-zA-Z]|[ivxIVX]{1,4}|\d{1,2})\)")
 _PAIRS = {")": "(", "]": "["}
+# A half-open interval: "[0, 1)", "(0, 1]".
+_NUM_END = r"\s*[-\u2212]?(?:\d+(?:\.\d+)?|\.\d+|\u221e|inf\w*)\s*"
+_HALF_OPEN = re.compile(rf"\[{_NUM_END},{_NUM_END}\)|\({_NUM_END},{_NUM_END}\]", re.IGNORECASE)
 
 
 def unbalanced(paragraph: str) -> list[str]:
     """Parentheses, square brackets, or double quotes in ``paragraph`` that do not pair up."""
     text = _URL.sub(lambda m: _MASK * len(m.group(0)), paragraph)
+    text = _HALF_OPEN.sub(lambda m: _MASK * len(m.group(0)), text)
     # "a) ... b) ..." enumerations and "(i)" are not unbalanced; blank the lone closer.
     if text.count("(") != text.count(")"):
         text = _ENUMERATOR.sub(
@@ -385,7 +415,7 @@ def unbalanced(paragraph: str) -> list[str]:
         found.append(
             _snippet(paragraph, 0, 0) + f" ({tex_open} `` and {tex_close} '' quotes)"
         )
-    elif text.count('"') % 2:
+    elif text.count('"') % 2 and (text.count('"') - len(re.findall(r'(?<=\d)"', text))) % 2:  # 3" is inches
         i = text.rfind('"')
         found.append(
             _snippet(paragraph, i, i + 1, _mark)
@@ -508,7 +538,8 @@ def _check(name: str, venue: Venue, values: dict[str, str]) -> Outcome:
             kind = ".tex" if text.checks == TEX_CHECKS else ".pdf"
             skipped.append(f"{text.path.name}: {_SKIPPED[name][kind]}")
             continue
-        found = [hit for paragraph in text.paragraphs for hit in fn(paragraph)]
+        check = (lambda p: repeated_words(p, pdf=True)) if name == REPEATED and text.checks == PDF_CHECKS else fn  # noqa: E731
+        found = [hit for paragraph in text.paragraphs for hit in check(paragraph)]
         if name == SPELLING:
             found = list(dict.fromkeys(found))  # each misspelt word once
         if found:
@@ -568,9 +599,29 @@ _STYLE_WORDS = frozenset(
 )
 _STYLE_MIN_COUNT = 5
 _STYLE_PER_1000 = 2.5
-# A content word (outside the title, abstract, and keywords) is overused at this many uses and this share of all content words.
-_OVERUSED_MIN_COUNT = 25
-_OVERUSED_SHARE = 0.025
+# An adjective or adverb (outside the title, abstract, and keywords) is overused at this many uses and this share of all content words.
+# Nouns are left out: a paper's subject ("studies", "devices") recurs by necessity.
+_OVERUSED_MIN_COUNT = 12
+_OVERUSED_SHARE = 0.005
+# Telling adjectives and adverbs apart with no tagger or corpora to download: by suffix,
+# less the common nouns that share one, plus the frequent ones no suffix marks.
+_ADJECTIVE_SUFFIXES = ("ous", "ive", "ful", "less", "able", "ible", "al", "ic", "ary", "ant", "ent")
+_NOT_ADVERBS = frozenset("family assembly anomaly reply supply apply multiply rely imply comply ally italy july bully belly jelly".split())
+_NOT_ADJECTIVES = frozenset(
+    """animal hospital journal signal trial material interval individual proposal terminal capital approval removal survival arrival
+    renewal referral portal principal rival denial dial vial metal petal pedal festival manual
+    clinic metric topic logic music traffic panic fabric rubric epidemic pandemic tactic mechanic critic statistic republic
+    objective archive motive initiative directive narrative perspective detective executive
+    summary boundary library salary diary glossary dictionary anniversary secretary commentary
+    table cable variable unless
+    participant plant variant mutant implant assistant applicant consultant inhabitant infant antioxidant occupant
+    patient student agent parent event content percent component resident president incident accident client talent gradient
+    coefficient opponent recipient ingredient respondent solvent extent intent descent consent dissent""".split()
+)
+_MODIFIER_WORDS = frozenset(
+    """large small big great good bad high low long short strong weak new old recent major minor main key wide broad deep early late
+    many several often always never rarely seldom almost nearly quite rather somewhat together""".split()
+)
 # The same content word this many times in one sentence.
 _SENTENCE_REPEATS = 3
 # This many consecutive sentences opening with the same word.
@@ -581,7 +632,8 @@ _MAX_SENTENCE_WORDS = 50
 _MIN_CONTENT_LEN = 4
 # Top words listed in the passing note.
 _TOP_WORDS = 5
-_WORD = re.compile(r"[A-Za-z][A-Za-z'’-]*[A-Za-z]|[A-Za-z]")
+_ITEM_LABEL = re.compile(r"[A-Za-z]+\.?\s+[A-Z]?\d+[A-Za-z]?\s*[:.]")
+_REPETITION_WORD = re.compile(r"[A-Za-z][A-Za-z'’-]*[A-Za-z]|[A-Za-z]")
 # A sentence break: end punctuation, then space and a capital (or a masked item), not after a common abbreviation.
 _SENTENCE_END = re.compile(r"(?<!\bal)(?<!\bFig)(?<!\bFigs)(?<!\be\.g)(?<!\bi\.e)(?<!\bvs)(?<!\bEq)(?<!\bRef)(?<!\bcf)(?<!\bapprox)(?<!\bNo)(?<![A-Z])[.!?]+[\"')\]]*\s+(?=[A-Z\"(" + _MASK + r"])")
 
@@ -607,11 +659,21 @@ def stem(word: str) -> str:
 
 
 def _words(text: str) -> list[str]:
-    return _WORD.findall(text)
+    return _REPETITION_WORD.findall(text)
 
 
 def _is_content(word: str) -> bool:
     return len(word) >= _MIN_CONTENT_LEN and word.lower() not in _STOP_WORDS and not (word.isupper() and len(word) > 1)
+
+
+def _is_modifier(word: str) -> bool:
+    """Whether ``word`` reads as an adjective or adverb (a heuristic: see ``_ADJECTIVE_SUFFIXES``)."""
+    w = word.lower()
+    if w in _MODIFIER_WORDS:
+        return True
+    if w.endswith("ly") and len(w) >= 5:
+        return w not in _NOT_ADVERBS
+    return w.endswith(_ADJECTIVE_SUFFIXES) and not w.endswith("ment") and w not in _NOT_ADJECTIVES
 
 
 def _sentences(paragraph: str) -> list[str]:
@@ -626,6 +688,14 @@ def _main_paragraphs(paragraphs: list[str]) -> list[str]:
         if len(p.split()) <= 4 and _REFERENCE_HEADING.match(p.strip()):
             return paragraphs[:i]
     return paragraphs
+
+
+def _front_matter(paragraphs: list[str]) -> str:
+    """What comes before the Introduction: a summary statement, key points, and the like also name the subject."""
+    for i, p in enumerate(paragraphs):
+        if re.fullmatch(r"(?:\d+\.?\s*)?introduction\.?", p.strip(), re.IGNORECASE):
+            return " ".join(paragraphs[:i])
+    return ""
 
 
 @dataclass
@@ -662,16 +732,17 @@ def repetition(paragraphs: list[str], topic: str = "") -> Repetition:
             out.style.append(f"'{word}' {count} times ({count * per_1000:.1f} per 1,000 words)")
 
     content = [w for w in all_words if _is_content(w)]
-    groups = Counter(stem(w) for w in content)
+    topic_stems = {stem(w) for w in _words(topic)}
+    # Only adjectives and adverbs outside the title, abstract, and keywords can be overused.
+    groups = Counter(stem(w) for w in content if _is_modifier(w) and stem(w) not in topic_stems)
     spelling: dict[str, Counter] = {}
     for w in content:
         spelling.setdefault(stem(w), Counter())[w.lower()] += 1
     name = {k: c.most_common(1)[0][0] for k, c in spelling.items()}
     out.top = [(name[k], n) for k, n in groups.most_common(_TOP_WORDS)]
-    topic_stems = {stem(w) for w in _words(topic)}
     if topic_stems:
         for key, count in groups.most_common(10):
-            if count >= _OVERUSED_MIN_COUNT and count / len(content) >= _OVERUSED_SHARE and key not in topic_stems:
+            if count >= _OVERUSED_MIN_COUNT and count / len(content) >= _OVERUSED_SHARE:
                 out.overused.append(f"'{name[key]}' {count} times ({100 * count / len(content):.1f}% of content words)")
 
     for paragraph in paragraphs:
@@ -688,7 +759,8 @@ def repetition(paragraphs: list[str], topic: str = "") -> Repetition:
                     out.in_sentence.append(f"'{name.get(key, key)}' {count} times in \"{snippet}\"")
         run: list[str] = []
         for sentence in sentences + [""]:
-            first = (_words(sentence)[:1] or [""])[0].lower()
+            # "Appendix S1: Search strategies. Appendix S2: ..." is a list of items, not prose.
+            first = "" if _ITEM_LABEL.match(sentence.strip()) else (_words(sentence)[:1] or [""])[0].lower()
             if run and first and first == _words(run[0])[0].lower():
                 run.append(sentence)
                 continue
@@ -702,7 +774,7 @@ def repetition(paragraphs: list[str], topic: str = "") -> Repetition:
 
 _REPETITION_KINDS = (
     ("style", "stock word(s) used often"),
-    ("overused", "word(s) outside the title, abstract, and keywords used unusually often"),
+    ("overused", "adjective(s) or adverb(s) outside the title, abstract, and keywords used unusually often"),
     ("in_sentence", "sentence(s) repeating a word"),
     ("openings", "run(s) of sentences opening with the same word"),
 )
@@ -720,7 +792,7 @@ def _repetition_check(venue: Venue, values: dict[str, str]) -> Outcome:
             issues.append(Issue(WARNING, fld.id, text.why, unchecked=True))
             continue
         own = manuscript_abstract(document.get(text.path), values.get("abstract", ""))
-        found = repetition(_main_paragraphs(text.paragraphs), topic + " " + (own[0] if own else ""))
+        found = repetition(_main_paragraphs(text.paragraphs), " ".join((topic, own[0] if own else "", _front_matter(text.paragraphs))))
         for kind, noun in _REPETITION_KINDS:
             hits = getattr(found, kind)
             if hits:
@@ -729,7 +801,7 @@ def _repetition_check(venue: Venue, values: dict[str, str]) -> Outcome:
                 issues.append(Issue(WARNING, fld.id, f"{text.path.name}: {len(hits)} {noun}: {shown}{more}; vary the wording"))
         top = ", ".join(f"{w} ({n})" for w, n in found.top)
         prefix = f"{text.path.name}: " if len(files) > 1 else ""
-        details.append(f"{prefix}{found.words:,} words; most frequent: {top}" if top else f"{prefix}no words read")
+        details.append(f"{prefix}{found.words:,} words; most frequent adjectives and adverbs: {top}" if top else f"{prefix}{found.words:,} words; no adjective or adverb repeated" if found.words else f"{prefix}no words read")
     return Outcome(issues, "; ".join(details))
 
 
@@ -737,7 +809,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     logger.info("Proofreading the %s manuscript's prose", venue.slug)
     for name, (title, _, _) in _CHECKS.items():
         checks.run(f"prose.{name}", title, PROSE, _check, name, venue, values)
-    checks.run(f"prose.{REPETITION}", "Varied word choice (no heavily repeated words)", PROSE, _repetition_check, venue, values)
+    checks.run(f"prose.{REPETITION}", "Varied word choice (no heavily repeated adjectives or adverbs)", PROSE, _repetition_check, venue, values)
     from . import style_check
 
     checks.run("prose.numbers", "Numbers of 10 or more in digits, thousands grouped one way", PROSE, style_check._numbers_check, venue, values)

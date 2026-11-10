@@ -1372,7 +1372,8 @@ def test_cli_validate_arxiv_no_reminder_when_source_clean(tmp_path, monkeypatch,
     err = _both(capsys.readouterr())
 
     assert rc == 0
-    assert "arxiv_latex_cleaner" not in err
+    assert "arxiv_latex_cleaner would change nothing" in err or "needs arxiv_latex_cleaner" in err
+    assert "run arxiv_latex_cleaner on" not in " ".join(err.split())
 
 
 def test_cli_validate_unknown_venue(tmp_path, capsys):

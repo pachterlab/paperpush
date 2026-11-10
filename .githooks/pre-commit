@@ -131,8 +131,8 @@ fi
 if git diff --cached --name-only --diff-filter=ACMDR -z \
     | tr '\0' '\n' | grep -qE '^(paperpush/[^/]+\.py|paperpush/(venues|submission_forms|manuscript_requirements|common_fields)\.json|scripts/gen_validation_check_count\.py)$'; then
     if python scripts/gen_validation_check_count.py; then
-        if ! git diff --quiet -- README.md docs/validation-checks.rst; then
-            git add README.md docs/validation-checks.rst
+        if ! git diff --quiet -- README.md docs/validation-checks.rst paperpush/validation_check_ids.json; then
+            git add README.md docs/validation-checks.rst paperpush/validation_check_ids.json
             echo "pre-commit: regenerated validation check docs and re-staged them."
         fi
     else

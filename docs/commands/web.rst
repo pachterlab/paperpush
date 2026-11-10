@@ -53,8 +53,8 @@ Options
 -------
 
 ``subfile``
-   A ``.sub`` file to open. It must exist and have an ``@venue:`` line;
-   create one with ``paperpush subfile VENUE`` (add ``--web`` to open it
+   A ``.sub`` file to open. It must exist; without an ``@venue:`` line it
+   opens as a general ``.sub``. Create one with ``paperpush subfile VENUE`` (add ``--web`` to open it
    straight away).
 
 ``-p PATH``, ``--path PATH``

@@ -103,7 +103,7 @@ See also
 --------
 
 - :doc:`validate` — measures the manuscript and other uploads against these
-  rules (``--dont-check-manuscript`` turns that off).
+  rules (``--disable-manuscript`` turns that off).
 - :doc:`publishers` — the publishers whose house rules back their venues' own.
 - :doc:`options` — the allowed values of a ``choice`` field, including the
   article-type field whose values key the per-type overrides.

@@ -69,13 +69,21 @@ SERIES = [
 _NAMES = {key: name for key, name, _ in SERIES}
 PANEL_TITLE = "Figure and table panels cited in order"
 
-_ITEM = r"S?\d{1,3}[a-zA-Z]?"
+# An item, with the panels that can follow its letter ("1a-c", "1a, b and d").
+_ITEM = r"(?:S?\d{1,3}[a-zA-Z](?:\s*(?:,|and\b|&|[\u2013-])\s*[a-zA-Z](?![\w]))*|S?\d{1,3})"
 _MENTION = re.compile(
     r"(?P<prefix>\b(?:Supplementary|Supplemental|Suppl\.?|Supp\.?|Extended\s+Data|Appendix)\s+(?:Information\s+)?)?" r"\b(?P<word>Fig(?:ure)?s?\.?|Tables?)\s*" rf"(?P<list>{_ITEM}(?:\s*(?:,|;|and|&|[\u2013-]|to)\s*{_ITEM}(?![\w]))*)",
     re.IGNORECASE,
 )
-# A caption: at the start of a line, the item number then '.', ':', '|', or two spaces.
-_CAPTION_TAIL = re.compile(r"\s*(?:[.:|\u2014-]|\s{2,}|$)")
+# A caption: at the start of a line, the item number then '.', ':', '|', two
+# spaces, the end of the line ("Table 1" over its title), or a capitalized word
+# (Springer's "Fig. 1 Overview of the method").
+_CAPTION_TAIL = re.compile(r"\s*(?:[.:|\u2014-]|\s{2,}|$)|[ \t]*\r?\n|[ \t]+(?:[A-Z][a-z]|A\s+(?!and\b)[a-z])")
+# "Figure 1, 15 patients": a count after the item, not a second item.
+_LIST_THEN_COUNT = re.compile(r"(.*\S)\s*,\s*\d{1,3}", re.DOTALL)
+_LOWERCASE_NEXT = re.compile(r"\s+(?!and\b|or\b)[a-z]")
+# "Table 2 in 12 patients": the digits count something, not a reference.
+_COUNT_NOT_REFERENCE = re.compile(r"\s*(?:of|in|from)\s+\d+\s+[a-z]")
 
 
 @dataclass(frozen=True)
@@ -117,6 +125,12 @@ def _expand(spec: str) -> list[str]:
     return items
 
 
+def _short_line_limit(text: str) -> float:
+    """Below this length a line stops short of the full measure (a two-column page's is short)."""
+    lengths = sorted(len(line) for line in text.split("\n") if len(line) > 20)
+    return min(50, 0.75 * lengths[len(lengths) // 2]) if lengths else 50
+
+
 def mentions(text: str) -> list[Mention]:
     """Every figure/table citation and caption in ``text``, in order.
 
@@ -124,10 +138,15 @@ def mentions(text: str) -> list[Mention]:
     caption after it, where collected legends usually start -- are left out.
     """
     out: list[Mention] = []
+    short_line = None
     for m in _MENTION.finditer(text):
         line_start = text.rfind("\n", 0, m.start()) + 1
         at_line_start = not text[line_start : m.start()].strip(" \t(")
-        single = len(_expand(m.group("list"))) == 1
+        listing = m.group("list")
+        count = _LIST_THEN_COUNT.fullmatch(listing)
+        if count and not m.group("word").rstrip(".").lower().endswith("s") and _LOWERCASE_NEXT.match(text, m.end()):
+            listing = count.group(1)
+        single = len(_expand(listing)) == 1
         caption = False
         if at_line_start and single:
             before = text[:line_start].rstrip()
@@ -135,8 +154,14 @@ def mentions(text: str) -> list[Mention]:
             # The line before a caption ends a paragraph: in punctuation, a page
             # number, or short of the full measure. A citation wrapped onto a new
             # line ("as shown in / Fig. 1.") follows a full, unpunctuated line.
-            caption = bool(_CAPTION_TAIL.match(text, m.end())) and (not before or before[-1] in ".!?:)]\"'" or before[-1].isdigit() or len(previous) < 50)
-        for item in _expand(m.group("list")):
+            if short_line is None:
+                short_line = _short_line_limit(text)
+            # A blank line also ends a paragraph, however the line above it ends (a long title, say).
+            blank_above = text[len(before) : line_start].count("\n") >= 2
+            caption = bool(_CAPTION_TAIL.match(text, m.end())) and (not before or blank_above or before[-1] in ".!?:)]\"'" or before[-1].isdigit() or len(previous) < short_line)
+        if not caption and _OTHER_AFTER.match(text, m.end()) and not _COUNT_NOT_REFERENCE.match(text, m.end()):
+            continue  # another paper's figure: "Fig. 3 of ref. 12"
+        for item in _expand(listing):
             series = _series(m.group("prefix") or "", m.group("word"), item)
             if series is not None:
                 out.append(Mention(series, int(re.sub(r"\D", "", item)), m.start(), caption, m.group(0)))
@@ -222,6 +247,9 @@ def panel_mentions(text: str, series: str | None = None) -> list[PanelCite]:
                 # After "and", a bare letter must close the list ("Fig. 2a and b)"), so
                 # "Fig. 2a and a control" is not read as a panel.
                 if sep.group(1) in ("and", "&") and not re.match(r"\s*(?:[),;.\]]|$)", text[letter.end() :]):
+                    break
+                # Panels run forward in one case: the "a" of "Fig. 2c, a rise" and the "B" of "Fig. 1b, B cells" are words.
+                if found and (letter.group(1).isupper() != found[-1].letter.isupper() or letter.group(1).lower() <= found[-1].letter.lower()):
                     break
                 found += [PanelCite(current[0], current[1], c, letter.start()) for c in _letters(letter.group(1), letter.group(2))]
                 pos = letter.end()
@@ -344,6 +372,27 @@ def _attached_count(venue: Venue, values: dict[str, str], role: str) -> int:
     from .requirements_check import _fields_for, _paths
 
     return sum(len(_paths(f, values)) for f in _fields_for(venue, role))
+
+
+def _attached_captions(venue: Venue, values: dict[str, str]) -> list[Mention]:
+    """Captions in attached figure and table documents: one ``figures.docx`` can hold every figure."""
+    from .requirements_check import _existing, _fields_for, _paths
+
+    out: list[Mention] = []
+    for role in ("figures", "tables"):
+        for f in _fields_for(venue, role):
+            for path in _existing(_paths(f, values)):
+                text = document.get(path).text if path.suffix.lower() in (".pdf", ".docx") else None
+                out += [m for m in mentions(text or "") if m.caption and m.series in ("figure", "table")]
+    return out
+
+
+def _combines_items(venue: Venue, values: dict[str, str], role: str, highest_cited: int) -> bool:
+    """Whether fewer documents are attached than the text has items, so a file holds several of them."""
+    from .requirements_check import _existing, _fields_for, _paths
+
+    paths = [p for f in _fields_for(venue, role) for p in _existing(_paths(f, values))]
+    return len(paths) < highest_cited and any(p.suffix.lower() in (".pdf", ".docx", ".pptx") for p in paths)
 
 
 def _supplement_captions(venue: Venue, values: dict[str, str]) -> list[Mention]:
@@ -541,7 +590,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         checks.record("citations.panels", PANEL_TITLE, CITATIONS, status, detail=str(exc))
         _legend_checks(checks, venue, values, None, "")
         return
-    found = found + _supplement_captions(venue, values)
+    found = found + _supplement_captions(venue, values) + _attached_captions(venue, values)
     attached = {"figure": _attached_count(venue, values, "figures"), "table": _attached_count(venue, values, "tables")}
     for key, name, title in SERIES:
         present = any(m.series == key for m in found)
@@ -551,6 +600,9 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
             checks.record(f"citations.{key}", title, CITATIONS, NOT_APPLICABLE, detail=f"no {name.lower()}s cited or captioned")
             continue
         extra = set(range(1, attached[key] + 1)) if attached.get(key) and not any(m.series == key and m.caption for m in found) else None
+        # A combined file with no captions says nothing about which numbers exist.
+        if extra and _combines_items(venue, values, "figures" if key == "figure" else "tables", max((m.number for m in found if m.series == key), default=0)):
+            extra = None
         checks.run(f"citations.{key}", title, CITATIONS, _order_check, found, key, extra, field_id)
     checks.run("citations.panels", PANEL_TITLE, CITATIONS, _panel_check, venue, values, field_id)
     _legend_checks(checks, venue, values, found, field_id)
@@ -684,12 +736,15 @@ def uncited_panel_problems(cites: list[PanelCite], named: dict[int, list[str]]) 
 # --- legends -------------------------------------------------------------------------------
 
 
-def legends(text: str) -> list[tuple[int, int, str]]:
-    """``(figure number, position, legend text)`` for each main-figure caption in ``text``."""
-    return [(m.number, start, body) for m, start, body in _caption_blocks(text) if m.series == "figure"]
+def legends(text: str, *, paragraphs: bool = False) -> list[tuple[int, int, str]]:
+    """``(figure number, position, legend text)`` for each main-figure caption in ``text``.
+
+    ``paragraphs``: each line of ``text`` is a whole paragraph (a Word file), so a legend ends with its line.
+    """
+    return [(m.number, start, body) for m, start, body in _caption_blocks(text, paragraphs=paragraphs) if m.series == "figure"]
 
 
-def _caption_blocks(text: str) -> list[tuple[Mention, int, str]]:
+def _caption_blocks(text: str, *, paragraphs: bool = False) -> list[tuple[Mention, int, str]]:
     """``(caption's mention, position, caption text)`` for each figure and table caption in ``text``."""
     out = []
     lines = text.split("\n")
@@ -707,7 +762,8 @@ def _caption_blocks(text: str) -> list[tuple[Mention, int, str]]:
         if mention is None:
             continue
         body = [line]
-        for following in lines[i + 1 : i + 60]:
+        # In paragraphs mode only a bare "Figure 1." label continues onto the next line.
+        for following in (lines[i + 1 : i + 2] if len(line.split()) <= 3 else []) if paragraphs else lines[i + 1 : i + 60]:
             if not following.strip() or _MENTION.match(following.strip()) and _CAPTION_TAIL.match(following.strip(), _MENTION.match(following.strip()).end()):
                 break
             body.append(following)
@@ -810,6 +866,8 @@ def duplicate_caption_problems(found: list[Caption]) -> list[str]:
         words = _caption_words(caption.text)
         if {"continued", "cont", "contd"} & set(words[:3]):
             continue  # a table running onto another page repeats its label
+        if not words:
+            continue  # a bare "Figure S1" line above the figure, its caption below
         item = (caption.series, caption.number)
         numbered.setdefault(item, []).append(words)
         if len(words) >= _MIN_CAPTION_WORDS and item not in worded.get(tuple(words), []):
@@ -923,17 +981,25 @@ def _legend_check(venue: Venue, values: dict[str, str], rules) -> Outcome:
         text = doc.text
         if text is None:
             raise Unchecked(f"could not read {path.name} as text")
-        found = legends(text)
+        found = legends(text, paragraphs=doc.is_docx)
         refs = _REFERENCE_HEADING.search(text)
         refs_pos = refs.start() if refs else None
         at_end = None
     if not found:
-        raise Unchecked(f"found no figure legends ('Figure 1. ...') in {path.name}")
+        # Figures combined in their own document carry their legends with them.
+        for _, other in _document_files(venue, values, ("figures",)):
+            combined = document.get(other)
+            found += legends(combined.text or "", paragraphs=combined.is_docx)
+        if not found:
+            raise Unchecked(f"found no figure legends ('Figure 1. ...') in {path.name}")
+        refs_pos, location_known = None, False
+    else:
+        location_known = True
     if rules.legend_max_words:
         long = [(n, len(t.split())) for n, _, t in found if len(t.split()) > rules.legend_max_words]
         for number, words in long:
             issues.append(Issue(WARNING, field.id, f"the legend of Figure {number} is about {words} words; the author guidelines allow {rules.legend_max_words}"))
-    location = rules.legends_location
+    location = rules.legends_location if location_known else None
     if location in ("end_of_manuscript", "after_references"):
         if at_end:
             pass

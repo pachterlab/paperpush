@@ -42,7 +42,6 @@ stall validation.
 
 from __future__ import annotations
 
-import difflib
 import json
 import logging
 import os
@@ -61,15 +60,19 @@ from .references import (
     YEAR_TOLERANCE,
     Entry,
     Finding,
+    _RETRACTION_NOTICES,
     _entry_first_author,
     _first_author_of,
     _normalize_text,
+    _retraction_finding,
     _significant_words,
     _strip_latex,
     _title_of,
+    _work_title,
     _year_of,
     _year_value,
     normalize_doi,
+    title_similarity,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,7 +111,7 @@ MAX_AI_ITEMS = 25
 INDEXED_KINDS = {"article", "inproceedings", "conference", "incollection", "inbook", "proceedings"}
 
 # Registry records that share a title with the work without being it.
-_NOT_THE_WORK = re.compile(r"^(?:erratum|errata|correction|corrigendum|retraction|retracted|retracted article|expression of concern|reply|response|comment on|author correction|publisher correction|faculty opinions)\b", re.IGNORECASE)
+_NOT_THE_WORK = re.compile(r"^(?:erratum|errata|correction|corrigendum|retraction|expression of concern|reply|response|comment on|author correction|publisher correction|faculty opinions)\b", re.IGNORECASE)
 _NOT_WORK_TYPES = {"dataset", "component", "peer-review", "grant", "journal-issue", "journal-volume", "journal", "proceedings", "book-series", "report-series", "standard-series"}
 
 # arXiv identifiers: new style (2101.00001v2) and old style (hep-th/9901001v1).
@@ -278,7 +281,7 @@ def _services() -> _Services:
 
 # --- registry queries -------------------------------------------------------------------
 
-_CROSSREF_FIELDS = "DOI,title,author,issued,type,relation,container-title,updated-by"
+_CROSSREF_FIELDS = "DOI,title,author,issued,type,relation,container-title,updated-by,update-to"
 
 
 def crossref_search(query: str, service: _Service) -> list[dict] | None:
@@ -335,24 +338,35 @@ def arxiv_lookup(ids: list[str], service: _Service) -> dict[str, dict] | None:
     """
     import xml.etree.ElementTree as ET  # nosec B405 -- a response from arXiv's own API
 
-    found: dict[str, dict] = {}
-    for start in range(0, len(ids), ARXIV_BATCH):
-        chunk = ids[start : start + ARXIV_BATCH]
-        url = "https://export.arxiv.org/api/query?" + urllib.parse.urlencode({"id_list": ",".join(chunk), "max_results": len(chunk)})
+    def feed_entries(url: str) -> list | None:
         body = service.get(url, accept="application/atom+xml")
         if body is None:
             return None
         try:
-            root = ET.fromstring(body)  # nosec B314
+            return ET.fromstring(body).findall(f"{_ATOM}entry")  # nosec B314
         except ET.ParseError:
             return None
-        for entry in root.findall(f"{_ATOM}entry"):
+
+    found: dict[str, dict] = {}
+    for start in range(0, len(ids), ARXIV_BATCH):
+        chunk = ids[start : start + ARXIV_BATCH]
+        url = "https://export.arxiv.org/api/query?" + urllib.parse.urlencode({"id_list": ",".join(chunk), "max_results": len(chunk)})
+        entries = feed_entries(url)
+        # arXiv now and then answers 200 with an empty feed: ask again before
+        # believing it, and never believe it of a whole batch.
+        if entries == []:
+            entries = feed_entries(url)
+            if entries == [] and len(chunk) > 1:
+                return None
+        if entries is None:
+            return None
+        for entry in entries:
             m = re.search(r"arxiv\.org/abs/" + _ARXIV_ID + r"$", (entry.findtext(f"{_ATOM}id") or "").strip(), re.IGNORECASE)
             if not m:
                 continue
             authors = [{"family": n.split()[-1], "literal": n} for n in ((a.findtext(f"{_ATOM}name") or "").strip() for a in entry.findall(f"{_ATOM}author")) if n]
             year = (entry.findtext(f"{_ATOM}published") or "")[:4]
-            found[m.group(1).lower()] = {
+            found[_arxiv_key(m.group(1))] = {
                 "title": " ".join((entry.findtext(f"{_ATOM}title") or "").split()),
                 "author": authors,
                 "issued": {"date-parts": [[int(year)]]} if year.isdigit() else {},
@@ -381,6 +395,13 @@ def biorxiv_published_doi(doi: str, service: _Service) -> str | None:
 # --- reading the references -------------------------------------------------------------
 
 
+def _arxiv_key(raw: str) -> str:
+    """An arXiv identifier as arXiv's API knows it: lower-cased, an old-style one without its subject class (math.DG/0211159 -> math/0211159)."""
+    raw = raw.lower()
+    archive, slash, number = raw.partition("/")
+    return f"{archive.split('.')[0]}/{number}" if slash else raw
+
+
 def arxiv_id_of(entry: Entry) -> tuple[str, int | None]:
     """The arXiv id (bare, lower-cased) and pinned version an entry cites, if any."""
     f = entry.fields
@@ -388,11 +409,11 @@ def arxiv_id_of(entry: Entry) -> tuple[str, int | None]:
     prefix = (f.get("archiveprefix", "") or f.get("eprinttype", "")).lower()
     m = _ARXIV_BARE.match(_strip_latex(eprint)) if eprint and prefix in ("arxiv", "") else None
     if m:
-        return m.group(1).lower(), int(m.group(2)) if m.group(2) else None
+        return _arxiv_key(m.group(1)), int(m.group(2)) if m.group(2) else None
     for name in ("doi", "eprint", "journal", "url", "note", "howpublished", "journaltitle", "booktitle", "publisher"):
         m = _ARXIV_IN_TEXT.search(_strip_latex(f.get(name, "")))
         if m:
-            return m.group(1).lower(), int(m.group(2)) if m.group(2) else None
+            return _arxiv_key(m.group(1)), int(m.group(2)) if m.group(2) else None
     return "", None
 
 
@@ -414,8 +435,8 @@ def references_from_entries(entries: Iterable[Entry]) -> list[Reference]:
             Reference(
                 label=_cite(e),
                 where=e.where,
-                title=_strip_latex(e.title).strip(),
-                author=_entry_first_author(e.author),
+                title=_strip_latex(e.title).strip() if "title" not in e.unresolved else "",
+                author=_entry_first_author(e.author) if "author" not in e.unresolved else "",
                 year=e.year,
                 kind=e.kind,
                 venue=_strip_latex(e.fields.get("journal", "") or e.fields.get("journaltitle", "") or e.fields.get("booktitle", "")).strip(),
@@ -450,7 +471,7 @@ def references_from_text(path: Path) -> list[Reference]:
                 text=text,
                 year=r.year,
                 doi=normalize_doi(doi_match.group(0)) if doi_match else "",
-                arxiv_id=arxiv.group(1).lower() if arxiv else "",
+                arxiv_id=_arxiv_key(arxiv.group(1)) if arxiv else "",
                 arxiv_version=int(arxiv.group(2)) if arxiv and arxiv.group(2) else None,
             )
         )
@@ -460,20 +481,9 @@ def references_from_text(path: Path) -> list[Reference]:
 # --- matching ---------------------------------------------------------------------------
 
 
-def title_similarity(a: str, b: str) -> float:
-    """How alike two titles are, 0..1; a title that is the other minus its subtitle counts as 1."""
-    a, b = _normalize_text(a), _normalize_text(b)
-    if not a or not b:
-        return 0.0
-    short, long_ = sorted((a, b), key=len)
-    if len(short.split()) >= 4 and long_.startswith(short):
-        return 1.0
-    return difflib.SequenceMatcher(None, a, b).ratio()
-
-
 def word_overlap(a: str, b: str) -> float:
     """Shared significant title words, as a share of the longer title's."""
-    wa, wb = set(_significant_words(a)), set(_significant_words(b))
+    wa, wb = set(_significant_words(_work_title(a))), set(_significant_words(_work_title(b)))
     if not wa or not wb:
         return 0.0
     return len(wa & wb) / max(len(wa), len(wb))
@@ -481,12 +491,14 @@ def word_overlap(a: str, b: str) -> float:
 
 def _is_candidate(record: dict) -> bool:
     title = _title_of(record).strip()
+    if any(isinstance(u, dict) and u.get("type") in _RETRACTION_NOTICES for u in record.get("update-to") or []):
+        return False  # the notice itself, often titled "Retracted: ..." like the article
     return bool(title) and not _NOT_THE_WORK.match(title) and str(record.get("type", "")).lower() not in _NOT_WORK_TYPES
 
 
 def _prose_overlap(text: str, record: dict) -> float:
     words = set(_normalize_text(text).split())
-    title_words = _significant_words(_title_of(record))
+    title_words = _significant_words(_work_title(_title_of(record)))
     if not title_words:
         return 0.0
     return sum(1 for w in title_words if w in words) / len(title_words)
@@ -549,7 +561,8 @@ def match_entry(ref: Reference, candidates: list[dict]) -> Lookup:
 
 def match_text(ref: Reference, candidates: list[dict]) -> Lookup:
     """Compare a reference-list entry (prose) with Crossref's candidates."""
-    candidates = [c for c in candidates if _is_candidate(c)]
+    # A title of a word or two ("New products") turns up in almost any entry.
+    candidates = [c for c in candidates if _is_candidate(c) and len(_significant_words(_work_title(_title_of(c)))) >= MIN_TITLE_WORDS]
     words = set(_normalize_text(ref.text).split())
     scored = sorted(((_prose_overlap(ref.text, c), c) for c in candidates), key=lambda t: -t[0])
     for score, c in scored:
@@ -574,6 +587,14 @@ def match_arxiv(ref: Reference, record: dict | None) -> Lookup:
     return Lookup(ref, MATCHED, record=record, source="arXiv")
 
 
+_WEB_PAGE_ENTRY = re.compile(r"(?is)\bhttps?://(?!(?:dx\.)?doi\.org)\S+.*\b(?:accessed|retrieved|last\s+visited)\b|\bweb\s?site\b.*\bhttps?://(?!(?:dx\.)?doi\.org)")
+
+
+def is_web_page_entry(text: str) -> bool:
+    """Whether a reference-list entry cites a web page ("... Web site. https://... Accessed May 1, 2026.")."""
+    return bool(text) and "doi.org" not in text.lower() and bool(_WEB_PAGE_ENTRY.search(text))
+
+
 # --- the searches -----------------------------------------------------------------------
 
 
@@ -584,6 +605,7 @@ def _search_one(ref: Reference, svc: _Services) -> Lookup:
         lookup = match_entry(ref, items) if items is not None else None
         if lookup is not None:
             lookup.source = "Crossref"
+        works = None
         if lookup is None or lookup.status != MATCHED:
             works = openalex_search(ref.title, svc.openalex) if svc.openalex.available else None
             if works is not None:
@@ -594,6 +616,9 @@ def _search_one(ref: Reference, svc: _Services) -> Lookup:
                 else:
                     lookup.source = "Crossref and OpenAlex"
                     lookup.candidates += second.candidates[:1]
+        # A miss means something only when both registries answered.
+        if lookup is not None and lookup.status == NOT_FOUND and (items is None or works is None):
+            lookup.status = UNKNOWN
         return lookup or Lookup(ref, UNKNOWN)
     items = crossref_search(ref.text, svc.crossref) if svc.crossref.available else None
     if items is None:
@@ -618,7 +643,8 @@ def search_references(refs: list[Reference], *, services: _Services | None = Non
         for r in arxiv_refs:
             result.lookups.append(match_arxiv(r, records.get(r.arxiv_id)) if records is not None else Lookup(r, UNKNOWN, source="arXiv"))
 
-    todo = [r for r in refs if not r.doi and not r.arxiv_id and (r.text or len(_normalize_text(r.title).split()) >= MIN_TITLE_WORDS)]
+    # A web page is not in the registries; the link check tells whether it is there.
+    todo = [r for r in refs if not r.doi and not r.arxiv_id and not is_web_page_entry(r.text) and (r.text or len(_normalize_text(r.title).split()) >= MIN_TITLE_WORDS)]
     for i, ref in enumerate(todo):
         if i >= MAX_SEARCHES:
             result.skipped = todo[i:]
@@ -650,6 +676,8 @@ def search_references(refs: list[Reference], *, services: _Services | None = Non
                     f'{lk.ref.label} ("{lk.ref.title[:120]}", {lk.ref.author or "no author"}, {lk.ref.year or "no year"}) matches no work in {searched}{near}. Check that it exists and its title is right; a reference that cannot be found may be fabricated',
                 )
             )
+        elif lk.status == MATCHED and lk.source != "arXiv" and lk.record and lk.record.get("DOI"):
+            result.findings += _retraction_finding(lk.ref.where, lk.ref.label, str(lk.record["DOI"]).lower(), lk.record)
     return result
 
 
@@ -729,7 +757,8 @@ def version_findings(
         records.update(arxiv_lookup(missing, svc.arxiv) or {})
     for r in arxiv_refs:
         rec = records.get(r.arxiv_id)
-        if rec is None or r.label in done:
+        # An entry with the journal DOI and an eprint field (an ADS export) already cites the article.
+        if rec is None or r.label in done or (r.doi and not r.doi.startswith("10.48550/")):
             continue
         journal = rec.get("journal_doi") or ""
         if journal:

@@ -426,7 +426,7 @@ def test_total_words_includes_references(tmp_path):
     tex = _tex("alpha beta gamma\n\\bibliography{ref}\ndelta\n", tmp_path)
     # words_before_references stops at the bibliography; total_words does not.
     assert m.words_before_references(tex) == 3
-    assert m.total_words(tex) == 3  # the bibliography marker still cuts source
+    assert m.total_words(tex) == 4  # text after the bibliography marker counts too
 
 
 def test_total_words_counts_full_pdf(tmp_path):

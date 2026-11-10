@@ -60,7 +60,7 @@ from . import venues as venues_pkg
 from ._logging import configure_logging
 from .autofill import autofill as _apply_autofill
 from .autofill import field_schema, parse_extraction
-from .database import Venue, get_venue, list_venues
+from .database import GENERAL_SLUG, Venue, get_venue, list_venues
 from .subfile import default_filename, find_subfile, is_subfile_name, parse as parse_subfile, subfile_stem, render_template, resolve_paths, write_template
 from .validate import Issue
 from .validate import validate_report as _run_validate_report
@@ -143,17 +143,17 @@ def _slug_from_reference(reference: str) -> str:
             recorded = parse_subfile(path.read_text(encoding="utf-8")).venue
         except OSError:
             recorded = ""
-        if recorded:
-            return recorded
+        return recorded or GENERAL_SLUG
     return subfile_stem(path)
 
 
-def _load_subfile(subfile: str, base: Optional[str] = None) -> tuple[Path, str, Venue]:
+def _load_subfile(subfile: str, base: Optional[str] = None, default_venue: Optional[str] = None) -> tuple[Path, str, Venue]:
     """Read a ``.sub`` file and resolve the venue it targets.
 
     Returns the resolved path, the file's text, and the venue. As in the CLI,
-    the venue comes from the file's own ``venue:`` line, falling back to the
-    filename stem for a file that predates it or was hand-written.
+    the venue comes from the file's own ``@venue:`` line, and a file without
+    one targets ``default_venue``, or without that the general venue (general
+    checks only).
     """
     path = find_subfile(_resolve(subfile, base))
     if not path.is_file():
@@ -162,11 +162,13 @@ def _load_subfile(subfile: str, base: Optional[str] = None) -> tuple[Path, str, 
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise ValueError(f"cannot read {path}: {exc}") from exc
-    return path, text, _venue_or_error(parse_subfile(text).venue or subfile_stem(path))
+    return path, text, _venue_or_error(parse_subfile(text).venue or default_venue or GENERAL_SLUG)
 
 
-def _issue_dicts(issues: list[Issue]) -> list[dict[str, str]]:
-    return [{"level": i.level, "field": i.field, "message": i.message} for i in issues]
+def _issue_dicts(issues: list[Issue]) -> list[dict[str, Any]]:
+    from .report import issue_dict
+
+    return [issue_dict(i) for i in issues]
 
 
 def _paperpush_command(*args: str) -> list[str]:
@@ -571,7 +573,7 @@ def _validation_inputs(subfile: Optional[str], manuscript_dir: Optional[str], ve
 
     named = file_inputs.given(files)
     if subfile:
-        path, text, venue_def = _load_subfile(subfile, manuscript_dir)
+        path, text, venue_def = _load_subfile(subfile, manuscript_dir, default_venue=venue)
         if venue and _venue_or_error(venue).slug != venue_def.slug:
             raise ValueError(f"{path.name} is for {venue_def.slug}, not {venue}; leave venue out, or make a .sub for {venue} with create_subfile")
         sub = resolve_paths(parse_subfile(text), path.parent)
@@ -607,7 +609,7 @@ def validate_subfile(
     check_links: bool = True,
     check_sensitive: bool = True,
     check_references: bool = True,
-    reference_check_full: bool = False,
+    reference_check_extended: bool = False,
     references_alphabetical: bool = False,
     references_citation_order: bool = False,
     check_manuscript: bool = True,
@@ -623,6 +625,8 @@ def validate_subfile(
     publisher: Optional[str] = None,
     issn: Optional[str] = None,
     journal: Optional[str] = None,
+    disable: Optional[list[str]] = None,
+    enable: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file and report every check.
 
@@ -661,9 +665,10 @@ def validate_subfile(
     pass `publisher` (slug or name), `issn`, or `journal` (exact title; both
     looked up in Crossref, needs network) with a general `.sub` or the named
     files, to check against the publisher's house rules.
-    `reference_check_full` (default false) adds one agent task per cited
-    source to verify claim support from its abstract or paper and one to
-    verify journal indexing. The regular manuscript pass measures reference
+    `reference_check_extended` (default false) adds three agent tasks per cited
+    source: verify claim support from its abstract or paper, check that it
+    is the original source of each claim, and verify journal indexing. The
+    regular manuscript pass measures reference
     age and citation occurrences per 1,000 words without this flag.
     `anonymous` checks a double-blind submission for information identifying
     its authors -- their names, emails, IDs and affiliations from the author
@@ -703,6 +708,14 @@ def validate_subfile(
     most this old; the letter is also checked for the name of a different
     venue left over from an earlier submission.
 
+    `disable` turns checks off by name, as `--disable-NAME` does on the command
+    line: a check ID (`bibliography.age`), the dotted start of one (`prose`,
+    `ai.notes`), or a group (`references`, `manuscript`). A disabled check comes
+    back as unchecked with the name that switched it off. `enable` takes the
+    same names and runs only those checks; a check both name goes with the more
+    specific one. An item of either can also be comma-separated names or the
+    absolute path of a text file listing them.
+
     `initial_submission` validates the file as an initial submission: every
     error comes back as a warning, so nothing blocks it. Use it when the venue
     lets the initial submission be in any format; that rule, when the venue
@@ -722,14 +735,14 @@ def validate_subfile(
     files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
     path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files, publisher, issn, journal)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
-    result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_full=reference_check_full, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
+    result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, disable=disable or (), enable=enable or (), initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
     out: dict[str, Any] = {
         "path": str(path or ""),
         "venue": venue_def.slug,
         "scope": result.scope,
         "files": result.files,
         "notes": result.notes,
-        "ok": result.ok,
+        "ok": None if result.ai_only else result.ok,  # an AI-only run gives no verdict
         "initial_submission_rule": result.initial_submission_rule,
         "initial_submission": result.initial_submission,
         "downgraded": result.downgraded,
@@ -756,10 +769,13 @@ def validation_ai_tasks(
     figures: Optional[list[str]] = None,
     tables: Optional[list[str]] = None,
     supplement: Optional[list[str]] = None,
-    reference_check_full: bool = False,
+    reference_check_extended: bool = False,
     publisher: Optional[str] = None,
     issn: Optional[str] = None,
     journal: Optional[str] = None,
+    check_references: bool = False,
+    disable: Optional[list[str]] = None,
+    enable: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     """The validation checks that need a reader's judgement, for you to do yourself.
 
@@ -771,9 +787,13 @@ def validation_ai_tasks(
     to `validate_subfile` as `ai_results` (`[{"id", "status": "pass"|"fail"|
     "unclear"|"not_applicable", "details", "evidence"}]`). No API key is
     needed: you are the reader.
-    Set `reference_check_full=true` to add per-source claim-support and
-    journal-indexing tasks; these may require reading external papers and
+    Set `reference_check_extended=true` to add per-source claim-support,
+    original-source, and journal-indexing tasks; these may require reading external papers and
     authoritative journal indexes.
+    Set `check_references=true` to run the reference lookups as well (network),
+    which adds the `ai.unverified_references` task; `validate_subfile` returns
+    that task in its `ai_tasks` by default. `disable` leaves out checks by name
+    and `enable` keeps only the named ones, as for `validate_subfile`.
 
     As with `validate_subfile`, files can be named instead of (or on top of) a
     `.sub`, with or without a `venue`, and `publisher` / `issn` / `journal`
@@ -783,10 +803,10 @@ def validation_ai_tasks(
 
     files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
     path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files, publisher, issn, journal)
-    result = _run_validate_report(sub, venue_def, check_links=False, check_references=False, reference_check_full=reference_check_full, check_openreview=False, subfile_path=str(path or ""), files_only=files_only, notes=notes)
+    result = _run_validate_report(sub, venue_def, check_links=False, check_references=check_references, reference_check_extended=reference_check_extended, check_openreview=False, disable=disable or (), enable=enable or (), subfile_path=str(path or ""), files_only=files_only, notes=notes)
     from .file_inputs import validate_command
 
-    return tasks_payload(result.ai_tasks, venue_def, str(path or ""), command="" if path else validate_command(venue, files))
+    return tasks_payload(result.ai_tasks, venue_def, str(path or ""), command=validate_command(None if path else venue, files, subfile=str(path or "")))
 
 
 def autofill_subfile(
@@ -1259,6 +1279,14 @@ def submit(
     expose_cdp: bool = False,
     skip_validate: bool = False,
     confirm_new_submission: bool = False,
+    network_checks: bool = False,
+    disable: Optional[list[str]] = None,
+    enable: Optional[list[str]] = None,
+    anonymous: Optional[bool] = None,
+    initial_submission: bool = False,
+    cover_letter_max_age_days: int = 7,
+    references_alphabetical: bool = False,
+    references_citation_order: bool = False,
 ) -> dict[str, Any]:
     """Open the venue's portal and fill in the submission form from a `.sub` file.
 
@@ -1281,7 +1309,11 @@ def submit(
       it. Ask the author; pass `confirm_new_submission=true` only if they want a
       brand-new submission anyway.
 
-    - The `.sub` file is validated. Errors come back as `blocked`, with the same
+    - The `.sub` file is validated, without the sensitive-data scan and, unless
+      `network_checks` is set, the link, reference, and OpenReview lookups.
+      `disable`, `enable`, `anonymous`, `initial_submission`, `cover_letter_max_age_days`,
+      `references_alphabetical`, and `references_citation_order` work as for
+      `validate_subfile`. Errors come back as `blocked`, with the same
       list `validate_subfile` gives. `skip_validate` turns this off (the CLI's
       `--skip-validate`): use it only when the author asked to skip
       validation, since an empty required field or missing file is then likely
@@ -1335,7 +1367,8 @@ def submit(
                 "reason": ("This looks like a revised manuscript. submit is for initial submissions: it opens a new submission, " "so a revision sent this way becomes a duplicate. Revisions go through the venue's own 'submit revision' link. " "Ask the author; call submit again with confirm_new_submission=true only if they want a new submission."),
             }
 
-    checked = None if skip_validate else validate_subfile(str(path), check_links=False, check_sensitive=False, check_references=False, check_openreview=False)
+    check_flags = dict(disable=disable, enable=enable, anonymous=anonymous, initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order)
+    checked = None if skip_validate else validate_subfile(str(path), check_links=network_checks, check_sensitive=False, check_references=network_checks, check_openreview=network_checks, **check_flags)
     if checked is not None and not checked["ok"]:
         return {
             "status": "blocked",
@@ -1376,6 +1409,23 @@ def submit(
         command.append("--close-on-failure")
     if skip_validate:
         command.append("--skip-validate")
+    # The child validates again, so it has to be told the same things.
+    command += [f"--disable-{name}" for name in disable or ()]
+    command += [f"--enable-{name}" for name in enable or ()]
+    if network_checks:
+        command.append("--enable-network-checks")
+    if anonymous:
+        command.append("--anonymous")
+    elif anonymous is False:
+        command.append("--disable-integrity.anonymity")
+    if initial_submission:
+        command.append("--initial-submission")
+    if references_alphabetical:
+        command.append("--references-alphabetical")
+    if references_citation_order:
+        command.append("--references-citation-order")
+    if cover_letter_max_age_days != 7:
+        command += ["--cover-letter-max-age", str(cover_letter_max_age_days)]
     if confirm_new_submission:
         command.append("--yes")
 

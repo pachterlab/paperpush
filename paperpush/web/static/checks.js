@@ -16,7 +16,7 @@
   const TRUE = new Set(["yes", "y", "true", "1", "on"]);
   const FALSE = new Set(["no", "n", "false", "0", "off"]);
   const DEFAULT_AUTHOR_FIELDS = ["name", "email?", "affiliation?", "orcid?", "corresponding"];
-  const AUTHOR_SPECIAL = new Set(["name", "first_name", "last_name", "open_review_id", "corresponding"]);
+  const AUTHOR_SPECIAL = new Set(["name", "open_review_id", "corresponding"]);
 
   const TITLES = {
     "form.schema": ["Field values have the right type and known field ids", "Submission form"],
@@ -55,12 +55,28 @@
     return [a.first_name || "", a.last_name || ""].map((s) => s.trim()).filter(Boolean).join(" ");
   }
 
+  // A multichoice value's entries; an option may hold commas, so known options
+  // are matched whole, longest first (validate.py's _multichoice_items).
+  function multichoiceItems(field, raw) {
+    const known = [...(field.accepted_options || field.options || [])].filter(Boolean).sort((a, b) => b.length - a.length);
+    const out = [];
+    let rest = raw.trim();
+    while (rest) {
+      const hit = known.find((o) => rest.startsWith(o) && /^\s*(,|$)/.test(rest.slice(o.length)));
+      if (hit) { out.push(hit); rest = rest.slice(hit.length); }
+      else { const i = rest.indexOf(","); out.push((i < 0 ? rest : rest.slice(0, i)).trim()); rest = i < 0 ? "" : rest.slice(i + 1); }
+      rest = rest.replace(/^[,\s]+/, "");
+    }
+    return out.filter(Boolean);
+  }
+
   function countItems(field, raw) {
-    if (field.type === "multichoice") return raw.split(",").filter((c) => c.trim()).length;
+    if (field.type === "multichoice") return multichoiceItems(field, raw).length;
     return nonEmptyLines(raw).length;
   }
 
   function isHttpUrl(value) {
+    if (/\s/.test(value.trim())) return false;
     try {
       const u = new URL(value.trim());
       return (u.protocol === "http:" || u.protocol === "https:") && Boolean(u.host);
@@ -112,6 +128,8 @@
       if (!authorName(a) && !(a.open_review_id || "").trim()) out.push(issue("error", field.id, "an author line is missing a name"));
       const who = authorName(a) || "an author";
       for (const col of requiredCols) {
+        // A line with no name at all has been reported above, and an OpenReview ID stands in for a name.
+        if ((col === "first_name" || col === "last_name") && (!authorName(a) || (a.open_review_id || "").trim())) continue;
         if (!String(a[col] || "").trim()) out.push(issue("error", field.id, `author '${who}' is missing ${col.replace(/_/g, " ")}`));
       }
     }
@@ -245,17 +263,17 @@
       }
       if (!present) continue;
 
-      if (field.options && field.options.length && ["choice", "multichoice", "text"].includes(field.type)) {
+      if (field.options && field.options.length && ["choice", "multichoice", "text", "textarea"].includes(field.type)) {
         applied.add("form.options");
         // Options written "code (Label)" (arXiv categories) also take the bare code.
         const accepted = new Set(field.accepted_options || field.options);
-        const chosen = field.type === "multichoice" ? raw.split(",").map((c) => c.trim()) : [raw.trim()];
+        const chosen = field.type === "multichoice" ? multichoiceItems(field, raw) : field.type === "textarea" ? raw.split("\n").map((l) => l.trim()) : [raw.trim()];
         for (const choice of chosen) {
           if (!choice || accepted.has(choice)) continue;
           if (field.options_recommended) {
             const entered = field.type === "multichoice" ? "added as a custom keyword" : "entered as custom text";
             buckets["form.options"].push(issue("warning", field.id, `${field.label}: '${choice}' is not in the recommended list; it will be ${entered}`));
-          } else if (field.type === "multichoice" || field.type === "text") {
+          } else if (["multichoice", "text", "textarea"].includes(field.type)) {
             // A closed single choice is a <select> here, and validate reports a bad one under form.schema.
             buckets["form.options"].push(issue("error", field.id, `${field.label}: '${choice}' is not a valid option`));
           }

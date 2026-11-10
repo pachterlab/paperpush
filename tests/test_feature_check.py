@@ -34,8 +34,8 @@ def test_reference_order_passes_when_citation_order_holds(tmp_path):
 
 def test_numbered_references_follow_first_citation(tmp_path):
     values = _manuscript(tmp_path, [
-        "1. Apple, A. A sufficiently long reference title. Journal 1, 2 (2019).",
-        "2. Meyer, M. Another sufficiently long reference title. Journal 1, 2 (2020).",
+        "1. Meyer, M. A sufficiently long reference title. Journal 1, 2 (2019).",
+        "2. Apple, A. Another sufficiently long reference title. Journal 1, 2 (2020).",
     ], ["The result follows [2] and later [1]."])
     out = _reference_order(VENUE, values, False, False)
     assert "not listed in order of first citation" in out.issues[0].message

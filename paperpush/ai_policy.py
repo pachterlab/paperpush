@@ -46,7 +46,15 @@ _PURPOSE = re.compile(
     r"\b(?i:writ\w*|draft\w*|edit\w*|copy-?edit\w*|proofread\w*|polish\w*|rephras\w*|paraphras\w*|translat\w*|grammar|grammatical|spelling|readability|language|wording|phrasing|clarity|manuscript|text|prose|code|coding|programming|scripts?|figures?|images?|illustrations?|graphics?|summar\w*|preparation)\b"
 )
 _USE = re.compile(r"\b(?i:used?|using|use\s+of|utili[sz]\w+|employ\w*|assist\w*|help\w*|aid(?:ed)?|support\w*|generat\w*|produc\w*|creat\w*|improv\w*|refin\w*|check\w*|enhanc\w*)\b")
-_NEGATION = re.compile(r"\b(?i:no|not|none|never|without|neither|nor)\b|n't\b")
+_NEGATION = re.compile(r"\b(?i:no|not|none|never|neither|nor)\b|n't\b|\b(?i:without)\s+(?:\w+\s+){0,4}?" + _TOOL)
+# A contrast between two clauses, each of which may say something different about the tool.
+_CLAUSE_BREAK = re.compile(r"\b(?i:but|however|yet|although|though|while|whereas|except)\b|;")
+_ANAPHOR = re.compile(r"\b(?i:it|they|them|this\s+tool|these\s+tools)\b|^\s*(?i:was|were|only)\b")
+# Signs that the sentence is about the authors' own use, not the tool as a research subject.
+_AUTHOR_USE = re.compile(
+    r"\b(?i:we|our|authors?|manuscript|paper|article|submission|preparation|writing)\b|\bI\b"
+    r"|\b(?i:(?:was|were|been|is|are)\s+(?:\w+\s+){0,2}?(?:used|utili[sz]ed|employed|applied)|(?:assisted|aided|supported|helped|edited|generated|produced|created|improved|checked|proofread|polished|drafted|written)\s+(?:\w+\s+){0,2}?(?:by|with|using)|using|use\s+of)\b"
+)
 # Uses limited to the language: what an ai_copyediting_exempt venue lets go undeclared.
 _COPYEDIT = re.compile(r"\b(?i:grammar|grammatical|spelling|readability|language|wording|phrasing|clarity|proofread\w*|copy-?edit\w*|polish\w*|typos?|style)\b")
 _SUBSTANTIVE = re.compile(r"\b(?i:draft\w*|generat\w*|writ(?:e|ing|ten)\s+(?:the\s+)?(?:code|text|sections?|first)|code|coding|programming|scripts?|figures?|images?|illustrations?|graphics?|analy[sz]\w*|data|summar\w*|literature|translat\w*)\b")
@@ -142,7 +150,7 @@ def _chunks(path: Path) -> list[tuple[str, str, str]] | None:
         out.append((heading, location, _tex_plain(source[last:])))
         return [c for c in out if c[2].strip()]
     text = doc.text
-    if text is None:
+    if text is None or not text.strip():
         return None
     heading, location, buf = "", "other", []
     for line in text.splitlines():
@@ -183,12 +191,26 @@ def _sentences(text: str) -> list[str]:
     return out
 
 
+def _affirms_use(sentence: str) -> bool:
+    """Whether some clause says the tool was used: "used ChatGPT to edit, but not to write" does."""
+    for clause in _CLAUSE_BREAK.split(sentence):
+        use = _USE.search(clause)
+        if use is None or not (_TOOL_RE.search(clause) or _ANAPHOR.search(clause)):
+            continue
+        denial = _NEGATION.search(clause)
+        if denial is None or denial.start() > use.start():
+            return True
+    return False
+
+
 def classify(sentence: str) -> tuple[bool, bool, bool] | None:
     """``(is_disclosure, negative, copyedit_only)`` for one sentence, or None if it names no AI tool."""
     tool = _TOOL_RE.search(sentence)
     if not tool:
         return None
-    negative = bool(_NEGATION.search(sentence)) and bool(_USE.search(sentence) or _PURPOSE.search(sentence))
+    if not _AUTHOR_USE.search(sentence):
+        return (False, False, False)
+    negative = bool(_NEGATION.search(sentence)) and bool(_USE.search(sentence) or _PURPOSE.search(sentence)) and not _affirms_use(sentence)
     disclosure = negative or bool(_USE.search(sentence) and _PURPOSE.search(sentence))
     if not disclosure:
         return (False, False, False)
@@ -244,6 +266,10 @@ def _sub_ai_answer(venue: Venue, values: dict[str, str]) -> tuple[str, str] | No
     return None
 
 
+# What may accompany a tool's name in a "name" that is really the tool's: "ChatGPT (OpenAI)", "Google Gemini 1.5".
+_TOOL_WORDS = {"ai", "assistant", "bard", "bot", "chat", "google", "large", "language", "meta", "microsoft", "model", "pro", "the", "version"}
+
+
 def _ai_authors(venue: Venue, values: dict[str, str]) -> list[str]:
     from .validate import parse_authors
 
@@ -253,7 +279,7 @@ def _ai_authors(venue: Venue, values: dict[str, str]) -> list[str]:
             continue
         for author in parse_authors(values[field.id], field.fields):
             name = (author.get("name") or " ".join(p for p in (author.get("first_name", ""), author.get("last_name", "")) if p)).strip()
-            if name and _TOOL_RE.search(name) and len(name.split()) <= 4:
+            if name and _TOOL_RE.search(name) and len(name.split()) <= 4 and not set(re.findall(r"[a-z]+", _TOOL_RE.sub(" ", name).lower())) - _TOOL_WORDS:
                 names.append(name)
     return names
 

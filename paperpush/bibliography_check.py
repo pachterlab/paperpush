@@ -87,6 +87,8 @@ def _fold(text: str) -> str:
 
 _BIBITEM = re.compile(r"\\bibitem\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}(.*?)(?=\\bibitem|\\end\s*\{\s*thebibliography|$)", re.DOTALL)
 _NOCITE = re.compile(r"\\nocite\s*\{([^}]*)\}")
+# A macro the author wrapped a citation command in.
+_CITE_MACRO = re.compile(r"\\(?:re|provide)?newcommand\*?\s*\{?\s*\\([A-Za-z]+)\s*\}?\s*\[\d\]\s*(?:\[[^\]]*\]\s*)?\{[^\n]*?\\[A-Za-z]*cite[a-z]*\*?\s*(?:\[[^\]]*\]\s*)*\{#\d\}")
 _BIB_NAMES = re.compile(r"\\(?:bibliography|addbibresource)\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}")
 
 
@@ -99,6 +101,10 @@ def _tex_bibliography(path: Path, source: str) -> Bibliography | None:
     from .front_matter_check import TEX_CITE
 
     cited = {k for m in TEX_CITE.finditer(source) for k in _keys(m.group(1))}
+    # \\newcommand{\\mycite}[1]{\\cite{#1}}: "#1" is no key, and \\mycite{a} cites a.
+    cited = {k for k in cited if "#" not in k}
+    for macro in _CITE_MACRO.finditer(source):
+        cited |= {k for m in re.finditer(r"\\" + macro.group(1) + r"(?![A-Za-z])\s*(?:\[[^\]]*\]\s*)*\{([^{}#]*)\}", source) for k in _keys(m.group(1))}
     nocite = {k for m in _NOCITE.finditer(source) for k in _keys(m.group(1))}
     items = _BIBITEM.findall(source)
     if items:
@@ -122,16 +128,37 @@ def _tex_bibliography(path: Path, source: str) -> Bibliography | None:
 # --- text reference lists ----------------------------------------------------------------
 
 _NUMBER_LABEL = re.compile(r"^\s*(?:\[(\d{1,4})\]|(\d{1,4})[.)])\s")
-_BRACKET = re.compile(r"\[\s*(\d{1,4}(?:\s*[,\u2013\u2014-]\s*\d{1,4})*)\s*\]")
+_BRACKET = re.compile(r"\[\s*(\d{1,4}(?:\s*[,;\u2013\u2014-]\s*\d{1,4})*)\s*\]")
 _YEAR = re.compile(r"\b((?:19|20)\d{2})([a-z]?)\b")
-_SURNAME = re.compile(r"[A-Z][A-Za-z'\u2019-]+")
+_SURNAME = re.compile(r"[^\W\d_](?:[^\W\d_]|['\u2019-])+")
 _PARTICLES = {"van", "von", "de", "der", "den", "da", "di", "du", "del", "della", "la", "le", "dos", "das", "ten", "ter"}
 
 
 def _numbers(group: str) -> list[int]:
     from .requirements_check import _numbers as numbers
 
-    return numbers(group.replace("\u2014", "-"))
+    return numbers(group.replace("\u2014", "-").replace(";", ","))
+
+
+def citation_groups(body: str, last: int) -> list[str]:
+    """The bracketed number groups of ``body`` that are citations of a list numbered up to ``last``.
+
+    "[0, 1]" is an interval (references count from 1), and a group of several
+    numbers all beyond the list ("[18-25]" with 12 references) is a range of
+    values. A lone "[45]" stays: that is a citation with no entry.
+    """
+    groups = []
+    for group in _BRACKET.findall(body):
+        numbers = _numbers(group)
+        if not numbers or min(numbers) < 1 or (len(numbers) > 1 and min(numbers) > last):
+            continue
+        groups.append(group)
+    return groups
+
+
+def _unwrap(text: str) -> str:
+    """``text`` with its line wraps turned into spaces (a blank line still ends a paragraph)."""
+    return re.sub(r"[ \t]*\n[ \t]*(?=\S)", " ", text)
 
 
 def _split(text: str) -> tuple[str, str] | None:
@@ -210,7 +237,7 @@ def _first_surname(entry: str) -> str:
         if bare.lower() in _PARTICLES and i + 1 < len(words):
             continue
         m = _SURNAME.match(bare)
-        if m:
+        if m and m.group(0)[0].isupper():
             return m.group(0)
     return ""
 
@@ -229,7 +256,8 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
     numbered = max((_sequential(list(p.finditer(tail))) for p in (_BRACKET_MARK, _LINE_MARK)), key=len)
     if len(numbered) >= 2:
         refs = [Ref(n, f"[{n}]", entry) for n, entry in _entries(tail, numbered)]
-        cited = {str(n) for g in _BRACKET.findall(body) for n in _numbers(g)}
+        last = max(int(n) for n, _ in _entries(tail, numbered))
+        cited = {str(n) for g in citation_groups(body, last) for n in _numbers(g)}
         note = ""
         if not cited and doc.is_docx:
             cited = {str(n) for n in docx_superscript_numbers(doc) or ()}
@@ -254,7 +282,7 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
             entries[-1] += " " + entry
         elif entry:
             entries.append(entry)
-    folded = _fold(body)
+    folded = _unwrap(_fold(body))
     refs: list[Ref] = []
     cited: set[str] = set()
     for entry in entries:
@@ -308,7 +336,9 @@ def _author_names(venue: Venue, values: dict[str, str]) -> list[tuple[str, str, 
 
 def _author_part(ref: Ref) -> str:
     """The part of an entry that lists its authors (before its year, when that comes early)."""
-    text = _fold(ref.authors)
+    from .references import _strip_latex
+
+    text = _fold(_strip_latex(ref.authors))
     year = _YEAR.search(text)
     if year and year.start() < len(text) * 0.6 and year.start() > 10:
         return text[: year.start()]

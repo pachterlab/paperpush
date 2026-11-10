@@ -30,8 +30,8 @@ Implemented so far:
                                       (scans referenced files for secrets, GPS
                                       metadata, LaTeX comments, broken links, and
                                       references whose DOI points at a different
-                                      work, by default; --dont-check-* to opt
-                                      out)
+                                      work, by default; --disable-CHECK to opt
+                                      out of any check)
     paperpush login <venue>     store credentials for a venue
     paperpush login --list        list the venues you are logged in to
     paperpush login --orcid <j>   store an ORCID iD/password for a journal that
@@ -66,7 +66,7 @@ from pydantic import ConfigDict, validate_call
 
 from . import __url__, __version__, credentials, venue_data
 from ._logging import configure_logging
-from .database import Venue, general_venue, get_venue, list_venues
+from .database import GENERAL_SLUG, Venue, general_venue, get_venue, list_venues
 from .subfile import default_filename, find_subfile, is_subfile_name, subfile_stem, with_subfile_suffix, write_template
 from .venues.common import DEFAULT_TIMEOUT_SECONDS
 
@@ -541,7 +541,7 @@ def _print_web_link(sub_path: Path, *, manuscript_dirs=(), blank_line: bool = Fa
     from .subfile import parse
 
     try:
-        venue = parse(sub_path.read_text(encoding="utf-8")).venue or subfile_stem(sub_path)
+        venue = parse(sub_path.read_text(encoding="utf-8")).venue or GENERAL_SLUG
     except (OSError, UnicodeDecodeError):
         return
     host = "127.0.0.1"
@@ -600,8 +600,10 @@ def _cmd_web(args: argparse.Namespace) -> int:
         print(f"error: cannot read {path}: {exc}", file=sys.stderr)
         return 1
     if not venue:
-        print(f"error: {path} has no '@venue:' line, so it is not a .sub file", file=sys.stderr)
-        return 1
+        if not is_subfile_name(path):
+            print(f"error: {path} has no '@venue:' line and is not named like a .sub file", file=sys.stderr)
+            return 1
+        venue = GENERAL_SLUG
     given = [Path(p).expanduser() for p in args.paths or ()]
     missing = [p for p in given if not p.exists()]
     if missing:
@@ -1265,47 +1267,23 @@ def _populate_orcid_into(sub_path: str, venue, profile) -> None:
     print(f"  Updated {sub_path}: filled ORCID details for author '{matched}'.")
 
 
-def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive: bool = True, check_links: bool = True, check_references: bool = True, check_manuscript: bool = True, check_anonymous: bool | None = None, check_hidden_text: bool = True, check_openreview: bool = True) -> list:
-    """Validate a loaded .sub against its venue and print the findings.
+def _report_validation(subfile, venue_def, subfile_path: str, *, network: bool = False, **flags) -> list:
+    """Validate a loaded .sub before ``submit`` opens a browser, and print the findings.
 
-    Runs the same checks ``submit`` performs before opening a browser --
-    required/missing fields, files that must exist, allowed options, file types,
-    and booleans -- printing warnings (advisory) and an error summary (blocking)
-    to stderr. Returns the list of error :class:`~paperpush.validate.Issue`
-    objects (empty when the file passes), so the caller decides what to do next.
-    Shared by ``submit`` (the gate before submission) and the standalone
-    ``validate`` command.
+    Prints warnings (advisory) and an error summary (blocking) to stderr, and
+    returns the error :class:`~paperpush.validate.Issue` objects (empty when the
+    file passes), so the caller decides what to do next.
 
-    When ``check_links`` is set (the default), the URLs cited in the referenced
-    files are probed and broken ones reported. When ``check_references`` is set
-    (also the default), the DOIs in the submission's bibliography are resolved
-    and compared against what each entry claims; both make network requests.
-    When ``check_sensitive`` is set, those files are additionally scanned for
-    information not meant to be published (secrets, GPS metadata,
-    editable-document links, LaTeX comments); all surface as advisory warnings.
-    When ``check_manuscript`` is set (the default), the manuscript and other
-    uploads are measured against the venue's author guidelines
-    (``manuscript_requirements.json``): formats, length, required sections and
-    statements, title-page items, figure resolution, reference count.
-    ``check_anonymous`` (default: the venue's ``anonymous`` flag) scans the
-    uploads and any linked anonymous.4open.science repositories for information
-    identifying the authors. ``check_hidden_text`` looks for text a reader cannot
-    see (hidden prompts to AI reviewers are errors); ``check_openreview`` looks
-    up the authors' OpenReview profiles for OpenReview venues.
+    Runs what ``paperpush validate`` runs except the sensitive-data scan and,
+    unless ``network`` is set, the link, reference, and OpenReview lookups:
+    they are slow, report mostly warnings, and the author has usually just seen
+    them from ``validate``. ``flags`` are those of :func:`_check_flags`.
     """
     from .validate import validate
 
-    issues = validate(
-        subfile,
-        venue_def,
-        check_sensitive=check_sensitive,
-        check_links=check_links,
-        check_references=check_references,
-        check_manuscript=check_manuscript,
-        check_anonymous=check_anonymous,
-        check_hidden_text=check_hidden_text,
-        check_openreview=check_openreview,
-    )
+    issues = validate(subfile, venue_def, check_sensitive=False, check_links=network, check_references=network, check_openreview=network, **flags)
+    skipped = "the sensitive-data scan" if network else "the link, reference, and OpenReview lookups and the sensitive-data scan"
+    print(f"note: submit skipped {skipped}; 'paperpush validate' runs them" + ("." if network else ", or add --enable-network-checks for the lookups."), file=sys.stderr)
     errors = [i for i in issues if i.is_error]
     warnings = [i for i in issues if not i.is_error]
     for issue in warnings:
@@ -1320,86 +1298,115 @@ def _report_validation(subfile, venue_def, subfile_path: str, *, check_sensitive
     return errors
 
 
-def _clean_latex_sources(subfile, venue_def):
-    """Swap the .sub's LaTeX uploads for arxiv_latex_cleaner'd copies (``--arxiv-latex-cleaner``).
-
-    Runs :func:`paperpush.latex_cleaner.clean_values` and prints where each
-    cleaned copy was written. The .sub on disk is left alone; the returned
-    :class:`~paperpush.subfile.SubFile` points at the copies so the rest of
-    ``validate`` checks what would be uploaded. Returns None (after printing
-    an error) when the optional package is not installed.
-    """
-    from . import latex_cleaner
-    from .subfile import SubFile
-
-    if not latex_cleaner.available():
-        print(f"error: --arxiv-latex-cleaner needs the arxiv_latex_cleaner package; install it with `{latex_cleaner.INSTALL_HINT}`", file=sys.stderr)
-        return None
-    values, cleaned, failures = latex_cleaner.clean_values(venue_def, subfile.values)
-    for field_id, path, reason in failures:
-        print(f"warning: [{field_id}] arxiv_latex_cleaner could not clean {path}: {reason}; validating the original", file=sys.stderr)
-    if not cleaned and not failures:
-        print("note: --arxiv-latex-cleaner found no LaTeX source (.tex, or a .zip/.tar bundle with one) to clean", file=sys.stderr)
-    for c in cleaned:
-        print(f"note: [{c.field_id}] cleaned {c.original} -> {c.cleaned}", file=sys.stderr)
-    if cleaned:
-        print("note: validating the cleaned copies; point the .sub at them to submit them", file=sys.stderr)
-    return SubFile(venue=subfile.venue, values=values)
-
-
 # The checks, as listed at the end of 'paperpush validate --help'. Keep in step
 # with docs/validation-checks.rst and "What it checks" in docs/commands/validate.rst.
 _VALIDATE_CHECKS = """\
 checks that run without AI:
-  submission form   required fields and confirmations, valid options, types,
-                    item counts, word/character limits, URLs, author list
-  files             files exist, accepted types and sizes, total upload size,
-                    portal word/page limits
-  integrity         reachable links, reference DOIs, secrets and private data,
-                    hidden text / prompt injection, anonymity (double-blind),
-                    OpenReview profiles
-  guidelines        formats and sizes, word/page limits, title/abstract/keyword
-                    limits, undefined abbreviations in the abstract, required
-                    sections and their order, required statements, title-page
-                    items, separate title page, reference count, citation style
-                    (numbered or author-year, numbered in order), DOIs on every
-                    reference, preprints/unpublished work, figure/table/
-                    supplementary counts, combined supplementary PDF, cover
-                    letter, edits to a mandatory template
-  layout            template or LaTeX class, page size, margins, body font and
-                    size, double spacing, line numbers, page numbers, English
-                    spelling variant
-  figures           resolution (dpi, line-art threshold), lettering size and
-                    typeface in vector figures, panel labels (case, bold, cited
-                    panels present, labelled panels cited), colour mode, print size, placement,
-                    legend length and location -- attached figure files, or the
-                    figures embedded in the manuscript when none are attached
-  citation order    main, supplementary, and Extended Data figures and tables
-                    first cited in order, all cited, none cited that is missing;
-                    panels of each figure and table (every series) first
-                    cited in order
-  .sub vs paper     title, abstract, authors (names, order, emails, ORCIDs),
-                    keywords, and statements match the manuscript word for word
-  front matter      no citations in the abstract, structured abstract headings
-                    (when the venue asks for them), a contact e-mail address
-  references        every reference cited and every citation listed, share of
-                    self-citations (>15, or >80% of the list)
-  prose             double spaces mid-sentence, repeated words ("the the"),
-                    spacing around punctuation, unbalanced brackets and quotes,
-                    common misspellings (codespell), repetitive word choice
 
-checks that need AI (--ai, or an agent via --ai-tasks / --ai-results; add
+  Bibliography
+    Every reference is cited and every citation has a reference. BibTeX entries
+    are complete and have unique keys, and self-citations stay within limits
+    (at most 15, and at most 80% of references). Also reports the share of
+    references more than 10 years old and the citation density.
+
+  Figure and table citations
+    Main, supplementary, and Extended Data figures and tables are first cited
+    in order, all are cited, and none is cited that is missing. Panels are
+    cited in order too. Every figure and table has a caption, no two share a
+    caption or number, and cross-references resolve (no "??").
+
+  Submission and manuscript consistency
+    The title, abstract, authors (names, order, emails, ORCIDs), keywords, and
+    statements in the .sub match the manuscript word for word. Word, figure,
+    and table counts stated on the title page match the manuscript.
+
+  Cover letter
+    The cover letter is addressed to the target venue and dated within the
+    last 7 days.
+
+  Additional manuscript details
+    No placeholders, to-do notes, comments, or highlighting are left in the
+    files, and Word files have no tracked changes or EndNote fields.
+    Affiliation numbers are superscripted, and the reference list is
+    alphabetical or follows first citation.
+
+  Figures
+    Resolution (dpi, with a line-art threshold), lettering size and typeface
+    in vector figures, panel labels, color mode, maximum dimensions, placement,
+    legend length and location, and legibility with red-green color blindness.
+    Reads the attached figure files, or the figures embedded in the manuscript
+    when none are attached.
+
+  Files
+    Uploads exist, have accepted types and sizes, and fit the portal's combined
+    size limit. The manuscript fits the portal's word and page limits.
+
+  Submission form
+    Required fields and confirmations, valid options, field types, the number
+    of entries in list fields, word and character limits, URLs, and complete
+    author lists and structured entries such as funding and reviewers.
+
+  Abstract and front matter
+    The abstract cites no references and has structured headings when the venue
+    asks for them. Keywords are given, and the manuscript has a contact e-mail
+    address.
+
+  Venue guidelines
+    File formats and sizes, word and page limits (overall and by section),
+    title, abstract, and keyword limits, required sections and their order,
+    required statements, title-page items, reference count and citation style,
+    DOIs and preprints in the reference list, figure, table, and supplementary
+    counts, the cover letter, disclosure of generative AI, and page layout
+    against a compiled copy of the venue's template.
+
+  Integrity and external sources
+    Links are reachable, reference DOIs match the works they cite, references
+    without a DOI match a registered work, no cited work is retracted, and
+    references cite the journal article or latest preprint. Scans for secrets
+    and private data, hidden text or prompts aimed at AI reviewers, anything
+    identifying the authors (double-blind), and OpenReview profiles. Previews
+    what arxiv_latex_cleaner would strip from LaTeX source, on a temporary copy.
+
+  Page layout
+    The venue's Word template or LaTeX class, page size, margins, body font and
+    size, double spacing, line and page numbers, and the required English
+    spelling variant.
+
+  Prose
+    A mechanical proofread: double spaces, doubled words ("the the"), spacing
+    around punctuation, unbalanced brackets and quotes, common misspellings
+    (codespell), repetitive word choice, numbers of 10 or more in digits,
+    consistent abbreviations and heading capitalization, and acronyms spelled
+    out at first use.
+
+  Rigor and reproducibility
+    Cell lines are authenticated, tested for mycoplasma, and not known to be
+    misidentified. Blinding, randomization, sample size, exclusions, and sex
+    are reported for animal and human studies. RRIDs resolve, test statistics
+    agree with their p values (statcheck), and a clinical trial gives a
+    registry ID.
+
+checks that require AI (--ai, or an agent via --ai-tasks / --ai-results; add
 --ai-only to run just these):
-  lettering size, typeface, and panel labels in raster figures, and that
-  each of their labelled panels is cited; title-page
-  items found only by reading (postal address, author footnotes, one-sentence
-  summary, classification, affiliations); tables pasted as images; reference
-  formatting in the venue's style; template used, for a PDF or Word manuscript;
-  the venue's free-text guideline rules; whether every .sub field agrees with
-  the manuscript in meaning
+
+  Whether every .sub field agrees with the manuscript in meaning, and whether
+  each figure and panel shows what its legend and the text say. Lettering and
+  panel labels in raster figures, and that their panels are cited; title-page
+  items found only by reading; tables pasted as images; reference formatting
+  in the venue's style; the template used, for a PDF or Word manuscript;
+  spelling, grammar, and tense; declarations, ethics approval, and consent;
+  and the venue's free-text guideline rules. --reference-check-extended also checks
+  that each cited source supports the claims that cite it and is their
+  original source.
 
 Guideline rules no check reads are listed as 'not implemented'. See
 'paperpush requirements VENUE' for a venue's rules.
+
+Turn any check off with --disable-<check ID>, or a family with the start of
+its ID: --disable-bibliography.age, --disable-prose, --disable-ai.notes. Run
+only some checks with --enable-<check ID>. Both take comma-separated names
+(--disable-prose,ai.notes) or a text file of names (--enable-checks.txt). Every
+ID is listed at https://paperpush.readthedocs.io/en/latest/validation-checks.html
 """
 
 
@@ -1438,9 +1445,16 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     (PDF by default; .html, .md, or .txt by extension). Exits 0 when the file is
     ready to submit, 1 when it has errors, and 2 when the venue is unknown.
     """
-    from . import file_inputs
+    from . import check_ids, file_inputs
     from . import report as report_mod
     from .subfile import SubFile, load
+
+    try:
+        check_flags = _check_flags(args)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    disable, enable = check_flags["disable"], check_flags["enable"]
 
     # '--figures a.png b.png x.sub.txt' reads the .sub as a figure (nargs='+'
     # is greedy); take it back as the positional .sub.
@@ -1465,12 +1479,12 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         venue = requested_venue
     else:
         try:
-            subfile = load(args.subfile)
+            subfile = load(args.subfile, default_venue=requested_venue)
         except OSError as exc:
             logger.error("validate: cannot read %s: %s", args.subfile, exc)
             print(f"error: cannot read {args.subfile}: {exc}", file=sys.stderr)
             return 1
-        venue = subfile.venue or "biorxiv"
+        venue = subfile.venue
         logger.info("validate: loaded %s targeting %s (%d values)", args.subfile, venue, len(subfile.values))
         if requested_venue and requested_venue.lower() != venue.lower():
             print(f"error: {args.subfile} is for {venue}, not {requested_venue}; drop --venue, or make a .sub for {requested_venue} with 'paperpush subfile {requested_venue}'", file=sys.stderr)
@@ -1506,22 +1520,39 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     # Names the run in messages and anchors the default report path: the .sub,
     # or else the first file named.
     label = args.subfile or next(p for p in (subfile.values.get(f.id, "").split("\n")[0] for f in venue_def.fields if f.type in ("file", "filelist")) if p)
-    rerun = f"paperpush validate {args.subfile}" if args.subfile else file_inputs.validate_command(requested_venue, files)
-    if getattr(args, "reference_check_full", False):
-        rerun += " --reference-check-full"
+    rerun = file_inputs.validate_command(requested_venue, files, subfile=args.subfile or "")
+    if getattr(args, "reference_check_extended", False):
+        rerun += " --reference-check-extended"
     for flag in ("publisher", "issn", "journal"):
         if getattr(args, flag, None):
             rerun += f" --{flag} {shlex.quote(getattr(args, flag))}"
 
+    rerun += "".join(f" --disable-{name}" for name in disable)
+    rerun += "".join(f" --enable-{name}" for name in enable)
+
     ai_only = getattr(args, "ai_only", False)
-    if ai_only and not getattr(args, "check_manuscript", True):
-        print("error: --ai-only cannot be combined with --dont-check-manuscript: the manuscript checks decide which AI checks apply", file=sys.stderr)
+    no_manuscript = not check_ids.reads_manuscript(disable, enable)
+    without = "--disable-manuscript" if "manuscript" in disable else "an --enable-* list with no manuscript check"
+    if ai_only and no_manuscript:
+        print(f"error: --ai-only cannot be combined with {without}: the manuscript checks decide which AI checks apply", file=sys.stderr)
         return 1
-    if getattr(args, "reference_check_full", False) and not getattr(args, "check_manuscript", True):
-        print("error: --reference-check-full needs manuscript checks; remove --dont-check-manuscript", file=sys.stderr)
+    if (getattr(args, "ai", False) or getattr(args, "ai_results", None) or getattr(args, "ai_tasks", None)) and no_manuscript:
+        print(f"error: the AI checks (--ai, --ai-results, --ai-tasks) cannot be combined with {without}: the manuscript checks decide which AI checks apply", file=sys.stderr)
+        return 1
+    if getattr(args, "reference_check_extended", False) and no_manuscript:
+        print(f"error: --reference-check-extended needs manuscript checks, so it cannot be combined with {without}", file=sys.stderr)
+        return 1
+    if getattr(args, "reference_check_extended", False) and getattr(args, "ai", False):
+        print("error: --reference-check-extended cannot be combined with --ai: the API model cannot read the cited papers; use --ai-tasks FILE so an agent can", file=sys.stderr)
+        return 1
+    if (disable or enable) and getattr(args, "web", False):
+        print("error: --disable-* and --enable-* are not supported with --web", file=sys.stderr)
         return 1
     if ai_only and getattr(args, "web", False):
         print("error: --ai-only is not supported with --web", file=sys.stderr)
+        return 1
+    if getattr(args, "reference_check_extended", False) and getattr(args, "web", False):
+        print("error: --reference-check-extended is not supported with --web; use it with --ai-tasks so an agent can read the cited papers", file=sys.stderr)
         return 1
 
     if getattr(args, "web", False) and files_only:
@@ -1538,11 +1569,6 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         report_out = report_mod.output_path(args.output, label)
         if report_out.exists() and not getattr(args, "overwrite", False):
             print(f"error: {report_out} already exists (use --overwrite to replace it)", file=sys.stderr)
-            return 1
-
-    if getattr(args, "arxiv_latex_cleaner", False):
-        subfile = _clean_latex_sources(subfile, venue_def)
-        if subfile is None:
             return 1
 
     ai = None
@@ -1569,18 +1595,8 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             progress=progress,
             files_only=files_only,
             notes=notes,
-            check_sensitive=getattr(args, "check_sensitive", True),
-            check_links=getattr(args, "check_links", True),
-            check_references=getattr(args, "check_references", True),
-            reference_check_full=getattr(args, "reference_check_full", False),
-            references_alphabetical=getattr(args, "references_alphabetical", False),
-            references_citation_order=getattr(args, "references_citation_order", False),
-            check_manuscript=getattr(args, "check_manuscript", True),
-            check_anonymous=getattr(args, "check_anonymous", None),
-            check_hidden_text=getattr(args, "check_hidden_text", True),
-            check_openreview=getattr(args, "check_openreview", True),
-            initial_submission=getattr(args, "initial_submission", False),
-            cover_letter_max_age_days=getattr(args, "cover_letter_max_age", 7),
+            reference_check_extended=getattr(args, "reference_check_extended", False),
+            **check_flags,
             ai_only=ai_only,
         )
     alt = getattr(args, "alt_color", False)
@@ -1627,6 +1643,9 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         return 1
     if ai_only:
         print(f"\nRan only the AI checks on {Path(label).name}; run 'paperpush validate' without --ai-only for the full pre-submission checks.", file=note_stream)
+        return 0
+    if enable:
+        print(f"\nThe checks chosen with --enable-* passed on {Path(label).name}; the others did not run, so this does not mean it is ready to submit.", file=note_stream)
         return 0
     if files_only:
         what = f"{venue}'s author guidelines" if not venue_def.is_general else "the general checks (no venue given)"
@@ -1701,7 +1720,7 @@ def _cmd_submit(args: argparse.Namespace) -> int:
         print(f"error: cannot read {args.subfile}: {exc}", file=sys.stderr)
         return 1
 
-    venue = subfile.venue or "biorxiv"
+    venue = subfile.venue
     logger.info("submit: loaded %s targeting %s (%d values)", args.subfile, venue, len(subfile.values))
 
     # Check the filled-in file against the venue's field schema before opening
@@ -1744,7 +1763,12 @@ def _cmd_submit(args: argparse.Namespace) -> int:
         logger.info("submit: --skip-validate given; not validating %s", args.subfile)
         print(f"warning: --skip-validate given; submitting {args.subfile} without running validate.", file=sys.stderr)
     elif venue_def is not None:
-        errors = _report_validation(subfile, venue_def, args.subfile)
+        try:
+            check_flags = _check_flags(args)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        errors = _report_validation(subfile, venue_def, args.subfile, network=getattr(args, "enable_network_checks", False), **check_flags)
         if errors:
             print(
                 "\nFix the items above, then run 'paperpush submit' again "
@@ -2072,7 +2096,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
         except OSError as exc:
             print(f"error: cannot read {sub_path}: {exc}", file=sys.stderr)
             return 1
-        slug = parse(text).venue or subfile_stem(sub_path)
+        slug = parse(text).venue or GENERAL_SLUG
     else:
         slug = subfile_stem(sub_path)
         text = None
@@ -2148,7 +2172,7 @@ def _autofill_in_browser(args: argparse.Namespace, input_dirs: list[Path], input
     out_path = Path(args.output) if args.output else sub_path
     if sub_path.exists():
         text = sub_path.read_text(encoding="utf-8")
-        slug = parse(text).venue or subfile_stem(sub_path)
+        slug = parse(text).venue or GENERAL_SLUG
     else:
         text, slug = None, subfile_stem(sub_path)
     try:
@@ -2672,6 +2696,74 @@ def _cmd_options(args: argparse.Namespace) -> int:
     return 0
 
 
+def _add_check_options(parser: argparse.ArgumentParser, *, documented: bool = True) -> None:
+    """Add the flags that change what validate checks, which ``validate`` and ``submit`` share.
+
+    A flag added here reaches both commands, and :func:`_check_flags` hands it
+    to the validator. ``submit`` keeps them out of its ``--help`` and points at
+    validate's.
+    """
+    group = parser.add_argument_group("choosing what is checked")
+
+    def add(*flags, help: str, **kwargs) -> None:
+        group.add_argument(*flags, help=help if documented else argparse.SUPPRESS, **kwargs)
+
+    group.add_argument("--disable", action="append", metavar="CHECK", help=argparse.SUPPRESS)
+    group.add_argument("--enable", action="append", metavar="CHECK", help=argparse.SUPPRESS)
+    # Never parsed: _expand_check_flags rewrites --disable-NAME and --enable-NAME first. They are here to show in --help.
+    add(
+        "--disable-CHECK",
+        dest="_disable_help",
+        action="store_true",
+        help="skip a check; repeat for more. CHECK is any check ID listed at https://paperpush.readthedocs.io/en/latest/validation-checks.html (--disable-ai.consistency, --disable-bibliography.age), or the start of one, for that whole family (--disable-prose, --disable-ai.notes). Two names cover wider sets: --disable-references skips every reference lookup (DOIs, registry searches, retractions, preprint versions, RRIDs, cell lines; with --disable-integrity.links, validate runs offline), and --disable-manuscript skips everything that reads the manuscript against the guidelines, and the AI checks. A skipped check is reported as not checked, never as passed. CHECK can also be comma-separated names (--disable-prose,ai.notes) or a text file listing them, comma- or whitespace-separated, with # for comments (--disable-checks.txt).",
+    )
+    add(
+        "--enable-CHECK",
+        dest="_enable_help",
+        action="store_true",
+        help="run only these checks; the rest are reported as not checked. CHECK is as for --disable-CHECK: an ID, a family, references or manuscript, comma-separated names, or a text file of names. With both flags, the more specific name wins: --enable-prose --disable-prose.spelling runs prose without spelling. It does not make a check apply that otherwise would not (--anonymous does that for integrity.anonymity), or add the lookups submit skips (--enable-network-checks does).",
+    )
+    add("--references-alphabetical", action="store_true", help="require references to be alphabetized by first-author surname when the venue leaves ordering open")
+    add("--references-citation-order", action="store_true", help="require references to follow first-citation order when the venue leaves ordering open")
+    add(
+        "--anonymous",
+        dest="check_anonymous",
+        action="store_const",
+        const=True,
+        help="check the submission for information identifying the authors, as " "for a double-blind venue. Venues marked anonymous (e.g. ICLR, AAAI) " "get this check automatically. Scans the attached files and the .sub's " "text fields for the authors' names, emails, ORCID/OpenReview IDs and " "affiliations, author metadata (PDF, Office, EXIF), home-directory " "paths, acknowledgments, camera-ready LaTeX switches, and non-anonymized " "github.com links, and fetches " "every linked anonymous.4open.science repository to scan it the same " "way (requires network access).",
+    )
+    add(
+        "--initial-submission",
+        dest="initial_submission",
+        action="store_true",
+        help="validate this as an initial submission: every error is reported as a warning, so nothing blocks it. Meant for venues whose guidelines let the initial submission be in any format (the report names the rule at the top when the venue has one; see 'paperpush requirements VENUE').",
+    )
+    add(
+        "--cover-letter-max-age",
+        dest="cover_letter_max_age",
+        type=int,
+        default=7,
+        metavar="DAYS",
+        help="warn when the date at the top of the cover letter is more than DAYS days old (default: 7). The cover letter is also checked for the name of a different venue, as left over from an earlier submission.",
+    )
+
+
+def _check_flags(args: argparse.Namespace) -> dict:
+    """The validator's keyword arguments for the flags of :func:`_add_check_options`; ValueError on an unknown check."""
+    from . import check_ids
+
+    disable, enable = check_ids.select(getattr(args, "disable", None) or [], getattr(args, "enable", None) or [])
+    return {
+        "disable": disable,
+        "enable": enable,
+        "check_anonymous": getattr(args, "check_anonymous", None),
+        "initial_submission": getattr(args, "initial_submission", False),
+        "cover_letter_max_age_days": getattr(args, "cover_letter_max_age", 7),
+        "references_alphabetical": getattr(args, "references_alphabetical", False),
+        "references_citation_order": getattr(args, "references_citation_order", False),
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     # The epilog is the discovery path for AI agents: an agent handed a
     # pip-installed paperpush reaches for `--help` long before it would think to
@@ -2767,7 +2859,7 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_validate.add_argument("subfile", nargs="?", help="path to the .sub file to check, e.g. biorxiv.sub.txt. Optional when files are named with --manuscript, --title-page, ...: they are then checked without a .sub")
-    p_validate.add_argument("--venue", metavar="VENUE", help="(no .sub) check the named files against this venue's author guidelines. Without it, only the checks that apply to any manuscript run: links, references, hidden text, sensitive data, figure/table citation order, front matter, the reference list, and prose")
+    p_validate.add_argument("--venue", metavar="VENUE", help="check the named files, or a .sub with no @venue: line, against this venue's author guidelines. Without it, only the checks that apply to any manuscript run: links, references, hidden text, sensitive data, figure/table citation order, front matter, the reference list, and prose")
     house_group = p_validate.add_argument_group("journals paperpush does not list", "Check the files (or a general .sub) against the journal's publisher's house rules instead (see 'paperpush publishers'). What those rules catch is reported as warnings, since a journal can depart from its publisher's rules.")
     house_group.add_argument("--publisher", metavar="PUBLISHER", help="the publisher, by slug or name, e.g. elsevier or 'Springer Nature'")
     house_group.add_argument("--issn", metavar="ISSN", help="the journal's ISSN; its publisher is looked up in Crossref (network)")
@@ -2780,61 +2872,11 @@ def build_parser() -> argparse.ArgumentParser:
     files_group.add_argument("--tables", nargs="+", metavar="FILE", help="table files")
     files_group.add_argument("--supplement", nargs="+", metavar="FILE", help="supplementary files")
     p_validate.add_argument("--web", action="store_true", help="show the checks in the paperpush web page on this computer instead of the terminal, where you can fix the fields and re-validate; edits are saved to the .sub (with --ai, the AI checks run too). Needs pip install 'paperpush[web]'")
+    _add_check_options(p_validate)
     p_validate.add_argument(
-        "--dont-check-links",
-        dest="check_links",
-        action="store_false",
-        help="skip checking that the URLs cited in the manuscript files are " "reachable. By default validate probes them and warns about broken " "links (404/gone, including still-private GitHub repos), which requires " "network access.",
-    )
-    p_validate.add_argument(
-        "--dont-check-for-sensitive-info",
-        dest="check_sensitive",
-        action="store_false",
-        help="skip scanning the referenced files for information not meant to " "be published. By default validate scans them for API keys, passwords, " "private keys, GPS coordinates in figures, editable-document links, and " "LaTeX source comments, nudges when no public code repository is linked, " "and reminds arXiv submitters to run arxiv_latex_cleaner on unclean " "source. Reported as advisory warnings.",
-    )
-    p_validate.add_argument(
-        "--dont-check-references",
-        dest="check_references",
-        action="store_false",
-        help="skip checking the references against the DOI registry. By " "default validate reads the submission's bibliography -- its .bib " "files, and the reference list in the manuscript itself -- resolves " "each DOI through doi.org, and warns when one is " "malformed, duplicated, unregistered, or registered to a different " "title, author, or year than the reference claims -- the usual sign of " "a DOI copied from the wrong reference. It also searches Crossref, " "OpenAlex, and arXiv for the references that have no DOI (a reference " "no registry knows may be fabricated) and checks that preprints are " "cited in their published or latest version. The same switch turns " "off the rigor checks' lookups of RRIDs (SciCrunch) and cell lines " "(Cellosaurus). Requires network access.",
-    )
-    p_validate.add_argument(
-        "--reference-check-full",
+        "--reference-check-extended",
         action="store_true",
-        help="queue agent reviews of journal indexing and whether each cited source supports the nearby claims; use --ai-tasks to hand these reviews to an agent (can require reading every cited paper)",
-    )
-    p_validate.add_argument("--references-alphabetical", action="store_true", help="require references to be alphabetized by first-author surname when the venue leaves ordering open")
-    p_validate.add_argument("--references-citation-order", action="store_true", help="require references to follow first-citation order when the venue leaves ordering open")
-    p_validate.add_argument(
-        "--dont-check-manuscript",
-        dest="check_manuscript",
-        action="store_false",
-        help="skip measuring the uploads against the venue's author guidelines. " "By default validate reads manuscript_requirements.json for the venue " "and checks the manuscript's format, word/page count (compiling LaTeX " "source to a scratch PDF with latexmk/pdflatex when installed), " "required section headings and declarations, title-page items, " "abstract/title/keyword limits, figure format, resolution, and count, " "supplementary-file rules, and the number of references. See " "'paperpush requirements VENUE' for the rules applied.",
-    )
-    p_validate.add_argument(
-        "--anonymous",
-        dest="check_anonymous",
-        action="store_const",
-        const=True,
-        help="check the submission for information identifying the authors, as " "for a double-blind venue. Venues marked anonymous (e.g. ICLR, AAAI) " "get this check automatically. Scans the attached files and the .sub's " "text fields for the authors' names, emails, ORCID/OpenReview IDs and " "affiliations, author metadata (PDF, Office, EXIF), home-directory " "paths, acknowledgments, camera-ready LaTeX switches, and non-anonymized " "github.com links, and fetches " "every linked anonymous.4open.science repository to scan it the same " "way (requires network access).",
-    )
-    p_validate.add_argument(
-        "--dont-check-hidden-text",
-        dest="check_hidden_text",
-        action="store_false",
-        help="skip looking for text a reader cannot see. By default validate " "reads every PDF, LaTeX, and Word upload for white, invisible, " "microscopic, or off-page text; hidden instructions to AI reviewers " "(prompt injection, grounds for desk rejection) are errors, other " "hidden prose and visible text addressed to an AI reviewer are warnings.",
-    )
-    p_validate.add_argument(
-        "--dont-check-openreview-profiles",
-        dest="check_openreview",
-        action="store_false",
-        help="skip looking up the authors' OpenReview profiles. For venues " "submitted through OpenReview (ICLR, AAAI), validate signs in with the " "login stored by 'paperpush login' and checks that every author has an " "active profile matching their name and email suffixes, with a current " "position. Requires network access.",
-    )
-    p_validate.add_argument(
-        "--arxiv-latex-cleaner",
-        dest="arxiv_latex_cleaner",
-        action="store_true",
-        help="run arxiv_latex_cleaner on the LaTeX source first (every .tex upload, " "and every .zip/.tar/.tar.gz/.tgz bundle containing one), then validate " "the cleaned copies. Strips comments and unreferenced or auxiliary files. " "Cleaned copies are written next to the originals (paper/ -> paper_arXiv/, " "source.zip -> source_arXiv.zip); the originals and the .sub are not " "changed. Needs the optional package: pip install 'paperpush[validate]'.",
+        help="queue agent reviews of journal indexing, whether each cited source supports the nearby claims, and whether it is their original source; use --ai-tasks to hand these reviews to an agent; not available with --ai, whose model cannot read the cited papers (can require reading every cited paper)",
     )
     p_validate.add_argument(
         "-o",
@@ -2846,20 +2888,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_validate.add_argument("--overwrite", action="store_true", help="replace the report saved with -o if the file already exists")
     p_validate.add_argument("--force", dest="overwrite", action="store_true", help=argparse.SUPPRESS)
-    p_validate.add_argument(
-        "--initial-submission",
-        dest="initial_submission",
-        action="store_true",
-        help="validate this as an initial submission: every error is reported as a warning, so nothing blocks it. Meant for venues whose guidelines let the initial submission be in any format (the report names the rule at the top when the venue has one; see 'paperpush requirements VENUE').",
-    )
-    p_validate.add_argument(
-        "--cover-letter-max-age",
-        dest="cover_letter_max_age",
-        type=int,
-        default=7,
-        metavar="DAYS",
-        help="warn when the date at the top of the cover letter is more than DAYS days old (default: 7). The cover letter is also checked for the name of a different venue, as left over from an earlier submission.",
-    )
     display_group = p_validate.add_argument_group("display", "Leave sections out of the report shown in the terminal and saved with -o (not --web). The summary line still counts every check, and the report says what was left out. The exit status is unchanged.")
     display_group.add_argument("--show-errors-only", dest="errors_only", action="store_true", help="show only the failed checks and their errors; overrides --hide-warnings and --hide-unchecked")
     display_group.add_argument("--hide-warnings", dest="hide_warnings", action="store_true", help="leave out the warnings section, and the warnings listed under failed checks")
@@ -2888,7 +2916,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_validate.add_argument("--ai-tasks", dest="ai_tasks", metavar="FILE", help="write the AI checks to FILE as JSON, for an agent (Claude Code, Codex, ...) to run with its own subscription; see the paperpush-validate skill")
     p_validate.add_argument("--ai-results", dest="ai_results", metavar="FILE", help='merge an agent\'s verdicts on the AI checks (JSON: {"results": [{"id", "status": pass|fail|unclear|not_applicable, "details"}]}) into the report instead of calling an API')
-    p_validate.set_defaults(func=_cmd_validate, arxiv_latex_cleaner=False, check_links=True, check_sensitive=True, check_references=True, check_manuscript=True, check_anonymous=None, check_hidden_text=True, check_openreview=True, initial_submission=False)
+    p_validate.set_defaults(func=_cmd_validate, check_anonymous=None, initial_submission=False)
 
     p_requirements = sub.add_parser("requirements", parents=[verbosity], help="show the manuscript requirements recorded for a venue's author guidelines")
     p_requirements.add_argument("venue", help="venue slug, e.g. nature")
@@ -3007,6 +3035,12 @@ def build_parser() -> argparse.ArgumentParser:
         "machine can then control the signed-in browser, and the agent guardrails (no final submit, "
         "uploads limited to .sub files) do not apply to it",
     )
+    _add_check_options(p_submit, documented=False)
+    submit_checks = p_submit.add_argument_group(
+        "validation before the browser opens",
+        "submit runs validate's checks on the .sub first, without the link, reference, and OpenReview lookups or the sensitive-data scan. It also takes every flag of 'paperpush validate' that changes what is checked (--disable-CHECK, --enable-CHECK, --anonymous, --initial-submission, ...): see 'paperpush validate --help'.",
+    )
+    submit_checks.add_argument("--enable-network-checks", action="store_true", help="also run the link, reference, and OpenReview lookups before opening the browser")
     p_submit.set_defaults(func=_cmd_submit)
 
     p_codegen = sub.add_parser("codegen", parents=[verbosity], help="record a venue's submission wizard as runner code")
@@ -3183,10 +3217,46 @@ def _use_existing_subfile(args: argparse.Namespace) -> None:
             setattr(args, attr, str(find_subfile(value)))
 
 
+# validate's flags from before --disable-NAME, still accepted.
+_OLD_DISABLE_FLAGS = {
+    "--dont-check-links": "integrity.links",
+    "--dont-check-for-sensitive-info": "integrity.sensitive",
+    "--dont-check-references": "references",
+    "--dont-check-manuscript": "manuscript",
+    "--dont-check-hidden-text": "integrity.hidden_text",
+    "--dont-check-openreview-profiles": "integrity.openreview",
+}
+
+
+def _expand_check_flags(argv: list[str]) -> list[str]:
+    """Turn the ``--disable-NAME`` and ``--enable-NAME`` flags of validate and submit into ``--disable=NAME`` and ``--enable=NAME``.
+
+    argparse needs its options declared up front, and NAME is any check ID.
+    """
+    if not {"validate", "submit"} & set(argv):
+        return argv
+    out = []
+    for arg in argv:
+        if arg in _OLD_DISABLE_FLAGS:
+            name = _OLD_DISABLE_FLAGS[arg]
+            print(f"note: {arg} is now --disable-{name}", file=sys.stderr)
+            out.append(f"--disable={name}")
+        elif arg == "--arxiv-latex-cleaner":
+            print("note: --arxiv-latex-cleaner no longer does anything: validate never changes your files. It reports what the cleaner would change by default, and the paperpush-fix skill applies it.", file=sys.stderr)
+        elif arg == "--enable-network-checks":
+            out.append(arg)
+        elif arg.startswith(("--disable-", "--enable-")):
+            flag, name = arg[2:].split("-", 1)
+            out.append(f"--{flag}={name}")
+        else:
+            out.append(arg)
+    return out
+
+
 @_validate
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(_expand_check_flags(sys.argv[1:] if argv is None else argv))
 
     configure_logging(verbosity=getattr(args, "verbose", 0), quiet=getattr(args, "quiet", False))
     logger.debug("dispatch: command=%r", getattr(args, "command", None))

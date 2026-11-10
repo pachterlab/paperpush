@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Optional
 
@@ -95,14 +95,17 @@ def parse_results(data: Any) -> dict[str, dict]:
     out: dict[str, dict] = {}
     if isinstance(data, list):
         for item in data:
-            if isinstance(item, dict) and item.get("id"):
-                out[str(item["id"])] = item
+            if not isinstance(item, dict) or not item.get("id"):
+                raise ValueError(f"expected each result to be an object with an 'id' and a 'status', got {item!r}")
+            out[str(item["id"])] = item
     elif isinstance(data, dict):
         for key, item in data.items():
             if isinstance(item, dict):
                 out[str(key)] = {"id": key, **item}
             elif isinstance(item, str):
                 out[str(key)] = {"id": key, "status": item}
+            else:
+                raise ValueError(f"result {key!r} should be an object with a 'status', got {item!r}")
     else:
         raise ValueError("expected a JSON object with a 'results' list")
     for task_id, item in out.items():
@@ -118,7 +121,7 @@ def parse_results(data: Any) -> dict[str, dict]:
 
 _NOTES_FILES = {
     "manuscript": ("manuscript",),
-    "title_page": ("manuscript",),
+    "title_page": ("title_page", "manuscript"),
     "abstract": ("manuscript",),
     "keywords": ("manuscript",),
     "sections": ("manuscript",),
@@ -160,6 +163,7 @@ def _role_paths(venue: Venue, values: dict[str, str], role: str) -> list[str]:
 def guideline_tasks(venue: Venue, values: dict[str, str]) -> list[AiTask]:
     """Tasks for the venue's free-text rules and the .sub-versus-manuscript comparison."""
     from .requirements import SECTION_TYPES, get_requirements, resolve
+    from .validate import _iter_upload_paths
 
     manuscript = _role_paths(venue, values, "manuscript")
     tasks: list[AiTask] = []
@@ -173,7 +177,7 @@ def guideline_tasks(venue: Venue, values: dict[str, str]) -> list[AiTask]:
             # not check (paperpush-respond-to-reviewers reads them).
             if not notes or section == "revision":
                 continue
-            files: list[str] = []
+            files: list[str] = [str(p) for p in _iter_upload_paths(venue, values)] if section == "upload" else []
             for role in _NOTES_FILES.get(section, ("manuscript",)):
                 files += _role_paths(venue, values, role)
             if section in ("supplementary", "cover_letter", "upload") and not files:
@@ -205,7 +209,11 @@ def guideline_tasks(venue: Venue, values: dict[str, str]) -> list[AiTask]:
             value = values.get(f.id, "").strip()
             if not value or f.type in _CONSISTENCY_SKIP_TYPES or f.autofill == "never":
                 continue
-            if len(value) > _MAX_VALUE_CHARS:
+            # A double-blind manuscript must not name the authors the form lists.
+            if venue.anonymous and f.type == "authorlist":
+                continue
+            # The title and abstract are compared word for word, so they stay whole.
+            if len(value) > _MAX_VALUE_CHARS and f.id not in ("title", "abstract"):
                 value = value[:_MAX_VALUE_CHARS] + " [...]"
             fields.append(f"--- {f.id} ({f.label}) ---\n{value}")
         if fields:
@@ -251,11 +259,15 @@ def resolve(checks, venue: Venue, values: dict[str, str], ai: Optional[AiOptions
     tasks = []
     for task in all_tasks(checks, venue, values):
         # Every AI check reads the submission's files; with none attached there is nothing to judge.
-        if task.files:
+        if checks.disabled_by(task.id):
+            checks.record(task.id, task.title, task.category, report.UNCHECKED)
+        elif task.files:
             tasks.append(task)
         else:
             checks.record(task.id, task.title, task.category, report.NOT_APPLICABLE, detail="no files attached")
     if not tasks:
+        if ai is not None and ai.mode == "api" and not ai.description:
+            ai.description = "not needed (no AI checks apply to this submission)"
         return tasks
     verdicts: dict[str, dict] = {}
     reason = "run with --ai (needs an API key) or have an agent do it with the paperpush-validate skill"
@@ -265,6 +277,7 @@ def resolve(checks, venue: Venue, values: dict[str, str], ai: Optional[AiOptions
     elif ai is not None and ai.mode == "api":
         try:
             verdicts = run_api(tasks, venue, ai)
+            reason = "the AI's answer had no verdict for this check"
         except Exception as exc:  # noqa: BLE001 -- report it; the deterministic checks stand
             message = str(exc)
             if ai.api_key:
@@ -327,6 +340,27 @@ def _task_text(tasks: list[AiTask], labels: dict[str, str]) -> str:
     return "Run each of these checks and return one result per check id.\n\n" + "\n\n".join(parts)
 
 
+# Formats that would reach the model as undecoded bytes.
+_ARCHIVE_SUFFIXES = {".zip", ".gz", ".tgz", ".tar", ".bz2", ".xz", ".7z", ".rar"}
+
+
+def _model_can_read(path: str) -> bool:
+    """Whether the API callers can send ``path`` as a PDF, an image, or real text."""
+    from .autofill import IMAGE_SUFFIXES
+
+    file = Path(path)
+    suffix = file.suffix.lower()
+    if suffix in _ARCHIVE_SUFFIXES:
+        return False
+    if suffix in (".pdf", ".docx") or suffix in IMAGE_SUFFIXES:
+        return True
+    try:
+        with file.open("rb") as fh:
+            return b"\0" not in fh.read(8192)
+    except OSError:
+        return False
+
+
 def run_api(tasks: list[AiTask], venue: Venue, ai: AiOptions, max_tokens: int = 16000) -> dict[str, dict]:
     """Ask an LLM API to run ``tasks``; return its verdicts keyed by task id."""
     import importlib
@@ -337,6 +371,20 @@ def run_api(tasks: list[AiTask], venue: Venue, ai: AiOptions, max_tokens: int = 
     provider = autofill.resolve_provider(ai.provider, alternative="run the checks with an agent: --ai-tasks / --ai-results", api_key=ai.api_key)
     model = ai.model or autofill.DEFAULT_MODELS[provider]
     ai.description = f"{provider} {model}"
+    verdicts: dict[str, dict] = {}
+    sendable: list[AiTask] = []
+    for task in tasks:
+        kept = [f for f in task.files if _model_can_read(f)]
+        left_out = ", ".join(Path(f).name for f in task.files if f not in kept)
+        if task.files and not kept:
+            verdicts[task.id] = {"id": task.id, "status": "unclear", "details": f"the AI cannot read {left_out} (an archive or binary format)"}
+        elif left_out:
+            sendable.append(replace(task, files=kept, instructions=f"{task.instructions}\n(Not attached, because its format cannot be read: {left_out}. Report 'unclear' for anything that depends on it.)"))
+        else:
+            sendable.append(task)
+    if not sendable:
+        return verdicts
+    tasks = sendable
     paths: list[str] = list(dict.fromkeys(f for task in tasks for f in task.files))
     documents = []
     labels: dict[str, str] = {}
@@ -351,7 +399,8 @@ def run_api(tasks: list[AiTask], venue: Venue, ai: AiOptions, max_tokens: int = 
         data = json.loads(text)
     except json.JSONDecodeError as exc:
         raise autofill.AutofillApiError(f"the model returned output that was not valid JSON: {exc}") from exc
-    return parse_results(data)
+    verdicts.update(parse_results(data))
+    return verdicts
 
 
 def tasks_payload(tasks: list[AiTask], venue: Venue, subfile: str = "", command: str = "") -> dict[str, Any]:

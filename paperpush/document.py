@@ -40,10 +40,28 @@ def normalize(text: str) -> str:
     return text
 
 
+# Letters NFKD does not decompose, spelled the way they are transliterated.
+_FOLD_LETTERS = str.maketrans({"ı": "i", "ȷ": "j", "ø": "o", "Ø": "O", "ł": "l", "Ł": "L", "đ": "d", "Đ": "D", "ð": "d", "Ð": "D", "þ": "th", "Þ": "Th", "ß": "ss", "ẞ": "SS", "æ": "ae", "Æ": "Ae", "œ": "oe", "Œ": "Oe"})
+# pdfTeX's OT1 accents come out of a PDF as a separate spacing glyph, with stray
+# spaces around it: "Jos´ e Garc ´ ıa". Not after a digit: "5´ end" is 5-prime.
+_SPACING_ACCENT = re.compile(r"(?<!\d)(?P<left>[^\W\d_]?)(?P<gap>\s?)[´¨ˆ˜¸ˇ˘˙¯˝](?P<after>\s?)(?P<right>[^\W\d_])")
+_SPACING_GRAVE = re.compile(r"(?<=[^\W\d_])`\s?(?=[a-zı])")
+
+
+def _repair_spacing_accents(text: str) -> str:
+    """``text`` with detached accent glyphs dropped and the word they split rejoined."""
+
+    def join(m: re.Match[str]) -> str:
+        # An accent before a capital starts a word, or trails the word before it.
+        return m["left"] + (m["gap"] + m["after"] if m["right"].isupper() else "") + m["right"]
+
+    return _SPACING_GRAVE.sub("", _SPACING_ACCENT.sub(join, text))
+
+
 def fold(text: str) -> str:
     """Lower-cased, accent-free text: for matching names and words."""
-    text = unicodedata.normalize("NFKD", normalize(text))
-    return "".join(c for c in text if not unicodedata.combining(c)).lower()
+    text = unicodedata.normalize("NFKD", _repair_spacing_accents(normalize(text)))
+    return "".join(c for c in text if not unicodedata.combining(c)).translate(_FOLD_LETTERS).lower()
 
 
 def tokens(text: str) -> list[str]:

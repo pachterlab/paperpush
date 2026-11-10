@@ -341,7 +341,7 @@ def image_colours(img) -> list[tuple[RGB, float]] | None:
     """The main colours of a Pillow image as (rgb, share of pixels), or None for a photograph."""
     from PIL import Image
 
-    if img.mode in ("1", "L", "LA", "I", "I;16", "F"):
+    if img.mode in ("1", "L", "LA", "I", "F") or img.mode.startswith("I;16"):
         return []  # greyscale: nothing for colour blindness to change
     work = img.copy()
     if work.mode in ("RGBA", "LA", "PA") or (
@@ -403,6 +403,8 @@ def _svg_component(value: str) -> float:
 
 def svg_colours(text: str) -> list[tuple[RGB, float]]:
     """The fill, stroke and gradient-stop colours an SVG sets, each weighted by its uses."""
+    from PIL import ImageColor
+
     counts: dict[RGB, float] = {}
     for m in _SVG_COLOUR_ATTR.finditer(text):
         value = m.group(1).strip()
@@ -420,6 +422,11 @@ def svg_colours(text: str) -> list[tuple[RGB, float]]:
                     rgb = tuple(min(255.0, _svg_component(v)) for v in r.groups())  # type: ignore[assignment]
                 except ValueError:
                     rgb = None
+            else:
+                # A CSS colour name: "red", "forestgreen".
+                name = re.match(r"[a-zA-Z]+", value)
+                if name and name.group(0).lower() in ImageColor.colormap:
+                    rgb = ImageColor.getrgb(name.group(0).lower())[:3]  # type: ignore[assignment]
         if rgb is not None:
             counts[rgb] = counts.get(rgb, 0) + 1
     return list(counts.items())

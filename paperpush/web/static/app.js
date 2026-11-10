@@ -556,10 +556,9 @@
       state.importSkipped = res.skipped;
     }
     // Several .sub files: the one for the open venue, else the first.
-    const parsed = subs.map((s) => ({ ...s, venue: Subfile.parse(s.text).venue }));
+    const parsed = subs.map((s) => ({ ...s, venue: Subfile.parse(s.text).venue || "general" }));
     const chosen = parsed.find((s) => state.venue && s.venue === state.venue.slug) || parsed.find((s) => s.venue) || null;
-    if (parsed.length && !chosen) toast(`${parsed.map((s) => s.name).join(", ")}: no '@venue:' line, so not a .sub file.`, "error");
-    else if (parsed.length > 1) toast(`Opened ${chosen.name}; ignored ${parsed.filter((s) => s !== chosen).map((s) => s.name).join(", ")}.`);
+    if (parsed.length > 1) toast(`Opened ${chosen.name}; ignored ${parsed.filter((s) => s !== chosen).map((s) => s.name).join(", ")}.`);
     if (chosen) {
       const sameVenue = state.venue && state.venue.slug === chosen.venue;
       openSubFile(chosen.text);
@@ -1177,7 +1176,7 @@
     return {
       node: el("div", { class: "multi" }, chips, select),
       counter,
-      set(v) { selected = [...new Set(v.split(",").map(codeOf).filter(Boolean))]; counter.update(v); render(); },
+      set(v) { selected = [...new Set(splitChoices(v, f.options).map(codeOf).filter(Boolean))]; counter.update(v); render(); },
     };
   }
 
@@ -1245,8 +1244,24 @@
     return {
       node: el("div", { class: "multi" }, chips, f.options.length > 8 ? filter : null, list, ...extras),
       counter,
-      set(v) { selected = v.split(",").map((s) => s.trim()).filter(Boolean); counter.update(v); renderChips(); renderList(); },
+      set(v) { selected = splitChoices(v, f.options); counter.update(v); renderChips(); renderList(); },
     };
+  }
+
+  // A multichoice value's entries. An option may hold commas ("Association
+  // study (GWAS, EWAS)"), so known options are matched whole, longest first.
+  // The same as validate's _multichoice_items.
+  function splitChoices(value, options) {
+    const known = [...options].filter(Boolean).sort((a, b) => b.length - a.length);
+    const out = [];
+    let rest = value.trim();
+    while (rest) {
+      const hit = known.find((o) => rest.startsWith(o) && /^\s*(,|$)/.test(rest.slice(o.length)));
+      if (hit) { out.push(hit); rest = rest.slice(hit.length); }
+      else { const i = rest.indexOf(","); out.push((i < 0 ? rest : rest.slice(0, i)).trim()); rest = i < 0 ? "" : rest.slice(i + 1); }
+      rest = rest.replace(/^[,\s]+/, "");
+    }
+    return out.filter(Boolean);
   }
 
   // Typed-in entries split on commas and semicolons, so a pasted list
@@ -1819,6 +1834,7 @@
     const body = el("div", { class: "body" },
       detail ? el("p", { class: "detail", text: detail }) : null,
       issues.length ? el("ul", {}, issues.map((i) => el("li", {},
+        i.unchecked ? "Not checked: " : "",
         i.field && state.fields.has(i.field) ? el("button", { type: "button", class: "link", onclick: () => focusField(i.field), text: state.fields.get(i.field).label }) : null,
         i.field && state.fields.has(i.field) ? ": " : "",
         i.message))) : null,
@@ -2428,8 +2444,7 @@
 
   let pendingText = null;
   function openSubFile(text) {
-    const { venue } = Subfile.parse(text);
-    if (!venue) { toast("That file has no '@venue:' line, so it is not a .sub file.", "error"); return; }
+    const venue = Subfile.parse(text).venue || "general";
     if (state.venue && state.venue.slug === venue) {
       setText(text);
       syncWidgets();

@@ -201,7 +201,7 @@ class LocalSession:
                     add(path)
         try:
             sub = parse_subfile(self.sub_path.read_text(encoding="utf-8"))
-            venue = get_venue(sub.venue) if sub.venue else None
+            venue = get_venue(sub.venue or GENERAL_SLUG)
         except (OSError, KeyError):
             venue = None
         if venue is not None:
@@ -595,9 +595,7 @@ def localize_local(venue: Venue, values: dict[str, str], local: LocalSession) ->
 
 def _localized_sub(text: str, files: Path, local: Optional[LocalSession] = None):
     sub = parse_subfile(text)
-    if not sub.venue:
-        raise HTTPException(400, "the .sub has no '@venue:' line")
-    venue = _venue_or_404(sub.venue)
+    venue = _venue_or_404(sub.venue or GENERAL_SLUG)
     if local is not None:
         sub.values = localize_local(venue, sub.values, local)
     else:
@@ -803,7 +801,7 @@ def check_group(result: dict[str, Any]) -> str:
 
 
 # The CLI flag a "switched off" note names means nothing on the website.
-_SWITCHED_OFF = re.compile(r"switched off \(--[a-z-]+\)")
+_SWITCHED_OFF = re.compile(r"switched off \(--[a-z._-]+\)")
 
 
 def _web_detail(detail: str, files: Path) -> str:
@@ -975,7 +973,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(500, f"cannot read {local.sub_path}: {exc}") from None
         return {
             "path": local.display(local.sub_path),
-            "venue": parse_subfile(text).venue,
+            "venue": parse_subfile(text).venue or GENERAL_SLUG,
             "text": text,
             "action": local.action,
             "workspace": LOCAL_WS,
@@ -1004,8 +1002,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def save_local(req: TextRequest, x_paperpush_token: Optional[str] = Header(None)) -> dict[str, Any]:
         """Write the page's .sub text back to the file."""
         local = local_session(x_paperpush_token)
-        if not parse_subfile(req.text).venue:
-            raise HTTPException(400, "the .sub has no '@venue:' line; not saved")
+        parsed = parse_subfile(req.text)
+        if not parsed.venue and not parsed.values:
+            raise HTTPException(400, "the text has no '@venue:' line or fields, so it is not a .sub file; not saved")
         partial = local.sub_path.with_name(f".{local.sub_path.name}.part")
         try:
             partial.write_text(req.text, encoding="utf-8")
@@ -1295,9 +1294,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         along with any upload the ``.sub`` does not name.
         """
         files, local = workspace(ws_id, x_paperpush_token)
-        slug = parse_subfile(req.text).venue
-        venue = _venue_or_404(slug) if slug else None
-        sub_name = default_filename(venue) if venue else "submission.sub.txt"
+        venue = _venue_or_404(parse_subfile(req.text).venue or GENERAL_SLUG)
+        sub_name = default_filename(venue)
         stem = subfile_stem(sub_name)
         if local is not None:
             resolve, extra, tmp_dir = local.resolve, (), None
@@ -1441,7 +1439,7 @@ def serve_local(
     host = "127.0.0.1"
     port = port or _free_port(host)
     sub_path = Path(sub_path).resolve()
-    venue = parse_subfile(sub_path.read_text(encoding="utf-8")).venue or subfile_stem(sub_path)
+    venue = parse_subfile(sub_path.read_text(encoding="utf-8")).venue or GENERAL_SLUG
     local = LocalSession(
         sub_path=sub_path,
         root=sub_path.parent,

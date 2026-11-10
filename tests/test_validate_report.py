@@ -97,7 +97,7 @@ def test_switched_off_file_checks_are_unchecked_when_files_exist(_use, tmp_path)
     assert _result(rep, "form.schema").status == report.PASSED
     for check_id in ("integrity.links", "integrity.dois"):
         assert _result(rep, check_id).status == report.UNCHECKED, check_id
-    assert "--dont-check-links" in _result(rep, "integrity.links").detail
+    assert "--disable-integrity.links" in _result(rep, "integrity.links").detail
 
 
 def test_file_scans_not_applicable_without_attachments(_use):
@@ -257,7 +257,7 @@ def test_colorblind_flag_opens_the_web_page_in_the_same_palette(tmp_path, monkey
     seen = {}
     monkeypatch.setattr(cli, "_open_web", lambda path, **kw: seen.update(kw) or 0)
     sub = tmp_path / "paper.sub"
-    sub.write_text("venue: biorxiv\n")
+    sub.write_text("@venue: biorxiv\n")
     assert main(["validate", str(sub), "--web", "--colorblind"]) == 0
     assert seen["colorblind"] is True
     assert main(["validate", str(sub), "--web", "--alt-color"]) == 0 and seen["colorblind"] is True
@@ -437,7 +437,15 @@ def test_cli_ai_only_needs_the_manuscript_checks(_use, tmp_path, monkeypatch, ca
     _use({})
     _cli_venue(monkeypatch, TITLE)
     assert main(["validate", str(_sub(tmp_path, "title: A study\n")), "--ai-only", "--dont-check-manuscript"]) == 1
-    assert "--ai-only cannot be combined with --dont-check-manuscript" in capsys.readouterr().err
+    assert "--ai-only cannot be combined with --disable-manuscript" in capsys.readouterr().err
+
+
+def test_cli_reference_check_extended_refuses_the_api_runner(_use, tmp_path, monkeypatch, capsys):
+    _use({})
+    _cli_venue(monkeypatch, TITLE)
+    assert main(["validate", str(_sub(tmp_path, "title: A study\n")), "--ai", "--reference-check-extended"]) == 1
+    err = capsys.readouterr().err
+    assert "--reference-check-extended cannot be combined with --ai" in err and "--ai-tasks" in err
 
 
 # ===========================================================================
@@ -1152,7 +1160,7 @@ def _bib_report(_use, tmp_path, bib: str, **kwargs):
     path = tmp_path / "refs.bib"
     path.write_text(bib, encoding="utf-8")
     manuscript = tmp_path / "manuscript.tex"
-    manuscript.write_text("\\documentclass{article}\\begin{document}Text \\cite{a}.\\bibliography{refs}\\end{document}\n", encoding="utf-8")
+    manuscript.write_text("\\documentclass{article}\\begin{document}Text \\cite{a}\\nocite{*}.\\bibliography{refs}\\end{document}\n", encoding="utf-8")
     venue = _venue(TITLE, MANUSCRIPT, _BIB_FIELD)
     return _report(venue, {"title": "A title", "manuscript_file": str(manuscript), "bibliography": str(path)}, **{"check_references": True, **kwargs})
 
@@ -1161,7 +1169,7 @@ def test_reference_search_checks_are_switched_off_with_the_doi_check(_use, tmp_p
     rep = _bib_report(_use, tmp_path, "@article{a, title={T}, author={A}}", check_references=False)
     for check_id in ("integrity.unmatched_references", "integrity.reference_versions"):
         assert _result(rep, check_id).status == report.UNCHECKED
-        assert "--dont-check-references" in _result(rep, check_id).detail
+        assert "--disable-references" in _result(rep, check_id).detail
 
 
 def test_a_fabricated_reference_is_reported_and_an_unindexed_one_goes_to_the_ai(_use, tmp_path, monkeypatch):

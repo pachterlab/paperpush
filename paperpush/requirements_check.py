@@ -59,7 +59,7 @@ from pathlib import Path
 from . import ai_policy
 from .database import Field, Venue
 from .manuscript import headings as manuscript_headings
-from .manuscript import normalize_heading, pages_before_references, reference_count, section_word_counts, title_page_text, total_pages, total_words, words_before_references
+from .manuscript import normalize_heading, pages_before_references, reference_count, section_word_counts, structured_abstract_labels, title_page_text, total_pages, total_words, words_before_references, words_excluding
 from .report import NOT_APPLICABLE, NOT_IMPLEMENTED
 from .requirements import ManuscriptRequirements, get_requirements, heading_aliases, resolve
 from .validate import BYTES_PER_MB, ERROR, WARNING, Checks, Issue, NotApplicable, Outcome, unchecked
@@ -85,8 +85,8 @@ _ROLE_FIELD_IDS: dict[str, tuple[str, ...]] = {
 
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _ORCID = re.compile(r"\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b|\\orcid")
-_KEYWORDS_LINE = re.compile(r"^\s*(?:key\s*words|keywords|index terms)\b|\\keywords", re.IGNORECASE | re.MULTILINE)
-_RUNNING_TITLE = re.compile(r"\b(?:running|short)\s+title\b|\\runningtitle|\\titlerunning", re.IGNORECASE)
+_KEYWORDS_LINE = re.compile(r"^\s*(?:key\s*words|keywords|index terms)\b|\\keywords|\\begin\s*\{\s*keywords?\s*\}|\\kwd\b", re.IGNORECASE | re.MULTILINE)
+_RUNNING_TITLE = re.compile(r"\b(?:running|short)\s+(?:title|head(?:er|ing)?)\b|\\runningtitle|\\titlerunning|\\shorttitle|\\runninghead", re.IGNORECASE)
 _WORD_COUNT = re.compile(r"\bword\s+count\b|\bwords\s*:\s*\d", re.IGNORECASE)
 _AUTHOR_CONTRIB = re.compile(r"author\s+contributions?|credit", re.IGNORECASE)
 _FUNDING = re.compile(r"\bfunding\b|\bgrant\b|\bsupported by\b", re.IGNORECASE)
@@ -252,7 +252,7 @@ def _length_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> li
         if words is None:
             issues.append(unchecked(field.id, f"could not count words in {path.name}; the {limit}-word limit in the author guidelines was not checked"))
         elif words > limit:
-            issues.append(Issue(ERROR, field.id, f"{field.label}: {words} words{where} exceeds the {limit}-word limit in the author guidelines"))
+            issues.extend(_over_word_limit(field, path, words, limit, where, rules, endings, whole=not scope))
 
     is_tex = path.suffix.lower() in (".tex", ".zip")
     for limit, count, scope in (
@@ -270,6 +270,50 @@ def _length_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> li
             rendered = " (rendered from the LaTeX source)" if is_tex else ""
             issues.append(Issue(ERROR, field.id, f"{field.label}: {pages} pages{where}{rendered} exceeds the {limit}-page limit in the author guidelines"))
     return issues
+
+
+def _exclusion_kind(part: str) -> str | None:
+    """What :func:`paperpush.manuscript.words_excluding` should look for to leave out ``part`` of a count_excludes list."""
+    text = part.lower()
+    for words, kind in (
+        (("reference",), "@references"),
+        (("supplement",), "@supplement"),
+        (("caption", "legend"), "@legends"),
+        (("table", "box"), "@tables"),
+        (("section title", "heading"), "@titles"),
+        (("title", "author", "affiliation", "keyword"), "@front"),
+        (("figure",), "@figures"),
+        (("abstract",), "Abstract"),
+        (("method",), "Methods"),
+        (("acknowledg",), "Acknowledgements"),
+        (("funding",), "funding"),
+    ):
+        if any(word in text for word in words):
+            return kind
+    return None
+
+
+def _over_word_limit(field: Field, path: Path, words: int, limit: int, where: str, rules, endings: tuple[str, ...], whole: bool) -> list[Issue]:
+    """The issue for a word count over ``limit``, once the parts the venue excludes are left out.
+
+    An ERROR only when every excluded part was found; otherwise the count may
+    still hold text the venue does not count, so it is a WARNING.
+    """
+    over = Issue(ERROR, field.id, f"{field.label}: {words} words{where} exceeds the {limit}-word limit in the author guidelines")
+    excludes = list(rules.count_excludes or [])
+    if not excludes:
+        return [over]
+    wordings = {name: canonical for kind in ("statements", "sections") for canonical, names in heading_aliases(kind).items() for name in names}
+    measured = words_excluding(path, wordings, {part: _exclusion_kind(part) for part in excludes}, endings, whole=whole)
+    if measured is None:
+        return [over]
+    net, missing = measured
+    if net <= limit:
+        return []
+    message = f"{field.label}: {net} words{where} without the parts the guidelines exclude ({', '.join(excludes)}) exceeds the {limit}-word limit in the author guidelines"
+    if not missing:
+        return [Issue(ERROR, field.id, message)]
+    return [Issue(WARNING, field.id, f"{message}; could not locate {', '.join(missing)} in {path.name}, which the count should leave out, so check it by hand")]
 
 
 # Wording that makes a statement in running text, without a heading of its own:
@@ -363,6 +407,11 @@ def _title_page_issues(field: Field, path: Path, reqs: ManuscriptRequirements, v
     front = title_page_text(path)
     if front is None:
         return [unchecked(field.id, f"could not read {path.name} as text; its title page was not checked")]
+    if path.suffix.lower() in (".tex", ".zip"):
+        from .manuscript import _tex_to_text
+
+        # The front matter stays raw for \\orcid and the like; names and the title are matched without markup.
+        front = f"{front}\n{_tex_to_text(front)}"
     issues: list[Issue] = []
     for item in items:
         if item == "title":
@@ -498,11 +547,11 @@ def _template_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> 
 
     pdf = manuscript._as_pdf(path)
     if pdf is None:
-        return []
+        return [unchecked(field.id, f"template: could not render {path.name} to a PDF, so its layout was not compared with the venue's template")]
     measured = template_check.measure(pdf, layout.running_head or "")
     if measured is None:
         logger.debug("could not measure the layout of %s", pdf)
-        return []
+        return [unchecked(field.id, f"template: could not measure the layout of {path.name} (a PDF with no extractable text, or pdfminer.six not installed), so it was not compared with the venue's template")]
     issues = [Issue(WARNING, field.id, f"template: {path.name}: {problem}") for problem in template_check.layout_problems(measured, layout, reqs.manuscript.font_size_pt)]
     if issues:
         style = f"'{reqs.manuscript.latex_class}' style" if reqs.manuscript.latex_class else "template"
@@ -535,6 +584,8 @@ def _template_source_issues(venue: Venue, reqs: ManuscriptRequirements, values: 
 
 _BRACKET_CITE = re.compile(r"\[(\d{1,3}(?:\s*[,\u2013-]\s*\d{1,3})*)\]")
 _AUTHOR_YEAR_CITE = re.compile(r"\(\s*(?:see\s+)?[A-Z][A-Za-z'\u2019-]+(?:\s+(?:et al\.?|and|&)\s*[A-Z]?[A-Za-z'\u2019-]*)?,?\s+(?:19|20)\d{2}[a-z]?|[A-Z][A-Za-z'\u2019-]+\s+et al\.?\s*\((?:19|20)\d{2}[a-z]?\)")
+_RANGE_CONTEXT = re.compile(r"(?:range|interval|between|within|clipped|scaled|normali[sz]ed|bounded|\bto|=|\u2208)\s*$", re.IGNORECASE)
+_CITING_TO = re.compile(r"\b(?:according|due|similar|compared|related|owing|refer|back|contrast)\s+to\s*$", re.IGNORECASE)
 _DOI = re.compile(r"\b10\.\d{4,9}/\S+|\bdoi\s*[:.]", re.IGNORECASE)
 _PREPRINT = re.compile(r"\b(?:biorxiv|medrxiv|arxiv|chemrxiv|psyarxiv|ssrn|research\s*square|preprints?\.org|preprint)\b", re.IGNORECASE)
 _UNPUBLISHED = re.compile(r"\b(?:unpublished|personal\s+communication|pers\.\s*comm|in\s+preparation|manuscript\s+submitted|submitted\s+for\s+publication)\b", re.IGNORECASE)
@@ -557,6 +608,21 @@ def _numbers(group: str) -> list[int]:
     return out
 
 
+def _citation_groups(body: str, listed: int | None) -> list[str]:
+    """The bracketed number groups of ``body`` that are citations, not intervals such as "[0, 1]" or "in the range [5, 10]"."""
+    groups: list[str] = []
+    for match in _BRACKET_CITE.finditer(body):
+        numbers = _numbers(match.group(1))
+        if 0 in numbers:
+            continue
+        before = body[max(0, match.start() - 40) : match.start()]
+        interval = len(numbers) == 2 and "," in match.group(1)
+        if interval and ((listed and numbers[1] > listed) or (_RANGE_CONTEXT.search(before) and not _CITING_TO.search(before))):
+            continue
+        groups.append(match.group(1))
+    return groups
+
+
 def _reference_style_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> list[Issue]:
     """Numbered vs author-year citations, and numbered citations in order of first citation."""
     from . import document, manuscript
@@ -567,7 +633,7 @@ def _reference_style_issues(field: Field, path: Path, reqs: ManuscriptRequiremen
     if text is None:
         return [unchecked(field.id, f"could not read {path.name} as text; its citation style was not checked")]
     body = manuscript.truncate_at_references(text)
-    bracket = _BRACKET_CITE.findall(body)
+    bracket = _citation_groups(body, reference_count(path))
     author_year = _AUTHOR_YEAR_CITE.findall(body)
     if len(bracket) < 3 and len(author_year) < 3:
         if doc.is_tex and doc.pdf is None:
@@ -605,7 +671,10 @@ def _reference_list_issues(field: Field, path: Path, reqs: ManuscriptRequirement
         return [unchecked(field.id, f"could not find the reference list in {path.name}; DOIs, preprints, and unpublished work were not checked")]
     issues: list[Issue] = []
     if rules.doi_required:
-        missing = [e for e in entries if not _DOI.search(e)]
+        from .reference_search import is_web_page_entry
+
+        # A web page has no DOI to give.
+        missing = [e for e in entries if not _DOI.search(e) and not is_web_page_entry(e)]
         if missing:
             sample = "; ".join(_short(e) for e in missing[:3])
             issues.append(Issue(WARNING, field.id, f"{len(missing)} of {len(entries)} references in {path.name} have no DOI (e.g. {sample}); the author guidelines require DOIs"))
@@ -630,13 +699,23 @@ def _short(text: str, limit: int = 70) -> str:
 _ACRONYM = re.compile(r"\b(?=[A-Za-z0-9-]*[A-Z][A-Za-z0-9-]*[A-Z])[A-Za-z][A-Za-z0-9-]{1,11}\b")
 # Abbreviations so standard that "no abbreviations" rules do not mean them.
 _STANDARD_ABBREVIATIONS = {"DNA", "RNA", "mRNA", "ATP", "USA", "UK", "US", "EU", "UN", "AI", "II", "III", "IV"}
+# The labels of a structured abstract, which are capitals but not abbreviations.
+_ABSTRACT_LABELS = {"BACKGROUND", "INTRODUCTION", "CONTEXT", "RATIONALE", "IMPORTANCE", "OBJECTIVE", "OBJECTIVES", "PURPOSE", "AIM", "AIMS", "METHODS", "METHOD", "DESIGN", "SETTING", "SETTINGS", "PARTICIPANTS", "PATIENTS", "INTERVENTION", "INTERVENTIONS", "RESULTS", "FINDINGS", "CONCLUSION", "CONCLUSIONS", "INTERPRETATION", "RELEVANCE", "SIGNIFICANCE", "LIMITATIONS", "FUNDING", "REGISTRATION", "SUMMARY"}
+# A run of several capitalized words ending in a colon: "MAIN OUTCOMES AND MEASURES:".
+_ABSTRACT_LABEL_RUN = re.compile(r"\b[A-Z][A-Z-]+(?:\s+[A-Z][A-Z-]+)+(?=\s*:)")
 
 
-def _undefined_abbreviations(text: str) -> list[str]:
+def _is_initialism(token: str) -> bool:
+    """Whether some hyphen-separated part of ``token`` is an initialism, unlike the capitals of "PubMed" or "McDonald"."""
+    return any(sum(c.isupper() for c in part) >= 2 and not re.search(r"[A-Z][a-z]{2,}", part) for part in token.split("-"))
+
+
+def _undefined_abbreviations(text: str, labels: tuple[str, ...] = ()) -> list[str]:
     found: list[str] = []
+    skip = _ABSTRACT_LABELS | {word.upper() for label in labels for word in label.split()} | {word for run in _ABSTRACT_LABEL_RUN.findall(text) for word in run.split()}
     for match in _ACRONYM.finditer(text):
         token = match.group(0).strip("-")
-        if token in _STANDARD_ABBREVIATIONS or token in found:
+        if token in _STANDARD_ABBREVIATIONS or token in found or token in skip or not _is_initialism(token):
             continue
         if re.search(rf"\(\s*{re.escape(token)}s?\s*\)", text):
             continue  # defined as "long form (ABC)"
@@ -650,6 +729,10 @@ def _section_order_issues(field: Field, path: Path, reqs: ManuscriptRequirements
     if found is None:
         return [unchecked(field.id, f"could not read {path.name} as text; its section order was not checked")]
     aliases = {**heading_aliases("statements"), **heading_aliases("sections")}
+    # A structured abstract's labels are not the body's sections.
+    sections = {wording: canonical for canonical, wordings in heading_aliases("sections").items() for wording in wordings}
+    labels = structured_abstract_labels([sections.get(re.sub(r"^\d+\W*", "", heading)) for heading in found])
+    found = [heading for index, heading in enumerate(found) if index not in labels]
     positions: list[tuple[str, int]] = []
     for name in order:
         key = next((k for k in aliases if k.lower() == name.lower().replace(" ", "_") or k.lower() == name.lower()), None)
@@ -848,7 +931,7 @@ def _abbreviations_check(venue: Venue, reqs: ManuscriptRequirements, values: dic
     fields = [f for f in _fields_for(venue, "abstract") if values.get(f.id, "").strip()]
     _need(fields, "no abstract in the .sub")
     for field in fields:
-        found = _undefined_abbreviations(values[field.id])
+        found = _undefined_abbreviations(values[field.id], tuple(reqs.abstract.structured_headings or ()))
         if found:
             issues.append(Issue(WARNING, field.id, f"{field.label}: undefined abbreviation(s) {', '.join(found[:8])}; the author guidelines ask for no (or only defined) abbreviations in the abstract"))
     return issues
@@ -961,12 +1044,66 @@ def _counts_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, 
         listed = len(_paths(field, values))
         table_total += listed
         issues.extend(_count_issue(field, listed, reqs.tables.max_count, "tables"))
-    if reqs.manuscript.max_display_items is not None and figure_total + table_total > reqs.manuscript.max_display_items:
-        issues.append(Issue(ERROR, "", f"{figure_total} figures and {table_total} tables listed; the author guidelines allow at most {reqs.manuscript.max_display_items} display items"))
+    display = reqs.manuscript.max_display_items
+    # Nothing attached: the figures and tables are in the manuscript, if anywhere.
+    count_figures = not figure_total and (reqs.figures.max_count is not None or display is not None)
+    count_tables = not table_total and (reqs.tables.max_count is not None or display is not None)
+    from_text = False
+    details: list[str] = []
+    if count_figures or count_tables:
+        captions = _manuscript_display_counts(venue, values)
+        if captions is None:
+            if _manuscript_paths(venue, values):
+                issues.append(unchecked("", "could not read the manuscript for its figure and table captions; the guidelines' figure and table limits were not checked"))
+            elif not (figure_total or table_total or reqs.supplementary.max_count is not None):
+                raise NotApplicable("no figures, tables, or manuscript to count")
+        else:
+            from_text = True
+            for wanted, count, cap, what in ((count_figures, captions[0], reqs.figures.max_count, "figures"), (count_tables, captions[1], reqs.tables.max_count, "tables")):
+                if not wanted:
+                    continue
+                details.append(f"{count} {what} counted from the manuscript's captions")
+                if cap is not None and count > cap:
+                    issues.append(Issue(WARNING, "", f"about {count} {what} captioned in the manuscript; the author guidelines allow at most {cap}"))
+            figure_total = captions[0] if count_figures else figure_total
+            table_total = captions[1] if count_tables else table_total
+    if display is not None and figure_total + table_total > display:
+        issues.append(Issue(WARNING if from_text else ERROR, "", f"{'about ' if from_text else ''}{figure_total} figures and {table_total} tables {'captioned in the manuscript' if from_text else 'listed'}; the author guidelines allow at most {display} display items"))
     supp_total = sum(len(_paths(field, values)) for field in _fields_for(venue, "supplementary"))
     if reqs.supplementary.max_count is not None and supp_total > reqs.supplementary.max_count:
         issues.append(Issue(ERROR, "", f"{supp_total} supplementary files listed; the author guidelines allow at most {reqs.supplementary.max_count}"))
-    return issues
+    return Outcome(issues, "; ".join(details))
+
+
+# A figure or table caption that opens a line: "Figure 2.", "Table 1:".
+_DISPLAY_CAPTION = re.compile(r"^[ \t]*(Fig(?:ure)?\.?|Table)\s+(\d+)[a-z]?\s*[.:|]", re.IGNORECASE | re.MULTILINE)
+
+
+def _manuscript_display_counts(venue: Venue, values: dict[str, str]) -> tuple[int, int] | None:
+    """How many main figures and tables the manuscript captions, or None when it cannot be read."""
+    from . import document
+
+    figures: set[str] = set()
+    tables: set[str] = set()
+    tex = [0, 0]
+    read = False
+    for _, path in _manuscript_paths(venue, values):
+        doc = document.get(path)
+        if doc.is_tex and doc.tex_source:
+            read = True
+            tex[0] += len(re.findall(r"\\begin\s*\{\s*figure\*?\s*\}", doc.tex_source))
+            tex[1] += len(re.findall(r"\\begin\s*\{\s*table\*?\s*\}", doc.tex_source))
+            continue
+        text = doc.text
+        if not text or not text.strip():
+            continue
+        read = True
+        for kind, number in _DISPLAY_CAPTION.findall(text):
+            (tables if kind.lower() == "table" else figures).add(number)
+    return (len(figures) + tex[0], len(tables) + tex[1]) if read else None
+
+
+_DOCUMENT_SUFFIXES = (".doc", ".docx", ".rtf", ".odt", ".tex", ".md", ".txt")
 
 
 def _supplementary_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
@@ -993,6 +1130,9 @@ def _supplementary_check(venue: Venue, reqs: ManuscriptRequirements, values: dic
             issues.append(Issue(WARNING, field.id, f"{paths[0].name}: the author guidelines ask for supplementary text, figures, and tables combined into a single PDF"))
         elif field.type == "filelist" and len([p for p in paths if p.suffix.lower() == ".pdf"]) > 1:
             issues.append(Issue(WARNING, field.id, f"{len(paths)} supplementary PDFs listed; the author guidelines ask for supplementary text, figures, and tables combined into a single PDF"))
+        elif field.type == "filelist" and any(p.suffix.lower() in _DOCUMENT_SUFFIXES for p in paths):
+            names = ", ".join(p.name for p in paths if p.suffix.lower() in _DOCUMENT_SUFFIXES)
+            issues.append(Issue(WARNING, field.id, f"{names}: the author guidelines ask for supplementary text, figures, and tables combined into a single PDF"))
     _need(applied, "no supplementary files listed")
     return issues
 
@@ -1011,7 +1151,7 @@ def _cover_letter_check(venue: Venue, reqs: ManuscriptRequirements, values: dict
 
             for path in _existing(_paths(field, values)):
                 text = document.get(path).text
-                if text is None:
+                if text is None or not text.strip():
                     issues.append(unchecked(field.id, f"could not read {path.name} as text; the {rules.max_words}-word cover-letter limit was not checked"))
                 elif len(text.split()) > rules.max_words:
                     issues.append(Issue(WARNING, field.id, f"{path.name} is about {len(text.split())} words; the author guidelines ask for at most {rules.max_words}"))

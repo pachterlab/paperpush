@@ -9,7 +9,7 @@ from the row above, so the reference reads as one paper and resolves to
 another.
 
 This module is the bibliography back end for ``paperpush validate`` (which runs
-it by default; ``--dont-check-references`` opts out). It does what `doi2bib
+it by default; ``--disable-references`` opts out). It does what `doi2bib
 <https://doi2bib.org>`_ does -- ask ``doi.org`` what a DOI actually refers to --
 and then compares that against what the reference claims:
 
@@ -54,9 +54,11 @@ quiet and only a genuinely different work is reported.
 from __future__ import annotations
 
 import difflib
+import html
 import json
 import logging
 import re
+import time
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -93,11 +95,16 @@ YEAR_TOLERANCE = 1
 # Outcome of asking doi.org about a DOI.
 DOI_FOUND = "found"  # resolved; CSL JSON metadata returned
 DOI_MISSING = "missing"  # 404/410 -- the DOI is not registered
+# doi.org answers a burst of lookups with HTTP 429: wait and ask again, this many times, this many seconds apart (growing).
+_RATE_LIMIT_TRIES = 4
+_RATE_LIMIT_WAIT = 2.0
 DOI_UNKNOWN = "unknown"  # offline, blocked, or an agency that won't serve CSL
 
 # The Finding category of a cited work that has been retracted (or withdrawn,
 # removed, or flagged with an expression of concern).
 RETRACTED = "retracted reference"
+# The Finding category of the per-run DOI budget running out.
+TRUNCATED = "DOI checks truncated"
 # Crossref ``updated-by`` notice types worth warning about, with how a finding
 # words each. Corrections and errata leave the work citable, so they are left out.
 _RETRACTION_NOTICES = {
@@ -113,7 +120,9 @@ _RETRACTION_NOTICES = {
 # which has no standard shape beyond "not empty".
 _DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$")
 # Prefixes an author pastes in front of a DOI when copying it from a page.
-_DOI_PREFIXES = ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "http://dx.doi.org/", "doi:", "doi.org/")
+_DOI_PREFIX = re.compile(r"(?:https?://)?(?:dx\.|www\.)?doi\.org/|doi\s*:\s*|doi\s+(?=10\.)", re.IGNORECASE)
+# A LaTeX command wrapped around a DOI in a BibTeX field: \url{...}, \doi{...}.
+_DOI_WRAPPER = re.compile(r"^\\(?:url|doi|nolinkurl|path)\s*\{", re.IGNORECASE)
 # Punctuation a DOI picks up from the sentence or BibTeX field it was pasted into.
 _DOI_TRAILING = ".,;:)]}'\"" + "\u201d\u2019"
 
@@ -131,6 +140,7 @@ _AUTHOR_SPLIT = re.compile(r"\s+and\s+", re.IGNORECASE)
 # commands that take a braced argument (``\c{c}``, ``\v{s}``). Both are dropped
 # without leaving a space, so ``Gr{\"u}nbaum`` and ``Fran\c{c}ois`` fold to one
 # word rather than two. The lookaheads keep ``\citep`` and ``\vspace`` out of it.
+_TEX_LETTER = re.compile(r"\\(i|j|aa|AA)(?![A-Za-z])\s*")
 _TEX_ACCENT = re.compile(r"\\[`'^~\"=.](?=[A-Za-z{])|\\[cvuHdbrkt](?=\s*\{)")
 # Any other LaTeX control word (``\emph``, ``\textbf``), which separates words
 # and so becomes a space.
@@ -150,7 +160,13 @@ BIB_EXTS = {".bib"}
 # A DOI written into running text. Unlike a .bib ``doi`` field this has no
 # delimiters, so the match stops at whitespace and at the punctuation a
 # reference list puts after a DOI; normalize_doi trims whatever else trails.
-_DOI_IN_TEXT = re.compile(r"\b10\.\d{4,9}/[^\s<>\"'\]}),;]*")
+# Parentheses and semicolons stay in the match because Elsevier and SICI DOIs
+# carry them (10.1016/S0140-6736(20)30183-5), as does a SICI's <1::AID-X>.
+_DOI_IN_TEXT = re.compile(r"\b10\.\d{4,9}/(?:[^\s<>\"'\]},]|<\d[^\s<>]*>)*")
+# Markup a registry leaves in a title: <i>, <sub>, <mml:math ...>.
+_XML_TAG = re.compile(r"</?[A-Za-z][\w:.-]*(?:\s[^<>]*)?/?>")
+# What a publisher prepends to a retracted article's own title.
+_RETRACTED_PREFIX = re.compile(r"^\s*(?:retracted(?:\s+article)?|withdrawn)\s*[:.\u2013\u2014-]\s*", re.IGNORECASE)
 # A DOI broken across a line by the PDF's line-wrapping: the rest of it is the
 # run of DOI-legal characters that opens the next line. Used to rebuild the
 # whole DOI before deciding a citation points at nothing (see
@@ -200,7 +216,8 @@ class Entry:
     at comparison time. ``kind`` is the entry type (``article``, ``misc``),
     ``fields`` every field the entry carries (lower-cased names), and
     ``unclosed`` marks an entry whose closing brace is missing, which BibTeX
-    would read on into the next entry.
+    would read on into the next entry. ``unresolved`` names the fields built
+    from an @string macro this file does not define, whose text is not known.
     """
 
     key: str
@@ -213,6 +230,7 @@ class Entry:
     kind: str = ""
     fields: dict = field(default_factory=dict, compare=False, hash=False, repr=False)
     unclosed: bool = False
+    unresolved: frozenset = field(default=frozenset(), compare=False, hash=False, repr=False)
 
 
 @dataclass(frozen=True)
@@ -251,12 +269,13 @@ def normalize_doi(raw: str) -> str:
     same work in different cases must compare equal. Returns ``""`` for a value
     that holds no DOI-ish text at all.
     """
-    value = raw.strip().strip("{}").strip()
-    for prefix in _DOI_PREFIXES:
-        if value.lower().startswith(prefix):
-            value = value[len(prefix) :]
-            break
-    value = value.strip().rstrip(_DOI_TRAILING)
+    value = _DOI_WRAPPER.sub("", raw.strip()).strip("{}").strip()
+    while prefix := _DOI_PREFIX.match(value):
+        value = value[prefix.end() :]
+    value = value.strip()
+    # A closing parenthesis stays when the DOI opened it: 10.1016/x(20)30183(5).
+    while value and value[-1] in _DOI_TRAILING and not (value[-1] == ")" and value.count("(") >= value.count(")")):
+        value = value[:-1]
     # \_ and friends: a DOI written into LaTeX often escapes its own punctuation.
     value = value.replace("\\_", "_").replace("\\%", "%").replace("\\&", "&").replace("\\#", "#")
     return value.lower()
@@ -272,10 +291,10 @@ def _is_well_formed(doi: str) -> bool:
 # A hand-rolled parser rather than a dependency: the checks below need exactly
 # four fields (doi, title, author, year) off each entry, and the shapes that
 # reach a real submission's .bib are narrow -- brace- or quote-delimited values,
-# nested braces, escaped delimiters. What this deliberately does not implement
-# is @string macro expansion and # concatenation; a value built that way is read
-# as its literal text, which at worst leaves a field looking unset and the entry
-# unchecked. It never invents a mismatch.
+# nested braces, escaped delimiters, @string macros and # concatenation. A macro
+# defined somewhere else (another .bib) cannot be expanded; the fields using one
+# are recorded in ``Entry.unresolved`` and left out of the comparisons, so it
+# never invents a mismatch.
 
 
 def _match_delimiter(text: str, start: int, opener: str) -> int:
@@ -303,13 +322,8 @@ def _match_delimiter(text: str, start: int, opener: str) -> int:
     return -1
 
 
-def _read_value(body: str, start: int) -> tuple[str, int]:
-    """Read the field value beginning at ``start``; return it and the index after it.
-
-    Handles the three BibTeX value forms: a braced group, a quoted string, and a
-    bare token (a number, or an unexpanded @string macro name) that runs to the
-    next comma.
-    """
+def _read_atom(body: str, start: int) -> tuple[str, int]:
+    """Read one braced group, quoted string, or bare token; return it and the index after it."""
     if start >= len(body):
         return "", start
     char = body[start]
@@ -333,18 +347,49 @@ def _read_value(body: str, start: int) -> tuple[str, int]:
                 return body[start + 1 : i], i + 1
             i += 1
         return body[start + 1 :], len(body)
-    end = body.find(",", start)
-    if end == -1:
+    stop = re.compile(r"[,#]").search(body, start)
+    if stop is None:
         return body[start:].strip(), len(body)
-    return body[start:end].strip(), end
+    return body[start : stop.start()].strip(), stop.start()
 
 
-def _parse_entry_body(body: str) -> tuple[str, dict[str, str]]:
+def _read_value(body: str, start: int, macros: dict[str, str] | None = None, unknown: list[str] | None = None) -> tuple[str, int]:
+    """Read the field value beginning at ``start``; return it and the index after it.
+
+    A value is one or more parts joined by ``#``: a braced group, a quoted
+    string, or a bare token (a number, or an @string macro name, expanded from
+    ``macros``). A macro that is not defined there is read as its name and added
+    to ``unknown``.
+    """
+    parts: list[str] = []
+    pos = start
+    while True:
+        bare = pos < len(body) and body[pos] not in '{"'
+        value, pos = _read_atom(body, pos)
+        if bare:
+            name = value.strip().lower()
+            if macros and name in macros:
+                value = macros[name]
+            elif name and not name.isdigit() and unknown is not None:
+                unknown.append(name)
+        parts.append(value)
+        after = pos
+        while after < len(body) and body[after].isspace():
+            after += 1
+        if body[after : after + 1] != "#":
+            return "".join(parts), pos
+        pos = after + 1
+        while pos < len(body) and body[pos].isspace():
+            pos += 1
+
+
+def _parse_entry_body(body: str, macros: dict[str, str] | None = None, unresolved: set[str] | None = None) -> tuple[str, dict[str, str]]:
     """Split an entry's body into its citation key and its field mapping.
 
     ``body`` is the text between the entry's delimiters: the key up to the first
     comma, then ``name = value`` pairs. Field names are lower-cased, so ``DOI``
-    and ``doi`` land in the same slot.
+    and ``doi`` land in the same slot. ``unresolved`` collects the names of
+    fields that use a macro ``macros`` does not define.
     """
     head, sep, rest = body.partition(",")
     key = head.strip()
@@ -357,8 +402,11 @@ def _parse_entry_body(body: str) -> tuple[str, dict[str, str]]:
         match = _FIELD_NAME.search(rest, pos)
         if match is None:
             break
-        value, pos = _read_value(rest, match.end())
+        unknown: list[str] = []
+        value, pos = _read_value(rest, match.end(), macros, unknown)
         fields.setdefault(match.group(1).lower(), value.strip())
+        if unknown and unresolved is not None:
+            unresolved.add(match.group(1).lower())
         # Skip the separating comma so the next name is found from a clean start.
         while pos < len(rest) and rest[pos] in ", \t\r\n":
             pos += 1
@@ -368,12 +416,13 @@ def _parse_entry_body(body: str) -> tuple[str, dict[str, str]]:
 def parse_bibtex(text: str, where: str = "") -> list[Entry]:
     """Parse every reference entry in a BibTeX document, in file order.
 
-    ``@comment`` / ``@preamble`` / ``@string`` blocks are skipped: they are not
-    references. A truncated final entry (an unclosed brace) is parsed from what
+    ``@comment`` / ``@preamble`` blocks are skipped and ``@string`` blocks define
+    macros for the entries after them: none are references. A truncated final entry (an unclosed brace) is parsed from what
     is there rather than dropped, so a partial file still yields its earlier,
     complete entries.
     """
     entries: list[Entry] = []
+    macros: dict[str, str] = {}
     pos = 0
     while True:
         match = _ENTRY_START.search(text, pos)
@@ -383,9 +432,16 @@ def parse_bibtex(text: str, where: str = "") -> list[Entry]:
         end = _match_delimiter(text, match.end() - 1, opener)
         body_end = end if end != -1 else len(text)
         pos = body_end + 1
+        if match.group(1).lower() == "string":
+            definition = text[match.end() : body_end]
+            named = _FIELD_NAME.search(definition)
+            if named:
+                macros[named.group(1).lower()] = _read_value(definition, named.end(), macros)[0].strip()
+            continue
         if match.group(1).lower() in _NON_ENTRY_TYPES:
             continue
-        key, fields = _parse_entry_body(text[match.end() : body_end])
+        unresolved: set[str] = set()
+        key, fields = _parse_entry_body(text[match.end() : body_end], macros, unresolved)
         raw_doi = fields.get("doi", "")
         entries.append(
             Entry(
@@ -399,6 +455,7 @@ def parse_bibtex(text: str, where: str = "") -> list[Entry]:
                 kind=match.group(1).lower(),
                 fields=fields,
                 unclosed=end == -1,
+                unresolved=frozenset(unresolved),
             )
         )
     return entries
@@ -448,6 +505,47 @@ def collect_entries(paths: Iterable[Path]) -> list[Entry]:
     for where, text in _iter_bib_blobs(paths):
         entries.extend(parse_bibtex(text, where))
     return entries
+
+
+def _printed_keys(paths: list[Path]) -> set[str] | None:
+    """The lower-cased keys a LaTeX source cites from its ``.bib``, or None to keep every entry.
+
+    None when no source reads a ``.bib`` or one prints it whole (``\\nocite{*}``).
+    """
+    from . import document
+    from .bibliography_check import _tex_bibliography
+
+    cited: set[str] = set()
+    for path in paths:
+        if path.suffix.lower() not in document.TEX_SUFFIXES:
+            continue
+        try:
+            source = document.get(path).tex_source
+            bib = _tex_bibliography(path, source) if source is not None else None
+        except Exception:  # noqa: BLE001 -- an unreadable source says nothing about what is printed
+            logger.debug("could not read the citations of %s", path, exc_info=True)
+            return None
+        if bib is None:
+            continue
+        if not bib.printed_only_cited or bib.cited is None:
+            return None
+        cited |= {key.lower() for key in bib.cited}
+    return cited or None
+
+
+def printed_entries(paths: Iterable[Path]) -> list[Entry]:
+    """The bibliography entries that reach the reference list.
+
+    BibTeX prints only the entries a LaTeX source cites, so the rest of a shared
+    ``.bib`` is not part of the submission. Without a source that says what is
+    cited, every entry counts.
+    """
+    paths = list(paths)
+    entries = collect_entries(paths)
+    cited = _printed_keys(paths) if entries else None
+    if cited is None:
+        return entries
+    return [e for e in entries if e.key.lower() in cited] or entries
 
 
 # --- reading DOIs out of the manuscript itself -----------------------------
@@ -509,6 +607,11 @@ def _entry_context(text: str, refs_at: int | None, start: int, end: int) -> str:
     return _normalize_text(_LINE_WRAP_HYPHEN.sub("", text[begin:finish]))
 
 
+def _same_entry(text: str, previous_end: int, start: int) -> bool:
+    """Whether a DOI at ``start`` repeats one ending at ``previous_end`` within one entry (a link and its label)."""
+    return start - previous_end <= CONTEXT_AFTER and _ENTRY_BOUNDARY.search(text, previous_end, start) is None
+
+
 def collect_citations(paths: Iterable[Path]) -> list[Citation]:
     """Every DOI written into the submission's prose, in the order found.
 
@@ -523,7 +626,8 @@ def collect_citations(paths: Iterable[Path]) -> list[Citation]:
     line: outside the reference list one mention of a DOI is as good as another,
     but *inside* it every occurrence is kept, because a reference list that
     cites one DOI twice has two entries to answer for -- and the second is where
-    a DOI pasted from the row above shows up.
+    a DOI pasted from the row above shows up. A DOI printed twice in one entry
+    (as a "doi:" and as a link) is one occurrence.
 
     A DOI the file wrapped across a line is recorded with its continuation so it
     can be rebuilt if the truncated form fails to resolve; one broken at the
@@ -534,6 +638,7 @@ def collect_citations(paths: Iterable[Path]) -> list[Citation]:
         for where, text in _iter_text_blobs(path):
             refs_at = _reference_list_start(text)
             seen_outside: set[str] = set()
+            last_in_list: dict[str, int] = {}
             for match in _DOI_IN_TEXT.finditer(text):
                 doi = normalize_doi(match.group(0))
                 wrapped = _DOI_CONTINUATION.match(text, match.end())
@@ -552,6 +657,11 @@ def collect_citations(paths: Iterable[Path]) -> list[Citation]:
                     if doi in seen_outside:
                         continue
                     seen_outside.add(doi)
+                else:
+                    previous_end = last_in_list.get(doi)
+                    last_in_list[doi] = match.end()
+                    if previous_end is not None and _same_entry(text, previous_end, match.start()):
+                        continue
                 context = _entry_context(text, refs_at, match.start(), match.end())
                 citations.append(Citation(doi=doi, where=where, context=context, in_reference_list=in_list, continuation=joined))
     return citations
@@ -613,10 +723,10 @@ def _context_supports(citation: Citation, record: dict) -> bool:
     words = set(citation.context.split())
 
     family = _normalize_text(_first_author_of(record))
-    if family and family in words:
+    if family and (family.split()[-1] in words or family.replace(" ", "") in words):
         return True
 
-    title_words = _significant_words(_title_of(record))
+    title_words = _significant_words(_work_title(_title_of(record)))
     if title_words:
         hits = sum(1 for w in title_words if w in words)
         if hits / len(title_words) >= TITLE_CONTEXT_OVERLAP:
@@ -663,17 +773,22 @@ def _resolve_doi(doi: str, *, timeout: float = DOI_CHECK_TIMEOUT) -> tuple[str, 
             "User-Agent": "paperpush-validate (+https://github.com/pachterlab/paperpush)",
         },
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # scheme is a literal https above  # nosec B310
-            payload = resp.read(MAX_TEXT_BYTES)
-    except urllib.error.HTTPError as exc:
-        if exc.code in _MISSING_STATUS:
-            return DOI_MISSING, None
-        logger.debug("DOI %s returned HTTP %s; treating as unknown", doi, exc.code)
-        return DOI_UNKNOWN, None
-    except Exception:
-        logger.debug("could not resolve DOI %s", doi, exc_info=True)
-        return DOI_UNKNOWN, None
+    for attempt in range(_RATE_LIMIT_TRIES):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # scheme is a literal https above  # nosec B310
+                payload = resp.read(MAX_TEXT_BYTES)
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in _MISSING_STATUS:
+                return DOI_MISSING, None
+            if exc.code == 429 and attempt + 1 < _RATE_LIMIT_TRIES:
+                time.sleep(_RATE_LIMIT_WAIT * (attempt + 1))
+                continue
+            logger.debug("DOI %s returned HTTP %s; treating as unknown", doi, exc.code)
+            return DOI_UNKNOWN, None
+        except Exception:
+            logger.debug("could not resolve DOI %s", doi, exc_info=True)
+            return DOI_UNKNOWN, None
 
     try:
         record = json.loads(payload.decode("utf-8", "replace"))
@@ -705,7 +820,8 @@ def _strip_latex(value: str) -> str:
     dropped without leaving a gap -- so ``Gr{\\"u}nbaum`` reads as ``Grunbaum``
     and ``\\emph{C. elegans}`` as `` C. elegans``.
     """
-    text = _TEX_ACCENT.sub("", value)
+    text = _TEX_LETTER.sub(lambda m: m.group(1)[0], value)
+    text = _TEX_ACCENT.sub("", text)
     text = _TEX_COMMAND.sub(" ", text)
     text = _TEX_ESCAPE.sub(r"\1", text)
     return text.replace("{", "").replace("}", "")
@@ -723,11 +839,27 @@ def _normalize_text(value: str) -> str:
 
 
 def _title_of(record: dict) -> str:
-    """The registered title, which CSL may give as a string or a one-item list."""
+    """The registered title, which CSL may give as a string or a one-item list; XML markup and entities are removed."""
     title = record.get("title") or record.get("container-title") or ""
     if isinstance(title, list):
         title = title[0] if title else ""
-    return title if isinstance(title, str) else ""
+    return html.unescape(_XML_TAG.sub("", title)) if isinstance(title, str) else ""
+
+
+def _work_title(title: str) -> str:
+    """A title without the "RETRACTED:" a publisher adds in front of a retracted article's."""
+    return _RETRACTED_PREFIX.sub("", title)
+
+
+def title_similarity(a: str, b: str) -> float:
+    """How alike two titles are, 0..1; a title that is the other minus its subtitle counts as 1."""
+    a, b = _normalize_text(_work_title(a)), _normalize_text(_work_title(b))
+    if not a or not b:
+        return 0.0
+    short, long_ = sorted((a, b), key=len)
+    if len(short.split()) >= 4 and long_.startswith(short):
+        return 1.0
+    return difflib.SequenceMatcher(None, a, b).ratio()
 
 
 def _first_author_of(record: dict) -> str:
@@ -774,9 +906,18 @@ def _entry_first_author(author_field: str) -> str:
     if "," in first:
         return first.split(",", 1)[0].strip()
     parts = first.split()
+    # "Smith J", "van der Waals JD": a family name, then initials.
+    if len(parts) > 1 and re.fullmatch(r"(?:[A-Z]\.?){1,3}", parts[-1]):
+        return " ".join(parts[:-1])
     # "Ludwig van Beethoven": the particle belongs to the family name, but
     # comparing the last token alone is enough to tell two authors apart.
     return parts[-1] if parts else ""
+
+
+def _same_family(a: str, b: str) -> bool:
+    """Whether two normalized family names can be one person's: "van der Waals" and "Waals", a consortium and its last word."""
+    words_a, words_b = set(a.split()), set(b.split())
+    return words_a <= words_b or words_b <= words_a
 
 
 def _year_value(raw: str) -> int | None:
@@ -798,14 +939,13 @@ def _mismatches(entry: Entry, record: dict) -> list[str]:
     problems: list[str] = []
 
     entry_title, registered_title = _normalize_text(entry.title), _normalize_text(_title_of(record))
-    if entry_title and registered_title:
-        ratio = difflib.SequenceMatcher(None, entry_title, registered_title).ratio()
-        if ratio < TITLE_MATCH_RATIO:
+    if entry_title and registered_title and "title" not in entry.unresolved:
+        if title_similarity(entry.title, _title_of(record)) < TITLE_MATCH_RATIO:
             problems.append(f'title is "{entry.title.strip()}" but the DOI is registered to "{_title_of(record).strip()}"')
 
     entry_author = _normalize_text(_entry_first_author(entry.author))
     registered_author = _normalize_text(_first_author_of(record))
-    if entry_author and registered_author and entry_author != registered_author:
+    if entry_author and registered_author and "author" not in entry.unresolved and not _same_family(entry_author, registered_author):
         problems.append(f"first author is {_entry_first_author(entry.author).strip()} but the DOI is registered to {_first_author_of(record).strip()}")
 
     entry_year, registered_year = _year_value(entry.year), _year_value(_year_of(record))
@@ -864,7 +1004,7 @@ def _truncation_finding(total: int, checked: int) -> Finding:
     """Say so when the per-run DOI budget stopped the check part-way through."""
     return Finding(
         "submission",
-        "DOI checks truncated",
+        TRUNCATED,
         f"only the first {checked} of {total} DOIs in the bibliography were checked " f"against the registry (paperpush's per-run limit); the rest were not verified",
     )
 
@@ -990,7 +1130,25 @@ def _citation_findings(citation: Citation, status: str, record: dict | None, doi
     return []
 
 
-def scan_references(paths: Iterable[Path], *, check_registry: bool = True, resolved_out: dict | None = None) -> list[Finding]:
+def coverage_note(coverage: dict) -> str:
+    """Why some DOIs went unchecked, from :func:`scan_references`'s ``coverage_out``; "" when all were looked up."""
+    unknown, unbudgeted = coverage.get("unknown", 0), coverage.get("unbudgeted", 0)
+    if not unknown and not unbudgeted:
+        return ""
+    why = []
+    if unknown:
+        why.append(f"{unknown} got no usable answer from the registry (unreachable, rate-limited, or no record in a readable form)")
+    if unbudgeted:
+        why.append(f"{unbudgeted} over paperpush's per-run limit of {MAX_DOI_CHECKS}")
+    return f"{unknown + unbudgeted} of {coverage['total']} reference DOI(s) were not checked: {'; '.join(why)}"
+
+
+def nothing_looked_up(coverage: dict) -> bool:
+    """Whether no DOI of ``coverage`` got an answer from the registry."""
+    return bool(coverage.get("total")) and coverage.get("unknown", 0) + coverage.get("unbudgeted", 0) >= coverage["total"]
+
+
+def scan_references(paths: Iterable[Path], *, check_registry: bool = True, resolved_out: dict | None = None, coverage_out: dict | None = None) -> list[Finding]:
     """Report references whose DOI does not match the work they cite.
 
     Reads the submission's bibliography two ways, because most submissions ship
@@ -1019,9 +1177,14 @@ def scan_references(paths: Iterable[Path], *, check_registry: bool = True, resol
     ``resolved_out``, if given, is filled with ``{doi: csl_record}`` for every
     DOI that resolved and whose record matches the reference citing it, so
     :mod:`paperpush.reference_search` can check those works' publication
-    versions without asking doi.org again.
+    versions without asking doi.org again. ``coverage_out``, if given, is filled
+    with how many distinct DOIs there were (``total``), how many got no usable
+    answer (``unknown``), and how many the limit left out (``unbudgeted``); see
+    :func:`coverage_note`. Only the ``.bib`` entries the manuscript prints are read
+    (:func:`printed_entries`).
     """
-    entries = collect_entries(paths)
+    paths = list(paths)
+    entries = printed_entries(paths)
     checkable = [e for e in entries if e.doi and _is_well_formed(e.doi)]
     citations = _relevant_citations(collect_citations(paths), {e.doi for e in checkable})
 
@@ -1053,6 +1216,8 @@ def scan_references(paths: Iterable[Path], *, check_registry: bool = True, resol
     workers = min(DOI_CHECK_WORKERS, len(budgeted))
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="paperpush-doicheck") as pool:
         resolved = {doi: outcome for (doi, _), outcome in zip(budgeted, pool.map(_resolve_with_fallback, budgeted))}
+    if coverage_out is not None:
+        coverage_out.update(total=len(candidates), unknown=sum(1 for status, _, _ in resolved.values() if status == DOI_UNKNOWN), unbudgeted=len(candidates) - len(budgeted))
 
     for entry in checkable:
         status, record, _ = resolved.get(entry.doi, (DOI_UNKNOWN, None, entry.doi))
@@ -1087,7 +1252,8 @@ def bib_structure_findings(paths: Iterable[Path]) -> tuple[list[Finding], int]:
     """BibTeX problems that make entries go missing or print wrongly; and how many entries were read.
 
     * two entries with the same citation key (BibTeX keys are case-insensitive):
-      BibTeX keeps the first and drops the other, and biber stops with an error;
+      BibTeX keeps the first and drops the other, and biber stops with an error
+      (one file shipped twice, loose and in a source archive, is read once);
     * an entry with no citation key, which nothing can cite;
     * an entry whose closing brace is missing, which swallows the entries after it;
     * a journal or conference entry with no title or no author;
@@ -1100,7 +1266,12 @@ def bib_structure_findings(paths: Iterable[Path]) -> tuple[list[Finding], int]:
     total = 0
     keys: dict[str, Entry] = {}
     arxiv: dict[str, Entry] = {}
+    seen_files: set[str] = set()
     for where, text in _iter_bib_blobs(paths):
+        content = " ".join(text.split())
+        if content in seen_files:
+            continue
+        seen_files.add(content)
         for entry in parse_bibtex(text, where):
             total += 1
             if not entry.key:
