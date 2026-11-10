@@ -6889,167 +6889,37 @@
       "https://journals.myesr.org/eur-radiol/for-authors/article-types/",
       "https://journals.myesr.org/eur-radiol/for-authors/mandatory-files/",
       "https://journals.myesr.org/eur-radiol/for-authors/optional-files/",
+      "https://journals.myesr.org/eur-radiol/for-authors/general-information/",
+      "https://journals.myesr.org/eur-radiol/for-authors/springer-open-choice/",
+      "https://journals.myesr.org/eur-radiol/publication-ethics/",
+      "https://journals.myesr.org/eur-radiol/wp-content/uploads/sites/2/2026/02/Disclosure-Paragraph-template_NEW.docx",
       "https://european-radiology.org/content-er/uploads/2024/06/Eur_Radiol_Manuscript_Requirements.pdf"
     ],
-    "retrieved": "2026-10-23",
+    "retrieved": "2026-11-10",
     "article_type_field": "article_type",
-    "article_types": {
-      "Original Article": {
-        "manuscript": {
-          "max_display_items": 11,
-          "max_words_before_refs": 3000,
-          "notes": [
-            "Main text up to 3,000 words, 6 figures, 5 tables; abstract, key points, keywords, disclosure paragraph and graphical abstract are mandatory.",
-            "Key points: Question and Findings (each 20 to 25 words in the requirements document) plus a Clinical Relevance Statement (max 40 words)."
-          ]
-        },
-        "figures": {
-          "max_count": 6
-        },
-        "tables": {
-          "max_count": 5
-        },
-        "abstract": {
-          "max_words": 250,
-          "structured": true
-        }
-      },
-      "Original Article (Systematic Review / Meta-Analysis)": {
-        "manuscript": {
-          "max_display_items": 17,
-          "max_words_before_refs": 5000,
-          "notes": [
-            "Systematic reviews and meta-analyses are submitted as Original Articles; up to 5,000 words, 12 figures, 5 tables; structured abstract."
-          ]
-        },
-        "figures": {
-          "max_count": 12
-        },
-        "tables": {
-          "max_count": 5
-        },
-        "abstract": {
-          "max_words": 250,
-          "structured": true
-        }
-      },
-      "Review (including Narrative Review)": {
-        "manuscript": {
-          "max_display_items": 17,
-          "max_words_before_refs": 5000,
-          "notes": [
-            "Unstructured abstract up to 250 words; five MeSH keywords; three key points including a clinical relevance statement; graphical abstract mandatory."
-          ]
-        },
-        "figures": {
-          "max_count": 12
-        },
-        "tables": {
-          "max_count": 5
-        },
-        "abstract": {
-          "max_words": 250,
-          "structured": false
-        }
-      },
-      "Technical Developments": {
-        "manuscript": {
-          "max_display_items": 8,
-          "max_words_before_refs": 2000,
-          "notes": [
-            "Up to 2,000 words, 4 figures, 4 tables; abstract, key points and graphical abstract mandatory."
-          ]
-        },
-        "figures": {
-          "max_count": 4
-        },
-        "tables": {
-          "max_count": 4
-        },
-        "abstract": {
-          "max_words": 250
-        }
-      },
-      "Special Report": {
-        "manuscript": {
-          "max_display_items": 10,
-          "max_words_before_refs": 3000,
-          "notes": [
-            "Abstract is not required to be structured but must summarize the key points; graphical abstract optional."
-          ]
-        },
-        "figures": {
-          "max_count": 6
-        },
-        "tables": {
-          "max_count": 4
-        },
-        "abstract": {
-          "max_words": 250,
-          "structured": false
-        }
-      },
-      "Guideline": {
-        "manuscript": {
-          "max_display_items": 17,
-          "max_words_before_refs": 5000,
-          "notes": [
-            "Based on a systematic review with graded evidence; graphical abstract mandatory."
-          ]
-        },
-        "figures": {
-          "max_count": 12
-        },
-        "tables": {
-          "max_count": 5
-        },
-        "abstract": {
-          "max_words": 250
-        }
-      },
-      "Statement": {
-        "manuscript": {
-          "max_display_items": 11,
-          "max_words_before_refs": 3000,
-          "notes": [
-            "Public position by a group of experts or societies; graphical abstract optional."
-          ]
-        },
-        "figures": {
-          "max_count": 6
-        },
-        "tables": {
-          "max_count": 5
-        },
-        "abstract": {
-          "max_words": 250
-        }
-      },
-      "Letter to the Editor": {
-        "manuscript": {
-          "max_words_before_refs": 1000,
-          "notes": [
-            "Up to 1,000 words; no abstract, key points, keywords, figures, tables or supplementary material; up to 10 references and up to 3 authors."
-          ]
-        },
-        "references": {
-          "max_count": 10
-        },
-        "figures": {
-          "max_count": 0
-        },
-        "tables": {
-          "max_count": 0
-        }
-      }
-    },
+    "notes": [
+      "Submission is via Editorial Manager (https://www.editorialmanager.com/eura/default2.aspx); open access is available through Springer Open Choice.",
+      "Peer review is single-blinded: manuscripts sent to reviewers are not anonymized, and reviewers' names are not disclosed to authors.",
+      "The manuscript can only be submitted by one of the authors, not by other staff members or assistants.",
+      "Neither the team of authors nor their order of appearance can be changed after submission; the order on the title page is binding for publication.",
+      "Preprints of primary research may be shared on preprint servers, and a preprint should always be referenced and disclosed in the submission.",
+      "Unsolicited resubmissions after rejection are not allowed and are rejected immediately.",
+      "A guarantor, ideally one of the authors, who takes overall responsibility for all aspects of the study is required."
+    ],
     "manuscript": {
       "formats": [
         ".docx",
         ".doc"
       ],
       "max_words_before_refs": 3000,
-      "max_display_items": 11,
+      "count_excludes": [
+        "title",
+        "abstract",
+        "keywords",
+        "references",
+        "figure captions",
+        "table captions"
+      ],
       "page_numbers": true,
       "single_file": false,
       "figures_placement": "separate",
@@ -7061,7 +6931,12 @@
         "Main-text limits at the top level are those of Original Article (3,000 words, 6 figures, 5 tables); other article types override them. Word counts are as given in the journal's article-type summary table.",
         "Items marked 'Must have' in the Manuscript Requirements (Edition 2, June 2024) are enforced: manuscripts failing them are returned before peer review.",
         "Be consistent with either British or American English; abbreviations other than universally understood ones (MRI, PET/CT, PI-RADS) must be defined in the abstract and again in the main text.",
-        "Introduction is recommended to be no more than 400 words; Discussion follows a four-paragraph structure ending with a conclusion on clinical relevance.",
+        "No company names are allowed in titles, abstracts or key points, but product or sequence names are allowed in titles and abstracts.",
+        "p-values are written with a small italic p, one space, the relational operator, one space and the value (p < 0.05), with a zero before the decimal point (unless equal to 1) and two digits after it except when very small or near the significance level.",
+        "Radiation and laboratory measurements are given in SI units.",
+        "Original Articles: the Discussion follows a four-paragraph structure ending with a conclusion on clinical relevance.",
+        "Original Articles: Materials and Methods must state whether the study is retrospective or prospective, date ranges, enrolment and retrieval method, inclusion and exclusion criteria, index test and reference standard, how evaluation was performed, instruments or drugs with trade and manufacturer names, and statistical methods.",
+        "Reporting guidelines: STARD for diagnostic accuracy, STROBE for observational studies, CONSORT for randomized controlled trials; CLAIM is recommended for artificial intelligence papers.",
         "Graphical abstract is mandatory (at revision stage) for Original Articles, Reviews, Technical Developments and Guidelines.",
         "Additional material is submitted as Electronic Supplementary Material, which is peer reviewed and published as received."
       ]
@@ -7074,10 +6949,12 @@
         "corresponding_author",
         "corresponding_email"
       ],
+      "separate_file": true,
       "title_max_words": 15,
       "notes": [
         "Title page carries title, author names, affiliations, and email/contact of all corresponding authors; do not include a running title or other disclosure information.",
-        "Title should state the body part, disease, technique and/or problem; no abbreviations except common ones such as CT, MRI, PET; no more than 15 words is highly recommended."
+        "Title should state the body part, disease, technique and/or problem; no abbreviations except common ones such as CT, MRI, PET; no more than 15 words is highly recommended.",
+        "All authors must be listed on the title page; equal contributions (joint first, last or corresponding authorship) are mentioned there."
       ]
     },
     "abstract": {
@@ -7085,12 +6962,12 @@
       "structured": true,
       "structured_headings": [
         "Objectives",
-        "Materials and Methods",
+        "Materials & Methods or Materials and Methods",
         "Results",
         "Conclusion"
       ],
       "notes": [
-        "Limit of 250 words is a Must have; the structured format is highly recommended and required for Original Articles (Objectives, Methods, Results, Conclusion).",
+        "Limit of 250 words is a Must have; the structured format is highly recommended and required for Original Articles (Objectives, Materials & Methods, Results, Conclusion).",
         "Reviews use an unstructured abstract of up to 250 words."
       ]
     },
@@ -7098,7 +6975,7 @@
       "min": 3,
       "max": 5,
       "notes": [
-        "3 to 5 keywords are required in the manuscript requirements (the article-type page says 1 to 5; Reviews use five MeSH keywords)."
+        "3 to 5 keywords are required in the manuscript requirements and on the mandatory-files page (the article-type page's submission structure says 1 to 5; Reviews, Technical Developments and Guidelines are asked for five MeSH keywords)."
       ]
     },
     "sections": {
@@ -7123,36 +7000,54 @@
         "Discussion",
         "References"
       ],
+      "max_words": {
+        "Introduction": 400
+      },
       "notes": [
-        "Section list is for Original Articles; Reviews use Introduction, topical headings and a Conclusion instead of Methods/Results/Discussion.",
-        "Key points and the keywords sit in the main document before the Introduction; a list of abbreviations is required if needed."
+        "Section list is for Original Articles and Technical Developments; other article types set their own.",
+        "Key points and the keywords sit in the main document before the Introduction; a list of abbreviations is required if needed and follows the key points.",
+        "The Introduction limit of 400 words is for Original Articles and is highly recommended rather than a Must have."
       ]
     },
     "statements": {
       "required": [
         "ethics_approval",
-        "consent_to_participate",
-        "competing_interests",
-        "funding"
+        "consent_to_participate"
       ],
+      "optional": [
+        "competing_interests",
+        "funding",
+        "acknowledgements"
+      ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "methods",
+        "acknowledgements"
+      ],
+      "ai_copyediting_exempt": false,
+      "ai_authorship_prohibited": true,
       "notes": [
-        "The Disclosure Paragraph (separate mandatory file) covers guarantor, conflict of interest, funding, statistics, informed consent, ethical approval, methodology and other declarations.",
+        "The Disclosure Paragraph (separate mandatory file, from the journal's template) carries acknowledgements, funding, guarantor, conflict of interest, statistics and biometry, informed consent, ethical approval, study subjects or cohorts overlap, and methodology, so these need not appear in the main document.",
+        "AI tools used to generate results must be described in detail in Materials and Methods; AI tools used for writing and content editing must be disclosed in the Acknowledgements.",
+        "Articles authored by a member of the Editorial Team or Scientific Editorial Board must include a statement acknowledging their position.",
         "The first sentence of Materials and Methods should address IRB approval and informed consent, including human and animal rights declarations."
       ]
     },
     "figures": {
       "max_count": 6,
-      "legends_location": "end_of_manuscript",
+      "legends_location": "after_references",
+      "multipanel_labels": "lowercase letters",
       "placement": "separate_files",
       "notes": [
-        "Figure captions must stand alone, define all abbreviations and symbols, and not describe or interpret the images in detail; panels are labeled with lowercase letters.",
+        "Figure captions must stand alone, define all abbreviations and symbols, and not describe or interpret the images in detail; panel letters are cited in the text in lowercase (Figure 1a) and appear bolded in the caption.",
         "Figure numbers and captions go only in the caption, not embedded in the figure file; Figure 1 of an Original Article should be the study flowchart.",
+        "Symbols and visual aids in figures must be explained in the caption, be clearly visible and, unless explicitly needed, be black or white.",
         "The optional-files page does not state figure file formats, resolution or dimensions."
       ]
     },
     "tables": {
-      "max_count": 5,
       "editable": true,
+      "max_count": 5,
       "placement": "separate_files",
       "notes": [
         "Tables numbered in Arabic numerals with a title, cited in order, understandable on their own, with abbreviations defined in footnotes; it is advisable that a table including legend take no more than one page; no colored letters or highlighted cells."
@@ -7164,7 +7059,7 @@
       ]
     },
     "references": {
-      "style": "Springer Basic (numeric) style: author(s) (year) title. Journal volume:pages or DOI",
+      "style": "Numbered in order of appearance: author(s) (year) title. Journal volume:pages or DOI",
       "numbered": true,
       "doi_required": false,
       "unpublished_allowed": false,
@@ -7173,9 +7068,270 @@
         "Citations are Arabic numerals in square brackets in order of appearance; list all authors if six or fewer, otherwise the first three followed by et al.; online resources need the date of last access."
       ]
     },
-    "notes": [
-      "Submission is via Editorial Manager; open access is available through Springer Open Choice."
-    ]
+    "revision": {
+      "marked_manuscript": "highlight",
+      "notes": [
+        "Revised submissions need two versions of the manuscript: an annotated version highlighting changes made against the previous version, and a clean version.",
+        "A response to reviewer comments is sometimes requested; the decision letter says whether it is required.",
+        "Changes of authorship or author order in a revision require a written explanation from the corresponding author in the response-to-reviewers box.",
+        "A Graphical Abstract file is mandatory at revision stage for Original Articles (including Systematic Reviews and Meta-Analyses), Reviews, Technical Developments and Guidelines."
+      ]
+    },
+    "article_types": {
+      "Original Article": {
+        "manuscript": {
+          "max_words_before_refs": 3000,
+          "notes": [
+            "Main text up to 3,000 words, 6 figures, 5 tables; abstract, key points, keywords, disclosure paragraph and graphical abstract are mandatory.",
+            "Key points: Question and Findings (each 20 to 25 words) plus a Clinical Relevance Statement (max 40 words); no abbreviations that are not spelled out except very common ones."
+          ]
+        },
+        "figures": {
+          "max_count": 6
+        },
+        "tables": {
+          "max_count": 5
+        },
+        "abstract": {
+          "max_words": 250,
+          "structured": true
+        }
+      },
+      "Original Article (Systematic Review / Meta-Analysis)": {
+        "manuscript": {
+          "max_words_before_refs": 5000,
+          "notes": [
+            "Systematic reviews and meta-analyses are submitted as Original Articles; up to 5,000 words, 12 figures, 5 tables; structured abstract."
+          ]
+        },
+        "figures": {
+          "max_count": 12
+        },
+        "tables": {
+          "max_count": 5
+        },
+        "abstract": {
+          "max_words": 250,
+          "structured": true
+        }
+      },
+      "Review (including Narrative Review)": {
+        "manuscript": {
+          "max_words_before_refs": 5000,
+          "notes": [
+            "Unstructured abstract up to 250 words; five MeSH keywords; three key points including a clinical relevance statement; graphical abstract mandatory.",
+            "The Introduction states the topic, its clinical relevance, the review's objectives and the inclusion criteria for the articles summarized; the body uses headings and subheadings; the Conclusion gives a take-home message, limitations and research gaps."
+          ]
+        },
+        "figures": {
+          "max_count": 12
+        },
+        "tables": {
+          "max_count": 5
+        },
+        "abstract": {
+          "max_words": 250,
+          "structured": false
+        },
+        "sections": {
+          "required": [
+            "Abstract",
+            "Key points",
+            "Introduction",
+            "Conclusions",
+            "References"
+          ],
+          "order": [
+            "Abstract",
+            "Key points",
+            "Introduction",
+            "Conclusions",
+            "References"
+          ],
+          "max_words": {}
+        },
+        "statements": {
+          "required": []
+        }
+      },
+      "Technical Developments": {
+        "manuscript": {
+          "max_words_before_refs": 2000,
+          "notes": [
+            "Up to 2,000 words, 4 figures, 4 tables; abstract, key points and graphical abstract mandatory; five MeSH keywords.",
+            "Three key points describe the technical innovation, the problem or need it addresses, and its practical or expected impact; the Introduction is one or two background paragraphs and then the aims; the Discussion ends with a paragraph of conclusions."
+          ]
+        },
+        "figures": {
+          "max_count": 4
+        },
+        "tables": {
+          "max_count": 4
+        },
+        "abstract": {
+          "max_words": 250,
+          "structured": false
+        },
+        "sections": {
+          "max_words": {}
+        }
+      },
+      "Special Report": {
+        "manuscript": {
+          "max_words_before_refs": 3000,
+          "notes": [
+            "Abstract is not required to be structured but must summarize the key points; graphical abstract optional."
+          ]
+        },
+        "figures": {
+          "max_count": 6
+        },
+        "tables": {
+          "max_count": 4
+        },
+        "abstract": {
+          "max_words": 250,
+          "structured": false
+        },
+        "sections": {
+          "required": [
+            "Abstract",
+            "Key points",
+            "References"
+          ],
+          "order": [
+            "Abstract",
+            "Key points",
+            "References"
+          ],
+          "max_words": {}
+        },
+        "statements": {
+          "required": []
+        }
+      },
+      "Guideline": {
+        "manuscript": {
+          "max_words_before_refs": 5000,
+          "notes": [
+            "Based on a systematic review with graded evidence; graphical abstract mandatory; five MeSH keywords; the title is agreed with the Editor before publication.",
+            "Key points summarize up to 3 key recommendations or changes from previous guidelines, in a single sentence each.",
+            "The abstract covers the clinical problem, the scope and target group, highlights or changes from prior guidelines, potential benefits and limitations, and ends with how readers can implement the information.",
+            "All guideline papers must include a recommendations table giving each recommendation's class and certainty of evidence."
+          ]
+        },
+        "figures": {
+          "max_count": 12
+        },
+        "tables": {
+          "max_count": 5
+        },
+        "abstract": {
+          "max_words": 250,
+          "structured": false
+        },
+        "sections": {
+          "required": [
+            "Abstract",
+            "Key points",
+            "Introduction",
+            "Methods",
+            "Recommendations",
+            "Limitations of the study",
+            "Conclusions",
+            "References"
+          ],
+          "order": [
+            "Abstract",
+            "Key points",
+            "Introduction",
+            "Methods",
+            "Recommendations",
+            "Limitations of the study",
+            "Conclusions",
+            "References"
+          ],
+          "max_words": {
+            "Introduction": 200
+          }
+        },
+        "statements": {
+          "required": []
+        }
+      },
+      "Statement": {
+        "manuscript": {
+          "max_words_before_refs": 3000,
+          "notes": [
+            "Public position by a group of experts or societies; graphical abstract optional."
+          ]
+        },
+        "figures": {
+          "max_count": 6
+        },
+        "tables": {
+          "max_count": 5
+        },
+        "abstract": {
+          "max_words": 250,
+          "structured": false
+        },
+        "sections": {
+          "required": [
+            "Abstract",
+            "Key points",
+            "References"
+          ],
+          "order": [
+            "Abstract",
+            "Key points",
+            "References"
+          ],
+          "max_words": {}
+        },
+        "statements": {
+          "required": []
+        }
+      },
+      "Letter to the Editor": {
+        "manuscript": {
+          "max_words_before_refs": 1000,
+          "notes": [
+            "Up to 1,000 words; no abstract, key points, keywords, figures, tables or supplementary material; up to 10 references and up to 3 authors; a disclosure paragraph is mandatory."
+          ]
+        },
+        "references": {
+          "max_count": 10
+        },
+        "figures": {
+          "max_count": 0
+        },
+        "tables": {
+          "max_count": 0
+        },
+        "supplementary": {
+          "max_count": 0
+        },
+        "abstract": {
+          "structured": false
+        },
+        "keywords": {
+          "min": 0,
+          "max": 0
+        },
+        "sections": {
+          "required": [
+            "References"
+          ],
+          "order": [],
+          "optional": [],
+          "max_words": {}
+        },
+        "statements": {
+          "required": []
+        }
+      }
+    }
   },
   "genome_medicine": {
     "source_urls": [
