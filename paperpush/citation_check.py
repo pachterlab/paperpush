@@ -173,13 +173,12 @@ def mentions(text: str) -> list[Mention]:
 
 def _reference_span(text: str, found: list[Mention]) -> tuple[int, int] | None:
     """Where the reference list runs: from its heading to the first caption after it."""
-    from .manuscript import _REFERENCE_HEADING
+    from .manuscript import reference_list_span
 
-    refs = _REFERENCE_HEADING.search(text)
-    if not refs:
+    span = reference_list_span(text)
+    if not span:
         return None
-    end = next((x.pos for x in found if x.caption and x.pos > refs.end()), len(text))
-    return refs.start(), end
+    return span[0], next((x.pos for x in found if x.caption and span[0] < x.pos < span[1]), span[1])
 
 
 # --- panels ---------------------------------------------------------------------------
@@ -194,7 +193,8 @@ _DASH = r"\s*[\u2013\u2014-]\s*"
 _PANEL_ITEM = re.compile(rf"(S?)(\d{{1,3}})(?:([a-zA-Z])(?:{_DASH}(?:\1\2)?([a-zA-Z]))?)?(?![\w])")
 # A bare letter (or range) continuing the previous item: the ", b" of "Fig. 2a, b".
 _PANEL_LETTER = re.compile(rf"([a-zA-Z])(?:{_DASH}([a-zA-Z]))?(?![\w])")
-_PANEL_SEP = re.compile(r"\s*(,|;|and\b|&)\s*")
+_PANEL_SEP = re.compile(r"\s*(,\s*(?:and\b|&)|,|;|and\b|&)\s*")
+_CELL_WORD = re.compile(r"\s+(?:cells?|lymphocytes?)\b", re.IGNORECASE)
 # Whose figure: "Fig. 3b of ref. 12", "Fig. 2a in Smith et al.", "(ref. 4, Fig. 1c)".
 _OTHER_AFTER = re.compile(r"\s*(?:of|in|from)\s+(?:refs?\b|\[|\(\d|\d|[A-Z][\w'-]+(?:\s+and\s+[A-Z][\w'-]+)?\s+(?:et\s+al|\(\d{4}|\d{4})|the\s+(?:original|cited|previous)|their\b|ours?\s+previous)")
 _OTHER_BEFORE = re.compile(r"(?:\brefs?\.?\s*\d+[\w\s,\u2013-]*|et\s+al\.?(?:\s*\(?\d{4}\)?)?|\[\d+[\d,\s\u2013-]*\])\s*[,;:]?\s*(?:see\s+)?$", re.IGNORECASE)
@@ -244,9 +244,10 @@ def panel_mentions(text: str, series: str | None = None) -> list[PanelCite]:
                     found += [PanelCite(kind, current[1], c, item.start()) for c in _letters(item.group(3), item.group(4))]
                 pos = item.end()
             elif current is not None and current[0] and lettered and (letter := _PANEL_LETTER.match(text, pos)):
-                # After "and", a bare letter must close the list ("Fig. 2a and b)"), so
-                # "Fig. 2a and a control" is not read as a panel.
-                if sep.group(1) in ("and", "&") and not re.match(r"\s*(?:[),;.\]]|$)", text[letter.end() :]):
+                # After "and", a bare letter must close the list ("Fig. 2a and b)") or be the
+                # next panel ("Fig. 2a and b show"), so "Fig. 2a and a control" is not read as one.
+                next_panel = found and ord(letter.group(1).lower()) == ord(found[-1].letter.lower()) + 1 and not _CELL_WORD.match(text, letter.end())
+                if sep.group(1).endswith(("and", "&")) and not next_panel and not re.match(r"\s*(?:[),;.\]]|$)", text[letter.end() :]):
                     break
                 # Panels run forward in one case: the "a" of "Fig. 2c, a rise" and the "B" of "Fig. 1b, B cells" are words.
                 if found and (letter.group(1).isupper() != found[-1].letter.isupper() or letter.group(1).lower() <= found[-1].letter.lower()):

@@ -306,9 +306,15 @@ def _addressed(sentence: str, m: re.Match[str]) -> bool:
     return True
 
 
-def _mask(text: str, names: list[str]) -> str:
+def _mask(text: str, names: list[str], keep: list[str] = ()) -> str:
+    """``text`` with ``names`` blanked out, except where one is part of a longer name in ``keep``."""
+    kept = [m.span() for name in keep for m in _name_pattern(name).finditer(text)]
+
+    def blank(m: re.Match[str]) -> str:
+        return m.group(0) if any(a <= m.start() and m.end() <= b for a, b in kept) else "\u2591" * len(m.group(0))
+
     for name in sorted(names, key=len, reverse=True):
-        text = _name_pattern(name).sub(lambda m: "\u2591" * len(m.group(0)), text)
+        text = _name_pattern(name).sub(blank, text)
     return text
 
 
@@ -322,12 +328,15 @@ def other_venue_mentions(text: str, venue: Venue, others: list[Venue]) -> list[t
         if other.slug == venue.slug:
             continue
         for name in venue_names(other):
-            # A name inside this venue's own ("Nature" in "Nature Communications") is not another venue.
-            if len(name) < 3 or any(name.lower() in o for o in own_folded) or name in candidates:
+            # A name inside this venue's own ("Nature" in "Nature Communications") is
+            # blanked with it below, so what is left of it really is the other venue.
+            if len(name) < 3 or name.lower() in own_folded or name in candidates:
                 continue
             candidates.append(name)
     candidates.sort(key=len, reverse=True)
-    masked = _mask(document.normalize(text), own)
+    # "Nature Communications" in a letter to Nature is another journal, not Nature.
+    longer = [name for name in candidates if any(o in name.lower() for o in own_folded)]
+    masked = _mask(document.normalize(text), own, longer)
     found: list[tuple[str, str]] = []
     seen: set[str] = set()
     for sentence in _SENTENCE.findall(masked):
@@ -352,8 +361,13 @@ def other_venue_mentions(text: str, venue: Venue, others: list[Venue]) -> list[t
 
 def names_venue(text: str, venue: Venue) -> bool:
     """Whether ``text`` names ``venue`` anywhere."""
-    normalized = document.normalize(text)
-    return any(_name_pattern(n).search(normalized) for n in venue_names(venue))
+    from .database import list_venues
+
+    own = venue_names(venue)
+    folded = [n.lower() for n in own]
+    longer = [name for other in list_venues() if other.slug != venue.slug for name in venue_names(other) if name.lower() not in folded and any(o in name.lower() for o in folded)]
+    masked = _mask(document.normalize(text), own, longer)
+    return "\u2591" in masked
 
 
 def _venue_check(checks: Checks, venue: Venue, values: dict[str, str]) -> Outcome:

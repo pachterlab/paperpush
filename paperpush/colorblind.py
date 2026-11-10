@@ -542,6 +542,10 @@ class Drawing:
         return confusions(self.colours or [], raster=self.raster)
 
 
+# How many pages of a figure PDF are read for colours.
+_MAX_FIGURE_PAGES = 30
+
+
 def pdf_figure_drawings(path: Path, name: str) -> list[Drawing]:
     """The colours of a figure file in PDF: its vector drawing, and each raster in it."""
     from pypdf import PdfReader
@@ -549,17 +553,18 @@ def pdf_figure_drawings(path: Path, name: str) -> list[Drawing]:
     reader = PdfReader(str(path))
     if not reader.pages:
         return []
-    page = reader.pages[0]
     counts: dict[RGB, float] = {}
-    contents = page.get_contents()
-    if contents is not None:
-        _stream_colours(contents, reader, counts)
-    for form in _forms(page):
-        _stream_colours(form, reader, counts)
-    drawings = [Drawing(name, list(counts.items()))] if counts else []
-    for n, img in enumerate(_page_images(page, 100), start=1):
-        drawings.append(Drawing(f"{name} (image {n})", image_colours(img), raster=True))
-    return drawings
+    rasters: list[Drawing] = []
+    # Every page: a figure PDF can hold several figures.
+    for page in reader.pages[:_MAX_FIGURE_PAGES]:
+        contents = page.get_contents()
+        if contents is not None:
+            _stream_colours(contents, reader, counts)
+        for form in _forms(page):
+            _stream_colours(form, reader, counts)
+        for img in _page_images(page, 100):
+            rasters.append(Drawing(f"{name} (image {len(rasters) + 1})", image_colours(img), raster=True))
+    return ([Drawing(name, list(counts.items()))] if counts else []) + rasters
 
 
 # A drawing narrower than this (points) on a manuscript page is a logo or an icon.

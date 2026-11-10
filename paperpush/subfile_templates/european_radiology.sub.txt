@@ -33,6 +33,10 @@ article_type:
 #   Path to the manuscript (PDF, Word, or LaTeX source).
 manuscript_file: 
 
+# Title page (file, optional)
+#   Optional. Path to the title page, when it is a separate file from the manuscript.
+title_page_file: 
+
 # Figure files (filelist, optional)
 #   Optional. One figure file per line as 'path | label' (label optional).
 figure_files: |

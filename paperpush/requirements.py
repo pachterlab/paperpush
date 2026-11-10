@@ -1049,6 +1049,13 @@ def resolve(reqs: ManuscriptRequirements, values: dict[str, str]) -> ManuscriptR
     base.pop("slug", None)
     merged = merge_entries(base, override)
     merged.pop("article_types", None)
+    # A type's own limit replaces the top-level one, whichever scope each is in:
+    # a 7,000-word Review is not also held to the 4,300 words of an Article.
+    stated = override.get("manuscript") or {}
+    for pair in (("max_words", "max_words_before_refs"), ("max_pages", "max_pages_before_refs")):
+        for own, inherited in (pair, pair[::-1]):
+            if stated.get(own) is not None and inherited not in stated:
+                (merged.get("manuscript") or {}).pop(inherited, None)
     resolved = ManuscriptRequirements.from_dict(reqs.slug, merged)
     if reqs.publisher:
         # The override's rules belong to whoever wrote the override.

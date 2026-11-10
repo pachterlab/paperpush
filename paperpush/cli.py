@@ -1332,7 +1332,8 @@ checks that run without AI:
 
   Figures
     Resolution (dpi, with a line-art threshold), lettering size and typeface
-    in vector figures, panel labels, color mode, maximum dimensions, placement,
+    in vector figures, panel labels, color mode, maximum dimensions, placement
+    (of tables too),
     legend length and location, and legibility with red-green color blindness.
     Reads the attached figure files, or the figures embedded in the manuscript
     when none are attached.

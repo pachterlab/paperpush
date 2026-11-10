@@ -178,6 +178,17 @@ _DOI_CONTINUATION = re.compile(r"[ \t]*\r?\n[ \t]*([A-Za-z0-9._;()/:+-]+)")
 # A hyphen the layout inserted at a line break, rejoined before the surrounding
 # reference text is compared against the registered record.
 _LINE_WRAP_HYPHEN = re.compile(r"-\s*\r?\n\s*")
+_DOTTED_NUMBER = re.compile(r"\d+(?:\.\d+)+[.,;]?")
+
+
+def _breaks_mid_doi(head: str, continuation: str) -> bool:
+    """Whether a DOI ending in ``head`` plainly goes on in ``continuation``, on the next line.
+
+    A DOI does not end in a hyphen, slash, or underscore; and "10.1016/j.cell.2020."
+    before "01.001" is one DOI, where a full stop before a word is the end of a sentence.
+    """
+    return head[-1:] in ("-", "/", "_") or (head[-1:] == "." and bool(_DOTTED_NUMBER.fullmatch(continuation)))
+
 
 # Where one reference entry ends and the next begins: a \bibitem, a numbered
 # marker opening a line ("[12]", "12.", "(12)"), or a blank line. Anchoring the
@@ -583,6 +594,22 @@ def _reference_list_start(text: str) -> int | None:
     return min(starts) if starts else None
 
 
+_END_THEBIBLIOGRAPHY = re.compile(r"\\end\s*\{\s*thebibliography\s*\}")
+
+
+def _reference_list_end(text: str, refs_at: int | None) -> int:
+    """Offset where the reference list starting at ``refs_at`` ends: a data-availability DOI after it is no reference."""
+    from . import manuscript
+
+    if refs_at is None:
+        return len(text)
+    close = _END_THEBIBLIOGRAPHY.search(text, refs_at)
+    if close:
+        return close.end()
+    after = manuscript._AFTER_REFERENCES.search(text, refs_at)
+    return after.start() if after else len(text)
+
+
 def _entry_context(text: str, refs_at: int | None, start: int, end: int) -> str:
     """The single reference entry a DOI sits in, normalized for comparison.
 
@@ -637,6 +664,7 @@ def collect_citations(paths: Iterable[Path]) -> list[Citation]:
     for path in _dedup_paths(paths):
         for where, text in _iter_text_blobs(path):
             refs_at = _reference_list_start(text)
+            refs_end = _reference_list_end(text, refs_at)
             seen_outside: set[str] = set()
             last_in_list: dict[str, int] = {}
             for match in _DOI_IN_TEXT.finditer(text):
@@ -651,8 +679,10 @@ def collect_citations(paths: Iterable[Path]) -> list[Citation]:
                     if not _is_well_formed(joined):
                         continue
                     doi, joined = joined, ""
+                elif joined and _is_well_formed(joined) and _breaks_mid_doi(match.group(0), wrapped.group(1)):
+                    doi, joined = joined, ""
 
-                in_list = refs_at is not None and match.start() >= refs_at
+                in_list = refs_at is not None and refs_at <= match.start() < refs_end
                 if not in_list:
                     if doi in seen_outside:
                         continue

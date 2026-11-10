@@ -63,7 +63,7 @@ _STATEMENT_HEADING = re.compile(r"(?im)^[ \t]*(?:\d+(?:\.\d+)*\.?[ \t]+)?(?:#+[ 
 # Where a statement section ends: the next statement or back-matter heading.
 _NEXT_HEADING = re.compile(r"(?im)^[ \t]*(?:\d+(?:\.\d+)*\.?[ \t]+)?(?:#+[ \t]*)?(?:acknowledge?ments?|author[ \t]+contributions?|competing[ \t]+interests?|conflicts?[ \t]+of[ \t]+interest|declarations?|funding|references|bibliography|ethics|supplementary[ \t]+information|additional[ \t]+information|correspondence|materials[ \t]+availability|lead[ \t]+contact)\b")
 _STATEMENT_FIELDS = re.compile(r"(?i)^(?:code_availability|data_availability|data_availability_links|data_statement|data_repository_url|code_url|software_availability)$")
-_CODE_WORD = re.compile(r"(?i)\b(?:code|software|scripts?|notebooks?|source)\b")
+_CODE_WORD = re.compile(r"(?i)\b(?:code|software|scripts?|notebooks?|source[ \t]+(?:files?|repositor(?:y|ies)))\b")
 
 _UPON_REQUEST = re.compile(r"(?i)\b(?:(?:up)?on[ \t]+(?:reasonable[ \t]+|justified[ \t]+|written[ \t]+)?request|by[ \t]+request|(?:at[ \t]+the[ \t]+)?request[ \t]+(?:to|from|of)[ \t]+the[ \t]+(?:corresponding[ \t]+|lead[ \t]+)?authors?|contact(?:ing)?[ \t]+the[ \t]+(?:corresponding[ \t]+|lead[ \t]+)?authors?)\b")
 # A reason a dataset legitimately cannot be posted publicly.
@@ -199,14 +199,14 @@ def _code_in_archive(path: Path) -> bool:
 def code_sources(venue: Venue, values: dict[str, str]) -> CodeSources:
     """The code this manuscript links or attaches, read from its main text (not its reference list)."""
     from . import sensitive
-    from .manuscript import truncate_at_references
+    from .manuscript import without_reference_list
     from .rigor_check import _texts
 
     found = CodeSources()
     body_parts = []
     for field_id, _, text in _texts(venue, values, roles=("manuscript", "supplementary")):
         found.field_id = found.field_id or field_id
-        body = truncate_at_references(text)
+        body = without_reference_list(text)
         body_parts.append(body)
         found.statements.extend((field_id, s) for s in statements(body))
     for key, value in values.items():
@@ -386,11 +386,11 @@ def _quote(text: str, pattern: re.Pattern) -> str:
 
 
 def _data_accessions_check(venue: Venue, values: dict[str, str], online: bool) -> Outcome:
-    from .manuscript import truncate_at_references
+    from .manuscript import without_reference_list
     from .rigor_check import _texts
 
     texts = _texts(venue, values, roles=("manuscript", "supplementary"))
-    body = "\n".join(truncate_at_references(t) for _, _, t in texts) + "\n" + "\n".join(v for k, v in values.items() if _STATEMENT_FIELDS.match(k))
+    body = "\n".join(without_reference_list(t) for _, _, t in texts) + "\n" + "\n".join(v for k, v in values.items() if _STATEMENT_FIELDS.match(k))
     accessions = list(dict.fromkeys(m.group(0) for pattern in (_GEO, _BIOPROJECT) for m in pattern.finditer(body)))
     if not accessions:
         raise NotApplicable("the manuscript gives no GEO series or BioProject accession")

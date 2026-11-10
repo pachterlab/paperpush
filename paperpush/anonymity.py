@@ -257,6 +257,10 @@ _REFERENCE_END = re.compile(
     r"^\s*(?:[A-Z]\.?\s+)?(?:appendix|appendices|supplementary\s+material)\b[^\n]{0,60}$" r"|^\s*(?:\d+\.?\s+)?(?:author\s+contributions?|contributions|acknowledge?ments?|funding|competing\s+interests?|conflicts?\s+of\s+interest|data\s+availability|code\s+availability|declarations?|ethics(?:\s+statement)?|supplementary\s+information)\s*:?\s*$" r"|\\end\s*\{\s*thebibliography\s*\}|\\appendix\b|\\(?:sub)*section\*?\s*(?:\[[^\]]*\])?\s*\{",
     re.IGNORECASE | re.MULTILINE,
 )
+# A lettered appendix heading ("A Implementation details"). The text may be case-folded, so
+# a wrapped reference title fits this too; a reference has a year close by (_YEAR_NEARBY).
+_LETTERED_APPENDIX = re.compile(r"^[ \t]*a\.?[ \t]+[a-z]+(?:[ \t]+[a-z][a-z-]+){0,7}[ \t]*$", re.IGNORECASE | re.MULTILINE)
+_YEAR_NEARBY = re.compile(r"\b(?:19|20)\d{2}\b")
 # "Copyright (c) 2026 Holder" -- the line Anonymous GitHub most often leaves
 # un-redacted, in a LICENSE file.
 _COPYRIGHT = re.compile(r"(?im)^\s*copyright\s+(?:\(c\)\s*|©\s*)?(?:\d{4}(?:\s*[-–,]\s*\d{4})*\s+)?(?P<holder>[^\n]{2,80})$")
@@ -289,6 +293,9 @@ def _reference_spans(text: str) -> list[tuple[int, int]]:
             return spans
         end = _REFERENCE_END.search(text, start.end())
         stop = end.start() if end else len(text)
+        appendix = next((m for m in _LETTERED_APPENDIX.finditer(text, start.end(), stop) if not _YEAR_NEARBY.search(text, m.end(), m.end() + 160)), None)
+        if appendix is not None:
+            end, stop = appendix, appendix.start()
         spans.append((start.start(), stop))
         if end is None:
             return spans

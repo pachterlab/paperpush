@@ -7,8 +7,9 @@ description: >-
   (reusing the values in any .sub files from earlier submissions), reformat
   the manuscript for the new venue (its Word/LaTeX template when one is found,
   else its layout rules), validate it, and write transfer.txt describing what
-  changed. The original files are
-  never modified. Triggers: "transfer my manuscript to <venue>", "resubmit
+  changed. For a venue paperpush does not support yet, first builds a draft
+  entry from the venue's guidelines and transfers against that. The original
+  files are never modified. Triggers: "transfer my manuscript to <venue>", "resubmit
   this paper to <venue>", "my paper was rejected from <venue>, move it to
   <venue>", "reuse my nature sub for cell", "paperpush-transfer".
 ---
@@ -33,9 +34,11 @@ delete anything in the source directory**; every change happens in the copy.
    Required. If the user did not give it, ask in plain text. Never guess it,
    scan the repository for candidate folders, or fall back to test fixtures.
 2. **The target venue slug** (e.g. `cell`). Ask or infer it from their
-   message, and confirm it with `paperpush venues`. If it is the same venue as
-   the earlier `.sub`, this is not a transfer: say so, and point them to
-   `paperpush-prepare-submission` or `paperpush-fix`.
+   message, and confirm it with `paperpush venues` (try its name, abbreviation,
+   and publisher's title). If it is not listed, see
+   [Target venue paperpush does not support](#target-venue-paperpush-does-not-support).
+   If it is the same venue as the earlier `.sub`, this is not a transfer: say
+   so, and point them to `paperpush-prepare-submission` or `paperpush-fix`.
 3. **Earlier `.sub` files** (optional). Use every `.sub` / `.sub.txt` the user
    names, plus any in the source directory itself and in its transfer
    subdirectories (`<slug>/<slug>.sub.txt` from an earlier run of this skill).
@@ -61,8 +64,8 @@ delete anything in the source directory**; every change happens in the copy.
    (`figures/fig1.png` stays `figures/fig1.png`), so LaTeX `\input` and
    `\includegraphics` paths still work:
    - For a directory, copy its whole tree except: other transfer
-     subdirectories, `.sub`/`.sub.txt` files, `transfer.txt`, `.git/`,
-     paperpush-fix backups, and LaTeX build output (`.aux`, `.log`, `.out`,
+     subdirectories, `.sub`/`.sub.txt` files, `transfer.txt`, `venue_draft/`,
+     `.git/`, paperpush-fix backups, and LaTeX build output (`.aux`, `.log`, `.out`,
      `.synctex.gz`, `.fls`, `.fdb_latexmk`, `.bbl`, `.blg`). If the tree is
      over about 200 MB, list the largest items and ask before copying.
    - For a set of files, copy just those, plus any file an earlier `.sub`
@@ -170,6 +173,9 @@ delete anything in the source directory**; every change happens in the copy.
    New directory: <abs new dir>
    New .sub: <abs path>
    Earlier .sub files used: <abs path> (<venue>, modified <date>), ...
+   Draft venue entry: <abs new dir>/venue_draft  (only for a venue paperpush
+       does not support; run paperpush on this .sub with
+       PAPERPUSH_VENUE_DATA=<abs new dir>/venue_draft/data)
 
    1. Files
       Copied: <n> files (<list, relative paths>)
@@ -209,10 +215,14 @@ delete anything in the source directory**; every change happens in the copy.
    6. To do
       <the author's remaining tasks, most important first>
       paperpush submit <abs new .sub>   (after: paperpush login <new venue>)
+      (or, when paperpush cannot submit to the new venue: upload the files
+       through <new venue>'s own portal, using the .sub as your checklist)
    ```
 
    Build section 3 from `paperpush requirements <slug> --json` for both
-   venues, listing only the rules that differ. Skip it, with a line saying why,
+   venues, listing only the rules that differ. If the earlier venue was itself
+   a draft entry, read its rules with `PAPERPUSH_VENUE_DATA` set to that
+   transfer's `venue_draft/data`. Skip the section, with a line saying why,
    when no earlier venue is known or it has no requirements entry. Shorten
    long values (abstracts, statements) to their first 80 characters, with
    `...`, instead of pasting them whole.
@@ -223,7 +233,38 @@ delete anything in the source directory**; every change happens in the copy.
    limit, a different reference style); whether the manuscript was reformatted
    and with which template (or the layout rules); the validation counts; and
    what is left for them. For the portal, point them to `paperpush-submit` (or
-   `paperpush login <venue>` then `paperpush submit <abs .sub>`).
+   `paperpush login <venue>` then `paperpush submit <abs .sub>`). If
+   `paperpush venues` shows the new venue is validate-only, or it is a draft
+   entry, paperpush cannot submit to it: tell them to upload the files through
+   the venue's own portal, using the `.sub` as their checklist.
+
+## Target venue paperpush does not support
+
+A venue `paperpush venues` does not list can still be transferred to, but not
+submitted to. Tell the user so up front, then:
+
+- **After step 2 and before step 3**, run the `paperpush-add-venue-validate`
+  skill (Skill tool) for the venue in its **temporary mode**, and tell it to use
+  `<new-dir>/venue_draft/` as the draft directory, so the entry stays with the
+  transfer. On a re-run, if `<new-dir>/venue_draft/data` already exists, reuse
+  it unless the user asks to read the guidelines again.
+- If the venue's guideline pages cannot be read, ask the user to save them as
+  files for that skill to read. If they have none, say that `paperpush format`
+  and the guideline checks will have little or nothing to work from, and ask
+  whether to go on.
+- Set `PAPERPUSH_VENUE_DATA=<new-dir>/venue_draft/data` on every `paperpush`
+  command from step 3 on, and give that path to `paperpush-autofill`,
+  `paperpush-validate`, and `paperpush-fix` when you invoke them. Without the
+  variable, paperpush does not know the venue. Tell `paperpush-autofill` that
+  `venue_draft/` is not part of the manuscript, and tell `paperpush-validate`
+  the draft entry already exists so it does not build a second one.
+- **Never run `paperpush login`, `paperpush submit`, or `paperpush-submit` for
+  it.** paperpush has no runner for this venue's portal.
+- In the summary, say the rules came from a draft entry read from the
+  guidelines just now, so they are only as good as that reading. Pass on
+  `paperpush-validate`'s pointers for hot-fixing the draft (with the paths
+  under `<new-dir>/venue_draft/`) and the suggestion to send the entry upstream
+  as a pull request.
 
 ## Rules
 
@@ -234,6 +275,8 @@ delete anything in the source directory**; every change happens in the copy.
 - An earlier `.sub` is a source, not the truth: the manuscript wins when they
   disagree, and the change goes in `transfer.txt`.
 - Never write a `never` field, even from an earlier `.sub`.
+- A draft venue entry stays in `<new-dir>/venue_draft/`. It never goes into
+  paperpush's own databases or the repo.
 - Never invent values: if neither the earlier `.sub` nor the files give it,
   leave it for the author.
 - Delegate filling to `paperpush-autofill`, reformatting to `paperpush format`,

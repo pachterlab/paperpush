@@ -175,6 +175,10 @@ _PLACEHOLDER_VALUE = re.compile(r"(?i)^(?:<.*>|\$.*|%.*|\{\{?.*\}?\}|none|null|t
 _CODE_VALUE = re.compile(r"[(\[]|^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+$")
 
 
+# "Forward pass: activations are cached": the shorter keywords also end ordinary labels.
+_PROSE_LABEL = re.compile(r"(?i)(?:pass|secret)[ \t]*:[ \t]*[a-z]+$")
+
+
 def _is_placeholder_credential(value: str) -> bool:
     quoted = value[:1] in "\"'"
     bare = value.strip("\"'")
@@ -226,7 +230,7 @@ def _iter_secret_findings(where: str, text: str) -> Iterator[Finding]:
     seen: set[tuple[str, str]] = set()
     for label, pattern, group in _SECRET_PATTERNS:
         for match in pattern.finditer(text):
-            if label == "hardcoded credential" and _is_placeholder_credential(match.group("val")):
+            if label == "hardcoded credential" and (_is_placeholder_credential(match.group("val")) or _PROSE_LABEL.match(match.group(0))):
                 continue
             raw = match.group(group) or match.group(0)
             key = (label, raw)
@@ -1047,4 +1051,7 @@ def _iter_text_blobs(path: Path) -> Iterator[tuple[str, str]]:
 
 def _office_blob_text(data: bytes) -> str | None:
     parts = _office_parts(data)
-    return None if parts is None else "\n".join(text for _, text in parts)
+    if parts is None:
+        return None
+    # The document body last: nothing else can then read as following its reference list.
+    return "\n".join(text for _, text in sorted(parts, key=lambda part: part[0] in ("word/document.xml", "content.xml")))

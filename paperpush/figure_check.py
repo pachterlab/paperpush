@@ -175,7 +175,7 @@ def _pdf_figure(path: Path, field_id: str, rules: FigureRules, number: int) -> F
     from . import pdf_layout
 
     fig = Figure(path.name, path, field_id, True, "vector", number=number)
-    pages = pdf_layout.read_pages(path, max_pages=1) if pdf_layout.available() else None
+    pages = pdf_layout.read_pages(path) if pdf_layout.available() else None
     if not pages:
         fig.kind = "other"
         return fig
@@ -185,8 +185,9 @@ def _pdf_figure(path: Path, field_id: str, rules: FigureRules, number: int) -> F
     scale = min(1.0, (max_mm / MM_PER_INCH * 72) / width_pt) if max_mm else 1.0
     fig.print_width_mm = width_pt * scale / 72 * MM_PER_INCH
     fig.file_width_mm, fig.file_height_mm = width_pt / 72 * MM_PER_INCH, page.height / 72 * MM_PER_INCH
-    fig.texts = _texts_from_glyphs(page.glyphs, scale)
-    images = [im for im in page.images if im.dpi]
+    # Every page: a figure PDF can hold several figures.
+    fig.texts = [text for p in pages for text in _texts_from_glyphs(p.glyphs, scale)]
+    images = [im for p in pages for im in p.images if im.dpi]
     if images and not fig.texts:
         # A raster image wrapped in a PDF: its resolution is the image's, as scaled.
         largest = max(images, key=lambda im: (im.x1 - im.x0) * (im.y1 - im.y0))
@@ -221,7 +222,9 @@ def _svg_length(value: str | None, em: float | None = None) -> float | None:
 def _css_declarations(text: str) -> dict[str, str]:
     """``{property: value}`` of a CSS declaration list, the ``font`` shorthand expanded."""
     out = {k.strip().lower(): v.strip() for k, v in (item.split(":", 1) for item in text.split(";") if ":" in item)}
-    shorthand = re.search(r"(?:^|\s)(\d*\.?\d+(?:px|pt|mm|cm|in|pc|rem|em|ex|%)?)(?:/\S+)?\s+(.+)$", out.get("font", ""))
+    # A size with a unit first: the "700" of Matplotlib's "font: 700 10px 'DejaVu Sans'" is the weight.
+    font = out.get("font", "")
+    shorthand = re.search(r"(?:^|\s)(\d*\.?\d+(?:px|pt|mm|cm|in|pc|rem|em|ex|%))(?:/\S+)?\s+(.+)$", font) or re.search(r"(?:^|\s)(\d*\.?\d+)(?:/\S+)?\s+(.+)$", font)
     if shorthand:
         out.setdefault("font-size", shorthand.group(1))
         out.setdefault("font-family", shorthand.group(2))

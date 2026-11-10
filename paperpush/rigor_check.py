@@ -94,6 +94,13 @@ def _text_or_skip(venue: Venue, values: dict[str, str]) -> list[tuple[str, str, 
     return texts
 
 
+def _body_texts(texts: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]:
+    """``texts`` without their reference lists: a cited paper's HeLa cells are not this study's."""
+    from .manuscript import without_reference_list
+
+    return [(field_id, name, without_reference_list(text)) for field_id, name, text in texts]
+
+
 # ---------------------------------------------------------------------------
 # research resources
 
@@ -220,7 +227,7 @@ def _plural(kind: str, n: int) -> str:
 
 
 def _rrids_check(venue: Venue, values: dict[str, str], online: bool) -> Outcome:
-    texts = _text_or_skip(venue, values)
+    texts = _body_texts(_text_or_skip(venue, values))
     issues: list[Issue] = []
     named: dict[str, dict[str, bool]] = {}
     given: dict[str, str] = {}
@@ -291,7 +298,7 @@ def cellosaurus_problem(name: str) -> tuple[str, str] | None | bool:
 
 
 def _cell_lines_check(venue: Venue, values: dict[str, str], online: bool) -> Outcome:
-    texts = _text_or_skip(venue, values)
+    texts = _body_texts(_text_or_skip(venue, values))
     lines: dict[str, str] = {}
     whole = "\n".join(t for _, _, t in texts)
     for field_id, _, text in texts:
@@ -324,13 +331,13 @@ def _cell_lines_check(venue: Venue, values: dict[str, str], online: bool) -> Out
 # study design
 
 _ANIMALS = re.compile(r"(?i)\b(?:mice|mouse|rats?|zebrafish|primates?|macaques?|rabbits?|pigs?|piglets|dogs|sheep|ferrets|hamsters|guinea\s+pigs|animals)\b")
-_HUMANS = re.compile(r"(?i)\b(?:participants|patients|volunteers|human\s+subjects|respondents|cohort|enrolled|recruited)\b")
+_HUMANS = re.compile(r"(?i)\b(?:participants|patients|volunteers|human\s+subjects|respondents|cohort|enrolled)\b")
 # The host of an antibody ("rabbit anti-LC3", "goat anti-mouse", "mouse monoclonal") is not a study animal.
 _HOSTS = r"(?:mouse|mice|rats?|rabbits?|pigs?|guinea\s+pigs?|hamsters?|sheep|dogs|goats?|donkeys?|chickens?)"
 _ANTIBODY_HOST = re.compile(rf"(?i)\b{_HOSTS}(?=[\s-]+(?:anti\b|anti-|monoclonal|polyclonal|IgG|IgM|IgA|secondary|primary|antibod))|\banti-{_HOSTS}\b|(?<=\()\s*{_HOSTS}\s*(?=[,;])")
 # Telling a study of animals or people from a mention of them.
 _ANIMAL_STUDY = re.compile(r"(?i)\b(?:mice|mouse|rats?|zebrafish|primates?|macaques?|rabbits?|pigs?|piglets|dogs|sheep|ferrets|hamsters|guinea\s+pigs|animals)\s+(?:were|was|received|underwent|aged|weighing|per\s+(?:group|cage))\b|\bIACUC\b|\banimal\s+(?:care|ethics|welfare|experiments?|stud(?:y|ies)|procedures?|protocols?)\b|\beuthani[sz]|\bsacrific|\bhoused\b")
-_HUMAN_STUDY = re.compile(r"(?i)\b(?:enrolled|recruit(?:ed|ment)|(?:informed\s+)?consent(?:ed)?|(?:participants|patients|subjects|individuals)\s+(?:were|who)|cohort\s+(?:of|study|included|comprised)|volunteers|respondents|ethics\s+(?:committee|board|approval)|institutional\s+review\s+board|IRB)\b")
+_HUMAN_STUDY = re.compile(r"(?i)\b(?:enrolled|(?:participants?|patients?|subjects?|individuals?|volunteers?|people|adults|children|women|men|respondents|controls)\b[^.]{0,80}\brecruited|(?:we|they|investigators?|researchers?)\s+recruited|recruit(?:ed|ment\s+of|ing)\s+(?:\w+\s+){0,3}?(?:participants?|patients?|subjects?|individuals?|volunteers?|people|adults|children|women|men|respondents|controls)|(?:participant|patient|subject|study)\s+recruitment|(?:informed\s+)?consent(?:ed)?|(?:participants|patients|subjects|individuals)\s+(?:were|who)|cohort\s+(?:of|study|included|comprised)|volunteers|respondents|ethics\s+(?:committee|board|approval)|institutional\s+review\s+board|IRB)\b")
 _DESIGN: dict[str, re.Pattern[str]] = {
     "blinding": re.compile(r"(?i)\bblind(?:ed|ing|ly)?\b|\bmask(?:ed|ing)\b(?=[^.]{0,60}\b(?:group|treatment|allocation|condition|genotype|outcome|assessor|investigator))|\b(?:un)?aware\s+of\s+(?:the\s+)?(?:group|treatment|genotype|allocation)|\bopen[- ]label\b"),
     "randomization": re.compile(r"(?i)\brandomi[sz](?:ed|ation|ing)\b|\brandom(?:ly)?\s+(?:assign|allocat)\w*|\ballocat\w+\s+(?:at\s+)?random\w*|\brandom\s+allocation\b"),
@@ -355,10 +362,7 @@ def _design_check(venue: Venue, values: dict[str, str]) -> Outcome:
     if _REVIEW_TYPE.search(values.get("article_type", "")) or _REVIEW_TITLE.search(values.get("title", "")):
         raise NotApplicable("a review reports no experiment or participants of its own")
     texts = _text_or_skip(venue, values)
-    whole = "\n".join(t for _, _, t in texts)
-    from .manuscript import truncate_at_references
-
-    body = truncate_at_references(whole)
+    body = "\n".join(t for _, _, t in _body_texts(texts))
     without_hosts = _ANTIBODY_HOST.sub(" ", body)
     animals = len(_ANIMALS.findall(without_hosts)) if _ANIMAL_STUDY.search(without_hosts) else 0
     humans = len(_HUMANS.findall(body)) if _HUMAN_STUDY.search(body) else 0
@@ -633,12 +637,12 @@ def _trial_reason(venue: Venue, values: dict[str, str], body: str) -> Optional[s
 
 
 def _trial_registration_check(venue: Venue, values: dict[str, str]) -> Outcome:
-    from .manuscript import truncate_at_references
+    from .manuscript import without_reference_list
 
     texts = _texts(venue, values, roles=("manuscript", "title_page"))
     if not texts:
         raise _no_text(venue, values, ("manuscript", "title_page"), "manuscript text")
-    body = "\n".join(truncate_at_references(text) for _, _, text in texts)
+    body = "\n".join(without_reference_list(text) for _, _, text in texts)
     found = list(dict.fromkeys(" ".join(m.group(0).split()) for m in TRIAL_ID.finditer(body)))
     if found:
         return Outcome([], f"trial registry ID(s) given: {', '.join(found[:5])}")

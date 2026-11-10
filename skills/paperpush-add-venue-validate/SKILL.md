@@ -25,12 +25,15 @@ its root. This skill edits the venue databases, runner code, and tests, and
 uses the repo's `scripts/` and `tests/`. Working from a pip install? Ask the
 user to clone the repo first, or use temporary mode.
 
-**Temporary mode** (no clone needed): when `paperpush-validate` calls this
-skill for a venue paperpush does not support, or the user wants to try a
-venue's rules without adding it to paperpush, write the entry into a draft
-directory instead of paperpush's databases. Everything goes under
+**Temporary mode** (no clone needed): when `paperpush-validate`,
+`paperpush-prepare-submission`, or `paperpush-transfer` calls this skill for a
+venue paperpush does not support, or the user wants to try a venue's rules
+without adding it to paperpush, write the entry into a draft directory instead
+of paperpush's databases. Everything goes under
 `<scratch>/venue_drafts/<slug>/` (the agent's scratch directory, or
-`$TMPDIR/paperpush_venue_drafts/<slug>/` if there is none):
+`$TMPDIR/paperpush_venue_drafts/<slug>/` if there is none). If the calling
+skill names a draft directory, use that in place of
+`<scratch>/venue_drafts/<slug>/` throughout:
 
 - the venue file is `<scratch>/venue_drafts/<slug>/<slug>.txt` (step 1's `-o`);
 - step 4 is only:

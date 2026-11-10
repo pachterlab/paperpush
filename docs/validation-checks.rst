@@ -8,7 +8,7 @@ sensitive-data scan (see :ref:`submit-validation`).
 
 .. BEGIN VALIDATION CHECK COUNT
 
-PaperPush currently has **153 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
+PaperPush currently has **154 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
 
 .. END VALIDATION CHECK COUNT
 
@@ -171,59 +171,60 @@ Venue rules marked *not implemented* are excluded.
 110. ``guidelines.sizes`` — Files within the guidelines' size limits
 111. ``guidelines.statements`` — Required statements and declarations present
 112. ``guidelines.supplementary`` — Supplementary material bundled and within length as the guidelines ask
-113. ``guidelines.template`` — Page layout matches a compiled copy of the venue's template
-114. ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
-115. ``guidelines.title_page`` — Title page carries the required items
-116. ``guidelines.title_page_file`` — Title page uploaded as a separate file
+113. ``guidelines.table_placement`` — Tables placed where the guidelines ask
+114. ``guidelines.template`` — Page layout matches a compiled copy of the venue's template
+115. ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
+116. ``guidelines.title_page`` — Title page carries the required items
+117. ``guidelines.title_page_file`` — Title page uploaded as a separate file
 
 **Integrity and external sources**
 
-117. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
-118. ``integrity.dois`` — Reference DOIs match the works they cite
-119. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
-120. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
-121. ``integrity.links`` — Links cited in the files are reachable
-122. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
-123. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
-124. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
-125. ``integrity.retractions`` — No cited work has been retracted
-126. ``integrity.sensitive`` — No secrets or private information in the files
-127. ``integrity.unmatched_references`` — References without a DOI match a registered work
+118. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
+119. ``integrity.dois`` — Reference DOIs match the works they cite
+120. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
+121. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
+122. ``integrity.links`` — Links cited in the files are reachable
+123. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
+124. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
+125. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
+126. ``integrity.retractions`` — No cited work has been retracted
+127. ``integrity.sensitive`` — No secrets or private information in the files
+128. ``integrity.unmatched_references`` — References without a DOI match a registered work
 
 **Page layout**
 
-128. ``layout.font`` — Body font matches the guidelines
-129. ``layout.font_size`` — Body text size matches the guidelines
-130. ``layout.language`` — Spelling follows the required English variant (US or UK)
-131. ``layout.line_numbers`` — Lines numbered continuously
-132. ``layout.line_spacing`` — Text is double-spaced
-133. ``layout.margins`` — Page margins match the guidelines
-134. ``layout.page_numbers`` — Pages are numbered
-135. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
-136. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
+129. ``layout.font`` — Body font matches the guidelines
+130. ``layout.font_size`` — Body text size matches the guidelines
+131. ``layout.language`` — Spelling follows the required English variant (US or UK)
+132. ``layout.line_numbers`` — Lines numbered continuously
+133. ``layout.line_spacing`` — Text is double-spaced
+134. ``layout.margins`` — Page margins match the guidelines
+135. ``layout.page_numbers`` — Pages are numbered
+136. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
+137. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
 
 **Prose**
 
-137. ``prose.acronyms`` — Acronyms spelled out at first use
-138. ``prose.brackets`` — Brackets and quotes pair up
-139. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
-140. ``prose.double_spaces`` — No double spaces between words
-141. ``prose.heading_case`` — Headings of the same level capitalized one way
-142. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
-143. ``prose.punctuation_spacing`` — Spacing around punctuation
-144. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
-145. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
-146. ``prose.spelling`` — Common misspellings (codespell)
+138. ``prose.acronyms`` — Acronyms spelled out at first use
+139. ``prose.brackets`` — Brackets and quotes pair up
+140. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
+141. ``prose.double_spaces`` — No double spaces between words
+142. ``prose.heading_case`` — Headings of the same level capitalized one way
+143. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
+144. ``prose.punctuation_spacing`` — Spacing around punctuation
+145. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
+146. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
+147. ``prose.spelling`` — Common misspellings (codespell)
 
 **Rigor and reproducibility**
 
-147. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
-148. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
-149. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
-150. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
-151. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
-152. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
-153. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
+148. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
+149. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
+150. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
+151. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
+152. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
+153. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
+154. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
 
 .. END VALIDATION CHECK LIST
 
@@ -869,6 +870,11 @@ drawing whose lettering can be read), or pictures in a Word file.
 - **Color mode and print size** of attached raster files, and **placement**
   (``placement``, ``manuscript.figures_placement``, ``single_file``): figures
   as separate files, in the manuscript, or after the references.
+- **Table placement** (``guidelines.table_placement``; ``tables.placement``,
+  ``manuscript.tables_placement``): tables as separate files, in the
+  manuscript, or after the references. Tables are found by their captions; in
+  LaTeX that is not compiled, by where the table environments are, and
+  ``endfloat`` counts as placing them at the end.
 
 The lettering of a raster figure is pixels, so its size, typeface, and panel
 labels go to an AI check, with the minimum size given as a fraction of the

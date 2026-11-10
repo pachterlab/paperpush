@@ -289,7 +289,8 @@ def measure_pdf(pages) -> PdfLayout | None:
         has_page_number = False
         segmented = {y: _segments(glyphs, 2.5 * body) for y, glyphs in rows.items()}
         seg_text = lambda seg: "".join(g.text for g in seg).strip()  # noqa: E731
-        edge_digits = [seg for segs in segmented.values() if len(segs) > 1 for seg in (segs[0], segs[-1]) if seg_text(seg).isdigit() and len(seg_text(seg)) <= 4]
+        # LaTeX sets its smaller line numbers a point off the text's baseline, so each is a row of its own.
+        edge_digits = [seg for segs in segmented.values() for seg in {id(s): s for s in (segs[0], segs[-1])}.values() if seg_text(seg).isdigit() and len(seg_text(seg)) <= 4]
         # Line numbers form a column; a page number in a running head stands alone.
         in_column = lambda seg: sum(abs(o[-1].x1 - seg[-1].x1) < 2 or abs(o[0].x0 - seg[0].x0) < 2 for o in edge_digits) >= 3  # noqa: E731
         ys = sorted(segmented)
@@ -310,7 +311,8 @@ def measure_pdf(pages) -> PdfLayout | None:
             if not kept:
                 continue
             row_text = " ".join("".join(g.text for g in seg) for seg in kept).strip()
-            if running and _PAGE_NUMBER.match(re.sub(r"\s+", " ", row_text)):
+            # A digits-only row in the line-number column is a line number, even near the page's edge.
+            if running and _PAGE_NUMBER.match(re.sub(r"\s+", " ", row_text)) and not (len(kept) == 1 and row_text.isdigit() and in_column(kept[0])):
                 has_page_number = True
                 continue
             if len(kept) == 1 and row_text.isdigit() and len(row_text) <= 4:

@@ -243,7 +243,7 @@ def _first_surname(entry: str) -> str:
 
 
 def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | None:
-    from .manuscript import _AUTHOR_YEAR_REF
+    from .manuscript import author_year_starts
 
     text = doc.text
     if text is None:
@@ -272,7 +272,7 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
         cited = {k.strip() for g in groups for k in re.split(r"[,;]", g) if k.strip() in known}
         return Bibliography("labels", refs, cited)
 
-    starts = [m.start() for m in _AUTHOR_YEAR_REF.finditer(tail)]
+    starts = author_year_starts(tail)
     if not starts:
         return None
     entries: list[str] = []

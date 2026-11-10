@@ -129,6 +129,25 @@ def truncate_at_references(text: str, headings: tuple[str, ...] = ()) -> str:
     return text[: match.start()] if match else text
 
 
+def reference_list_span(text: str) -> tuple[int, int] | None:
+    """Where the reference list runs in extracted text: its heading to whatever follows it, or None."""
+    heading = _REFERENCE_HEADING.search(text)
+    if heading is None:
+        return None
+    after = _AFTER_REFERENCES.search(text, heading.end())
+    return heading.start(), after.start() if after else len(text)
+
+
+def without_reference_list(text: str) -> str:
+    """``text`` with its reference list cut out; the back matter after it stays.
+
+    For the checks that read everything the authors wrote: a code-availability
+    statement or a trial number can come after the references.
+    """
+    span = reference_list_span(text)
+    return text if span is None else text[: span[0]] + "\n" + text[span[1] :]
+
+
 def _word_count(text: str) -> int:
     return len(text.split())
 
@@ -496,7 +515,8 @@ def _strip_line_numbers(page: str) -> str:
         if tail is None:
             continue
         digits = tail.group(1)
-        for value in {int(digits[k:]) for k in range(len(digits))}:
+        # Longest reading first: "212" and its suffix "12" climb alike, and a tie keeps the first.
+        for value in dict.fromkeys(int(digits[k:]) for k in range(len(digits))):
             for step, needed in ((1, max(8, written // 2)), (5, max(4, written // 10))):
                 chain = _line_number_chain(tails, start, value, step)
                 indices = sorted(chain)
@@ -1109,6 +1129,9 @@ def _run_in_heading(line: str) -> tuple[str, int] | None:
     match = _RUN_IN_BREAK.match(body)
     if match is None or len(match.group(1).split()) > _HEADING_MAX_WORDS:
         return None
+    # A label is capitalized; "results. We..." is a sentence wrapped at that word.
+    if not next((c.isupper() for c in match.group(1) if c.isalpha()), False):
+        return None
     return match.group(1), len(line) - len(body) + match.end()
 
 
@@ -1264,12 +1287,19 @@ def _text_section_marks(text: str, wordings: dict[str, str]) -> list[tuple[int, 
     return marks
 
 
-def structured_abstract_labels(names: list[str | None]) -> set[int]:
+# An abstract is at most a few hundred words; a longer run of "labels" is the paper itself.
+_MAX_STRUCTURED_ABSTRACT_CHARS = 5000
+
+
+def structured_abstract_labels(names: list[str | None], starts: list[int] | None = None) -> set[int]:
     """Which of ``names`` (canonical headings in order, None for other lines) are a structured abstract's labels.
 
     A structured abstract repeats the body's headings ("Background", "Results"),
     and its labels come straight after the Abstract heading. They run until the
-    first section seen a second time, which starts the body.
+    first section seen a second time, which starts the body. There are at least
+    two of them, and with ``starts`` (each heading's offset) they span no more
+    than an abstract can: a supplement repeating "Methods" does not make the
+    paper before it an abstract.
     """
     start = next((i for i, name in enumerate(names) if name == "Abstract"), None)
     if start is None or not any(names[start + 1 : start + 3]):
@@ -1281,7 +1311,8 @@ def structured_abstract_labels(names: list[str | None]) -> set[int]:
         if not name:
             continue
         if name in seen:
-            return labels
+            too_long = starts is not None and starts[index] - starts[start] > _MAX_STRUCTURED_ABSTRACT_CHARS
+            return labels if len(labels) >= 2 and not too_long else set()
         seen.add(name)
         labels.add(index)
     return set()
@@ -1297,6 +1328,7 @@ _TEX_ENV_ABSTRACT = re.compile(r"\\begin\s*\{\s*abstract\s*\}.*?\\end\s*\{\s*abs
 _TEX_ENV_TABLE = re.compile(r"\\begin\s*\{\s*table\*?\s*\}.*?\\end\s*\{\s*table\*?\s*\}", re.DOTALL)
 _TEX_CAPTION = re.compile(r"\\caption\*?\s*(?:\[[^\]]*\])?\s*\{")
 _TEX_ABSTRACT_MACRO = re.compile(r"\\abstract\s*\{")
+_TEX_ENV_BIBLIOGRAPHY = re.compile(r"\\begin\s*\{\s*thebibliography\s*\}.*?\\end\s*\{\s*thebibliography\s*\}", re.DOTALL)
 
 
 def _tex_group_end(source: str, opening: int) -> int:
@@ -1315,7 +1347,7 @@ def _tex_group_end(source: str, opening: int) -> int:
 
 def _section_spans(marks: list[tuple[int, int, str]], limit: int) -> dict[str, list[tuple[int, int]]]:
     """The ``(start, end)`` of each known section, by canonical name; an abstract keeps its labels."""
-    labels = structured_abstract_labels([name for _, _, name in marks])
+    labels = structured_abstract_labels([name for _, _, name in marks], [start for start, _, _ in marks])
     spans: dict[str, list[tuple[int, int]]] = {}
     for index, (start, _, name) in enumerate(marks):
         if index in labels:
@@ -1393,6 +1425,11 @@ def words_excluding(path: Path, wordings: dict[str, str], parts: dict[str, str],
         elif kind == "@references":
             if not has_references:
                 missing.append(part)
+            elif whole and is_tex:
+                # A whole-document count runs past the bibliography, so it has to be cut out.
+                spans += [m.span() for m in _TEX_ENV_BIBLIOGRAPHY.finditer(source)]
+            elif whole:
+                spans.append(reference_list_span(source))
         elif kind == "@front":
             if marks or abstract:
                 spans.append((0, min([marks[0][0]] * bool(marks) + [a for a, _ in abstract])))
@@ -1479,6 +1516,38 @@ def _cited_bib_entries(main_tex: Path, source: str) -> list[str] | None:
     return used or None
 
 
+# A wrapped line opening with a journal and its volume ("Nature 12, 1-9"), not an entry.
+_JOURNAL_VOLUME_LINE = re.compile(r"[A-Z][\w.&]*(?:[ \t]+[A-Z][\w.&]*){0,4}[ \t]+\d{1,4}[ \t]*[,:(;]")
+_ENTRY_YEAR = re.compile(r"\b(?:19|20)\d{2}[a-z]?\b")
+_ENTRY_CLOSED = re.compile(r"(?:[.)\]]|\d|https?://\S+|doi\S*)\s*$", re.IGNORECASE)
+
+
+def author_year_starts(tail: str) -> list[int]:
+    """Where each entry of an author-year reference list starts in ``tail``; [] when none has a year.
+
+    Extraction wraps entries over lines, and the year can be on any of them, so
+    an entry ends only once it holds a year and a line closes it. A line then
+    starts the next entry if it opens with a capital and is not a journal and
+    volume. A piece with no year of its own goes back to the entry before.
+    """
+    starts: list[int] = []
+    offset = 0
+    has_year = closed = False
+    for line in tail.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped:
+            upper = stripped[0].isupper() and not _JOURNAL_VOLUME_LINE.match(stripped)
+            if upper and (not starts or (has_year and (closed or _AUTHOR_YEAR_REF.match(stripped)))):
+                starts.append(offset + len(line) - len(line.lstrip()))
+                has_year = False
+            has_year = has_year or bool(_ENTRY_YEAR.search(stripped))
+            closed = bool(_ENTRY_CLOSED.search(stripped))
+        offset += len(line)
+    bounds = starts + [len(tail)]
+    kept = [a for i, (a, b) in enumerate(zip(bounds, bounds[1:])) if i == 0 or _ENTRY_YEAR.search(tail[a:b])]
+    return kept if _ENTRY_YEAR.search(tail) else []
+
+
 def _numbered_starts(tail: str) -> list[re.Match[str]]:
     """The numbered-entry matches of a reference list, or [] when it is not a numbered list.
 
@@ -1525,12 +1594,12 @@ def reference_count(path: Path) -> int | None:
         # entry can hide its number from the line-anchored pattern.
         highest = max(int(m.group(1) or m.group(2)) for m in numbered)
         return max(highest, len(numbered)) if highest <= len(numbered) * 3 else len(numbered)
-    return len(_AUTHOR_YEAR_REF.findall(tail)) or None
+    return len(author_year_starts(tail)) or None
 
 
 # Where a reference list ends in extracted text: a figure/table caption or a
 # heading that commonly follows it.
-_AFTER_REFERENCES = re.compile(r"^\s*" + _MD_HEADING_OPEN + r"(?:(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?\.?|Table)\s+S?\d+\s*[.:|]|Figure\s+legends?\b|Tables?\s*$|Supplementary\s+(?:information|materials?)\b|Appendix\b|Methods\s*$)", re.IGNORECASE | re.MULTILINE)
+_AFTER_REFERENCES = re.compile(r"^\s*" + _MD_HEADING_OPEN + r"(?:(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?\.?|Table)\s+S?\d+\s*[.:|]|Figure\s+legends?\b|Tables?\s*$|Supplementary\s+(?:information|materials?)\b|Appendix\b|(?:Online\s+|Materials\s+and\s+)?Methods\s*$|(?:(?:Data|Code|Software|Materials?)(?:(?:\s*,\s*|\s+and\s+)\w+)*\s+availability|Acknowledge?ments?|Author\s+contributions?|Funding|Competing\s+interests?|Conflicts?\s+of\s+interest|(?:Clinical\s+)?Trial\s+registration)\b\s*(?:\*\*|__)?\s*(?:[:.](?:\s|$)|$)|(?:Ethics(?:\s+statement)?|Declarations?|Additional\s+information)\s*$)", re.IGNORECASE | re.MULTILINE)
 _BIB_ITEM = re.compile(r"\\bibitem\s*(?:\[[^\]]*\])?\s*\{[^}]*\}(.*?)(?=\\bibitem|\\end\s*\{\s*thebibliography|$)", re.DOTALL)
 
 
@@ -1565,7 +1634,7 @@ def reference_entries(path: Path) -> list[str] | None:
     end = _AFTER_REFERENCES.search(tail)
     if end:
         tail = tail[: end.start()]
-    starts = [m.start() for m in _numbered_starts(tail)] or [m.start() for m in _AUTHOR_YEAR_REF.finditer(tail)]
+    starts = [m.start() for m in _numbered_starts(tail)] or author_year_starts(tail)
     if not starts:
         return None
     bounds = starts + [len(tail)]

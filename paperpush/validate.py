@@ -832,7 +832,7 @@ def _retraction_issues(venue: Venue, values: dict[str, str], retracted: list | N
     """
     _upload_paths_or_skip(venue, values)
     if retracted is None:
-        raise Unchecked("the reference DOI lookup did not finish")
+        raise Unchecked("the reference lookups did not finish")
     return _with_coverage(_findings_to_issues(retracted), coverage)
 
 
@@ -1771,8 +1771,10 @@ def validate_report(
         retracted: list = []
         ref_ctx = _ReferenceContext()
         dois = bar.run("Reference DOIs", checks.run, "integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values, retracted, ref_ctx.resolved, ref_ctx.coverage)
-        bar.run("Reference search", checks.run, "integrity.unmatched_references", unmatched_title, integrity, _unmatched_reference_issues, venue, values, ref_ctx, retracted)
-        checks.run("integrity.retractions", retractions_title, integrity, _retraction_issues, venue, values, None if dois.status == report.UNCHECKED else retracted, ref_ctx.coverage)
+        unmatched = bar.run("Reference search", checks.run, "integrity.unmatched_references", unmatched_title, integrity, _unmatched_reference_issues, venue, values, ref_ctx, retracted)
+        # With no DOI to look up, the title search is all the retraction check has to go on.
+        looked_up = dois.status != report.UNCHECKED and (unmatched.status != report.UNCHECKED or ref_ctx.coverage.get("total"))
+        checks.run("integrity.retractions", retractions_title, integrity, _retraction_issues, venue, values, retracted if looked_up else None, ref_ctx.coverage)
         checks.run("integrity.reference_versions", versions_title, integrity, _reference_version_issues, venue, values, ref_ctx)
         for task in ref_ctx.ai_tasks:
             checks.needs_ai(task)

@@ -62,7 +62,7 @@ from .manuscript import headings as manuscript_headings
 from .manuscript import normalize_heading, pages_before_references, reference_count, section_word_counts, structured_abstract_labels, title_page_text, total_pages, total_words, words_before_references, words_excluding
 from .report import NOT_APPLICABLE, NOT_IMPLEMENTED
 from .requirements import ManuscriptRequirements, get_requirements, heading_aliases, resolve
-from .validate import BYTES_PER_MB, ERROR, WARNING, Checks, Issue, NotApplicable, Outcome, unchecked
+from .validate import BYTES_PER_MB, ERROR, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked, unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -731,7 +731,9 @@ def _section_order_issues(field: Field, path: Path, reqs: ManuscriptRequirements
     aliases = {**heading_aliases("statements"), **heading_aliases("sections")}
     # A structured abstract's labels are not the body's sections.
     sections = {wording: canonical for canonical, wordings in heading_aliases("sections").items() for wording in wordings}
-    labels = structured_abstract_labels([sections.get(re.sub(r"^\d+\W*", "", heading)) for heading in found])
+    # An abstract comes before the references, so a repeat after them cannot end one.
+    refs_at = next((i for i, heading in enumerate(found) if re.sub(r"^\d+\W*", "", heading) in ("references", "bibliography")), len(found))
+    labels = structured_abstract_labels([sections.get(re.sub(r"^\d+\W*", "", heading)) if index < refs_at else None for index, heading in enumerate(found)])
     found = [heading for index, heading in enumerate(found) if index not in labels]
     positions: list[tuple[str, int]] = []
     for name in order:
@@ -781,7 +783,7 @@ HANDLED_RULES = frozenset(
         "sections.required", "sections.order", "sections.combined_allowed", "sections.max_words",
         "statements.required", "statements.ai_use_if_used", "statements.ai_use_locations", "statements.ai_use_cover_letter",
         "statements.ai_copyediting_exempt", "statements.ai_authorship_prohibited",
-        "figures.formats", "figures.min_dpi", "figures.min_dpi_line_art", "figures.min_dpi_combination",
+        "figures.formats", "figures.min_dpi", "figures.min_dpi_line_art",
         "figures.max_file_size_mb", "figures.max_count", "figures.single_column_width_mm", "figures.double_column_width_mm",
         "figures.max_width_mm", "figures.max_height_mm", "figures.color_mode", "figures.min_font_size_pt",
         "figures.max_font_size_pt", "figures.font", "figures.legend_max_words", "figures.legends_location",
@@ -857,6 +859,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     run("guidelines.reference_style", "Citation style matches the guidelines (numbered or author-year)", _reference_style_check, venue, reqs, values)
     run("guidelines.reference_list", "Reference entries follow the guidelines' rules on DOIs, preprints, and unpublished work", _reference_list_check, venue, reqs, values)
     run("guidelines.counts", "Number of figures, tables, and supplementary files within the guidelines' limits", _counts_check, venue, reqs, values)
+    run("guidelines.table_placement", "Tables placed where the guidelines ask", _table_placement_check, venue, reqs, values)
     run("guidelines.supplementary", "Supplementary material bundled and within length as the guidelines ask", _supplementary_check, venue, reqs, values)
     run("guidelines.cover_letter", "Cover letter provided and within length", _cover_letter_check, venue, reqs, values)
     run("guidelines.template", "Page layout matches a compiled copy of the venue's template", _template_check, venue, reqs, values)
@@ -1026,6 +1029,71 @@ def _reference_list_check(venue: Venue, reqs: ManuscriptRequirements, values: di
     r = reqs.references
     _need(r.doi_required or r.preprints_allowed is False or r.unpublished_allowed is False, "the guidelines put no DOI, preprint, or unpublished-work rule on the reference list")
     return _per_manuscript(venue, values, _reference_list_issues, reqs)
+
+
+def _manuscript_tables(path: Path) -> tuple[list[tuple[int, int]], int | None]:
+    """Where the main tables sit in a manuscript: ``(number, offset)`` of each, and the references' offset or None.
+
+    Read from the captions, so a layout table on a title page is not taken for
+    one. A LaTeX source compiled to a PDF is read as printed; otherwise by where
+    its table environments are, and the endfloat package sends those to the end.
+    """
+    from . import citation_check, document
+    from .manuscript import _REFERENCE_HEADING, _TEX_BIBLIOGRAPHY, _TEX_REFERENCE_SECTION
+
+    doc = document.get(path)
+    if doc.is_tex and doc.pdf is None:
+        source = doc.tex_source
+        if source is None:
+            raise Unchecked(f"could not read the LaTeX source of {path.name}")
+        found = citation_check.tex_mentions(source)
+        marks = [m.start() for m in (_TEX_BIBLIOGRAPHY.search(source), _TEX_REFERENCE_SECTION.search(source)) if m]
+        refs_at = -1 if re.search(r"\\usepackage\s*(?:\[[^\]]*\])?\s*\{[^}]*\bendfloat\b", source) else min(marks, default=None)
+    else:
+        text = doc.text
+        if text is None:
+            raise Unchecked(f"could not read {path.name} as text")
+        found = citation_check.mentions(text)
+        heading = _REFERENCE_HEADING.search(text)
+        refs_at = heading.start() if heading else None
+    return [(m.number, m.pos) for m in found if m.series == "table" and m.caption], refs_at
+
+
+def _table_placement_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> Outcome:
+    """Whether the tables are in separate files, in the manuscript, or after the references, as the guidelines ask."""
+    placement = reqs.tables.placement or reqs.manuscript.tables_placement
+    _need(placement, "the guidelines say nowhere in particular for tables to go")
+    files = _manuscript_paths(venue, values)
+    _need(files, "no manuscript file to read")
+    field, path = files[0]
+    table_fields = _fields_for(venue, "tables")
+    attached = [(fld, p) for fld in table_fields for p in _existing(_paths(fld, values))]
+    if placement == "combined_file" and len(attached) > 1:
+        return Outcome([Issue(WARNING, attached[0][0].id, f"{len(attached)} table files attached; the author guidelines ask for all tables combined into one document")])
+    if placement in ("separate", "separate_files", "combined_file") and attached:
+        return Outcome([], f"{len(attached)} table file(s) attached")
+    tables, refs_at = _manuscript_tables(path)
+    if placement in ("separate", "separate_files", "combined_file"):
+        if tables and table_fields:
+            ask = "as a separate file" if placement != "combined_file" else "combined into one document"
+            return Outcome([Issue(WARNING, field.id, f"the tables are only in {path.name}; the author guidelines ask for each table {ask}")])
+        return Outcome([], f"{len(tables)} table(s) in the manuscript; the form has no table upload" if tables else "")
+    at_end = placement in ("end", "end_of_manuscript")
+    if not tables:
+        _need(attached, "no tables found in the manuscript or attached")
+        where = "at the end of the manuscript file" if at_end else "in the manuscript file"
+        return Outcome([Issue(WARNING, attached[0][0].id, f"no tables found in {path.name}; the author guidelines ask for tables {where} (attaching them separately may not be enough)")])
+    detail = f"{len(tables)} table(s) in the manuscript"
+    if placement == "end_or_inline":
+        return Outcome([], detail)
+    if refs_at is None:
+        return Outcome([unchecked(field.id, f"could not find the reference list in {path.name}, so the tables' position was not checked")], detail)
+    before = [number for number, pos in tables if pos < refs_at]
+    if at_end and before:
+        return Outcome([Issue(WARNING, field.id, f"Table {', '.join(map(str, before))} comes before the references in {path.name}; the author guidelines ask for tables at the end of the manuscript")], detail)
+    if not at_end and not before:
+        return Outcome([Issue(WARNING, field.id, f"every table comes after the references in {path.name}; the author guidelines ask for tables in the text")], detail)
+    return Outcome([], detail)
 
 
 def _counts_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:

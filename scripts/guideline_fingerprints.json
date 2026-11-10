@@ -164,6 +164,11 @@
     "recorded": "2026-10-23",
     "sha256": "77d5bace9019e8d8bf9679e93dabe3ed162ac7a6dc086968b8b5764dfaa56837"
   },
+  "https://journals.myesr.org/eur-radiol/for-authors/general-information/": {
+    "chars": 241,
+    "recorded": "2026-11-10",
+    "sha256": "f3abffee129566d6ad46dbfa64f2133da6ec6852b305352f5149c2a33f4bb9d5"
+  },
   "https://journals.myesr.org/eur-radiol/for-authors/mandatory-files/": {
     "chars": 1387,
     "recorded": "2026-10-23",
@@ -173,6 +178,21 @@
     "chars": 814,
     "recorded": "2026-10-23",
     "sha256": "5ca931986e2add13d5450b6e5f3e6e6a0a7f2857c62864ad81022b69ca90134d"
+  },
+  "https://journals.myesr.org/eur-radiol/for-authors/springer-open-choice/": {
+    "chars": 511,
+    "recorded": "2026-11-10",
+    "sha256": "083a9e5f7d0ac1ac19b6a3d4781a3117ec206ff3bc7c4ceeb61351ba328e1533"
+  },
+  "https://journals.myesr.org/eur-radiol/publication-ethics/": {
+    "chars": 12694,
+    "recorded": "2026-11-10",
+    "sha256": "bc12db4158a04ccd9d7013b75c0aed28c8ffb8fbde8cac9b6d09b68abc934c0c"
+  },
+  "https://journals.myesr.org/eur-radiol/wp-content/uploads/sites/2/2026/02/Disclosure-Paragraph-template_NEW.docx": {
+    "chars": 1650,
+    "recorded": "2026-11-10",
+    "sha256": "83f00112c599df00dc247647ba51faebfeee6e9b17294640be556e3122267e5d"
   },
   "https://journals.plos.org/plosbiology/s/figures": {
     "chars": 27508,

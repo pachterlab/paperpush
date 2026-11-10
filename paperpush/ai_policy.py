@@ -35,8 +35,10 @@ from .validate import ERROR, WARNING, Issue, NotApplicable, Outcome
 # ordinary words or people's names (Claude, Gemini, Mistral, Copilot) only count
 # with a capital letter, and only beside a use (see _DISCLOSURE).
 _TOOL = (
-    r"(?:\b(?i:chat\s?gpt|gpt-?(?:3(?:\.5)?|4(?:o|\.\d)?|4o-mini|5)|openai|anthropic|deepseek|perplexity(?:\.ai)?|grammarly|quillbot|deepl|writefull|paperpal|trinka|midjourney|dall[-·]?e(?:\s?\d)?|stable\s+diffusion|scispace|elicit)\b"
-    r"|\b(?:Claude|Gemini|Bard|Copilot|LLaMA|Llama(?:\s?\d)?|Mistral|Qwen|Grok)\b"
+    r"(?:\b(?i:chat\s?gpt|gpt-?(?:3(?:\.5)?|4(?:o|\.\d)?|4o-mini|5)|openai|deepseek|perplexity\.ai|grammarly|quillbot|deepl|writefull|paperpal|trinka|midjourney|dall[-·]?e(?:\s?\d)?|stable\s+diffusion|scispace)\b"
+    r"|\b(?:Claude|Gemini|Bard|Copilot|LLaMA|Llama(?:\s?\d)?|Mistral|Qwen|Grok|Elicit|Perplexity\s+AI)\b"
+    # "Anthropic" alone, not an adjective ("Anthropic disturbance").
+    r"|\bAnthropic\b(?!\s+[a-z])"
     r"|\bLLMs?\b"
     r"|\b(?i:large\s+language\s+models?|generative\s+(?:ai|artificial\s+intelligence)|gen-?ai|(?:ai|artificial\s+intelligence)[- ](?:assisted|based|powered|driven)\s+(?:tools?|technolog(?:y|ies)|writing|language|editing|software|assistan(?:ts?|ce))|(?:ai|artificial\s+intelligence)\s+(?:tools?|chat\s?bots?|assistants?|writing\s+(?:tools?|assistants?)|language\s+models?)|chat\s?bots?)\b)"
 )
