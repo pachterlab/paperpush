@@ -31,6 +31,9 @@ and only tiers 1 and 2 are edited.
   directory, use the `<venue>.sub.txt` in it. With no `.sub`, run
   `paperpush-validate` instead: this skill needs the `.sub` to know which
   files belong to the submission.
+- An earlier validation result, if the user gave one (a `--json` file or a
+  saved report) or this conversation already ran one. Step 1a decides
+  whether to reuse it.
 - **Whether to make edits at all.** If they asked "what can be fixed?", do a
   dry run: steps 1–3 only, then report the plan.
 - Flags they passed to validate before (`--initial-submission`,
@@ -46,13 +49,67 @@ their relative paths, for files in subdirectories). One backup per run,
 taken before round 1; later rounds don't back up again. Never put the backups
 where the `.sub` points, and never overwrite an earlier backup.
 
-## Step 1: validate and read the JSON
+## Step 1: get round 1's validation results
+
+### 1a: reuse an earlier run if there is one and it is still current
+
+Validation is slow, and the AI checks are the slowest part. Don't redo a run
+that is already done. Look for one in this order:
+
+1. **A file the user gave you**: a `--json` report, or a saved report
+   (`.txt`, `.md`, `.html`, `.pdf` from `-o`), with any `--ai-results` file
+   that went with it.
+2. **A run earlier in this conversation** on this `.sub` (for example
+   `paperpush-validate` just ran): its `--json` file and AI verdicts.
+
+Every report starts with how it was made. The JSON's first keys are
+`command` (the `paperpush validate ...` command as typed), `cwd` (where it
+ran), `generated` (when, ISO 8601), and `inputs` (the `.sub` and each upload
+it names, each with `path`, `size`, `modified`, and `sha256`). A saved report
+has `Command:` and `Generated:` lines under its title. (MCP:
+`validate_subfile` returns `generated` and `inputs`, not `command`.)
+
+Use the earlier run as round 1 only if all of these hold:
+
+- **Same submission.** It was run on this `.sub` (the `.sub` path in
+  `command`/`inputs`, or the report's `File:` line).
+- **Nothing has changed since.** For a JSON report, compute the SHA-256 of
+  each file in `inputs` now (`shasum -a 256 <file>`); every one must match,
+  and no file is missing. Also check the sources behind them that step 2
+  would edit (a `.tex`, its `\input` files, the `.bib`, the `.docx` behind
+  a PDF): none may be modified after `generated`. A saved report has no
+  hashes, so compare the modification time of the `.sub`, each file it
+  names, and those sources against its `Generated:` line.
+- **The flags are known.** Take them from `command`, and drop its output
+  options (`--json`, `-o`, `--ai-tasks`, `--ai-results`, `--overwrite`,
+  display options such as `--show-errors-only`). If the user now asks for
+  different flags, run validation again.
+- **The details are there.** You need each issue's check id, field, and
+  message. A JSON report has them. A saved report with `--show-errors-only`,
+  `--hide-warnings`, or `--hide-unchecked` left some out: run validation
+  again.
+
+When a condition fails, say which (for example "manuscript.tex changed
+after the report was generated") and run validation fresh (1b). A report
+with no `Command:`/`Generated:` header came from an older paperpush. You
+can't tell whether it is current, so run it again.
+
+When the earlier run is still current, tell the user you're reusing it and
+from when. Use its checks as round 1. If it already has AI verdicts (its
+`ai` says "agent results from ..."), use them. If its AI checks are still
+`needs_ai`, do them now (as below), with
+`paperpush validate <abs .sub> [the flags] --ai-only --ai-tasks <scratch>/tasks.json`,
+which skips the deterministic checks.
+
+### 1b: otherwise, validate
 
 ```
 paperpush validate <abs .sub> --json <scratch>/round1.json --ai-tasks <scratch>/tasks.json [the user's flags]
 ```
 
 (MCP: `validate_subfile(subfile)`; its `checks` carry the same issues.)
+
+### Reading the results
 
 In `round1.json`, `checks[]` gives each check's `id`, `status` (`failed`,
 `warning`, `unchecked`, `needs_ai`, `passed`, ...) and `issues[]`, each with

@@ -98,6 +98,7 @@ def check_catalog() -> dict[str, str]:
         "ai.reference_source.*": "Each cited source supports the claims that cite it (only run with --reference-check-extended)",
         "ai.reference_primary.*": "Each cited source is the original source of the claims that cite it (only run with --reference-check-extended)",
         "ai.reference_journal.*": "Each cited journal is correctly identified and indexed (only run with --reference-check-extended)",
+        "ai.figure_reproduction.*": "Each main figure is reproduced by rerunning the authors' code in a fresh environment (only run with --reproduce-figures)",
     })
     return {check_id: title for check_id, title in catalog.items() if not check_id.startswith("not_implemented.")}
 
@@ -124,9 +125,10 @@ def check_list(catalog: dict[str, str]) -> str:
              "Each item below is a distinct report check ID, and the name to give",
              "``--disable-<ID>`` to turn it off (see :ref:`vc-disable`). A check may be not",
              "applicable, unable to run, or require AI; which ones run depends on the",
-             "venue, files, and options. The three ``.*`` entries are families with one numbered",
-             "check per cited reference when ``--reference-check-extended`` is used; disable them",
-             "without the ``.*``. Venue rules marked *not implemented* are excluded.", ""]
+             "venue, files, and options. The ``.*`` entries are families with one numbered",
+             "check per cited reference when ``--reference-check-extended`` is used, or per main",
+             "figure when ``--reproduce-figures`` is used; disable them without the ``.*``.",
+             "Venue rules marked *not implemented* are excluded.", ""]
     for prefix, ids in by_group.items():
         lines.extend([f"**{groups.get(prefix, prefix.replace('_', ' ').title())}**", ""])
         for check_id in ids:

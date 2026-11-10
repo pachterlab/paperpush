@@ -321,7 +321,8 @@ Arguments
    Instead of printing the report, open the ``.sub`` in the paperpush web page
    on this computer and run the checks there. You can fix fields and
    re-validate, and every edit is saved to the file. With ``--ai`` the AI checks
-   run too. ``--reference-check-extended`` is not available with ``--web``.
+   run too. ``--reference-check-extended`` and ``--reproduce-figures`` are not
+   available with ``--web``.
    Needs ``pip install 'paperpush[web]'``.
 
 ``--disable-<CHECK>``
@@ -419,7 +420,13 @@ Arguments
    go to stderr, so stdout is only the JSON), or with ``FILE`` also write the
    JSON there. Each check has ``id``, ``title``, ``category``, ``status``, and
    ``issues``; each issue has ``level``, ``field``, and ``message``. The
-   ``paperpush-fix`` skill reads it.
+   report starts with how it was made: ``command`` (the command as typed),
+   ``cwd``, ``generated`` (when it ran), and ``inputs`` (the ``.sub`` and
+   each upload, with ``path``, ``size``, ``modified``, and ``sha256``), so
+   you can tell later whether the files have changed since. Reports saved
+   with ``-o`` have ``Command:`` and ``Generated:`` lines under the title.
+   The ``paperpush-fix`` skill reads it, and reuses it as its first round
+   when nothing has changed.
 
 ``--ai-tasks FILE``
    Write the AI checks to ``FILE`` as JSON -- each with an id, instructions,

@@ -143,6 +143,19 @@ def _no_network_reference_search(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_network_code_repositories(monkeypatch):
+    """Keep the suite offline: the GitHub API and NCBI accession lookups "do not answer".
+
+    ``rigor.code_availability`` opens linked GitHub repositories and
+    ``rigor.data_accessions`` looks up GEO/BioProject accessions by default.
+    Tests of those lookups patch ``reproducibility_check._get_json`` themselves.
+    """
+    import paperpush.reproducibility_check as reproducibility_check
+
+    monkeypatch.setattr(reproducibility_check, "_get_json", lambda *a, **k: (0, None))
+
+
+@pytest.fixture(autouse=True)
 def _no_network_openalex(monkeypatch):
     """Keep the suite offline: OpenAlex (pick-venue, find-reviewers) is "unreachable".
 

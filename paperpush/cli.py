@@ -1384,7 +1384,8 @@ checks that run without AI:
     misidentified. Blinding, randomization, sample size, exclusions, and sex
     are reported for animal and human studies. RRIDs resolve, test statistics
     agree with their p values (statcheck), and a clinical trial gives a
-    registry ID.
+    registry ID. Code behind the analysis is linked, archived, licensed, and
+    declares its environment, and GEO and BioProject accessions are public.
 
 checks that require AI (--ai, or an agent via --ai-tasks / --ai-results; add
 --ai-only to run just these):
@@ -1397,7 +1398,9 @@ checks that require AI (--ai, or an agent via --ai-tasks / --ai-results; add
   spelling, grammar, and tense; declarations, ethics approval, and consent;
   and the venue's free-text guideline rules. --reference-check-extended also checks
   that each cited source supports the claims that cite it and is their
-  original source.
+  original source. When code is linked, each figure panel is traced to the
+  code and public data that draw it; --reproduce-figures also has an agent
+  rerun the code for each figure and compare the result with the submission.
 
 Guideline rules no check reads are listed as 'not implemented'. See
 'paperpush requirements VENUE' for a venue's rules.
@@ -1523,6 +1526,12 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     rerun = file_inputs.validate_command(requested_venue, files, subfile=args.subfile or "")
     if getattr(args, "reference_check_extended", False):
         rerun += " --reference-check-extended"
+    if getattr(args, "reproduce_figures", False):
+        rerun += " --reproduce-figures"
+        if getattr(args, "reproduce_minutes", 30) != 30:
+            rerun += f" --reproduce-minutes {args.reproduce_minutes}"
+        if getattr(args, "reproduce_download_gb", 5.0) != 5.0:
+            rerun += f" --reproduce-download-gb {args.reproduce_download_gb:g}"
     for flag in ("publisher", "issn", "journal"):
         if getattr(args, flag, None):
             rerun += f" --{flag} {shlex.quote(getattr(args, flag))}"
@@ -1545,6 +1554,15 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     if getattr(args, "reference_check_extended", False) and getattr(args, "ai", False):
         print("error: --reference-check-extended cannot be combined with --ai: the API model cannot read the cited papers; use --ai-tasks FILE so an agent can", file=sys.stderr)
         return 1
+    if getattr(args, "reproduce_figures", False) and no_manuscript:
+        print(f"error: --reproduce-figures needs manuscript checks, so it cannot be combined with {without}", file=sys.stderr)
+        return 1
+    if getattr(args, "reproduce_figures", False) and getattr(args, "ai", False):
+        print("error: --reproduce-figures cannot be combined with --ai: the API model cannot run code; use --ai-tasks FILE so an agent can", file=sys.stderr)
+        return 1
+    if getattr(args, "reproduce_minutes", 30) <= 0 or getattr(args, "reproduce_download_gb", 5.0) <= 0:
+        print("error: --reproduce-minutes and --reproduce-download-gb must be greater than 0", file=sys.stderr)
+        return 1
     if (disable or enable) and getattr(args, "web", False):
         print("error: --disable-* and --enable-* are not supported with --web", file=sys.stderr)
         return 1
@@ -1553,6 +1571,9 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         return 1
     if getattr(args, "reference_check_extended", False) and getattr(args, "web", False):
         print("error: --reference-check-extended is not supported with --web; use it with --ai-tasks so an agent can read the cited papers", file=sys.stderr)
+        return 1
+    if getattr(args, "reproduce_figures", False) and getattr(args, "web", False):
+        print("error: --reproduce-figures is not supported with --web; use it with --ai-tasks so an agent can run the code", file=sys.stderr)
         return 1
 
     if getattr(args, "web", False) and files_only:
@@ -1596,9 +1617,14 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             files_only=files_only,
             notes=notes,
             reference_check_extended=getattr(args, "reference_check_extended", False),
+            reproduce_figures=getattr(args, "reproduce_figures", False),
+            reproduce_minutes=getattr(args, "reproduce_minutes", 30),
+            reproduce_download_gb=getattr(args, "reproduce_download_gb", 5.0),
             **check_flags,
             ai_only=ai_only,
         )
+    result.command = shlex.join(["paperpush", *getattr(args, "raw_argv", sys.argv[1:])])
+    result.cwd = os.getcwd()
     alt = getattr(args, "alt_color", False)
     hide = report_mod.hidden_statuses(
         errors_only=getattr(args, "errors_only", False),
@@ -2878,6 +2904,10 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="queue agent reviews of journal indexing, whether each cited source supports the nearby claims, and whether it is their original source; use --ai-tasks to hand these reviews to an agent; not available with --ai, whose model cannot read the cited papers (can require reading every cited paper)",
     )
+    reproduce_group = p_validate.add_argument_group("figure reproduction", "Queue one agent task per main figure: rebuild the code's environment from the repository's own dependency files, rerun the code that draws the figure, and compare the result with the submitted figure. Each figure is reported as reproduced, differs, failed, or not attempted (controlled-access data, over budget, missing hardware). Hand the tasks to an agent with --ai-tasks; the agent runs the authors' code on this computer. Not available with --ai or --web.")
+    reproduce_group.add_argument("--reproduce-figures", dest="reproduce_figures", action="store_true", help="queue the figure-reproduction tasks (needs a code repository, archive, or attached code)")
+    reproduce_group.add_argument("--reproduce-minutes", dest="reproduce_minutes", type=int, default=30, metavar="N", help="run-time budget per figure, in minutes (default 30)")
+    reproduce_group.add_argument("--reproduce-download-gb", dest="reproduce_download_gb", type=float, default=5.0, metavar="GB", help="download budget per figure, in GB (default 5)")
     p_validate.add_argument(
         "-o",
         "--output",
@@ -3256,7 +3286,10 @@ def _expand_check_flags(argv: list[str]) -> list[str]:
 @_validate
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(_expand_check_flags(sys.argv[1:] if argv is None else argv))
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    args = parser.parse_args(_expand_check_flags(raw_argv))
+    # The command as typed, recorded in validate reports.
+    args.raw_argv = raw_argv
 
     configure_logging(verbosity=getattr(args, "verbose", 0), quiet=getattr(args, "quiet", False))
     logger.debug("dispatch: command=%r", getattr(args, "command", None))

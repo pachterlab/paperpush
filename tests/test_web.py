@@ -950,6 +950,16 @@ def test_validate_web_refuses_reference_check_extended(tmp_path, monkeypatch, se
     assert served == []
 
 
+def test_validate_web_refuses_reproduce_figures(tmp_path, monkeypatch, served, capsys):
+    from paperpush.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "biorxiv.sub").write_text(_filled_template())
+    assert main(["validate", "biorxiv.sub", "--web", "--reproduce-figures"]) == 1
+    assert "--reproduce-figures is not supported with --web" in capsys.readouterr().err
+    assert served == []
+
+
 # --- shared forms ------------------------------------------------------------
 
 SHARED_JS = STATIC / "shared.js"

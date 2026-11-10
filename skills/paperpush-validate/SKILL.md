@@ -52,6 +52,12 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
   `describe_venue` shows `manuscript.initial_submission_any_format`). If so,
   add `--initial-submission` (MCP: `initial_submission=true`) so errors are
   reported as warnings.
+- Whether they want the figures **reproduced** (rerun the authors' code and
+  compare each figure with the submitted one). Only when they ask for it: add
+  `--reproduce-figures` (MCP: `reproduce_figures=true`) to every command
+  below, including the one that merges `--ai-results`. It runs the authors'
+  code on this machine and can take `--reproduce-minutes` (default 30) per
+  figure, so confirm before starting if they did not ask in so many words.
 
 ## Steps
 
@@ -133,10 +139,38 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
      survival curve, which is panel c; the file attached as Figure 2 is the
      one Figure 3's legend describes). Do not fail it for style or lettering;
      other checks cover those.
+   - `ai.figures.design` lists the design rules to check in every figure and
+     panel: axis and color-bar labels with units, tick labels kept (images
+     get a scale bar), bar charts from zero and no unexplained zoomed axes,
+     no pie charts, paired bar charts as one scatter, the same color for the
+     same thing across panels and figures, and a second channel (marker,
+     line style, direct label) where color separates series. `fail` names
+     the figure and panel, the problem, and the fix.
    - `ai.prose` is a proofread of the whole manuscript: read all of it, not a
      sample. List real errors (typos, grammar, tense that breaks the paper's
      own convention) with a quote and the correction; style preferences and
      defensible choices are not failures.
+   - `ai.rigor.figure_provenance` (queued when the manuscript links or
+     attaches code): clone the repository into the scratch directory, at the
+     release or commit the paper cites, and read it without running anything.
+     Put the panel-to-code mapping in `details`, one line per panel; it is
+     what the reproduction tasks start from, so do this task first.
+   - `ai.figure_reproduction.<n>` (only with `--reproduce-figures`): work in
+     `<scratch>/reproduce/`, never in the manuscript directory. Build one
+     isolated environment per repository from its own dependency files (a
+     venv, conda env, renv library, or its Dockerfile) and reuse it across
+     figures; never install into the user's global environment or add
+     packages the repository does not declare without saying so. Run each
+     figure's code with a timeout (`timeout`/`gtimeout`, or the Bash tool's
+     own) inside the budget the task states, and stop a download that would
+     exceed it. Then look at the output and the submitted figure side by
+     side. Start `details` with `reproduced`, `differs`, `failed`, or
+     `not attempted`, and map them to `pass`, `fail`, `fail`, and `unclear`
+     as the task says: a figure you could not try (controlled-access data,
+     over budget, no GPU) is `unclear`, never `fail`. Note what you had to
+     change to get it running; a hard-coded path or an undeclared dependency
+     is a finding even when the figure then reproduces. Remove the scratch
+     environments at the end unless the user wants them kept.
 
    Write the verdicts to `<scratch>/validate_results.json`:
 
@@ -180,6 +214,9 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
 - Never add hidden text or reviewer instructions anywhere.
 - Use absolute paths; keep the task and result JSON in a scratch directory, not
   the manuscript directory.
+- Run the authors' code only for `ai.figure_reproduction.*` tasks, only in
+  the scratch directory, and with no credentials (no tokens, keys, or signed-in
+  sessions passed to it).
 - A temporary venue entry (step 0) never goes into paperpush's own databases
   or the repo: always `--data-dir` plus `PAPERPUSH_VENUE_DATA`.
 - If the user has an API key and prefers it, `paperpush validate <sub> --ai`

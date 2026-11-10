@@ -785,7 +785,7 @@ HANDLED_RULES = frozenset(
         "figures.max_file_size_mb", "figures.max_count", "figures.single_column_width_mm", "figures.double_column_width_mm",
         "figures.max_width_mm", "figures.max_height_mm", "figures.color_mode", "figures.min_font_size_pt",
         "figures.max_font_size_pt", "figures.font", "figures.legend_max_words", "figures.legends_location",
-        "figures.multipanel_labels", "figures.placement",
+        "figures.multipanel_labels", "figures.placement", "figures.print_grayscale",
         "tables.formats", "tables.editable", "tables.max_count", "tables.placement",
         "supplementary.formats", "supplementary.max_file_size_mb", "supplementary.max_count", "supplementary.combined_single_pdf", "supplementary.max_pages",
         "references.style", "references.numbered", "references.max_count", "references.include_titles",

@@ -177,6 +177,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `legends_location` | `end_of_manuscript` \| `with_figure` \| `after_references` or null | Where figure legends go. |
 | `multipanel_labels` | string or null | Required style of panel labels. |
 | `color_charge` | boolean or null | Color figures carry a charge. |
+| `print_grayscale` | boolean or null | The print edition shows figures in grayscale, so colors that differ only in hue merge (figures.grayscale checks this; color_charge implies it). |
 | `placement` | `separate_files` \| `end_of_manuscript` \| `inline` \| `end_or_inline` \| `combined_file` or null | Where figures go for the initial submission. combined_file: every figure in one document (Word or PDF), in citation order, each legend after its figure. |
 | `notes` | list of string or null | Rules with no structured key. |
 

@@ -173,6 +173,15 @@ class ValidationReport:
     files: list[str] = field(default_factory=list)
     # Notes on how the named files were placed (see paperpush.file_inputs).
     notes: list[str] = field(default_factory=list)
+    # The command that produced the report (``paperpush validate ...``, as
+    # typed), the directory it ran in, and when it ran (ISO 8601).
+    command: str = ""
+    cwd: str = ""
+    generated: str = ""
+    # The .sub and every upload it names at the time of the run: dicts of
+    # path, size, modified, sha256 (see paperpush.validate.file_fingerprint).
+    # Compare them with the files now to tell whether the report is stale.
+    inputs: list[dict] = field(default_factory=list)
 
     def by_status(self, status: str) -> list[CheckResult]:
         return [r for r in self.results if r.status == status]
@@ -198,6 +207,10 @@ class ValidationReport:
 
     def to_dict(self) -> dict:
         return {
+            "command": self.command,
+            "cwd": self.cwd,
+            "generated": self.generated,
+            "inputs": self.inputs,
             "venue": self.venue,
             "subfile": self.subfile,
             # An AI-only run did not run the deterministic checks: no verdict either way.
@@ -314,6 +327,10 @@ def _hidden_note(report: ValidationReport, hide: frozenset[str]) -> str:
 
 def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide: frozenset[str] = frozenset()) -> list[_Line]:
     lines: list[_Line] = [_Line("title", f"paperpush validation report: {report_name(report)}")]
+    if report.command:
+        lines.append(_Line("meta", f"Command: {report.command}" + (f" (run in {report.cwd})" if report.cwd else "")))
+    if report.generated:
+        lines.append(_Line("meta", f"Generated: {report.generated}"))
     if report.subfile:
         lines.append(_Line("meta", f"File: {report.subfile}"))
     lines += [_Line("meta", f"Checked: {path}") for path in report.files]

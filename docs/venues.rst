@@ -26,7 +26,7 @@ find venues that fit your manuscript's topic.
 
 .. BEGIN SUPPORTED VENUES
 
-*75 supported venues.*
+*76 supported venues.*
 
 .. list-table::
    :header-rows: 1
@@ -261,6 +261,13 @@ find venues that fit your manuscript's topic.
      - medicine
      - Journal
      - https://jamanetwork.com/journals/jama
+     - ✅
+     -
+   * - ``jiim``
+     - JIIM
+     - radiology, medicine, machine learning, computer science
+     - Journal
+     - https://link.springer.com/journal/10278
      - ✅
      -
    * - ``jmlr``

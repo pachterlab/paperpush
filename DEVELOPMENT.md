@@ -432,7 +432,7 @@ enough to run on a schedule; only the venues it flags need to be re-read.
 python scripts/check_guidelines.py --diff          # check every page, show what changed
 python scripts/check_guidelines.py --venue nature  # one venue
 python scripts/check_guidelines.py --accept nature # after updating the entry: advance its baseline
-python scripts/check_guidelines.py --record-new    # after adding a venue: record its pages
+python scripts/check_guidelines.py --record-new --venue nature  # after adding a venue: record its pages
 ```
 
 Each page comes back `unchanged`, `changed`, `new` (no baseline), `unreadable`

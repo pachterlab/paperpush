@@ -7,7 +7,7 @@ Prepare manuscripts for submission to preprint servers, journals, and conference
 PaperPush provides the following services:
 - A standardized system to share all metadata submitted to a venue (the .sub file)
 <!-- BEGIN VALIDATION CHECK COUNT -->
-- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 144 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
+- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 153 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
 <!-- END VALIDATION CHECK COUNT -->
 - A central database of journal/conference manuscript requirements and submission data
 - Automated and fast submission portal filling with deterministic scripts
@@ -190,6 +190,7 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 | [IEEE TPAMI](https://www.computer.org/csdl/journal/tp) | `ieee_tpami` | ✅ |  |
 | [iScience](https://www.cell.com/iscience) | `iscience` | ✅ |  |
 | [JAMA](https://jamanetwork.com/journals/jama) | `jama` | ✅ |  |
+| [JIIM](https://link.springer.com/journal/10278) | `jiim` | ✅ |  |
 | [JMLR](https://www.jmlr.org) | `jmlr` | ✅ |  |
 | [JNM](https://jnm.snmjournals.org) | `jnm` | ✅ |  |
 | [The Lancet](https://www.thelancet.com/journals/lancet/home) | `lancet` | ✅ |  |

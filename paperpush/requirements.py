@@ -299,6 +299,7 @@ class FigureRules:
     legends_location: Annotated[Optional[LegendsLocation], PField(description="Where figure legends go.")] = None
     multipanel_labels: Annotated[Optional[str], PField(description="Required style of panel labels.")] = None
     color_charge: Annotated[Optional[bool], PField(description="Color figures carry a charge.")] = None
+    print_grayscale: Annotated[Optional[bool], PField(description="The print edition shows figures in grayscale, so colors that differ only in hue merge (figures.grayscale checks this; color_charge implies it).")] = None
     placement: Annotated[Optional[Placement], PField(description="Where figures go for the initial submission. combined_file: every figure in one document (Word or PDF), in citation order, each legend after its figure.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()
 

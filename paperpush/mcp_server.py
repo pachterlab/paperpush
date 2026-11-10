@@ -610,6 +610,9 @@ def validate_subfile(
     check_sensitive: bool = True,
     check_references: bool = True,
     reference_check_extended: bool = False,
+    reproduce_figures: bool = False,
+    reproduce_minutes: int = 30,
+    reproduce_download_gb: float = 5.0,
     references_alphabetical: bool = False,
     references_citation_order: bool = False,
     check_manuscript: bool = True,
@@ -670,6 +673,14 @@ def validate_subfile(
     is the original source of each claim, and verify journal indexing. The
     regular manuscript pass measures reference
     age and citation occurrences per 1,000 words without this flag.
+    `reproduce_figures` (default false) adds one agent task per main figure
+    (`ai.figure_reproduction.<n>`): build a fresh environment from the code
+    repository's own dependency files, rerun the code that draws the figure
+    within `reproduce_minutes` (default 30) and `reproduce_download_gb`
+    (default 5) per figure, and compare the result with the submitted figure.
+    You run the authors' code on this machine to do them. Without it, a
+    manuscript that links code still gets `ai.rigor.figure_provenance`
+    (trace each panel to its code and data, without running anything).
     `anonymous` checks a double-blind submission for information identifying
     its authors -- their names, emails, IDs and affiliations from the author
     list, author metadata, home-directory paths, acknowledgments -- in the
@@ -735,9 +746,12 @@ def validate_subfile(
     files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
     path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files, publisher, issn, journal)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
-    result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, disable=disable or (), enable=enable or (), initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
+    result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, reproduce_figures=reproduce_figures, reproduce_minutes=reproduce_minutes, reproduce_download_gb=reproduce_download_gb, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, disable=disable or (), enable=enable or (), initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
     out: dict[str, Any] = {
         "path": str(path or ""),
+        # When it ran and a fingerprint of each input, to tell later whether the result is stale.
+        "generated": result.generated,
+        "inputs": result.inputs,
         "venue": venue_def.slug,
         "scope": result.scope,
         "files": result.files,
@@ -770,6 +784,9 @@ def validation_ai_tasks(
     tables: Optional[list[str]] = None,
     supplement: Optional[list[str]] = None,
     reference_check_extended: bool = False,
+    reproduce_figures: bool = False,
+    reproduce_minutes: int = 30,
+    reproduce_download_gb: float = 5.0,
     publisher: Optional[str] = None,
     issn: Optional[str] = None,
     journal: Optional[str] = None,
@@ -790,6 +807,10 @@ def validation_ai_tasks(
     Set `reference_check_extended=true` to add per-source claim-support,
     original-source, and journal-indexing tasks; these may require reading external papers and
     authoritative journal indexes.
+    Set `reproduce_figures=true` to add one task per main figure that reruns
+    the authors' code in a fresh environment and compares the output with the
+    submitted figure (budgets: `reproduce_minutes`, `reproduce_download_gb`
+    per figure); pass the same flag to `validate_subfile` with your verdicts.
     Set `check_references=true` to run the reference lookups as well (network),
     which adds the `ai.unverified_references` task; `validate_subfile` returns
     that task in its `ai_tasks` by default. `disable` leaves out checks by name
@@ -803,10 +824,19 @@ def validation_ai_tasks(
 
     files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
     path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files, publisher, issn, journal)
-    result = _run_validate_report(sub, venue_def, check_links=False, check_references=check_references, reference_check_extended=reference_check_extended, check_openreview=False, disable=disable or (), enable=enable or (), subfile_path=str(path or ""), files_only=files_only, notes=notes)
+    result = _run_validate_report(sub, venue_def, check_links=False, check_references=check_references, reference_check_extended=reference_check_extended, reproduce_figures=reproduce_figures, reproduce_minutes=reproduce_minutes, reproduce_download_gb=reproduce_download_gb, check_openreview=False, disable=disable or (), enable=enable or (), subfile_path=str(path or ""), files_only=files_only, notes=notes)
     from .file_inputs import validate_command
 
-    return tasks_payload(result.ai_tasks, venue_def, str(path or ""), command=validate_command(None if path else venue, files, subfile=str(path or "")))
+    command = validate_command(None if path else venue, files, subfile=str(path or ""))
+    if reference_check_extended:
+        command += " --reference-check-extended"
+    if reproduce_figures:
+        command += " --reproduce-figures"
+        if reproduce_minutes != 30:
+            command += f" --reproduce-minutes {reproduce_minutes}"
+        if reproduce_download_gb != 5.0:
+            command += f" --reproduce-download-gb {reproduce_download_gb:g}"
+    return tasks_payload(result.ai_tasks, venue_def, str(path or ""), command=command)
 
 
 def autofill_subfile(

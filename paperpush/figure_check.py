@@ -15,7 +15,8 @@ pictures in a Word file. Each figure is reduced to a :class:`Figure`:
 Against ``figures`` in ``manuscript_requirements.json`` this checks the
 resolution (``min_dpi``, and ``min_dpi_line_art`` for figures with only a few
 flat colours), the smallest and largest lettering (``min_font_size_pt`` /
-``max_font_size_pt``), the typeface (``font``), the panel labels
+``max_font_size_pt``), the typeface (``font``) and that it is the same in
+every figure, the panel labels
 (``multipanel_labels``: their case and weight in the figures, and that each
 panel the text cites -- "Fig. 2d" -- exists, and that each labelled panel is
 cited), the colour mode and print size of
@@ -447,6 +448,8 @@ class _Inventory:
     figures: list[Figure]
     attached: bool
     why_empty: str = ""
+    # The figures' colours, read once by _figure_drawings: (drawings, names not read).
+    drawings: tuple[list, list[str]] | None = field(default=None, repr=False, compare=False)
 
 
 def inventory(venue: Venue, values: dict[str, str], rules: FigureRules) -> _Inventory:
@@ -497,6 +500,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     run("figures.dpi", "Figures meet the minimum resolution (dpi)", rules.min_dpi or rules.min_dpi_line_art, "the guidelines set no minimum resolution", _dpi_check, inv, rules, where)
     run("figures.text_size", "Figure lettering within the guidelines' size range", rules.min_font_size_pt or rules.max_font_size_pt, "the guidelines set no figure lettering size", _text_size_check, checks, inv, rules, where)
     run("figures.font", "Figure lettering uses the required typeface", rules.font, "the guidelines name no figure font", _font_check, checks, inv, rules, where)
+    run("figures.font_consistency", CONSISTENCY_TITLE, True, "", _font_consistency_check, checks, venue, values, inv, rules, where)
     run("figures.lettering", "Figure panels labeled in the required style (e.g., a, b, c)", True, "", _lettering_check, checks, venue, values, inv, rules)
     run("figures.color_mode", "Figure colour mode (RGB, CMYK, grayscale) matches the guidelines", rules.color_mode and inv.attached, "the guidelines set no colour mode (or no figure files are attached)", _color_mode_check, inv, rules)
     run("figures.dimensions", "Figures within the guidelines' maximum width and height", (rules.max_width_mm or rules.max_height_mm) and inv.attached, "the guidelines set no maximum figure size (or no figure files are attached)", _dimensions_check, inv, rules)
@@ -504,6 +508,9 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         _content_task(checks, venue, values, inv)
     # Reads the colours itself (pypdf and Pillow), so it does not need the inventory's figures.
     checks.run("figures.colorblind", COLORBLIND_TITLE, FIGURES, _colorblind_check, venue, values, inv)
+    from .figure_design_check import run_design_checks
+
+    run_design_checks(checks, venue, values, inv, rules)
     placement = rules.placement or reqs.manuscript.figures_placement or ("inline" if reqs.manuscript.single_file else None)
     checks.run("figures.placement", "Figures placed where the guidelines ask", FIGURES, _placement_check, venue, values, inv, placement, reqs)
 
@@ -553,6 +560,8 @@ def _raster_ai_task(checks: Checks, inv: _Inventory, rules: FigureRules) -> int:
         wants.append(f"the typeface is {rules.font}")
     if rules.multipanel_labels:
         wants.append(f"multi-panel figures label their panels {rules.multipanel_labels}")
+    if len(inv.figures) > 1:
+        wants.append("all figures use the same typeface (this is good practice even where the guidelines are silent)")
     if not wants:
         return 0
     lines = []
@@ -824,6 +833,104 @@ def _font_check(checks: Checks, inv: _Inventory, rules: FigureRules, where: str)
     return Outcome(issues, f"fonts used: {', '.join(families[:6])}" + (f"; {queued} raster figure(s) need the AI check" if queued else ""))
 
 
+CONSISTENCY_TITLE = "Figure lettering uses one typeface across the figures"
+# A second typeface counts as mixed in when it sets at least this share of a
+# figure's lettering and at least MIXED_MIN_CHARS characters of it.
+MIXED_SHARE = 0.1
+MIXED_MIN_CHARS = 10
+# A figure needs this many characters of lettering for its typeface to count.
+MIN_CHARS_FOR_FONT = 5
+
+
+def _family_key(family: str) -> str:
+    """One name for faces the guidelines treat as the same (Arial and Helvetica)."""
+    from .layout_check import _EQUIVALENT
+
+    for group in _EQUIVALENT:
+        if family in group:
+            return "/".join(sorted(group))
+    return family
+
+
+def _families(weights: Counter) -> Counter:
+    """Characters per typeface (``_family_key``), symbol and math fonts left out."""
+    from .layout_check import font_family
+
+    out: Counter = Counter()
+    for name, count in weights.items():
+        family, generic = font_family(name)
+        if family == "Symbol" or generic == "symbol":
+            continue
+        out[_family_key(family)] += count
+    return out
+
+
+def _body_family(venue: Venue, values: dict[str, str]) -> str | None:
+    """The manuscript's main body-text typeface, if a manuscript can be measured."""
+    from .layout_check import _measure_all
+
+    try:
+        measured = _measure_all(venue, values)
+    except Exception as exc:  # noqa: BLE001 -- the comparison is only a note
+        logger.debug("could not measure the manuscript's body font: %s", exc)
+        return None
+    for _, m in measured:
+        if m.pdf is not None and m.pdf.body_fonts:
+            weights = m.pdf.body_fonts
+        elif m.docx is not None and m.docx.fonts:
+            weights = m.docx.fonts
+        elif m.tex is not None and m.tex.font:
+            weights = Counter({m.tex.font: 1})
+        else:
+            continue
+        families = _families(weights)
+        if families:
+            return families.most_common(1)[0][0]
+    return None
+
+
+def _font_consistency_check(checks: Checks, venue: Venue, values: dict[str, str], inv: _Inventory, rules: FigureRules, where: str) -> Outcome:
+    """Each figure set in one typeface, and every figure in the same one.
+
+    Symbol and math fonts are left out, and Arial and Helvetica count as one.
+    The manuscript's body font is reported alongside but not flagged: many
+    venues want sans-serif figures with serif text.
+    """
+    issues: list[Issue] = []
+    main_of: dict[str, list[str]] = {}  # typeface -> figures set mainly in it
+    for fig in inv.figures:
+        if fig.kind != "vector" or not fig.texts:
+            continue
+        weights: Counter = Counter()
+        for t in fig.texts:
+            weights[t.font] += len(t.text.strip())
+        families = _families(weights)
+        total = sum(families.values())
+        if total < MIN_CHARS_FOR_FONT:
+            continue
+        (main, _), *others = families.most_common()
+        main_of.setdefault(main, []).append(fig.name)
+        mixed = [(family, count) for family, count in others if count >= MIXED_MIN_CHARS and count / total >= MIXED_SHARE]
+        if mixed:
+            parts = ", ".join(f"{family} ({100 * count / total:.0f}%)" for family, count in mixed)
+            issues.append(Issue(WARNING, fig.field_id, f"{fig.name} mixes typefaces: {main} ({100 * families[main] / total:.0f}% of its lettering) and {parts}; set all of a figure's lettering in one typeface"))
+    if len(main_of) > 1:
+        groups = sorted(main_of.items(), key=lambda kv: -len(kv[1]))
+        listed = "; ".join(f"{family}: {', '.join(names[:4])}{' and more' if len(names) > 4 else ''}" for family, names in groups)
+        issues.append(Issue(WARNING, "", f"the figures are set in different typefaces ({listed}); use one typeface for the lettering of every figure"))
+    queued = _raster_ai_task(checks, inv, rules)
+    if not main_of:
+        raise Unchecked(f"no vector lettering whose font can be read in the {where}" + (f"; {queued} raster figure(s) are queued for the AI check" if queued else ""))
+    detail = f"figure typeface{'s' if len(main_of) > 1 else ''}: {', '.join(sorted(main_of))}"
+    body = _body_family(venue, values)
+    if body:
+        same = body in main_of and len(main_of) == 1
+        detail += f"; body text in {body}" + ("" if same else " (a different typeface from the figures, which most venues allow)")
+    if queued:
+        detail += f"; {queued} raster figure(s) need the AI check"
+    return Outcome(issues, detail)
+
+
 # --- panel labels ---------------------------------------------------------------------
 
 def cited_panels(text: str) -> dict[int, set[str]]:
@@ -942,12 +1049,23 @@ def _figure_drawings(venue: Venue, values: dict[str, str], inv: _Inventory, unre
     """The figures' colours, as :class:`~paperpush.colorblind.Drawing` items.
 
     The names of figures whose colours could not be read are added to ``unread``.
+    Read once per inventory: the colour checks (colour blindness, gray printing,
+    default colors) share the result.
     """
+    if inv.drawings is None:
+        missed: list[str] = []
+        inv.drawings = (_read_figure_drawings(venue, values, inv, missed), missed)
+    drawings, missed = inv.drawings
+    if unread is not None:
+        unread.extend(missed)
+    return list(drawings)
+
+
+def _read_figure_drawings(venue: Venue, values: dict[str, str], inv: _Inventory, unread: list[str]) -> list:
     from . import colorblind
     from .requirements_check import manuscript_files
 
     drawings: list[colorblind.Drawing] = []
-    unread = [] if unread is None else unread
 
     def add(make, *args) -> None:
         try:

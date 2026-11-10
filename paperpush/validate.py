@@ -25,6 +25,7 @@ list so the author sees one combined, actionable summary:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import urllib.parse
@@ -1460,6 +1461,7 @@ _MANUSCRIPT_STAGES = (
     ("cover_letter_check", "Cover letter"),
     ("prose_check", "Spelling and prose"),
     ("rigor_check", "Rigor and reproducibility"),
+    ("reproducibility_check", "Code and figure reproducibility"),
 )
 
 
@@ -1485,6 +1487,7 @@ def _ai_only_report(checks: Checks, subfile: SubFile, venue: Venue, *, ai, subfi
     tasks = bar.run("AI checks", ai_validate.resolve, checks, venue, values, ai)
     bar.finish()
     result = report.ValidationReport(venue=venue.slug, subfile=subfile_path, results=checks.results, ai_tasks=tasks, ai_only=True)
+    _record_inputs(result, venue, values, subfile_path)
     result.initial_submission_rule = any_format_initial_rule(venue.slug, values)
     if initial_submission:
         result.initial_submission = True
@@ -1508,6 +1511,9 @@ def validate(
     check_links: bool = True,
     check_references: bool = True,
     reference_check_extended: bool = False,
+    reproduce_figures: bool = False,
+    reproduce_minutes: int = 30,
+    reproduce_download_gb: float = 5.0,
     check_manuscript: bool = True,
     check_anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
@@ -1535,6 +1541,9 @@ def validate(
         check_links=check_links,
         check_references=check_references,
         reference_check_extended=reference_check_extended,
+        reproduce_figures=reproduce_figures,
+        reproduce_minutes=reproduce_minutes,
+        reproduce_download_gb=reproduce_download_gb,
         check_manuscript=check_manuscript,
         check_anonymous=check_anonymous,
         check_hidden_text=check_hidden_text,
@@ -1556,6 +1565,9 @@ def validate_report(
     check_links: bool = True,
     check_references: bool = True,
     reference_check_extended: bool = False,
+    reproduce_figures: bool = False,
+    reproduce_minutes: int = 30,
+    reproduce_download_gb: float = 5.0,
     check_manuscript: bool = True,
     check_anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
@@ -1702,7 +1714,11 @@ def validate_report(
         raise ValueError("the AI checks need check_manuscript: the manuscript checks decide which AI checks apply")
     if reference_check_extended and not check_manuscript:
         raise ValueError("reference_check_extended needs check_manuscript to read citation contexts")
-    checks = Checks(options={"cover_letter_max_age_days": cover_letter_max_age_days, "reference_check_extended": reference_check_extended, "references_alphabetical": references_alphabetical, "references_citation_order": references_citation_order, "check_registries": check_registries}, disabled=disable, enabled=enable)
+    if reproduce_figures and not check_manuscript:
+        raise ValueError("reproduce_figures needs check_manuscript to find the figures and the code")
+    if reproduce_figures and ai is not None and ai.mode == "api":
+        raise ValueError("reproduce_figures needs an agent that can run code; the API model cannot (export the tasks for an agent instead)")
+    checks = Checks(options={"cover_letter_max_age_days": cover_letter_max_age_days, "reference_check_extended": reference_check_extended, "reproduce_figures": reproduce_figures, "reproduce_minutes": reproduce_minutes, "reproduce_download_gb": reproduce_download_gb, "check_repositories": check_links and not check_ids.off_reason("integrity.links", disable), "references_alphabetical": references_alphabetical, "references_citation_order": references_citation_order, "check_registries": check_registries}, disabled=disable, enabled=enable)
     checks.use_publisher_fallback(venue, subfile.values)
     if ai_only:
         if not check_manuscript:
@@ -1805,6 +1821,7 @@ def validate_report(
 
     result = report.ValidationReport(venue=venue.slug, subfile=subfile_path, results=checks.results, ai_tasks=tasks)
     _set_scope(result, venue, values, files_only, notes)
+    _record_inputs(result, venue, values, subfile_path)
     result.initial_submission_rule = any_format_initial_rule(venue.slug, values)
     if initial_submission:
         result.initial_submission = True
@@ -1821,6 +1838,37 @@ def validate_report(
         len(result.issues()) - errors,
     )
     return result
+
+
+def file_fingerprint(path: Path) -> dict:
+    """``{path, size, modified, sha256}`` for ``path``, to tell later whether it changed."""
+    import datetime
+
+    path = Path(path).expanduser().resolve()
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(chunk)
+    stat = path.stat()
+    modified = datetime.datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds")
+    return {"path": str(path), "size": stat.st_size, "modified": modified, "sha256": digest.hexdigest()}
+
+
+def _record_inputs(result, venue: Venue, values: dict[str, str], subfile_path: str) -> None:
+    """Stamp ``result`` with when it ran and a fingerprint of the .sub and each upload."""
+    import datetime
+
+    result.generated = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    candidates = ([Path(subfile_path)] if subfile_path else []) + list(_iter_upload_paths(venue, values))
+    seen: set[str] = set()
+    for path in candidates:
+        try:
+            info = file_fingerprint(path)
+        except OSError:
+            continue
+        if info["path"] not in seen:
+            seen.add(info["path"])
+            result.inputs.append(info)
 
 
 def _set_scope(result, venue: Venue, values: dict[str, str], files_only: bool, notes: Optional[list[str]]) -> None:

@@ -1,7 +1,7 @@
 ## Supported venues
 
 <!-- BEGIN SUPPORTED VENUES -->
-_75 supported venues (auto-generated from `paperpush/venues.json`)._
+_76 supported venues (auto-generated from `paperpush/venues.json`)._
 
 | Slug | Venue | Keywords | Venue type | Validate | Submit | Submission platform | Description | Submit walkthrough |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -38,6 +38,7 @@ _75 supported venues (auto-generated from `paperpush/venues.json`)._
 | `ieee_tpami` | [IEEE TPAMI](https://www.computer.org/csdl/journal/tp) | computer vision, machine learning | Journal | yes | no | - | IEEE Computer Society journal covering computer vision, pattern analysis and recognition, and machine intelligence with an emphasis on machine learning for pattern analysis. | ➖ |
 | `iscience` | [iScience](https://www.cell.com/iscience) | general, biology | Journal | yes | no | - | Multidisciplinary Cell Press journal. | ➖ |
 | `jama` | [JAMA](https://jamanetwork.com/journals/jama) | medicine | Journal | yes | no | - | Weekly general medical journal of the American Medical Association publishing original investigations, research letters, reviews and commentary. | ➖ |
+| `jiim` | [JIIM](https://link.springer.com/journal/10278) | radiology, medicine, machine learning, computer science | Journal | yes | no | - | Official peer-reviewed journal of the Society for Imaging Informatics in Medicine (SIIM), covering research and practice in clinical, engineering, and information technologies across medical imaging environments (formerly the Journal of Digital Imaging). | ➖ |
 | `jmlr` | [JMLR](https://www.jmlr.org) | machine learning, statistics | Journal | yes | no | - | Open-access journal publishing theory and methods of machine learning; applications of ML to other domains are out of scope. | ➖ |
 | `jnm` | [JNM](https://jnm.snmjournals.org) | radiology, medicine | Journal | yes | no | - | Official journal of the Society of Nuclear Medicine and Molecular Imaging publishing original laboratory and clinical investigations in nuclear medicine and molecular imaging. | ➖ |
 | `lancet` | [The Lancet](https://www.thelancet.com/journals/lancet/home) | medicine | Journal | yes | no | - | Weekly international general medical journal publishing original research likely to change clinical practice, plus reviews, commentary and correspondence. | ➖ |

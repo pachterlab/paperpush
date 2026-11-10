@@ -93,7 +93,7 @@ For an existing venue in a source checkout working from the web, see what
 changed since the entry was written. This calls no LLM:
 
 ```
-python scripts/check_guidelines.py --diff --venue <slug>
+python scripts/check_guidelines.py --diff --venue <slug> --headless
 ```
 
 Each page comes back `unchanged`, `changed` (with a diff), `new`, `unreadable`,
@@ -111,8 +111,9 @@ against `paperpush requirements <slug>` yourself in step 2.
   reference style. Follow links to separate pages for figures, LaTeX
   templates, cover letters, and revised manuscripts. PDF and `.docx` guideline files count as pages.
 - Publisher sites (Nature, Science, Cell, Springer, Elsevier, Wiley) usually
-  block plain fetches. Render them with Playwright (headed if headless is
-  refused), or run `python scripts/check_guidelines.py --text <URL>`.
+  block plain fetches. Render them with headless Playwright, or run
+  `python scripts/check_guidelines.py --text <URL> --headless`. Do not open a
+  headed browser; if a page refuses headless fetches, say so in the report.
 - Write down each page you used. They all go in `source_urls`.
 
 ### From files
@@ -222,15 +223,18 @@ keep both.
 Then record the guideline baselines (source checkout only):
 
 ```
-python scripts/check_guidelines.py --record-new          # new venue / new URLs
-python scripts/check_guidelines.py --accept <slug>       # existing venue you just updated
+python scripts/check_guidelines.py --record-new --venue <slug> --headless   # new venue / new URLs
+python scripts/check_guidelines.py --accept <slug>                          # existing venue you just updated
 ```
+
+Always pass `--venue <slug>` (and `--headless`): without `--venue`, the script
+re-fetches every page of every venue in the database, not just this one.
 
 Working from files, `--record-new` fetches the public URLs in `source_urls`
 to record their baselines. If those pages are bot-walled and come back
 `unreadable`, that is expected: say so in the report. For an existing venue,
 `--accept` promotes whatever text the last check run saw, which may predate
-the user's files; run `python scripts/check_guidelines.py --venue <slug>`
+the user's files; run `python scripts/check_guidelines.py --venue <slug> --headless`
 first so the baseline is the current page.
 
 Run the tests that cover these files:

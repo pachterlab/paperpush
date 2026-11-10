@@ -332,6 +332,25 @@ def test_cli_saves_the_report_in_the_requested_format(_use, tmp_path, monkeypatc
     assert "PASSED" in out and "Saved the report to" in out
 
 
+def test_cli_report_records_the_command_time_and_input_fingerprints(_use, tmp_path, monkeypatch):
+    _use({})
+    _cli_venue(monkeypatch, TITLE)
+    sub = _sub(tmp_path, "title: A study\n")
+    argv = ["validate", str(sub), "--dont-check-links", "--dont-check-references", "--json", str(tmp_path / "r.json"), "-o", str(tmp_path / "r.txt")]
+    assert main(argv) == 0
+    data = json.loads((tmp_path / "r.json").read_text())
+    assert list(data)[:4] == ["command", "cwd", "generated", "inputs"]
+    assert data["command"].startswith("paperpush validate ") and "--dont-check-links" in data["command"]
+    assert data["generated"] and data["cwd"]
+    [entry] = data["inputs"]
+    assert entry["path"] == str(sub.resolve()) and entry["size"] == sub.stat().st_size
+    assert entry == validate_mod.file_fingerprint(sub)
+    text = (tmp_path / "r.txt").read_text()
+    assert f"Command: {data['command']}" in text and f"Generated: {data['generated']}" in text
+    sub.write_text(sub.read_text() + "\n")
+    assert validate_mod.file_fingerprint(sub)["sha256"] != entry["sha256"]
+
+
 def test_cli_display_flags_filter_the_terminal_and_saved_report(_use, tmp_path, monkeypatch, capsys):
     _use({})
     _cli_venue(monkeypatch, TITLE)
@@ -446,6 +465,21 @@ def test_cli_reference_check_extended_refuses_the_api_runner(_use, tmp_path, mon
     assert main(["validate", str(_sub(tmp_path, "title: A study\n")), "--ai", "--reference-check-extended"]) == 1
     err = capsys.readouterr().err
     assert "--reference-check-extended cannot be combined with --ai" in err and "--ai-tasks" in err
+
+
+def test_cli_reproduce_figures_refuses_the_api_runner(_use, tmp_path, monkeypatch, capsys):
+    _use({})
+    _cli_venue(monkeypatch, TITLE)
+    assert main(["validate", str(_sub(tmp_path, "title: A study\n")), "--ai", "--reproduce-figures"]) == 1
+    err = capsys.readouterr().err
+    assert "--reproduce-figures cannot be combined with --ai" in err and "--ai-tasks" in err
+
+
+def test_cli_reproduce_budgets_must_be_positive(_use, tmp_path, monkeypatch, capsys):
+    _use({})
+    _cli_venue(monkeypatch, TITLE)
+    assert main(["validate", str(_sub(tmp_path, "title: A study\n")), "--reproduce-figures", "--reproduce-minutes", "0"]) == 1
+    assert "greater than 0" in capsys.readouterr().err
 
 
 # ===========================================================================
@@ -734,6 +768,72 @@ def test_svg_lettering_size_is_scaled_to_the_print_width(_use, tmp_path):
     rep = _report(_venue(FIGURES), {"figure_files": str(svg)})
     issue = _result(rep, "figures.text_size").issues[0].message
     assert "'tiny'" in issue and "'big'" not in issue
+
+
+def _svg_fig(path: Path, *families: str) -> Path:
+    texts = "".join(f'<text font-family="{family}" font-size="12" x="1" y="{20 * (i + 1)}">{label}</text>' for i, (family, label) in enumerate(families))
+    path.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="60mm" viewBox="0 0 340 230">{texts}</svg>')
+    return path
+
+
+def test_figures_in_different_typefaces_are_flagged(_use, tmp_path):
+    _use({"testj": {"figures": {"min_font_size_pt": 5}}})
+    one = _svg_fig(tmp_path / "fig1.svg", ("Arial", "Expression level"), ("Helvetica", "Time after dose"))
+    two = _svg_fig(tmp_path / "fig2.svg", ("Times New Roman", "Expression level"), ("Times New Roman", "Time after dose"))
+    rep = _report(_venue(FIGURES), {"figure_files": f"{one} | Figure 1\n{two} | Figure 2"})
+    res = _result(rep, "figures.font_consistency")
+    assert res.status != report.PASSED
+    message = " ".join(i.message for i in res.issues)
+    assert "different typefaces" in message and "fig1.svg" in message and "fig2.svg" in message
+    assert "mixes" not in message  # Arial and Helvetica count as one
+
+
+def test_a_figure_mixing_typefaces_is_flagged(_use, tmp_path):
+    _use({"testj": {"figures": {"min_font_size_pt": 5}}})
+    fig = _svg_fig(tmp_path / "fig1.svg", ("Arial", "Expression level"), ("Courier New", "Time after dose"), ("Symbol", "abg"))
+    rep = _report(_venue(FIGURES), {"figure_files": f"{fig} | Figure 1"})
+    message = " ".join(i.message for i in _result(rep, "figures.font_consistency").issues)
+    assert "fig1.svg mixes typefaces" in message and "Courier" in message
+    assert "Symbol" not in message and "different typefaces" not in message
+
+
+def test_figures_in_one_typeface_pass(_use, tmp_path):
+    _use({"testj": {"figures": {"min_font_size_pt": 5}}})
+    one = _svg_fig(tmp_path / "fig1.svg", ("Arial", "Expression level"))
+    two = _svg_fig(tmp_path / "fig2.svg", ("Helvetica", "Time after dose"))
+    rep = _report(_venue(FIGURES), {"figure_files": f"{one} | Figure 1\n{two} | Figure 2"})
+    res = _result(rep, "figures.font_consistency")
+    assert res.status == report.PASSED, res.issues
+    assert "Arial/Helvetica" in res.detail
+
+
+def test_figure_typeface_is_compared_with_the_body_text(_use, tmp_path):
+    _pdfminer()
+    _use({"testj": {"figures": {}}})
+    lines = "".join(text_line(72, 720 - 14 * i, "Some sentence of body text set in the manuscript font.") for i in range(40))
+    doc = write_pdf(tmp_path / "ms.pdf", [lines])  # set in Helvetica
+    figs = [_svg_fig(tmp_path / "fig1.svg", ("Courier New", "Expression level")), _svg_fig(tmp_path / "fig2.svg", ("Arial", "Expression level"))]
+    for fig, different in zip(figs, (True, False)):
+        rep = _report(_venue(MANUSCRIPT, FIGURES), {"manuscript_file": str(doc), "figure_files": f"{fig} | Figure 1"})
+        res = _result(rep, "figures.font_consistency")
+        assert res.status == report.PASSED  # a different typeface from the text is only noted
+        assert "body text in Arial/Helvetica" in res.detail
+        assert ("different typeface from the figures" in res.detail) == different
+
+
+def test_raster_figures_typeface_consistency_goes_to_the_ai_task(_use, tmp_path):
+    from PIL import Image
+
+    _use({"testj": {"figures": {}}})
+    paths = []
+    for n in (1, 2):
+        path = tmp_path / f"fig{n}.png"
+        Image.new("RGB", (600, 400), "white").save(path)
+        paths.append(f"{path} | Figure {n}")
+    rep = _report(_venue(FIGURES), {"figure_files": "\n".join(paths)})
+    task = next(t for t in rep.ai_tasks if t.id == "ai.figures.raster_lettering")
+    assert "same typeface" in task.instructions and len(task.files) == 2
+    assert _result(rep, "figures.font_consistency").status == report.UNCHECKED
 
 
 def _figure_pdf(path: Path, labels=("a", "b"), small_size: float = 4, label_font_bold: bool = False) -> Path:

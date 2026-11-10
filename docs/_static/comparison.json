@@ -11,12 +11,12 @@
     ],
     "tailored_checks": [
       "yes",
-      "75 venues",
+      "76 venues",
       "(+ any venue, via online guideline scraping)"
     ],
     "num_checks": [
       "yes",
-      "144"
+      "153"
     ],
     "chk_references": [
       "yes",
