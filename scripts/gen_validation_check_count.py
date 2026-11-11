@@ -174,7 +174,7 @@ def main() -> int:
     args = parser.parse_args()
     catalog = check_catalog()
     count = len(catalog)
-    readme = f"- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — {count} distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html)."
+    readme = f"- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, anonymization, and much, much more — {count} distinct validation check types in total. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html)"
     docs = f"PaperPush currently has **{count} distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``."
     current = [replace_block(README, readme, check=args.check), replace_block(DOCS, docs, check=args.check, start_marker=DOCS_START, end_marker=DOCS_END),
                replace_block(DOCS, check_list(catalog), check=args.check, start_marker=LIST_START, end_marker=LIST_END),
