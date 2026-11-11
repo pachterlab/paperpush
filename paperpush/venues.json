@@ -1117,5 +1117,21 @@
       "machine learning",
       "computer science"
     ]
+  },
+  "alphaxiv": {
+    "name": "alphaXiv",
+    "full_name": "alphaXiv - Open research publishing and discussion platform",
+    "venue_type": "preprint",
+    "anonymous": false,
+    "site_url": "https://www.alphaxiv.org",
+    "submission_guide": "https://www.alphaxiv.org/docs/ai-policy",
+    "description": "Research discussion platform layered on arXiv that also lets authors publish a PDF directly, after automated checks; a later arXiv version is merged into the same page.",
+    "keywords": [
+      "physics",
+      "math",
+      "computer science",
+      "machine learning",
+      "statistics"
+    ]
   }
 }

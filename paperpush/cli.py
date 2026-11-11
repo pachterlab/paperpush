@@ -152,7 +152,7 @@ def _parse_keywords(text: str) -> list[str]:
 
 # Columns of the `paperpush venues` table, in display order: the names --columns and
 # --hide-columns take.
-_VENUE_COLUMNS = ("slug", "venue", "keywords", "type", "link", "validate", "submit")
+_VENUE_COLUMNS = ("slug", "venue", "keywords", "type", "citedness", "link", "validate", "submit")
 
 
 def _parse_columns(text: str, flag: str) -> list[str]:
@@ -181,6 +181,10 @@ def _select_columns(columns: list[str] | None, hidden: list[str] | None) -> list
 
 
 @_validate
+def _fmt_citedness(value: float | None) -> str:
+    return f"{value:.1f}" if value is not None else ""
+
+
 def _print_venues(
     validate: bool = False,
     submit: bool = False,
@@ -190,6 +194,8 @@ def _print_venues(
 ) -> int:
     from rich.console import Console
     from rich.table import Table
+
+    from . import venue_metrics
 
     venues = list_venues()
     if not venues:
@@ -219,6 +225,8 @@ def _print_venues(
         "venue": ("Venue", dict(no_wrap=True, min_width=max(len(v.name) for v in venues)), lambda v: v.name),
         "keywords": ("Keywords", dict(ratio=1, min_width=12), lambda v: ", ".join(v.keywords)),
         "type": ("Type", dict(no_wrap=True), lambda v: _TYPE_LABELS.get(v.venue_type, v.venue_type.capitalize())),
+        # OpenAlex 2-year mean citedness (see paperpush/venue_metrics.py); blank for preprint servers and unmatched venues.
+        "citedness": ("2-yr citedness", dict(justify="right", no_wrap=True), lambda v: _fmt_citedness(venue_metrics.mean_citedness_2yr(v.slug))),
         "link": ("Link", dict(style="dim", overflow="fold", ratio=1, min_width=12), lambda v: v.site_url or v.submission_url),
         "validate": ("Validate", dict(justify="center", style="green", no_wrap=True), lambda v: _CHECK if v.supports_validate else ""),
         "submit": ("Submit", dict(justify="center", style="green", no_wrap=True), lambda v: _CHECK if v.supports_submit else ""),
@@ -236,6 +244,8 @@ def _print_venues(
         # Piped or captured: one row per line rather than squeezing to 80 columns.
         console = Console(width=max(console.width, 250))
     console.print(table)
+    if "citedness" in shown:
+        console.print("\n2-yr citedness: OpenAlex's 2-year mean citations per work, an open counterpart of the Journal Impact Factor (not the Clarivate figure). Not comparable across fields.", highlight=False, soft_wrap=True)
     console.print(f"\nFor more details, see {_VENUES_URL}", highlight=False, soft_wrap=True)
     console.print(f"Venue data: {venue_data.active_source().describe()} (refresh with 'paperpush update-venues')", highlight=False, soft_wrap=True)
     console.print(
@@ -682,6 +692,9 @@ def _cmd_pick_venue(args: argparse.Namespace) -> int:
     if args.json:
         data = selection.to_dict(limit=None if args.all else args.limit)
         data["ai"] = ranking.to_dict() if ranking else None
+        from .database import VENUE_KEYWORDS
+
+        data["subject_vocabulary"] = [k for k in VENUE_KEYWORDS if k != "general"]
         if journals is not None and journals.hits:
             data["openalex"] = journals.to_dict(limit=None if args.all else args.limit)
         else:
@@ -3228,7 +3241,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pick.add_argument("--ai", action="store_true", help="ask an LLM to choose the subjects and rank the venues, with a reason each (needs ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY)")
     p_pick.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(--ai) LLM provider; defaults to the first whose API key is set")
     p_pick.add_argument("--model", help="(--ai) model to use (default: the provider's autofill default)")
-    p_pick.add_argument("--json", action="store_true", help="print the result as JSON for agents: matches (the supported venues: slug, name, venue_type, portal, keywords, score, reasons), openalex (any journal: name, publisher, similar works, open access, APC, h-index, paperpush slug), the subjects used, what was read from the manuscript, and the --ai ranking")
+    p_pick.add_argument("--json", action="store_true", help="print the result as JSON for agents: matches (the supported venues: slug, name, venue_type, portal, keywords, score, reasons), openalex (any journal: name, publisher, similar works, open access, APC, h-index, 2-year mean citedness, paperpush slug), the subjects used, subject_vocabulary (the subjects venues are tagged with), what was read from the manuscript, and the --ai ranking")
     p_pick.set_defaults(func=_cmd_pick_venue)
 
     p_rev = sub.add_parser(

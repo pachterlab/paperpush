@@ -334,7 +334,7 @@ def test_cli_type_filter(capsys):
     assert main(["pick-venue", "--all", "-t", "preprint"]) == 0
     out = capsys.readouterr().out
     venue_lines = [line for line in out.splitlines() if line and not line.startswith("Use ")]
-    assert len(venue_lines) == 3
+    assert len(venue_lines) == 4
     assert all("(preprint)" in line for line in venue_lines)
 
 

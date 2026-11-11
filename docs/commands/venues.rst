@@ -47,7 +47,13 @@ Options
 
 ``--columns COL[,COL...]``
    Show only these comma-separated columns, in this order. Columns: ``slug``,
-   ``venue``, ``keywords``, ``type``, ``link``, ``validate``, ``submit``.
+   ``venue``, ``keywords``, ``type``, ``citedness``, ``link``, ``validate``,
+   ``submit``.
+
+   ``citedness`` (shown as *2-yr citedness*) is OpenAlex's 2-year mean
+   citations per work: an open counterpart of the Journal Impact Factor, not
+   the Clarivate figure, and not comparable across fields. It is blank for
+   preprint servers and for venues paperpush has not matched to OpenAlex.
 
 ``--hide-columns COL[,COL...]``
    Hide these comma-separated columns. Combines with ``--columns``.

@@ -794,6 +794,7 @@ class JournalHit:
     is_in_doaj: bool | None = None
     apc_usd: int | None = None
     h_index: int | None = None
+    mean_citedness_2yr: float | None = None  # OpenAlex's open analogue of the impact factor
     slug: str = ""  # the paperpush venue, when supported
     support: str = ""  # what paperpush supports for it (see support_level)
 
@@ -814,6 +815,7 @@ def journal_dict(hit: JournalHit) -> dict:
         "is_in_doaj": hit.is_in_doaj,
         "apc_usd": hit.apc_usd,
         "h_index": hit.h_index,
+        "mean_citedness_2yr": hit.mean_citedness_2yr,
         "paperpush_slug": hit.slug or None,
         "paperpush_support": hit.support or None,
     }
@@ -911,6 +913,7 @@ def find_journals(
                 is_in_doaj=info.get("is_in_doaj"),
                 apc_usd=info.get("apc_usd"),
                 h_index=stats.get("h_index"),
+                mean_citedness_2yr=round(stats["2yr_mean_citedness"], 1) if isinstance(stats.get("2yr_mean_citedness"), (int, float)) else None,
                 slug=venue.slug if venue else "",
                 support=support_level(venue) if venue else "",
             )
@@ -928,6 +931,8 @@ def format_journals(hits: list[JournalHit]) -> list[str]:
             facts.insert(0, hit.publisher)
         if hit.h_index is not None:
             facts.append(f"h-index {hit.h_index}")
+        if hit.mean_citedness_2yr is not None:
+            facts.append(f"2-yr mean citedness {hit.mean_citedness_2yr:g}")
         if hit.is_oa:
             facts.append("open access" + (" (DOAJ)" if hit.is_in_doaj else ""))
         if hit.apc_usd:

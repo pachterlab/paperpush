@@ -1,0 +1,93 @@
+# paperpush submission file for alphaxiv  -*- mode: yaml -*-
+# alphaXiv - Open research publishing and discussion platform
+#
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate alphaxiv.sub.txt`
+#   - to fill out submission portal: `paperpush submit alphaxiv.sub.txt`
+# Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web alphaxiv.sub.txt   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
+#
+# To fill this out with AI from your manuscript files:
+#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill alphaxiv.sub.txt
+#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR alphaxiv.sub.txt
+
+@venue: alphaxiv
+# submission guide: https://www.alphaxiv.org/docs/ai-policy
+
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
+
+# Paper PDF (file, REQUIRED)
+#   Path to the paper PDF, up to 50 MB.
+#   each file at most 50 MB
+manuscript_file: tests/manuscript_files/alphaxiv/manuscript.pdf
+
+# ----------------------------------------------------------------------
+# Manuscript details
+# ----------------------------------------------------------------------
+
+# Title (text, REQUIRED)
+#   The full title of the paper.
+title: PAPERPUSH TEST - DO NOT REVIEW
+
+# Abstract (textarea, REQUIRED)
+#   The abstract as it appears in the paper.
+abstract: |
+  This is an automated test of a submission tool. It is not research and must not be published.
+
+# Publication date (text, optional)
+#   Optional. When this content was originally published, as YYYY-MM-DD. Left empty, the portal's pre-filled date is kept.
+publication_date: 2026-11-10
+
+# URL slug (text, optional)
+#   Optional. The suffix of the paper's alphaxiv.org/abs/ address, e.g. my-publication-title. Left empty, the slug alphaXiv generates is kept.
+url_slug: paperpush-test-do-not-review
+
+# Categories (multichoice, optional)
+#   Optional. Comma-separated primary fields.
+#   options: Computer Science | Mathematics | Physics | Quantitative Biology | Quantitative Finance | Statistics | Electrical Engineering and Systems Science | Economics
+categories: Computer Science
+
+# Subcategories (multichoice, optional)
+#   Optional. Comma-separated specific arXiv codes or topics, e.g. cs.AI, math.CO.
+#   options: run 'paperpush options alphaxiv.subcategories' to list the choices
+subcategories: cs.AI, cs.LG
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
+
+# Authors (authorlist, REQUIRED)
+#   One author per line, in order, as the author's name. To link your own name to your alphaXiv researcher profile, choose "This is me" in the portal before you submit.
+authors: |
+  Test Author
+  Second Tester
+
+# Organizations (textarea, optional)
+#   Optional. One organization per line, up to 100, each up to 200 characters. Left empty, the organizations alphaXiv extracts from the PDF are kept.
+#   provide 0-100 item(s), one per line
+organizations: |
+  Example University
+
+# ----------------------------------------------------------------------
+# Declarations
+# ----------------------------------------------------------------------
+
+# I have the right to publish this content on alphaXiv (boolean, REQUIRED)
+#   You must confirm this yourself before the portal allows submission.
+agree_terms: yes
+
+# ----------------------------------------------------------------------
+# Additional information
+# ----------------------------------------------------------------------
+
+# BibTeX (textarea, optional)
+#   Optional. Shown as the BibTeX citation on the publication page. Left empty, the entry alphaXiv generates is kept.
+bibtex: |
+  
+
+# vim: set filetype=yaml :

@@ -26,7 +26,7 @@ find venues that fit your manuscript's topic.
 
 .. BEGIN SUPPORTED VENUES
 
-*76 supported venues.*
+*77 supported venues.*
 
 .. list-table::
    :header-rows: 1
@@ -39,6 +39,13 @@ find venues that fit your manuscript's topic.
      - Link
      - Validate
      - Submit
+   * - ``alphaxiv``
+     - alphaXiv
+     - physics, math, computer science, machine learning, statistics
+     - Preprint
+     - https://www.alphaxiv.org
+     - ✅
+     - ✅
    * - ``arxiv``
      - arXiv
      - physics, math, computer science, machine learning, statistics, biology

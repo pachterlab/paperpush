@@ -579,6 +579,11 @@
     "recorded": "2026-09-21",
     "sha256": "44dc2dde8cf032652a18076724ece80dda7c981f7559b160a0753fcc368418d8"
   },
+  "https://www.alphaxiv.org/docs/ai-policy": {
+    "chars": 799,
+    "recorded": "2026-11-10",
+    "sha256": "4809dc70978e9f61c01db1a6491b111e272d2e21555c7f52edfafbf80b16c3e9"
+  },
   "https://www.biorxiv.org/about-biorxiv": {
     "chars": 15135,
     "recorded": "2026-11-01",

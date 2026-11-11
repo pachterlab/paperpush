@@ -29,6 +29,9 @@ Choose your favorite mode: AI agent skills, website, or command line. All modes 
 #### Venue-specific metadata collection and venue-tailored checking for an unsupported venue
 - `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE_NAME with PaperPush.`
 
+#### Choosing a venue
+- `/paperpush-pick-venue Suggest venues for my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.`
+
 #### General manuscript checking
 - `/paperpush-validate Validate my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.`
 
@@ -154,6 +157,7 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 
 | Venue | Slug | Validate + basic .sub | Submit + full .sub |
 | --- | --- | :---: | :---: |
+| [alphaXiv](https://www.alphaxiv.org) | `alphaxiv` | ✅ | ✅ |
 | [arXiv](https://arxiv.org) | `arxiv` | ✅ | ✅ |
 | [bioRxiv](https://www.biorxiv.org) | `biorxiv` | ✅ | ✅ |
 | [medRxiv](https://www.medrxiv.org) | `medrxiv` | ✅ | ✅ |
@@ -256,6 +260,7 @@ Each venue is listed in `paperpush/venues.json` (the master list of venues and t
 
 | Skill | Use it to |
 | --- | --- |
+| `/paperpush-pick-venue` | suggest venues for a manuscript: journals that publish similar work, checked against your constraints (open access, APC budget) and each supported venue's limits, then hand the chosen one to `/paperpush-prepare-submission` |
 | `/paperpush-prepare-submission` | go from a manuscript directory to a filled-in portal (autofill, validate, submit if supported) |
 | `/paperpush-autofill` | fill a `.sub` from the manuscript files |
 | `/paperpush-validate` | run every check, including the ones that need a reader |
@@ -266,6 +271,8 @@ Each venue is listed in `paperpush/venues.json` (the master list of venues and t
 | `/paperpush-respond-to-reviewers` | prepare a revision in two phases: (1) copy the manuscript and reviews into a new `revisionN/` directory (e.g., revision1, revision2, etc.) and propose a plan for each comment, then (once you approve) (2) revise the manuscript; write the response to reviewers, the clean revised manuscript, and a marked manuscript; and validate the revised manuscript |
 | `/paperpush-add-venue-validate` | add or refresh a venue's author guidelines (contributors) |
 | `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and `submit` support for a venue, with tests (contributors) |
+
+[(docs/_static/schematic.png)](docs/_static/schematic.pdf)
 
 ## What is a .sub file
 

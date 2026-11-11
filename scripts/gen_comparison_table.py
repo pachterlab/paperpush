@@ -39,30 +39,63 @@ OUT_DIR = ROOT / "docs" / "_static"
 
 YES, NO, PARTIAL, UNKNOWN = "yes", "no", "partial", "unknown"
 
-# Row key -> row label. Order is the order in the table.
-FEATURES = [
-    ("price", "Price"),
-    ("open_source", "Open source"),
-    ("tailored_checks", "Venue-tailored checks"),
-    ("num_checks", "Number of checks"),
-    ("chk_references", "Reference verification (DOIs, retractions, hallucinations)"),
-    ("chk_figures", "Figure quality (resolution, lettering, color)"),
-    ("chk_limits", "Word, page, and section limits"),
-    ("chk_layout", "Page layout (margins, fonts, spacing)"),
-    ("chk_anonymity", "Anonymization for blind review"),
-    ("chk_rigor", "Reporting and rigor (RRIDs, statistics, ethics)"),
-    ("chk_language", "Language and spelling"),
-    ("reformat", "Reformat to venue requirements"),
-    ("requirement_db", "Venue requirement database"),
-    ("metadata_file", "Submission metadata file"),
-    ("shareable", "Shareable (plain-text, versionable)"),
-    ("cli", "Command-line support"),
-    ("ai_agent", "AI agent integration (MCP)"),
-    ("skills", "Agent skills"),
-    ("transfer", "Venue transfer support"),
-    ("portal_filling", "Submission portal filling"),
-    ("offline", "Offline support"),
+# (section, [(row key, row label), ...]). Order is the order in the table.
+SECTIONS = [
+    (
+        "Format",
+        [
+            ("price", "Price"),
+            ("open_source", "Open source"),
+            ("privacy", "Privacy and data storage"),
+        ],
+    ),
+    (
+        "Features",
+        [
+            ("venue_picking", "Venue picking"),
+            ("file_validation", "File validation"),
+            ("reviewer_selection", "Reviewer selection"),
+            ("portal_filling", "Submission portal filling"),
+            ("respond_reviewers", "Responding to reviewers"),
+            ("transfer", "Venue transfer reformatting"),
+        ],
+    ),
+    (
+        "Manuscript checks",
+        [
+            ("num_checks", "Number of checks"),
+            ("tailored_checks", "Venue-tailored checks"),
+            ("non_ai_checks", "Non-AI (rule-based) checks"),
+            ("chk_references", "Reference verification (DOIs, retractions, hallucinations)"),
+            ("chk_figures", "Figure quality (resolution, lettering, color)"),
+            ("chk_limits", "Word, page, and section limits"),
+            ("chk_layout", "Page layout (margins, fonts, spacing)"),
+            ("chk_anonymity", "Anonymization for blind review"),
+            ("chk_rigor", "Reporting and rigor (RRIDs, statistics, ethics)"),
+            ("chk_language", "Language and spelling"),
+            ("reformat", "Reformat to venue requirements"),
+        ],
+    ),
+    (
+        "Databases",
+        [
+            ("requirement_db", "Venue guidelines database"),
+            ("portal_db", "Venue submission portal database"),
+        ],
+    ),
+    (
+        "Workflow",
+        [
+            ("metadata_file", "Submission metadata file"),
+            ("skills", "AI agent skills"),
+            ("ai_agent", "MCP server"),
+            ("web", "Web interface"),
+            ("cli", "Command-line support"),
+            ("offline", "Offline support"),
+        ],
+    ),
 ]
+FEATURES = [row for _, rows in SECTIONS for row in rows]
 
 
 # --------------------------------------------------------------------------
@@ -92,6 +125,12 @@ def _check_count() -> int | None:
     return int(m.group(1)) if m else None
 
 
+def _non_ai_check_count() -> int:
+    """Checks that run without a model: every check ID outside the ``ai.`` namespace."""
+    ids = json.loads((ROOT / "paperpush" / "validation_check_ids.json").read_text())
+    return sum(1 for i in ids if not i.startswith("ai."))
+
+
 def _skill_count() -> int:
     skills = ROOT / "paperpush" / "_skills"
     return sum(1 for p in skills.iterdir() if (p / "SKILL.md").exists())
@@ -105,8 +144,16 @@ def paperpush_column() -> dict:
         "name": "PaperPush",
         "price": (YES, "Free"),
         "open_source": (YES, "BSD-2"),
-        "tailored_checks": (YES, f"{validate_venues} venues", "(+ any venue, via online guideline scraping)"),
+        "privacy": (YES, "Runs locally; nothing stored"),
+        "venue_picking": (YES, "Yes"),
+        "file_validation": (YES, "Yes"),
+        "reviewer_selection": (YES, "Yes"),
+        "portal_filling": (YES, f"{submit_venues} venues"),
+        "respond_reviewers": (YES, "Yes"),
+        "transfer": (YES, "Yes"),
         "num_checks": (YES, f"{checks}" if checks else "yes"),
+        "tailored_checks": (YES, f"{validate_venues} venues", "(+ any venue, via online guideline scraping)"),
+        "non_ai_checks": (YES, f"{_non_ai_check_count()}"),
         "chk_references": (YES, "DOIs, retractions, preprint versions"),
         "chk_figures": (YES, "DPI, lettering, fonts, colorblind"),
         "chk_limits": (YES, "Word, page, section"),
@@ -115,21 +162,20 @@ def paperpush_column() -> dict:
         "chk_rigor": (YES, "RRIDs, statistics, cell lines"),
         "chk_language": (YES, "Spelling, prose, acronyms"),
         "reformat": (YES, "Yes"),
-        "requirement_db": (YES, "Open JSON"),
-        "metadata_file": (YES, ".sub file"),
-        "shareable": (YES, "Yes"),
-        "cli": (YES, "Yes"),
-        "ai_agent": (YES, "MCP server"),
+        "requirement_db": (YES, f"{validate_venues} venues, open JSON"),
+        "portal_db": (YES, f"{submit_venues} venues, open JSON"),
+        "metadata_file": (YES, ".sub file (plain text)"),
         "skills": (YES, f"{skills}"),
-        "transfer": (YES, "Yes"),
-        "portal_filling": (YES, f"{submit_venues} venues"),
+        "ai_agent": (YES, "Yes"),
+        "web": (YES, "Yes"),
+        "cli": (YES, "Yes"),
         "offline": (YES, "Yes"),
         "sources": ["This repository"],
     }
 
 
 # Date the other tools' data was last researched (shown in the table).
-RESEARCHED = "2026-11-07"
+RESEARCHED = "2026-11-11"
 
 # --------------------------------------------------------------------------
 # Other tools. Researched 2026-11-07 from the vendors' sites and listings.
@@ -156,14 +202,22 @@ TOOLS = [
         "reformat": (NO, ""),
         "requirement_db": (NO, ""),
         "metadata_file": (NO, ""),
-        "shareable": (NO, ""),
         "cli": (NO, ""),
         "ai_agent": (NO, ""),
         "skills": (NO, "0"),
         "transfer": (NO, ""),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
+        "privacy": (PARTIAL, "Not used for training"),
+        "venue_picking": (NO, ""),
+        "file_validation": (PARTIAL, "Submission readiness"),
+        "reviewer_selection": (NO, ""),
+        "respond_reviewers": (PARTIAL, "Drafts from reviewer notes"),
+        "non_ai_checks": (UNKNOWN, "?"),
+        "portal_db": (NO, ""),
+        "web": (YES, ""),
         "sources": [
+            "https://paperpal.com/privacy-policy",
             "https://paperpal.com/manuscript-check",
             "https://www.capterra.com/p/10003076/Paperpal/",
         ],
@@ -184,14 +238,22 @@ TOOLS = [
         "reformat": (NO, ""),
         "requirement_db": (PARTIAL, "Per-journal configs, private"),
         "metadata_file": (NO, ""),
-        "shareable": (NO, ""),
         "cli": (NO, ""),
         "ai_agent": (NO, ""),
         "skills": (NO, "0"),
         "transfer": (NO, ""),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
+        "privacy": (UNKNOWN, "?"),
+        "venue_picking": (NO, ""),
+        "file_validation": (YES, "Track changes, counts"),
+        "reviewer_selection": (NO, ""),
+        "respond_reviewers": (NO, ""),
+        "non_ai_checks": (YES, "30+"),
+        "portal_db": (PARTIAL, "Portal integrations"),
+        "web": (YES, ""),
         "sources": [
+            "https://www.penelope.ai/privacy",
             "https://www.penelope.ai",
             "https://www.capterra.com/p/255629/Penelopeai/",
         ],
@@ -212,20 +274,27 @@ TOOLS = [
         "reformat": (PARTIAL, "Citations only"),
         "requirement_db": (NO, ""),
         "metadata_file": (NO, ""),
-        "shareable": (NO, ""),
         "cli": (NO, ""),
         "ai_agent": (NO, ""),
         "skills": (NO, "0"),
         "transfer": (NO, ""),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
-        "sources": ["https://trinka.ai/features", "https://trinka.ai/pricing"],
+        "privacy": (PARTIAL, "Not stored on Confidential plan"),
+        "venue_picking": (YES, "Journal Finder"),
+        "file_validation": (PARTIAL, "Technical checks"),
+        "reviewer_selection": (NO, ""),
+        "respond_reviewers": (NO, ""),
+        "non_ai_checks": (UNKNOWN, "?"),
+        "portal_db": (NO, ""),
+        "web": (YES, ""),
+        "sources": ["https://trinka.ai/features", "https://trinka.ai/pricing", "https://www.trinka.ai/features"],
     },
     {
         "name": "Research Eagle",
-        "price": (NO, "Free tier; $12/paper"),
+        "price": (PARTIAL, "Checks free; AI from $12/paper"),
         "open_source": _CLOSED,
-        "tailored_checks": (YES, "18,960 journals"),
+        "tailored_checks": (YES, "18,960 journals", "(of 30,269 indexed; general checks for the rest)"),
         "num_checks": (PARTIAL, "Not stated"),
         "chk_references": (NO, ""),
         "chk_figures": (PARTIAL, "DPI"),
@@ -237,14 +306,21 @@ TOOLS = [
         "reformat": (NO, ""),
         "requirement_db": (PARTIAL, "18,960 journals, private"),
         "metadata_file": (NO, ""),
-        "shareable": (NO, ""),
         "cli": (NO, ""),
         "ai_agent": (NO, ""),
         "skills": (NO, "0"),
         "transfer": (NO, ""),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
-        "sources": ["https://researcheagle.org/", "https://researcheagle.org/pricing"],
+        "privacy": (YES, "Deleted in same request; no training"),
+        "venue_picking": (NO, ""),
+        "file_validation": (PARTIAL, "DOCX/PDF, size limit"),
+        "reviewer_selection": (NO, ""),
+        "respond_reviewers": (NO, ""),
+        "non_ai_checks": (YES, "Standard check uses no AI"),
+        "portal_db": (NO, ""),
+        "web": (YES, ""),
+        "sources": ["https://researcheagle.org/", "https://researcheagle.org/pricing", "https://researcheagle.org/privacy-policy/"],
     },
     {
         "name": "Articlo",
@@ -262,13 +338,20 @@ TOOLS = [
         "reformat": (YES, "Word output"),
         "requirement_db": (PARTIAL, "2,875 journals, private"),
         "metadata_file": (NO, ""),
-        "shareable": (NO, ""),
         "cli": (NO, ""),
         "ai_agent": (NO, ""),
         "skills": (NO, "0"),
         "transfer": (YES, "Re-targeting"),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
+        "privacy": (PARTIAL, "Stored in account; never sent to AI"),
+        "venue_picking": (NO, ""),
+        "file_validation": (PARTIAL, "Flags separate source files"),
+        "reviewer_selection": (NO, ""),
+        "respond_reviewers": (NO, ""),
+        "non_ai_checks": (YES, "Rule-based formatting"),
+        "portal_db": (NO, ""),
+        "web": (YES, ""),
         "sources": ["https://getarticlo.com/", "https://getarticlo.com/journals"],
     },
     {
@@ -287,14 +370,21 @@ TOOLS = [
         "reformat": (NO, ""),
         "requirement_db": (PARTIAL, "Private"),
         "metadata_file": (NO, ""),
-        "shareable": (NO, ""),
         "cli": (NO, ""),
         "ai_agent": (NO, ""),
         "skills": (NO, "0"),
         "transfer": (NO, ""),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
-        "sources": ["https://checkmymanuscript.com/"],
+        "privacy": (YES, "Deleted after processing"),
+        "venue_picking": (YES, "Journal Finder"),
+        "file_validation": (PARTIAL, "Format checks"),
+        "reviewer_selection": (YES, "Reviewer Finder"),
+        "respond_reviewers": (NO, ""),
+        "non_ai_checks": (UNKNOWN, "?"),
+        "portal_db": (NO, ""),
+        "web": (YES, ""),
+        "sources": ["https://checkmymanuscript.com/", "https://checkmymanuscript.com"],
     },
     {
         "name": "SciScore",
@@ -312,14 +402,22 @@ TOOLS = [
         "reformat": (NO, ""),
         "requirement_db": (NO, ""),
         "metadata_file": (NO, ""),
-        "shareable": (NO, ""),
         "cli": (NO, ""),
         "ai_agent": (NO, ""),
         "skills": (NO, "0"),
         "transfer": (NO, ""),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
+        "privacy": (UNKNOWN, "?"),
+        "venue_picking": (NO, ""),
+        "file_validation": (NO, ""),
+        "reviewer_selection": (NO, ""),
+        "respond_reviewers": (NO, ""),
+        "non_ai_checks": (PARTIAL, "Regex + ML"),
+        "portal_db": (NO, ""),
+        "web": (YES, ""),
         "sources": [
+            "https://jmir.org/2022/6/e37324",
             "https://sciscore.com/",
             "https://pmc.ncbi.nlm.nih.gov/articles/PMC7644557/",
         ],
@@ -340,14 +438,22 @@ TOOLS = [
         "reformat": (NO, ""),
         "requirement_db": (NO, ""),
         "metadata_file": (NO, ""),
-        "shareable": (NO, ""),
         "cli": (NO, ""),
         "ai_agent": (NO, ""),
         "skills": (NO, "0"),
         "transfer": (NO, ""),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
+        "privacy": (PARTIAL, "Stored (EU); not used for training"),
+        "venue_picking": (NO, ""),
+        "file_validation": (NO, ""),
+        "reviewer_selection": (NO, ""),
+        "respond_reviewers": (NO, ""),
+        "non_ai_checks": (NO, "Language models"),
+        "portal_db": (NO, ""),
+        "web": (YES, ""),
         "sources": [
+            "https://writefull.com/privacy",
             "https://www.writefull.com",
             "https://www.capterra.com/p/236309/Writefull/pricing/",
         ],
@@ -368,14 +474,23 @@ TOOLS = [
         "reformat": (YES, "40,000+ templates"),
         "requirement_db": (PARTIAL, "Journal templates"),
         "metadata_file": (NO, ""),
-        "shareable": (NO, ""),
         "cli": (NO, ""),
         "ai_agent": (NO, ""),
         "skills": (NO, "0"),
         "transfer": (NO, ""),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
+        "privacy": (PARTIAL, "API: not used for training"),
+        "venue_picking": (PARTIAL, "DOAJ journal finder"),
+        "file_validation": (PARTIAL, "Guideline compliance"),
+        "reviewer_selection": (UNKNOWN, "?"),
+        "respond_reviewers": (UNKNOWN, "?"),
+        "non_ai_checks": (UNKNOWN, "?"),
+        "portal_db": (NO, ""),
+        "web": (YES, ""),
         "sources": [
+            "https://docs.api.scispace.com/platform/data-privacy",
+            "https://scispace.com/agents/doaj-i6csev0m",
             "https://libguides.library.arizona.edu/ai-researchers/scispace",
             "https://scispace.com/formats",
             "https://www.capterra.com/p/178127/Scispace/pricing/",
@@ -386,7 +501,7 @@ TOOLS = [
 DEFAULT_TEXT = {YES: "Yes", NO: "No", PARTIAL: "Partial", UNKNOWN: "?"}
 
 CSS = """
-@page { size: 17in 11in; margin: 0.35in; }
+@page { size: 17in 15in; margin: 0.35in; }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 16px; background: #ffffff; color: #1f2328;
        font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
@@ -400,6 +515,8 @@ th.tool.us { background: #0969da; color: #fff; }
 td small { display: block; font-weight: 400; font-size: 9.5px; margin-top: 2px; }
 th.tool small { display: block; font-weight: 400; font-size: 10px; color: #6e7781; }
 th.feature { text-align: left; background: #f6f8fa; font-weight: 600; width: 190px; }
+tr.group th { text-align: left; font-size: 12.5px; font-weight: 700; padding: 12px 4px 3px;
+              background: none; border-bottom: 1.5px solid #1f2328; border-radius: 0; }
 td.yes { background: #c9f0d1; color: #0a5c22; }
 td.no { background: #ffd6d6; color: #8a1010; }
 td.partial { background: #ffe9b0; color: #6b4800; }
@@ -423,21 +540,22 @@ def build_html(columns: list[dict]) -> str:
         cls = "tool us" if i == 0 else "tool"
         head.append(f'<th class="{cls}">{html.escape(t["name"])}{note}</th>')
     rows = []
-    for key, label in FEATURES:
-        tds = [f'<th class="feature">{html.escape(label)}</th>']
-        for i, t in enumerate(columns):
-            status, text, note = cell(t, key)
-            cls = f"{status} us" if i == 0 else status
-            note_html = f"<small>{html.escape(note)}</small>" if note else ""
-            tds.append(f'<td class="{cls}">{html.escape(text)}{note_html}</td>')
-        rows.append("<tr>" + "".join(tds) + "</tr>")
+    for section, features in SECTIONS:
+        rows.append(f'<tr class="group"><th colspan="{len(columns) + 1}">{html.escape(section)}</th></tr>')
+        for key, label in features:
+            tds = [f'<th class="feature">{html.escape(label)}</th>']
+            for i, t in enumerate(columns):
+                status, text, note = cell(t, key)
+                cls = f"{status} us" if i == 0 else status
+                note_html = f"<small>{html.escape(note)}</small>" if note else ""
+                tds.append(f'<td class="{cls}">{html.escape(text)}{note_html}</td>')
+            rows.append("<tr>" + "".join(tds) + "</tr>")
     return f"""<!doctype html><html><head><meta charset="utf-8">
 <title>PaperPush comparison</title><style>{CSS}</style></head><body>
 <h1>PaperPush compared with other manuscript tools</h1>
-<p class="sub">Feature support as advertised by each tool, checked {RESEARCHED}.
-Prices are list prices for individual authors where available.</p>
+<p class="sub">Feature support as advertised by each tool, checked {RESEARCHED}.</p>
 <table><thead><tr>{''.join(head)}</tr></thead><tbody>{''.join(rows)}</tbody></table>
-<div class="legend"><span class="yes" style="background:#c9f0d1">Supported</span>
+<div class="legend"><span style="background:#c9f0d1">Supported</span>
 <span style="background:#ffe9b0">Partial</span>
 <span style="background:#ffd6d6">Not supported</span>
 <span style="background:#e5e7ea">Unknown</span></div>

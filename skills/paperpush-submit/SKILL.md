@@ -140,6 +140,11 @@ report, `paperpush-fix` to fix what it can in the files and the `.sub`, or
 `paperpush-autofill` to fill missing fields. Do not quietly retry
 with validation skipped.
 
+If a `transfer.txt` next to the `.sub` says `Initial-submission format:
+format-free`, or the user says this is an initial submission to a venue that
+waives formatting, add `--initial-submission` (MCP:
+`initial_submission=true`) so the waived formatting rules do not block it.
+
 **When the user asked to skip validation**, pass it through:
 
 ```

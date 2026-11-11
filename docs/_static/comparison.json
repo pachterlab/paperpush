@@ -9,14 +9,46 @@
       "yes",
       "BSD-2"
     ],
-    "tailored_checks": [
+    "privacy": [
       "yes",
-      "76 venues",
-      "(+ any venue, via online guideline scraping)"
+      "Runs locally; nothing stored"
+    ],
+    "venue_picking": [
+      "yes",
+      "Yes"
+    ],
+    "file_validation": [
+      "yes",
+      "Yes"
+    ],
+    "reviewer_selection": [
+      "yes",
+      "Yes"
+    ],
+    "portal_filling": [
+      "yes",
+      "25 venues"
+    ],
+    "respond_reviewers": [
+      "yes",
+      "Yes"
+    ],
+    "transfer": [
+      "yes",
+      "Yes"
     ],
     "num_checks": [
       "yes",
       "155"
+    ],
+    "tailored_checks": [
+      "yes",
+      "77 venues",
+      "(+ any venue, via online guideline scraping)"
+    ],
+    "non_ai_checks": [
+      "yes",
+      "113"
     ],
     "chk_references": [
       "yes",
@@ -52,35 +84,31 @@
     ],
     "requirement_db": [
       "yes",
-      "Open JSON"
+      "77 venues, open JSON"
+    ],
+    "portal_db": [
+      "yes",
+      "25 venues, open JSON"
     ],
     "metadata_file": [
       "yes",
-      ".sub file"
+      ".sub file (plain text)"
     ],
-    "shareable": [
+    "skills": [
+      "yes",
+      "11"
+    ],
+    "ai_agent": [
+      "yes",
+      "Yes"
+    ],
+    "web": [
       "yes",
       "Yes"
     ],
     "cli": [
       "yes",
       "Yes"
-    ],
-    "ai_agent": [
-      "yes",
-      "MCP server"
-    ],
-    "skills": [
-      "yes",
-      "10"
-    ],
-    "transfer": [
-      "yes",
-      "Yes"
-    ],
-    "portal_filling": [
-      "yes",
-      "24 venues"
     ],
     "offline": [
       "yes",
@@ -148,10 +176,6 @@
       "no",
       ""
     ],
-    "shareable": [
-      "no",
-      ""
-    ],
     "cli": [
       "no",
       ""
@@ -176,7 +200,40 @@
       "no",
       ""
     ],
+    "privacy": [
+      "partial",
+      "Not used for training"
+    ],
+    "venue_picking": [
+      "no",
+      ""
+    ],
+    "file_validation": [
+      "partial",
+      "Submission readiness"
+    ],
+    "reviewer_selection": [
+      "no",
+      ""
+    ],
+    "respond_reviewers": [
+      "partial",
+      "Drafts from reviewer notes"
+    ],
+    "non_ai_checks": [
+      "unknown",
+      "?"
+    ],
+    "portal_db": [
+      "no",
+      ""
+    ],
+    "web": [
+      "yes",
+      ""
+    ],
     "sources": [
+      "https://paperpal.com/privacy-policy",
       "https://paperpal.com/manuscript-check",
       "https://www.capterra.com/p/10003076/Paperpal/"
     ]
@@ -239,10 +296,6 @@
       "no",
       ""
     ],
-    "shareable": [
-      "no",
-      ""
-    ],
     "cli": [
       "no",
       ""
@@ -267,7 +320,40 @@
       "no",
       ""
     ],
+    "privacy": [
+      "unknown",
+      "?"
+    ],
+    "venue_picking": [
+      "no",
+      ""
+    ],
+    "file_validation": [
+      "yes",
+      "Track changes, counts"
+    ],
+    "reviewer_selection": [
+      "no",
+      ""
+    ],
+    "respond_reviewers": [
+      "no",
+      ""
+    ],
+    "non_ai_checks": [
+      "yes",
+      "30+"
+    ],
+    "portal_db": [
+      "partial",
+      "Portal integrations"
+    ],
+    "web": [
+      "yes",
+      ""
+    ],
     "sources": [
+      "https://www.penelope.ai/privacy",
       "https://www.penelope.ai",
       "https://www.capterra.com/p/255629/Penelopeai/"
     ]
@@ -330,10 +416,6 @@
       "no",
       ""
     ],
-    "shareable": [
-      "no",
-      ""
-    ],
     "cli": [
       "no",
       ""
@@ -358,16 +440,49 @@
       "no",
       ""
     ],
+    "privacy": [
+      "partial",
+      "Not stored on Confidential plan"
+    ],
+    "venue_picking": [
+      "yes",
+      "Journal Finder"
+    ],
+    "file_validation": [
+      "partial",
+      "Technical checks"
+    ],
+    "reviewer_selection": [
+      "no",
+      ""
+    ],
+    "respond_reviewers": [
+      "no",
+      ""
+    ],
+    "non_ai_checks": [
+      "unknown",
+      "?"
+    ],
+    "portal_db": [
+      "no",
+      ""
+    ],
+    "web": [
+      "yes",
+      ""
+    ],
     "sources": [
       "https://trinka.ai/features",
-      "https://trinka.ai/pricing"
+      "https://trinka.ai/pricing",
+      "https://www.trinka.ai/features"
     ]
   },
   {
     "name": "Research Eagle",
     "price": [
-      "no",
-      "Free tier; $12/paper"
+      "partial",
+      "Checks free; AI from $12/paper"
     ],
     "open_source": [
       "no",
@@ -375,7 +490,8 @@
     ],
     "tailored_checks": [
       "yes",
-      "18,960 journals"
+      "18,960 journals",
+      "(of 30,269 indexed; general checks for the rest)"
     ],
     "num_checks": [
       "partial",
@@ -421,10 +537,6 @@
       "no",
       ""
     ],
-    "shareable": [
-      "no",
-      ""
-    ],
     "cli": [
       "no",
       ""
@@ -449,9 +561,42 @@
       "no",
       ""
     ],
+    "privacy": [
+      "yes",
+      "Deleted in same request; no training"
+    ],
+    "venue_picking": [
+      "no",
+      ""
+    ],
+    "file_validation": [
+      "partial",
+      "DOCX/PDF, size limit"
+    ],
+    "reviewer_selection": [
+      "no",
+      ""
+    ],
+    "respond_reviewers": [
+      "no",
+      ""
+    ],
+    "non_ai_checks": [
+      "yes",
+      "Standard check uses no AI"
+    ],
+    "portal_db": [
+      "no",
+      ""
+    ],
+    "web": [
+      "yes",
+      ""
+    ],
     "sources": [
       "https://researcheagle.org/",
-      "https://researcheagle.org/pricing"
+      "https://researcheagle.org/pricing",
+      "https://researcheagle.org/privacy-policy/"
     ]
   },
   {
@@ -512,10 +657,6 @@
       "no",
       ""
     ],
-    "shareable": [
-      "no",
-      ""
-    ],
     "cli": [
       "no",
       ""
@@ -538,6 +679,38 @@
     ],
     "offline": [
       "no",
+      ""
+    ],
+    "privacy": [
+      "partial",
+      "Stored in account; never sent to AI"
+    ],
+    "venue_picking": [
+      "no",
+      ""
+    ],
+    "file_validation": [
+      "partial",
+      "Flags separate source files"
+    ],
+    "reviewer_selection": [
+      "no",
+      ""
+    ],
+    "respond_reviewers": [
+      "no",
+      ""
+    ],
+    "non_ai_checks": [
+      "yes",
+      "Rule-based formatting"
+    ],
+    "portal_db": [
+      "no",
+      ""
+    ],
+    "web": [
+      "yes",
       ""
     ],
     "sources": [
@@ -603,10 +776,6 @@
       "no",
       ""
     ],
-    "shareable": [
-      "no",
-      ""
-    ],
     "cli": [
       "no",
       ""
@@ -631,8 +800,41 @@
       "no",
       ""
     ],
+    "privacy": [
+      "yes",
+      "Deleted after processing"
+    ],
+    "venue_picking": [
+      "yes",
+      "Journal Finder"
+    ],
+    "file_validation": [
+      "partial",
+      "Format checks"
+    ],
+    "reviewer_selection": [
+      "yes",
+      "Reviewer Finder"
+    ],
+    "respond_reviewers": [
+      "no",
+      ""
+    ],
+    "non_ai_checks": [
+      "unknown",
+      "?"
+    ],
+    "portal_db": [
+      "no",
+      ""
+    ],
+    "web": [
+      "yes",
+      ""
+    ],
     "sources": [
-      "https://checkmymanuscript.com/"
+      "https://checkmymanuscript.com/",
+      "https://checkmymanuscript.com"
     ]
   },
   {
@@ -693,10 +895,6 @@
       "no",
       ""
     ],
-    "shareable": [
-      "no",
-      ""
-    ],
     "cli": [
       "no",
       ""
@@ -721,7 +919,40 @@
       "no",
       ""
     ],
+    "privacy": [
+      "unknown",
+      "?"
+    ],
+    "venue_picking": [
+      "no",
+      ""
+    ],
+    "file_validation": [
+      "no",
+      ""
+    ],
+    "reviewer_selection": [
+      "no",
+      ""
+    ],
+    "respond_reviewers": [
+      "no",
+      ""
+    ],
+    "non_ai_checks": [
+      "partial",
+      "Regex + ML"
+    ],
+    "portal_db": [
+      "no",
+      ""
+    ],
+    "web": [
+      "yes",
+      ""
+    ],
     "sources": [
+      "https://jmir.org/2022/6/e37324",
       "https://sciscore.com/",
       "https://pmc.ncbi.nlm.nih.gov/articles/PMC7644557/"
     ]
@@ -784,10 +1015,6 @@
       "no",
       ""
     ],
-    "shareable": [
-      "no",
-      ""
-    ],
     "cli": [
       "no",
       ""
@@ -812,7 +1039,40 @@
       "no",
       ""
     ],
+    "privacy": [
+      "partial",
+      "Stored (EU); not used for training"
+    ],
+    "venue_picking": [
+      "no",
+      ""
+    ],
+    "file_validation": [
+      "no",
+      ""
+    ],
+    "reviewer_selection": [
+      "no",
+      ""
+    ],
+    "respond_reviewers": [
+      "no",
+      ""
+    ],
+    "non_ai_checks": [
+      "no",
+      "Language models"
+    ],
+    "portal_db": [
+      "no",
+      ""
+    ],
+    "web": [
+      "yes",
+      ""
+    ],
     "sources": [
+      "https://writefull.com/privacy",
       "https://www.writefull.com",
       "https://www.capterra.com/p/236309/Writefull/pricing/"
     ]
@@ -875,10 +1135,6 @@
       "no",
       ""
     ],
-    "shareable": [
-      "no",
-      ""
-    ],
     "cli": [
       "no",
       ""
@@ -903,7 +1159,41 @@
       "no",
       ""
     ],
+    "privacy": [
+      "partial",
+      "API: not used for training"
+    ],
+    "venue_picking": [
+      "partial",
+      "DOAJ journal finder"
+    ],
+    "file_validation": [
+      "partial",
+      "Guideline compliance"
+    ],
+    "reviewer_selection": [
+      "unknown",
+      "?"
+    ],
+    "respond_reviewers": [
+      "unknown",
+      "?"
+    ],
+    "non_ai_checks": [
+      "unknown",
+      "?"
+    ],
+    "portal_db": [
+      "no",
+      ""
+    ],
+    "web": [
+      "yes",
+      ""
+    ],
     "sources": [
+      "https://docs.api.scispace.com/platform/data-privacy",
+      "https://scispace.com/agents/doaj-i6csev0m",
       "https://libguides.library.arizona.edu/ai-researchers/scispace",
       "https://scispace.com/formats",
       "https://www.capterra.com/p/178127/Scispace/pricing/"

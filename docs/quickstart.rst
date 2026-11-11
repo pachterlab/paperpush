@@ -38,6 +38,9 @@ skill:
 
    * - Skill
      - Use it to
+   * - ``/paperpush-pick-venue``
+     - suggest venues for a manuscript, checked against your constraints
+       and each supported venue's limits, then prepare the chosen one
    * - ``/paperpush-prepare-submission``
      - go from a manuscript directory to a filled-in portal (autofill,
        validate, submit)

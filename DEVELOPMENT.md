@@ -295,6 +295,23 @@ Update venues.md checklist after running `pytest tests/test_submit.py --run-port
 python scripts/gen_readme_venues.py
 ```
 
+## Venue citation metrics
+
+`paperpush/venue_metrics.json` holds each venue's OpenAlex 2-year mean
+citedness, shown in the `2-yr citedness` column of `paperpush venues` and as
+`mean_citedness_2yr` in the MCP `list_supported_venues`. It lives outside
+`venues.json` so older releases keep accepting the published venue data. The
+numbers come from the network, so the pre-commit hook doesn't refresh them;
+run this before a release or after adding a venue:
+
+```bash
+python scripts/gen_venue_metrics.py   # set OPENALEX_API_KEY to avoid the shared rate limit
+```
+
+It looks up new venues by name and prints each new match to check; a venue
+already in the file keeps its `openalex_id`, so to fix a wrong match edit that
+id by hand (or delete the entry) and re-run. Preprint servers get no value.
+
 ## Manuscript requirements
 
 `paperpush/manuscript_requirements.json` records, per venue slug, what the

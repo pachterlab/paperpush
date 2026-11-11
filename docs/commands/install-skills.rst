@@ -20,6 +20,7 @@ them.
 ==================================  ==============================================================
 Skill                               Use it to
 ==================================  ==============================================================
+``paperpush-pick-venue``            suggest venues for a manuscript, then prepare the chosen one
 ``paperpush-prepare-submission``    go from a manuscript directory to a filled-in portal
 ``paperpush-autofill``              fill a ``.sub`` from the manuscript files
 ``paperpush-validate``              run every check, including the ones that need a reader
@@ -92,6 +93,7 @@ Examples
    $ paperpush install-skills
    installed paperpush-autofill
    installed paperpush-fix
+   installed paperpush-pick-venue
    installed paperpush-portal-debug
    installed paperpush-prepare-submission
    installed paperpush-respond-to-reviewers

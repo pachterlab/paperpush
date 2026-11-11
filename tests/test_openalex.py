@@ -53,7 +53,7 @@ WORKS = [
 ]
 
 SOURCE_DETAILS = {
-    "S1": {"id": "https://openalex.org/S1", "display_name": "Genome Biology", "issn_l": "1474-760X", "host_organization_name": "BioMed Central", "is_oa": True, "is_in_doaj": True, "apc_usd": 5490, "summary_stats": {"h_index": 392}, "type": "journal", "homepage_url": "https://genomebiology.biomedcentral.com"},
+    "S1": {"id": "https://openalex.org/S1", "display_name": "Genome Biology", "issn_l": "1474-760X", "host_organization_name": "BioMed Central", "is_oa": True, "is_in_doaj": True, "apc_usd": 5490, "summary_stats": {"h_index": 392, "2yr_mean_citedness": 9.874}, "type": "journal", "homepage_url": "https://genomebiology.biomedcentral.com"},
     "S2": {"id": "https://openalex.org/S2", "display_name": "Bioinformatics", "issn_l": "1367-4803", "host_organization_name": "Oxford University Press", "is_oa": True, "is_in_doaj": True, "apc_usd": 3989, "summary_stats": {"h_index": 563}, "type": "journal"},
     "S4": {"id": "https://openalex.org/S4", "display_name": "bioRxiv (Cold Spring Harbor Laboratory)", "host_organization_name": "Cold Spring Harbor Laboratory", "type": "repository", "summary_stats": {"h_index": 136}},
 }
@@ -198,7 +198,7 @@ def test_find_journals_groups_similar_work_by_source(fake):
     assert names[0] == "Genome Biology"  # two recent, close matches
     assert set(names) == {"Genome Biology", "Bioinformatics", "bioRxiv (Cold Spring Harbor Laboratory)"}
     top = found.hits[0]
-    assert top.score == 100 and top.works == 2 and top.apc_usd == 5490 and top.h_index == 392 and top.publisher == "BioMed Central"
+    assert top.score == 100 and top.works == 2 and top.apc_usd == 5490 and top.h_index == 392 and top.mean_citedness_2yr == 9.9 and top.publisher == "BioMed Central"
     # Supported venues are matched by name, across "the"/case/parentheticals.
     assert top.slug == "genome_biology"
     assert {h.name: h.slug for h in found.hits}["bioRxiv (Cold Spring Harbor Laboratory)"] == "biorxiv"
@@ -216,7 +216,7 @@ def test_find_journals_type_filter_keeps_only_preprint_servers(fake):
 
 def test_format_journals_marks_supported_venues(fake):
     lines = format_journals(find_journals(ManuscriptQuery(title=TITLE, abstract=ABSTRACT), venues=_SUPPORTED, this_year=2026).hits)
-    assert lines[0].startswith("1. Genome Biology -- BioMed Central; 2 similar works; h-index 392; open access (DOAJ); APC $5,490")
+    assert lines[0].startswith("1. Genome Biology -- BioMed Central; 2 similar works; h-index 392; 2-yr mean citedness 9.9; open access (DOAJ); APC $5,490")
     assert "[paperpush: genome_biology, " in lines[0]
     assert lines[1].strip().startswith("e.g. ")
 

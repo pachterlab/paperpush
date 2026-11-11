@@ -1,12 +1,13 @@
 ## Supported venues
 
 <!-- BEGIN SUPPORTED VENUES -->
-_76 supported venues (auto-generated from `paperpush/venues.json`)._
+_77 supported venues (auto-generated from `paperpush/venues.json`)._
 
 | Slug | Venue | Keywords | Venue type | Validate | Submit | Submission platform | Description | Submit walkthrough |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `acl_arr` | [ACL Rolling Review](https://aclrollingreview.org) | natural language processing, machine learning | Conference | yes | no | - | Centralized, rolling peer-review service for the ACL community, feeding reviewed NLP and computational linguistics papers to *ACL conferences. | ➖ |
 | `ajhg` | [AJHG](https://www.cell.com/ajhg) | genetics, medicine | Journal | yes | no | - | Official journal of the American Society of Human Genetics, publishing research and perspectives across human genetics and genomics. | ➖ |
+| `alphaxiv` | [alphaXiv](https://www.alphaxiv.org) | physics, math, computer science, machine learning, statistics | Preprint | yes | yes | — | Research discussion platform layered on arXiv that also lets authors publish a PDF directly, after automated checks; a later arXiv version is merged into the same page. | ❌ |
 | `arxiv` | [arXiv](https://arxiv.org) | physics, math, computer science, machine learning, statistics, biology | Preprint | yes | yes | arXiv (native) | Free distribution service and open-access archive for preprints in physics, mathematics, computer science, quantitative biology, quantitative finance, statistics, and more. | ✅ 2026-11-03 |
 | `bioinformatics` | [Bioinformatics](https://academic.oup.com/bioinformatics) | bioinformatics, biology, genetics | Journal | yes | yes | ScholarOne Manuscripts | Computational molecular biology covering new algorithms, software, databases, and analyses of biological data. | ✅ 2026-11-03 |
 | `biorxiv` | [bioRxiv](https://www.biorxiv.org) | biology, genetics, bioinformatics, neuroscience, immunology | Preprint | yes | yes | openRxiv | Free online archive and distribution service for unpublished preprints in the life sciences. | ✅ 2026-11-03 |

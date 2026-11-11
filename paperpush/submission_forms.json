@@ -3590,5 +3590,118 @@
         ]
       }
     ]
+  },
+  "alphaxiv": {
+    "submission_url": "https://www.alphaxiv.org/",
+    "fields": [
+      {
+        "id": "manuscript_file",
+        "label": "Paper PDF",
+        "type": "file",
+        "required": true,
+        "help": "Path to the paper PDF, up to 50 MB.",
+        "accept": [
+          ".pdf"
+        ],
+        "max_file_size_mb": 50,
+        "autofill": "filemap"
+      },
+      {
+        "id": "title",
+        "label": "Title",
+        "type": "text",
+        "required": true,
+        "help": "The full title of the paper.",
+        "autofill": "extract"
+      },
+      {
+        "id": "abstract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "help": "The abstract as it appears in the paper.",
+        "autofill": "extract"
+      },
+      {
+        "id": "authors",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "help": "One author per line, in order, as the author's name. To link your own name to your alphaXiv researcher profile, choose \"This is me\" in the portal before you submit.",
+        "fields": [
+          "name"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "organizations",
+        "label": "Organizations",
+        "type": "textarea",
+        "section": "authors",
+        "help": "Optional. One organization per line, up to 100, each up to 200 characters. Left empty, the organizations alphaXiv extracts from the PDF are kept.",
+        "max_count": 100,
+        "autofill": "extract"
+      },
+      {
+        "id": "publication_date",
+        "label": "Publication date",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. When this content was originally published, as YYYY-MM-DD. Left empty, the portal's pre-filled date is kept.",
+        "autofill": "never"
+      },
+      {
+        "id": "url_slug",
+        "label": "URL slug",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. The suffix of the paper's alphaxiv.org/abs/ address, e.g. my-publication-title. Left empty, the slug alphaXiv generates is kept.",
+        "autofill": "never"
+      },
+      {
+        "id": "categories",
+        "label": "Categories",
+        "type": "multichoice",
+        "section": "metadata",
+        "help": "Optional. Comma-separated primary fields.",
+        "options": [
+          "Computer Science",
+          "Mathematics",
+          "Physics",
+          "Quantitative Biology",
+          "Quantitative Finance",
+          "Statistics",
+          "Electrical Engineering and Systems Science",
+          "Economics"
+        ],
+        "autofill": "classify"
+      },
+      {
+        "id": "subcategories",
+        "label": "Subcategories",
+        "type": "multichoice",
+        "section": "metadata",
+        "help": "Optional. Comma-separated specific arXiv codes or topics, e.g. cs.AI, math.CO.",
+        "options_file": "alphaxiv_subcategories.txt",
+        "autofill": "classify"
+      },
+      {
+        "id": "bibtex",
+        "label": "BibTeX",
+        "type": "textarea",
+        "section": "additional",
+        "help": "Optional. Shown as the BibTeX citation on the publication page. Left empty, the entry alphaXiv generates is kept.",
+        "autofill": "never"
+      },
+      {
+        "id": "agree_terms",
+        "label": "I have the right to publish this content on alphaXiv",
+        "type": "boolean",
+        "required": true,
+        "help": "You must confirm this yourself before the portal allows submission.",
+        "confirm": true,
+        "autofill": "never"
+      }
+    ]
   }
 }

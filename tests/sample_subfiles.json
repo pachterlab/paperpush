@@ -1024,5 +1024,20 @@
       "abstract": "We prove a sample theorem about a family of finite combinatorial structures.",
       "manuscript_file": "tests/manuscript_files/arxiv/manuscript.pdf"
     }
+  },
+  "alphaxiv.sub.txt": {
+    "venue": "alphaxiv",
+    "fields": {
+      "manuscript_file": "tests/manuscript_files/alphaxiv/manuscript.pdf",
+      "title": "PAPERPUSH TEST - DO NOT REVIEW",
+      "abstract": "This is an automated test of a submission tool. It is not research and must not be published.",
+      "authors": "Test Author\nSecond Tester\n",
+      "organizations": "Example University\n",
+      "publication_date": "2026-11-10",
+      "url_slug": "paperpush-test-do-not-review",
+      "categories": "Computer Science",
+      "subcategories": "cs.AI, cs.LG",
+      "agree_terms": "yes"
+    }
   }
 }

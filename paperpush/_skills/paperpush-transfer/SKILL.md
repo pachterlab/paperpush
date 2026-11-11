@@ -84,6 +84,41 @@ delete anything in the source directory**; every change happens in the copy.
    Then get the target schema (`paperpush schema <venue>`, hidden from
    `--help`) and its guidelines (`paperpush requirements <venue> --json`).
 
+   **If the new venue waives formatting at initial submission, ask now.** That
+   is when the guidelines set `manuscript.initial_submission_any_format`, at
+   the top level or under an entry in `article_types`. Ask before doing any
+   more work, unless the user already said which they want ("keep my
+   formatting", "format it fully"):
+
+   > <Venue> does not require its formatting for an initial submission:
+   > "<the rule>". How should I prepare the manuscript?
+   >
+   > 1. **Remove only what identifies the earlier journal (recommended).**
+   >    Uses <venue>'s template if it provides one, and otherwise keeps your
+   >    current layout. Either way it still meets what applies now: <the
+   >    venue's actual limits and requirements from the list below>.
+   > 2. **Conform to every requirement now.** Applies <venue>'s template or
+   >    layout rules, reference style, and the rest, which you would otherwise
+   >    do at revision or acceptance.
+
+   Call these **format-free** and **full** below. A venue without the rule is
+   always **full**, with no question. When re-running in place, reuse the
+   choice on the `Initial-submission format:` line of the existing
+   `transfer.txt`, and ask only if it is missing.
+
+   Under format-free, only how the manuscript looks is waived: template, page
+   setup, fonts, spacing, line and page numbers, section order and heading
+   style, reference style, and figure placement and file specifications.
+   These **still apply**:
+   - length limits (words, pages, abstract, title, display items, reference
+     count). If the rule itself waives length ("style and length are
+     flexible"), treat them as guides: report an overrun, but do not trim it;
+   - accepted file types;
+   - anything the rule requires or makes a condition ("provided it stays within
+     the word guide", "must include a title page and significance statement");
+   - required statements, anonymization on a double-blind venue, the `.sub`'s
+     fields, and the integrity checks (references, placeholders, and so on).
+
 4. **Read the earlier `.sub` files** as data, with relative paths resolved:
 
    ```
@@ -123,10 +158,12 @@ delete anything in the source directory**; every change happens in the copy.
      `transfer.txt` so the author can re-enter it if it still applies.
    - Write `values.json` in a temporary directory, not the new directory.
 
-6. **Reformat the manuscript for the new venue.** Do this by default; skip it
-   only when the user asked to keep the original formatting (record that in
-   `transfer.txt`). It runs before validation so validation measures the
-   reformatted file.
+6. **Reformat the manuscript for the new venue.** Do this by default; skip
+   `paperpush format` only when the user asked to keep the original formatting
+   (record that in `transfer.txt`). Under format-free, keep its result only if
+   it applied a template, as described below. Converting and removing the
+   earlier venue's information, below, happen either way. This step runs before
+   validation so validation measures the final file.
    - **Convert first when the new venue needs another file type.** Compare the
      manuscript's type with `manuscript.formats` in `paperpush requirements
      <venue> --json`. When the new venue does not accept it but accepts `docx`
@@ -174,13 +211,57 @@ delete anything in the source directory**; every change happens in the copy.
      that did not pass. `left_to_author` (reference style, front matter the
      new class wants, figure placement, ...) goes into the To-do list too.
    - If `format` fails, report the error, keep the unformatted copy, and go on.
+   - **Under format-free**, run `format` without `--update-sub` (MCP:
+     `update_subfile=false`) and read `template` in its JSON. If it is set and
+     the result is usable (a LaTeX manuscript compiled), point the `.sub` at
+     the formatted file as above. If it is empty, `format` fell back to the
+     venue's layout rules, which are waived here: remove the `formatted/`
+     directory this run created and keep the copy's layout. Templates it found
+     but could not apply (`other_templates`, such as an Overleaf link) go in
+     the To-do list as optional. Its `left_to_author` items that are waived
+     are optional too.
+   - **Remove what identifies the earlier venue**, on every transfer, as the
+     last part of this step: reformatting replaces a template but leaves the
+     text and metadata. Work on the copies in the new directory (the formatted
+     manuscript when there is one), and record each removal for `transfer.txt`.
+     Look for the names of the venues in the earlier `.sub` files and, when no
+     earlier venue is known, for whatever journal the files show they were
+     prepared for:
+     - title-page, header, footer, and watermark text: "Submitted to ...", the
+       journal's name or logo, manuscript IDs, submission dates, and the old
+       venue's article-type label;
+     - template branding: LaTeX `\journal{...}` and similar commands, and class
+       options that print the journal's name. If the class itself prints it,
+       switch to `article` if the result compiles, else leave it and add it to
+       the To-do list. A publisher's generic template that names no journal
+       can stay;
+     - sentences about the earlier submission (what its editors or reviewers
+       asked for);
+     - file names containing the old venue's name or slug (rename the copy and
+       update the new `.sub`), and document metadata (Word properties, PDF
+       title and subject);
+     - the cover letter: replace a plain mention of the old journal or editor
+       with the new one. Anything that argues the fit for the old journal goes
+       in the To-do list for the author to rewrite.
+
+     Leave references, citations, and any journal the science itself discusses
+     alone. If you edited the source behind an uploaded PDF, rebuild the PDF. A
+     PDF with no source cannot be edited: list what it shows in the To-do list.
 
 7. **Validate.** Invoke the `paperpush-validate` skill (via the Skill tool) on
-   the new `.sub`, including the checks that need a reader. Do not run
-   `paperpush-fix` yourself: if validate finds errors or warnings, ask whether
-   to run it, and say that it edits only the copies in the new directory (the
-   formatted manuscript, when step 6 made one). If they say yes, invoke it and
-   use its final validation in step 8.
+   the new `.sub`, including the checks that need a reader. Under format-free,
+   tell it this is an initial submission, so it passes `--initial-submission`
+   (MCP: `initial_submission=true`). That flag shows **every** error as a
+   warning, including the ones that still apply, so sort the warnings yourself
+   using the list in step 3: treat those that still apply as errors, and the
+   rest as waived.
+
+   Do not run `paperpush-fix` yourself: if validate finds errors or warnings
+   (under format-free, only those that still apply), ask whether to run it, and
+   say that it edits only the copies in the new directory (the formatted
+   manuscript, when step 6 made one). If they say yes, invoke it and use its
+   final validation in step 8. Under format-free, pass it the same flag and
+   tell it to leave the waived items alone.
 
 8. **Write `<new-dir>/transfer.txt`** (rewrite it if this is a re-run). Plain
    text, absolute paths, in this order:
@@ -192,6 +273,8 @@ delete anything in the source directory**; every change happens in the copy.
    New directory: <abs new dir>
    New .sub: <abs path>
    Earlier .sub files used: <abs path> (<venue>, modified <date>), ...
+   Initial-submission format: <format-free or full>: <the venue's rule>
+       (only when the venue has the rule)
    Draft venue entry: <abs new dir>/venue_draft  (only for a venue paperpush
        does not support; run paperpush on this .sub with
        PAPERPUSH_VENUE_DATA=<abs new dir>/venue_draft/data)
@@ -225,17 +308,25 @@ delete anything in the source directory**; every change happens in the copy.
       Changes: <each change, one line each>
       Left for you: <each left_to_author item>
       Layout checks not passed: <id>: <message>, ...
-      (or: "Not reformatted: <reason>" -- kept the original formatting at
-       your request, no Word/LaTeX source, or the error format gave)
+      (or: "Not reformatted: <reason>" -- format-free initial submission and
+       the venue has no usable template, kept the original formatting at your
+       request, no Word/LaTeX source, or the error format gave)
+      Removed earlier-venue information: <file>: <what was removed>, ...
+      Could not remove: <file>: <what and why>, ...
 
    5. Validation
       <n> errors, <n> warnings, <n> not checked
       <each error and warning, one line each>
+      (format-free: "Still apply: <each>" and "Waived at initial submission:
+       <each>" in place of the list above)
       <what paperpush-fix changed, if it ran>
 
    6. To do
       <the author's remaining tasks, most important first>
-      paperpush submit <abs new .sub>   (after: paperpush login <new venue>)
+      (format-free: "Apply <new venue>'s formatting when it asks, at revision
+       or acceptance")
+      paperpush submit <abs new .sub>   (after: paperpush login <new venue>;
+       format-free: add --initial-submission)
       (or, when paperpush cannot submit to the new venue: upload the files
        through <new venue>'s own portal, using the .sub as your checklist)
    ```
@@ -253,8 +344,12 @@ delete anything in the source directory**; every change happens in the copy.
    updated, and new; the guideline differences that matter most (a lower word
    limit, a different reference style); whether the manuscript was reformatted
    and with which template (or the layout rules); the validation counts; and
-   what is left for them. For the portal, point them to `paperpush-submit` (or
-   `paperpush login <venue>` then `paperpush submit <abs .sub>`). If
+   what is left for them. Under format-free, say what was removed and which
+   warnings still apply, so a passing validation is not mistaken for all clear.
+   For the portal, point them to `paperpush-submit` (or
+   `paperpush login <venue>` then `paperpush submit <abs .sub>`, adding
+   `--initial-submission` under format-free, or validation will refuse the
+   formatting errors). If
    `paperpush venues` shows the new venue is validate-only, or it is a draft
    entry, paperpush cannot submit to it: tell them to upload the files through
    the venue's own portal, using the `.sub` as their checklist.

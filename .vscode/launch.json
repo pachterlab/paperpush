@@ -1,10 +1,9 @@
 {
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "Debug AAAI 2027",
-            "args": ["submit", "tests/sub_files/aaai_2027/aaai_2027.sub.txt"],
+            "name": "Debug alpaXiv",
+            "args": ["submit", "tests/sub_files/alphaxiv/alphaxiv.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {

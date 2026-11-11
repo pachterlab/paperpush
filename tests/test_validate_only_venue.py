@@ -224,7 +224,7 @@ def test_venues_columns_selects_and_orders(capsys):
 
 def test_venues_hide_columns(capsys):
     assert main(["venues", "--hide-columns", "link,keywords"]) == 0
-    assert _header(capsys.readouterr().out) == ["Slug", "Venue", "Type", "Validate", "Submit"]
+    assert _header(capsys.readouterr().out) == ["Slug", "Venue", "Type", "2-yr", "citedness", "Validate", "Submit"]
 
 
 def test_venues_columns_and_hide_columns_combine(capsys):

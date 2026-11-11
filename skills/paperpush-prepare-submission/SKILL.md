@@ -29,8 +29,10 @@ use `paperpush-submit` directly instead.
    plain text (a path is free-text; do not use a multiple-choice prompt). Never
    guess it, scan the repository for candidate folders, or fall back to test
    fixtures.
-2. **The venue slug** (e.g. `bioinformatics`). If the user did not say it, ask
-   or infer it from their message. Look it up with `paperpush venues` (try its
+2. **The venue slug** (e.g. `bioinformatics`). If the user did not say it,
+   infer it from their message; if they haven't chosen one, offer to run the
+   `paperpush-pick-venue` skill (Skill tool) for the manuscript and continue
+   here with the venue they pick. Look it up with `paperpush venues` (try its
    name, abbreviation, and publisher's title). If it is not listed, don't stop:
    see [Venue paperpush does not support](#venue-paperpush-does-not-support).
 

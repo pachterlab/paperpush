@@ -56,6 +56,7 @@ from typing import IO, Any, Literal, Optional
 
 from . import __version__
 from . import credentials
+from . import venue_metrics
 from . import venues as venues_pkg
 from ._logging import configure_logging
 from .autofill import autofill as _apply_autofill
@@ -195,7 +196,10 @@ def list_supported_venues(include_deprecated: bool = False) -> list[dict[str, An
     """List the venues paperpush can submit to.
 
     Returns one summary per venue: slug (the identifier every other tool takes),
-    display name, kind, portal URL, and how many fields its submission form has.
+    display name, kind, portal URL, how many fields its submission form has, and
+    `mean_citedness_2yr` (OpenAlex's 2-year mean citations per work, an open
+    counterpart of the impact factor but not the Clarivate figure; null for
+    preprint servers and venues without an OpenAlex match).
     Call `describe_venue` for the fields themselves.
     """
     return [
@@ -212,6 +216,7 @@ def list_supported_venues(include_deprecated: bool = False) -> list[dict[str, An
             "login_required": venue.has_form and venues_pkg.login_required(venue.slug),
             "supports_validate": venue.supports_validate,
             "supports_submit": venue.supports_submit,
+            "mean_citedness_2yr": venue_metrics.mean_citedness_2yr(venue.slug),
             "field_count": len(venue.fields),
             "required_field_count": sum(1 for f in venue.fields if f.required),
         }
@@ -250,7 +255,9 @@ def pick_venue(
     abstract, or keywords) is also matched against any journal: `openalex`
     holds the journals and preprint servers that published the most similar
     works in OpenAlex (name, publisher, similar works with examples, open
-    access, APC, h-index), each marked with its `paperpush_slug` when
+    access, APC, h-index, and `mean_citedness_2yr`: OpenAlex's
+    2-year mean citations per work, an open analogue of the impact factor but
+    not the Clarivate figure), each marked with its `paperpush_slug` when
     paperpush supports it. If OpenAlex cannot be reached, `openalex.error`
     says why and only `matches` is filled. Venues are ranked on thematic fit
     alone; follow up with `describe_venue` and `create_subfile` for a
