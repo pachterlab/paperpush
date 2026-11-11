@@ -128,7 +128,7 @@ def test_venues_lists_supported_venues(capsys):
     assert rc == 0
     # One table with a column per attribute; venue types appear in the Type column.
     header = out.splitlines()[0].split()
-    assert header == ["Slug", "Venue", "Keywords", "Type", "Link", "Validate", "Submit"]
+    assert header == ["Slug", "Venue", "Keywords", "Type", "2-yr", "citedness", "Link", "Validate", "Submit"]
     assert "Preprint" in out and "Journal" in out
     # Every configured venue slug shows up in the listing.
     for venue in list_venues():
