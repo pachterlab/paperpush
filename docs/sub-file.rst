@@ -1,3 +1,5 @@
+.. _what-is-a-sub-file:
+
 The .sub file
 =============
 

@@ -171,31 +171,3 @@ Helper commands
 ``paperpush web VENUE.sub.txt``
    Open a ``.sub`` file in a local copy of the web app. See
    :doc:`../commands/web`.
-
-.. _what-is-a-sub-file:
-
-What is a .sub file?
---------------------
-
-The ``.sub`` file is a YAML-like text file holding all the metadata and file
-paths needed to upload a manuscript to a venue's submission portal. In the
-snippet below you would fill in the manuscript path, title, and abstract:
-
-.. code-block:: subfile
-
-   @venue: venue
-
-   # Manuscript file (file, REQUIRED)
-   #   Path to the submission.
-   manuscript_file: /PATH/TO/MANUSCRIPT.pdf
-
-   # Title (text, REQUIRED)
-   #   The full title of the article.
-   title: TITLE
-
-   # Abstract (textarea, REQUIRED)
-   #   Plain-text abstract, at least 20 characters
-   abstract: |
-     HERE IS THE ABSTRACT
-
-See :doc:`../sub-file` for a full, filled-in example.

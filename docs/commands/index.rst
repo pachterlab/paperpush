@@ -35,7 +35,7 @@ Every subcommand accepts these logging flags:
 ``-q``, ``--quiet``
    Log errors only.
 
-The commands, in workflow order
+All commands
 -------------------------------
 
 .. toctree::
@@ -43,20 +43,20 @@ The commands, in workflow order
 
    venues
    subfile
-   options
    autofill
    validate
-   requirements
-   format
-   convert
-   publishers
    login
    submit
-   recovery-report
-   codegen
-   web
+   options
+   requirements
    pick-venue
    find-reviewers
+   publishers
+   format
+   convert
+   recovery-report
    add-venue
+   codegen
    update-venues
+   web
    install-skills
