@@ -1,10 +1,11 @@
 {
   "data_format": 2,
-  "commit": "7af06f942e09bac2d79bb619e19cb66742dfd704",
-  "published_at": "2026-11-10T15:38:41-08:00",
+  "commit": "3c0b195bcaaa5ec2b851feee6ea569775c0c0dcc",
+  "published_at": "2026-11-11T14:58:56-08:00",
   "files": {
     "_assets/aaai_2027_countries.txt": "1d4f026a58ba8487655950050e6083e901527f7bbd52d66e458fd4dbe8adcbb0",
     "_assets/aaai_2027_topics.txt": "5590bec01e7be137d7f5bd8bb07aeb155499de071d33bc356da88e1bb38baf9a",
+    "_assets/alphaxiv_subcategories.txt": "c5745c61fddd4ae7a2a26067d8b9f37c6f4c7d437e5171992f61d8a610625fc2",
     "_assets/arxiv_categories.txt": "fbdc1bf97275c57b5450fb2e824e7ab78dedebfbfb078e92bf5945c6ee3ed11c",
     "_assets/bioinformatics_keywords.txt": "d3ed22caaa3fdb4a30489354691128f06180ffd0081ad8911b4080d01da32674",
     "_assets/genome_biology_institution_countries.txt": "3525658fd16e2e997f3e1cbcf29b31f74bca9c8295c639f3c5ce58772e6a6100",
@@ -20,11 +21,11 @@
     "_assets/science_signaling_subjects.txt": "5842a971be87377ff86ffb77e1fffa1eae6b392d3718d71af3ea72b51ea21c79",
     "_assets/science_subjects.txt": "c40afa2c15ce65164f43216c80ed26cef3c040017036e456322734d3dfbcb670",
     "_assets/science_translational_medicine_subjects.txt": "b13c4d61625c528587c85baf8b25cbe81501dd9d55f1ae92e3cf0333e5b29760",
-    "manuscript_requirements.json": "f25efcf5806d48d6ad403ade3f47bb3f8542cab085bd1c45c8987a75a95dba26",
+    "manuscript_requirements.json": "282bb5ecbd8d0701bd6e8c39e970a907f8e089bc7fb4ca337b66ef5e4e6f47d2",
     "manuscript_requirements.schema.json": "6364aa250ad4de52d97cf9eda360ef5f017b6a3a4b90f1ccd316c81ffa44fd34",
-    "submission_forms.json": "8ad4a6d104624fd7858b20cb42b5474ec4dea82558a7af6d2a4a918af04cac5e",
+    "submission_forms.json": "764c2200b3ac7f3bf9ba1efa289fc257d2c25d628e03a61fd300fe53f45771e5",
     "submission_forms.schema.json": "f938987758e03532effd5bf118f03b747d9ddfaff042237ec7e2ec4f651aa9ad",
-    "venues.json": "ec97f8088150663af83a7565964ed9bf337afd32b31d258633649fb31a27e0b5",
+    "venues.json": "2194035ebd9fdfb45819d4d9808fc3dca27daa787a7b7b5d37a0f57aa4a2e9fd",
     "venues.schema.json": "f20895611364c418f0def9bcada90f639e65301b7f62c6f7764e90f66d9995e4"
   }
 }

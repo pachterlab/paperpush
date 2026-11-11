@@ -19432,5 +19432,17 @@
         }
       }
     }
+  },
+  "alphaxiv": {
+    "source_urls": [
+      "https://www.alphaxiv.org/docs/ai-policy"
+    ],
+    "retrieved": "2026-11-10",
+    "statements": {
+      "notes": [
+        "AI assistance is welcome, including substantial assistance with drafting, code, figures, proofs, literature search, and experiments.",
+        "Papers that are entirely AI generated, with little or no human writing, are not accepted."
+      ]
+    }
   }
 }
