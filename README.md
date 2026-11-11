@@ -1,23 +1,36 @@
-# PaperPush: Automated manuscript submission to journals, conferences, and preprint servers
+<p align="center">
+  <img src="docs/_static/logo.svg" width="140" alt="PaperPush logo">
+</p>
 
-<!-- [![Documentation Status](https://readthedocs.org/projects/paperpush/badge/?version=latest)](https://paperpush.readthedocs.io/en/latest/?badge=latest) -->
+<h1 align="center">PaperPush</h1>
 
-Prepare manuscripts for submission to preprint servers, journals, and conferences with just a few commands.
+<p align="center">
+  <strong>A tool and AI companion for scientific publishing.</strong><br>
+  Prepare manuscripts for submission to preprint servers, journals, and conferences with just a few commands.
+</p>
+
+<!-- [![PyPI version](https://badge.fury.io/py/paperpush.svg)](https://badge.fury.io/py/paperpush)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/paperpush)](https://pypistats.org/packages/paperpush)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/paperpush)](https://pypi.org/project/paperpush/)
+[![PyPI - License](https://img.shields.io/pypi/l/paperpush)](https://pypi.org/project/paperpush/)
+[![Tests](https://github.com/pachterlab/paperpush/actions/workflows/test.yml/badge.svg)](https://github.com/pachterlab/paperpush/actions/workflows/test.yml)
+[![Documentation Status](https://readthedocs.org/projects/paperpush/badge/?version=latest)](https://paperpush.readthedocs.io/en/latest/?badge=latest) -->
 
 PaperPush provides the following services:
-- A standardized system to share all metadata submitted to a venue (the .sub file)
+- A standardized system to share all metadata submitted to a venue (the .sub file - [see an example here](https://paperpush.readthedocs.io/en/latest/sub-file.html#sub-file-example))
 <!-- BEGIN VALIDATION CHECK COUNT -->
 - Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 155 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
 <!-- END VALIDATION CHECK COUNT -->
-- A central database of journal/conference manuscript requirements and submission data
+- A central database of journal/conference [manuscript requirements](https://paperpush.readthedocs.io/en/latest/schemas/manuscript_requirements.html) (paperpush/manuscript_requirements.json) and [submission data](https://paperpush.readthedocs.io/en/latest/schemas/submission_forms.html) (paperpush/submission_forms.json)
 - Automated and fast submission portal filling with deterministic scripts
+- AI skills with an MCP server, a [website](https://paperpush.onrender.com), and a [command line interface](https://paperpush.readthedocs.io/en/latest/commands/index.html)
 - Free, open-source, actively-maintained, and never stores your data
 
-## tl;dr
+## Quickstart
 
-Choose your favorite mode: AI agent skills, website, or command line. All modes support venue-specific metadata collection, venue-tailored checking, and submission portal filling for supported venues.
+Choose your favorite mode: AI agent skills, website, or command line. All modes support venue-specific metadata collection, venue-tailored checking, and submission portal filling for supported venues. AI agents support additional tasks.
 
-### AI agent skills:
+### AI agent skills
 
 #### Install in Claude Code (other AI agents listed below)
 - `/plugin marketplace add pachterlab/paperpush`
@@ -41,8 +54,9 @@ Choose your favorite mode: AI agent skills, website, or command line. All modes 
 #### Respond to reviewers
 - `/paperpush-respond-to-reviewers Prepare my response to reviewers in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.`
 
+### Website
 
-### Website: 
+[paperpush.onrender.com](https://paperpush.onrender.com)
 
 #### Venue-specific metadata collection, venue-tailored checking, and submission portal filling for a supported venue
 - Visit [paperpush.onrender.com](https://paperpush.onrender.com)
@@ -53,11 +67,12 @@ Choose your favorite mode: AI agent skills, website, or command line. All modes 
 - Click the blue "Share" button to share the editable form with co-authors (or download and share the .sub file)
 - (If available) Click the "Fill out submission portal automatically" button and follow the instructions
 
-### Command line interface: 
+### Command line interface
+
 #### Venue-specific metadata collection, venue-tailored checking, and submission portal filling for a supported venue
 - To install:
-  - `pip install paperpush["all"]`  # Recommended — for AI API usage, MCP server, local web deployment, and additional manuscript validation checks
-  - `playwright install chromium`  # Required for `submit`
+  - `pip install paperpush["all"]`  # Recommended — ["all"] enables AI API usage, MCP server, local web deployment, and additional manuscript validation checks
+  - `playwright install chromium`  # Required for `submit` - installs the playwright dependency and the required chromium browser
 - `paperpush subfile VENUE`  # create a .sub file (`paperpush subfile general` if you have not chosen a venue yet)
 - Fill out VENUE.sub.txt  # or agent skill /paperpush-autofill
 - `paperpush validate VENUE.sub.txt`  # validate the files and data in VENUE.sub.txt  # or agent skill /paperpush-validate
@@ -66,10 +81,6 @@ Choose your favorite mode: AI agent skills, website, or command line. All modes 
 - (If available) `paperpush login VENUE`  # log in to the VENUE submission portal
 - (If available) `paperpush submit VENUE.sub.txt`  # fill out the VENUE submission portal with information in VENUE.sub.txt  # or agent skill /paperpush-submit
   - `submit` is for **initial submissions only**. Upload a revision through the venue's own "submit revision" link for the existing manuscript (prepare it with `/paperpush-respond-to-reviewers`)
-
-## Website
-
-[paperpush.onrender.com](https://paperpush.onrender.com): prepare a submission in your browser, validate it, and share the editable form with co-authors — no install needed. 
 
 ## Install
 
@@ -120,7 +131,7 @@ Then ask:
 
 See [`docs/example-session.md`](docs/example-session.md) for a full worked example of this flow.
 
-## Quickstart
+## CLI usage
 
 Use the agent skill `/paperpush-prepare-submission` to run this entire pipeline.
 
@@ -272,7 +283,7 @@ Each venue is listed in `paperpush/venues.json` (the master list of venues and t
 | `/paperpush-add-venue-validate` | add or refresh a venue's author guidelines (contributors) |
 | `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and `submit` support for a venue, with tests (contributors) |
 
-[(docs/_static/schematic.png)](docs/_static/schematic.pdf)
+[![PaperPush schematic](docs/_static/schematic.png)](docs/_static/schematic.pdf)
 
 ## What is a .sub file
 
@@ -294,6 +305,8 @@ title: TITLE
 abstract: |
   HERE IS THE ABSTRACT
 ```
+
+See a full, filled-in example [here](https://paperpush.readthedocs.io/en/latest/sub-file.html#sub-file-example) (from [tests/sub_files/arxiv/arxiv.sub.txt](tests/sub_files/arxiv/arxiv.sub.txt)).
 
 ## MCP server
 

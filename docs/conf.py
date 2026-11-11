@@ -12,6 +12,8 @@ from datetime import date
 # Make the package importable so ``sphinx.ext.autodoc`` and ``__version__``
 # resolve against the checked-out source rather than an installed copy.
 sys.path.insert(0, os.path.abspath(".."))
+# Local Sphinx extensions (the .sub file lexer).
+sys.path.insert(0, os.path.abspath("_ext"))
 
 try:
     from paperpush import __version__ as _version
@@ -35,6 +37,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "myst_parser",
+    "subfile_lexer",
 ]
 
 # Parse both reStructuredText and Markdown (the latter via MyST).

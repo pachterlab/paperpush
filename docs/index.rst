@@ -1,60 +1,74 @@
 PaperPush
 =========
 
-**Automated manuscript submission to journals, conferences, and preprint
-servers.**
+.. image:: _static/logo.svg
+   :width: 140
+   :align: center
+   :alt: PaperPush logo
 
-PaperPush prepares manuscripts for submission to preprint servers, journals,
-and conferences with just a few commands. Instead of spending hours checking
-manuscript files against author guidelines and filling out submission portals
-by hand, give PaperPush a manuscript directory and a target venue: it validates
-the documents and fills out the submission portal for you.
+**A tool and AI companion for scientific publishing.**
 
-PaperPush provides:
+Prepare manuscripts for submission to preprint servers, journals, and
+conferences with just a few commands.
 
-- a standardized file (the ``.sub`` file) holding everything submitted to a
-  journal or conference, which you can share with co-authors;
-- extensive venue-specific guideline checking, including section lengths,
-  reference hallucination, figure resolution, link validation, and
-  anonymization (see :doc:`validation-checks`);
-- a central database of journal and conference manuscript requirements;
-- fast, automated submission-portal filling with deterministic scripts;
-- all of it free, open source, actively maintained, and never storing your
-  data.
+PaperPush provides the following services:
 
-Get started
------------
+- A standardized system to share all metadata submitted to a venue (the
+  ``.sub`` file; :ref:`see an example here <sub-file-example>`).
+- Extensive venue-specific manuscript guideline checking, including section
+  lengths, reference hallucination, figure resolution, link validation, and
+  anonymization. The checks in a report depend on the venue and files
+  (:doc:`see the full list <validation-checks>`).
+- A central database of journal and conference
+  :doc:`manuscript requirements <schemas/manuscript_requirements>`
+  (``paperpush/manuscript_requirements.json``) and
+  :doc:`submission data <schemas/submission_forms>`
+  (``paperpush/submission_forms.json``).
+- Automated and fast submission portal filling with deterministic scripts.
+- AI skills with an MCP server, a `website <https://paperpush.onrender.com>`_,
+  and a :doc:`command line interface <commands/index>`.
+- Free, open source, actively maintained, and never stores your data.
 
-Pick whichever path suits you; :doc:`quickstart` walks through each one.
+Quickstart
+----------
 
-**With an AI agent** (Claude Code shown; see :doc:`installation` for Codex and
-other agents):
+Choose your favorite mode: AI agent skills, website, or command line. All
+modes support venue-specific metadata collection, venue-tailored checking, and
+submission portal filling for :doc:`supported venues <venues>`. AI agents
+support additional tasks (choosing a venue, fixing validation issues,
+transferring between venues, and responding to reviewers).
 
-.. code-block:: text
+:doc:`quickstart/ai`
+   Install in Claude Code (:ref:`other agents <install-the-ai-agent-skills>`):
 
-   /plugin marketplace add pachterlab/paperpush
-   /plugin install paperpush@paperpush
-   /paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.
+   .. code-block:: text
 
-**On the website**: no install needed. Visit
-`paperpush.onrender.com <https://paperpush.onrender.com>`_, pick a venue,
-upload your files, validate, and share the editable form with co-authors.
+      /plugin marketplace add pachterlab/paperpush
+      /plugin install paperpush@paperpush
+      /paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE with PaperPush.
 
-**On the command line**:
+:doc:`quickstart/web`
+   No install needed. Visit
+   `paperpush.onrender.com <https://paperpush.onrender.com>`_, select the
+   venue (or "General"), upload your files, validate, share the editable form
+   with co-authors, and fill out the portal automatically when available.
 
-.. code-block:: bash
+:doc:`quickstart/cli`
+   .. code-block:: bash
 
-   paperpush subfile VENUE               # 1. create a VENUE.sub.txt template
-   #                                       2. fill out VENUE.sub.txt (by hand, paperpush web, or paperpush autofill)
-   paperpush validate VENUE.sub.txt      # 3. check files and metadata against the author guidelines
-   paperpush login VENUE                 # 4. log in to the portal (venues with submit support)
-   paperpush submit VENUE.sub.txt        # 5. fill out the submission portal
+      pip install "paperpush[all]" && playwright install chromium
+      paperpush subfile VENUE               # create VENUE.sub.txt
+      #                                       fill out VENUE.sub.txt
+      paperpush validate VENUE.sub.txt      # check files and metadata against the author guidelines
+      paperpush login VENUE                 # log in to the portal (if available)
+      paperpush submit VENUE.sub.txt        # fill out the submission portal (if available)
 
 .. note::
 
-   ``paperpush submit`` fills out the venue's portal but **does not click the
-   final submit button**. Always review the form in the browser before
-   submitting.
+   PaperPush never presses the final submit button. It brings you to one of
+   the last steps of the venue's portal; review the form there before
+   submitting. ``submit`` is for **initial submissions only**: upload a
+   revision through the venue's own "submit revision" link.
 
 .. toctree::
    :maxdepth: 2
@@ -74,6 +88,7 @@ upload your files, validate, and share the editable form with co-authors.
    :caption: Reference
 
    venues
+   sub-file
    validation-checks
    schemas/venues
    schemas/submission_forms

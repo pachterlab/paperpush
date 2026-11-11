@@ -1,0 +1,7 @@
+/* .sub file highlighting, matching the "Highlight" rules in .vscode/settings.json.
+   Sphinx wraps a block with :language: subfile in div.highlight-subfile. */
+div.highlight-subfile .highlight .c { color: #9e9e9e; font-style: normal; }   /* comment */
+div.highlight-subfile .highlight .k { color: #e53935; font-weight: bold; }    /* REQUIRED */
+div.highlight-subfile .highlight .nb { color: #43a047; font-weight: bold; }   /* optional */
+div.highlight-subfile .highlight .nt { color: #00897b; font-weight: bold; }   /* field name */
+div.highlight-subfile .highlight .s { color: #1e88e5; }                        /* answer */

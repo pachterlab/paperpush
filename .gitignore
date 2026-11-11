@@ -213,3 +213,4 @@ tests/manuscript_files/
 # paperpush codegen output (paste into the venue runner, don't commit)
 steps.py
 *_steps.py
+manuscript/
