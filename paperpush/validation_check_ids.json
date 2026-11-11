@@ -64,6 +64,7 @@
  "cover_letter.date",
  "cover_letter.venue",
  "details.affiliation_superscripts",
+ "details.latex_compiles",
  "details.placeholders",
  "details.reference_order",
  "details.word_cleanliness",

@@ -218,8 +218,10 @@ these:
 - `integrity.sensitive`, `integrity.hidden_text`, `integrity.anonymity`:
   report them with the location. (LaTeX comments and junk files in a bundle
   are the exception: step 5b removes them.)
-- `files.uploads` (a missing file), `guidelines.formats` (wrong file type):
-  name the file to supply or the export to make.
+- `files.uploads` (a missing file): name the file to supply.
+- `guidelines.formats` (wrong file type): when the file is a `.docx`, `.tex`,
+  or `.md` and the venue accepts one of `docx` or `tex`, offer
+  `paperpush convert` (step 3c). Otherwise name the export to make.
 - `unchecked` and `not_implemented` checks: say what could not be checked
   and why, as `paperpush-validate` does.
 - A sentence whose meaning is unclear, where a fix would mean guessing what
@@ -258,6 +260,33 @@ Keep the JSON's `template`, `changes`, and `left_to_author` for the report;
 `left_to_author` items (reference style, front matter the class wants) go
 under "Needs your decision". If `format` fails, report why and go on with
 the original file.
+
+## Step 3c: convert first, if the venue needs another file type
+
+When round 1 has `guidelines.formats` because the venue wants Word and the
+source is LaTeX or Markdown, or wants LaTeX and the source is Word or
+Markdown, ask once, alongside the step 3b question, whether to convert it. Say
+that it writes a new copy and leaves the current file as it is. If they say
+no, the issue stays in tier 3.
+
+If they say yes, convert before step 3b, so `format` works on the new file and
+the other fixes go into it:
+
+```
+paperpush convert <abs .sub> --to docx|tex --no-source --update-sub --json [--manuscript <abs source>]
+```
+
+(MCP: `convert_manuscript(subfile=..., to=..., embed_source=false, update_subfile=true)`.)
+`--no-source` keeps the original LaTeX out of a `.docx` the venue will receive:
+it can hold text a reader cannot see, such as `\todo` notes or, on a double-blind
+submission, author names. Pass `--bib` if the `.bib` is not next to the source.
+Then validate again.
+
+Read the JSON. `clean: false` means something did not come through: `counts`
+shows each item in the source and in the output, and `warnings` says what to
+check. Each warning goes under "Needs your decision". Never report a
+conversion as done without relaying them. If `convert` fails, report why and
+leave the issue in tier 3.
 
 ## Step 4: apply the fixes
 
@@ -393,7 +422,8 @@ In this order:
 
 1. **Result**: passes or doesn't, the error/warning counts before and after,
    and how many rounds ran.
-2. **Fixed**: if step 3b ran, first the formatted file, the template used
+2. **Fixed**: if step 3c ran, first the converted file and its `counts`
+   and `warnings`. If step 3b ran, then the formatted file, the template used
    (or "the venue's layout rules"), and its changes. Then, grouped by file,
    each fix with its check id and a short before → after. For tier 2 trims, show the full diff of the changed
    sentences and the new count against the limit. If step 5b ran, say how

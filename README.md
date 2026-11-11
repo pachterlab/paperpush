@@ -7,7 +7,7 @@ Prepare manuscripts for submission to preprint servers, journals, and conference
 PaperPush provides the following services:
 - A standardized system to share all metadata submitted to a venue (the .sub file)
 <!-- BEGIN VALIDATION CHECK COUNT -->
-- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 154 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
+- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 155 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
 <!-- END VALIDATION CHECK COUNT -->
 - A central database of journal/conference manuscript requirements and submission data
 - Automated and fast submission portal filling with deterministic scripts
@@ -134,6 +134,7 @@ Helper commands:
 - `paperpush requirements VENUE`: print VENUE's author guidelines, if available. Rules marked `*` come from its publisher's house rules.
 - `paperpush pick-venue`: List journals that are a good thematic fit for your manuscript. Give keywords, the manuscript, or its `--title` and `--abstract`. By default it searches any journal, through the works most similar to yours in [OpenAlex](https://openalex.org), and marks the ones PaperPush supports; `--paperpush-supported-only` ranks only the venues supported in PaperPush (offline). It only checks for thematic fit, not impact or likelihood of acceptance.
 - `paperpush format VENUE.sub.txt`: reformat the manuscript (.docx or LaTeX) for VENUE. It first looks for the venue's own Word or LaTeX template (the recorded template link, then the venue's author-guideline pages) and applies it; without one it applies the venue's layout rules (page size, margins, font, spacing, line and page numbers). The original is never changed; the result and a CHANGES.md go to a new directory. `--list-templates` only shows the templates found.
+- `paperpush convert --manuscript FILE --to docx|tex`: convert a manuscript from Markdown to Word or LaTeX, or between Word and LaTeX. Equations become editable Word equations, citations and cross-references stay live, and a .docx made from LaTeX converts back with every unedited block restored exactly. `--no-source` leaves the LaTeX out of a .docx bound for a journal. The result and a CONVERSION.md, which compares source and output, go to a new directory.
 - `paperpush find-reviewers VENUE.sub.txt`: Suggest peer reviewers who recently published similar work (from OpenAlex), leaving out the manuscript's authors, their recent co-authors, colleagues at their institutions, and anyone you `--exclude`. `--write` adds the suggestions to the .sub's reviewer field; fill in their e-mail addresses, which OpenAlex does not have.
 - `paperpush options VENUE.FIELD`: print the allowed values for FIELD in VENUE's submission form.
 - `paperpush web VENUE.sub.txt`: open a sub file in a local deployment of the web application

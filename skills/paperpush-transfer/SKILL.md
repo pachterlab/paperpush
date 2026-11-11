@@ -8,8 +8,9 @@ description: >-
   the manuscript for the new venue (its Word/LaTeX template when one is found,
   else its layout rules), validate it, and write transfer.txt describing what
   changed. For a venue paperpush does not support yet, first builds a draft
-  entry from the venue's guidelines and transfers against that. The original
-  files are never modified. Triggers: "transfer my manuscript to <venue>", "resubmit
+  entry from the venue's guidelines and transfers against that. Converts the
+  manuscript first (Word, LaTeX, Markdown) when the new venue needs another
+  file type. The original files are never modified. Triggers: "transfer my manuscript to <venue>", "resubmit
   this paper to <venue>", "my paper was rejected from <venue>, move it to
   <venue>", "reuse my nature sub for cell", "paperpush-transfer".
 ---
@@ -126,6 +127,24 @@ delete anything in the source directory**; every change happens in the copy.
    only when the user asked to keep the original formatting (record that in
    `transfer.txt`). It runs before validation so validation measures the
    reformatted file.
+   - **Convert first when the new venue needs another file type.** Compare the
+     manuscript's type with `manuscript.formats` in `paperpush requirements
+     <venue> --json`. When the new venue does not accept it but accepts `docx`
+     or `tex`, or the manuscript is Markdown, convert the copy before
+     reformatting:
+
+     ```
+     paperpush convert <new-dir>/<venue>.sub.txt --to docx|tex -o <new-dir>/converted --no-source --update-sub --json
+     ```
+
+     (MCP: `convert_manuscript(subfile=..., to=..., output_dir=..., embed_source=false, update_subfile=true)`;
+     add `--manuscript <abs source>` for the PDF case below, and `--bib
+     <abs .bib>` if the `.bib` is not next to the source.) `--no-source` keeps
+     the original LaTeX out of a `.docx` the venue will receive. Keep the JSON
+     for `transfer.txt`. Every entry in its `warnings`, and any `counts` that
+     differ, goes into the To-do list: `clean: false` means something did not
+     come through. If `convert` fails, report the error, keep the copy as it
+     is, and go on.
    - Only a Word (`.docx`) or LaTeX (`.tex`, or a `.zip` of LaTeX sources)
      manuscript can be reformatted. If the new `.sub`'s manuscript is a PDF,
      look in the new directory for its source (a `.docx` or `.tex` with the
@@ -197,6 +216,8 @@ delete anything in the source directory**; every change happens in the copy.
       reference style, title page, file formats, anything else that differs)
 
    4. Formatting
+      Converted: <source type> -> <target type>, <abs path>  (only if converted)
+          Did not come through: <each count that differs, each warning>
       Formatted manuscript: <abs path>  (unformatted copy: <abs path>)
       Template: <URL or path>   or   No template (<template_note>); the
           venue's layout rules were applied
@@ -279,6 +300,7 @@ submitted to. Tell the user so up front, then:
   paperpush's own databases or the repo.
 - Never invent values: if neither the earlier `.sub` nor the files give it,
   leave it for the author.
-- Delegate filling to `paperpush-autofill`, reformatting to `paperpush format`,
+- Delegate filling to `paperpush-autofill`, converting to `paperpush convert`,
+  reformatting to `paperpush format`,
   checking to `paperpush-validate`, and fixing to `paperpush-fix` (with the
   user's go-ahead); do not duplicate their logic here, and do not submit.

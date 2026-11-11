@@ -46,6 +46,7 @@ import tempfile
 import unicodedata
 import zipfile
 import zlib
+from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -829,7 +830,22 @@ def total_pages(path: Path) -> int | None:
 # Seconds a single compile may take before it is abandoned.
 BUILD_TIMEOUT_S = 300
 
-_BUILD_CACHE: dict[tuple[str, int, int], Path | None] = {}
+
+@dataclass(frozen=True)
+class TexBuild:
+    """What compiling a LaTeX manuscript produced.
+
+    ``pdf`` is the scratch PDF, or None when none was produced. ``errors`` are
+    the errors in the LaTeX log, in order. ``has_root`` is False for a ``.zip``
+    with no ``.tex`` holding ``\\documentclass``, which there is nothing to compile.
+    """
+
+    pdf: Path | None = None
+    errors: tuple[str, ...] = ()
+    has_root: bool = True
+
+
+_BUILD_CACHE: dict[tuple[str, int, int], TexBuild] = {}
 _BUILD_DIRS: list[str] = []
 
 
@@ -895,9 +911,9 @@ def _compile(main: Path, outdir: Path) -> Path | None:
 
     Prefers ``latexmk`` (which reruns pdflatex/bibtex/biber as needed); falls
     back to pdflatex twice around a bibtex pass when only pdflatex is present.
-    A non-zero exit still yields the PDF when one was produced -- a stray
-    overfull box or a missing citation does not change the page count enough to
-    matter, and a partial render beats no measurement at all.
+    Neither stops at the first LaTeX error, and a non-zero exit still yields the
+    PDF when one was produced -- a stray error does not change the page count
+    enough to matter, and a partial render beats no measurement at all.
     """
     env = dict(os.environ)
     # Let \input/\include and \bibliography find the source tree from the
@@ -909,7 +925,7 @@ def _compile(main: Path, outdir: Path) -> Path | None:
     pdf = outdir / (main.stem + ".pdf")
     tool = tex_toolchain()
     if tool == "latexmk":
-        _run(["latexmk", "-pdf", "-interaction=nonstopmode", "-halt-on-error", "-f", f"-outdir={outdir}", main.name], main.parent, env, BUILD_TIMEOUT_S)
+        _run(["latexmk", "-pdf", "-interaction=nonstopmode", "-f", f"-outdir={outdir}", main.name], main.parent, env, BUILD_TIMEOUT_S)
     elif tool == "pdflatex":
         pdflatex = ["pdflatex", "-interaction=nonstopmode", f"-output-directory={outdir}", main.name]
         _run(pdflatex, main.parent, env, BUILD_TIMEOUT_S / 3)
@@ -922,24 +938,47 @@ def _compile(main: Path, outdir: Path) -> Path | None:
     return pdf if pdf.is_file() and pdf.stat().st_size > 0 else None
 
 
-def build_pdf(path: Path) -> Path | None:
-    """Compile a ``.tex`` file or ``.zip`` LaTeX bundle to a scratch PDF.
+def _log_errors(log: Path) -> tuple[str, ...]:
+    """The errors in a LaTeX log, each with the source line LaTeX points at."""
+    try:
+        lines = log.read_text("utf-8", "replace").splitlines()
+    except OSError:
+        return ()
+    errors: list[str] = []
+    stopped = False
+    for index, line in enumerate(lines):
+        stopped = stopped or line.startswith("! Emergency stop")
+        if not line.startswith("! ") or "==> Fatal error occurred" in line or line.startswith("! Emergency stop"):
+            continue
+        message = line[2:].strip()
+        for following in lines[index + 1 : index + 15]:
+            if following.startswith("! "):
+                break
+            if re.match(r"l\.\d+", following):
+                message += f" ({following.strip()})"
+                break
+        errors.append(message)
+    if stopped and not errors:
+        errors.append("LaTeX stopped early, often because the file has no \\end{document}")
+    return tuple(dict.fromkeys(errors))
 
-    Returns the path of the rendered PDF in a temporary directory, or None when
-    no TeX toolchain is installed, the bundle has no root ``.tex``, or the build
-    produced no PDF. The result is cached per (path, size, mtime) for the
-    process, so repeated measurements of one manuscript compile once. The
-    source directory is never modified: all build products go to the scratch
-    directory, which is removed at exit.
+
+def tex_build(path: Path) -> TexBuild:
+    """Compile a ``.tex`` file or ``.zip`` LaTeX bundle to a scratch PDF and report how it went.
+
+    The result is cached per (path, size, mtime) for the process, so repeated
+    measurements of one manuscript compile once. The source directory is never
+    modified: all build products go to the scratch directory, which is removed
+    at exit.
     """
     try:
         stat = path.stat()
     except OSError:
-        return None
+        return TexBuild()
     key = (str(path.resolve()), stat.st_size, int(stat.st_mtime))
     if key in _BUILD_CACHE:
         return _BUILD_CACHE[key]
-    result: Path | None = None
+    result = TexBuild()
     if tex_toolchain() is None:
         logger.info("No TeX toolchain (latexmk/pdflatex) found; cannot render %s for a page count", path.name)
     else:
@@ -948,7 +987,8 @@ def build_pdf(path: Path) -> Path | None:
         try:
             if suffix == ".tex":
                 logger.info("Compiling %s to a scratch PDF for page counting", path.name)
-                result = _compile(path, outdir)
+                pdf = _compile(path, outdir)
+                result = TexBuild(pdf, _log_errors(outdir / (path.stem + ".log")))
             elif suffix == ".zip":
                 srcdir = outdir / "src"
                 with zipfile.ZipFile(path) as zf:
@@ -956,17 +996,28 @@ def build_pdf(path: Path) -> Path | None:
                 main = _main_tex(sorted(srcdir.rglob("*.tex")))
                 if main is None:
                     logger.info("%s holds no .tex with \\documentclass; cannot render it", path.name)
+                    result = TexBuild(has_root=False)
                 else:
                     logger.info("Compiling %s (from %s) to a scratch PDF for page counting", main.name, path.name)
                     (outdir / "out").mkdir(exist_ok=True)
-                    result = _compile(main, outdir / "out")
+                    pdf = _compile(main, outdir / "out")
+                    result = TexBuild(pdf, _log_errors(outdir / "out" / (main.stem + ".log")))
         except (zipfile.BadZipFile, OSError) as exc:
             logger.debug("Could not build %s: %s", path, exc)
-            result = None
-        if result is None:
+            result = TexBuild()
+        if result.pdf is None:
             logger.warning("Could not render %s to PDF; its page count was not checked", path.name)
     _BUILD_CACHE[key] = result
     return result
+
+
+def build_pdf(path: Path) -> Path | None:
+    """The scratch PDF compiled from a ``.tex`` file or ``.zip`` LaTeX bundle (see :func:`tex_build`).
+
+    None when no TeX toolchain is installed, the bundle has no root ``.tex``, or
+    the build produced no PDF.
+    """
+    return tex_build(path).pdf
 
 
 def _as_pdf(path: Path) -> Path | None:

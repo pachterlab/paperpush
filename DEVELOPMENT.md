@@ -396,6 +396,12 @@ never writing next to the source, and caches the build for the process. With
 no TeX toolchain the limit is reported as unchecked. Tests that need a
 toolchain are skipped when none is installed.
 
+`details.latex_compiles` reports that same build (`paperpush.manuscript.tex_build`):
+an error when LaTeX errors leave no PDF, a warning when they leave a partial
+one, and unchecked when the failure may come from the local setup (a package
+missing from the TeX installation, or a manuscript needing XeLaTeX, LuaLaTeX, or
+shell escape, since the build uses pdfLaTeX without it).
+
 `manuscript.initial_submission_any_format` is set only when the guidelines let
 the initial submission be in any format (formatting rules apply from revision
 or acceptance); it holds that rule in one sentence. `validate` quotes it at the

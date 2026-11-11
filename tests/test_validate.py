@@ -1345,7 +1345,7 @@ def test_cli_validate_arxiv_reminds_to_run_cleaner(tmp_path, monkeypatch, capsys
     monkeypatch.setattr(venues, "submission_base", lambda slug: "arxiv")
 
     tex = tmp_path / "main.tex"
-    tex.write_text("% TODO tidy before arxiv\n\\documentclass{article}\n", encoding="utf-8")
+    tex.write_text("% TODO tidy before arxiv\n\\documentclass{article}\n\\begin{document}\nx\n\\end{document}\n", encoding="utf-8")
     sub = _write_sub(tmp_path / "arxiv.sub", f"@venue: arxiv\nmanuscript_file: {tex}\n")
 
     rc = main(["validate", str(sub)])

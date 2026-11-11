@@ -8,7 +8,7 @@ sensitive-data scan (see :ref:`submit-validation`).
 
 .. BEGIN VALIDATION CHECK COUNT
 
-PaperPush currently has **154 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
+PaperPush currently has **155 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
 
 .. END VALIDATION CHECK COUNT
 
@@ -109,122 +109,123 @@ Venue rules marked *not implemented* are excluded.
 **Additional manuscript details**
 
 65. ``details.affiliation_superscripts`` — Affiliation numbers after author names are superscripted
-66. ``details.placeholders`` — No placeholders, to-do notes, comments, or highlighting left in the files
-67. ``details.reference_order`` — Reference list is alphabetical or follows first citation
-68. ``details.word_cleanliness`` — Word files have no tracked changes or EndNote fields
+66. ``details.latex_compiles`` — LaTeX source compiles to a PDF
+67. ``details.placeholders`` — No placeholders, to-do notes, comments, or highlighting left in the files
+68. ``details.reference_order`` — Reference list is alphabetical or follows first citation
+69. ``details.word_cleanliness`` — Word files have no tracked changes or EndNote fields
 
 **Figures**
 
-69. ``figures.color_mode`` — Figure color mode (RGB, CMYK, grayscale) matches the guidelines
-70. ``figures.colorblind`` — Figure colors distinguishable with red-green color blindness
-71. ``figures.default_colors`` — Figures do not use a plotting tool's default colors
-72. ``figures.dimensions`` — Figures within the guidelines' maximum width and height
-73. ``figures.dpi`` — Figures meet the minimum resolution (dpi)
-74. ``figures.font`` — Figure lettering uses the required typeface
-75. ``figures.font_consistency`` — Figure lettering uses one typeface across the figures
-76. ``figures.grayscale`` — Figure colors stay distinguishable when printed in gray
-77. ``figures.legends`` — Figure legends within the length limit and placed where the guidelines ask
-78. ``figures.lettering`` — Figure panels labeled in the required style (e.g., a, b, c)
-79. ``figures.placement`` — Figures placed where the guidelines ask
-80. ``figures.text_size`` — Figure lettering within the guidelines' size range
+70. ``figures.color_mode`` — Figure color mode (RGB, CMYK, grayscale) matches the guidelines
+71. ``figures.colorblind`` — Figure colors distinguishable with red-green color blindness
+72. ``figures.default_colors`` — Figures do not use a plotting tool's default colors
+73. ``figures.dimensions`` — Figures within the guidelines' maximum width and height
+74. ``figures.dpi`` — Figures meet the minimum resolution (dpi)
+75. ``figures.font`` — Figure lettering uses the required typeface
+76. ``figures.font_consistency`` — Figure lettering uses one typeface across the figures
+77. ``figures.grayscale`` — Figure colors stay distinguishable when printed in gray
+78. ``figures.legends`` — Figure legends within the length limit and placed where the guidelines ask
+79. ``figures.lettering`` — Figure panels labeled in the required style (e.g., a, b, c)
+80. ``figures.placement`` — Figures placed where the guidelines ask
+81. ``figures.text_size`` — Figure lettering within the guidelines' size range
 
 **Files**
 
-81. ``files.manuscript_length`` — Manuscript within the portal's word/page limits
-82. ``files.total_size`` — Combined upload size within the portal's limit
-83. ``files.uploads`` — Upload files exist and have accepted types and sizes
+82. ``files.manuscript_length`` — Manuscript within the portal's word/page limits
+83. ``files.total_size`` — Combined upload size within the portal's limit
+84. ``files.uploads`` — Upload files exist and have accepted types and sizes
 
 **Submission form**
 
-84. ``form`` — Submission form checked (needs a .sub file)
-85. ``form.authors`` — Author list is complete (names, corresponding author, emails)
-86. ``form.counts`` — Number of entries in list fields (keywords, authors, suggested reviewers, …) within the form's limits
-87. ``form.lengths`` — Text within the form's word/character limits
-88. ``form.options`` — Choices are valid options
-89. ``form.required`` — Required fields are filled and confirmations given
-90. ``form.schema`` — Field values have the right type and known field ids
-91. ``form.subfields`` — Structured entries (funding, reviewers, ...) are complete
-92. ``form.urls`` — Link fields hold http(s) URLs
+85. ``form`` — Submission form checked (needs a .sub file)
+86. ``form.authors`` — Author list is complete (names, corresponding author, emails)
+87. ``form.counts`` — Number of entries in list fields (keywords, authors, suggested reviewers, …) within the form's limits
+88. ``form.lengths`` — Text within the form's word/character limits
+89. ``form.options`` — Choices are valid options
+90. ``form.required`` — Required fields are filled and confirmations given
+91. ``form.schema`` — Field values have the right type and known field ids
+92. ``form.subfields`` — Structured entries (funding, reviewers, ...) are complete
+93. ``form.urls`` — Link fields hold http(s) URLs
 
 **Abstract and front matter**
 
-93. ``front_matter.abstract_citations`` — Abstract cites no references
-94. ``front_matter.contact_email`` — Manuscript gives a contact e-mail address
-95. ``front_matter.keywords`` — Keywords given in the .sub or the manuscript
-96. ``front_matter.structured_abstract`` — Abstract structured with the required headings
+94. ``front_matter.abstract_citations`` — Abstract cites no references
+95. ``front_matter.contact_email`` — Manuscript gives a contact e-mail address
+96. ``front_matter.keywords`` — Keywords given in the .sub or the manuscript
+97. ``front_matter.structured_abstract`` — Abstract structured with the required headings
 
 **Venue guidelines**
 
-97. ``guidelines`` — Author-guideline checks ran (needs a venue with recorded guidelines)
-98. ``guidelines.abstract_abbreviations`` — Abstract defines its abbreviations
-99. ``guidelines.ai_policy`` — Use of generative AI disclosed where the guidelines ask, and no AI tool listed as an author
-100. ``guidelines.counts`` — Number of figures, tables, and supplementary files within the guidelines' limits
-101. ``guidelines.cover_letter`` — Cover letter provided and within length
-102. ``guidelines.formats`` — Files are in formats the guidelines accept
-103. ``guidelines.length`` — Manuscript within the guidelines' word/page limits
-104. ``guidelines.reference_count`` — Reference count within the limit
-105. ``guidelines.reference_list`` — Reference entries follow the guidelines' rules on DOIs, preprints, and unpublished work
-106. ``guidelines.reference_style`` — Citation style matches the guidelines (numbered or author-year)
-107. ``guidelines.section_length`` — Sections within the guidelines' word limits
-108. ``guidelines.section_order`` — Sections in the guidelines' order
-109. ``guidelines.sections`` — Required section headings present
-110. ``guidelines.sizes`` — Files within the guidelines' size limits
-111. ``guidelines.statements`` — Required statements and declarations present
-112. ``guidelines.supplementary`` — Supplementary material bundled and within length as the guidelines ask
-113. ``guidelines.table_placement`` — Tables placed where the guidelines ask
-114. ``guidelines.template`` — Page layout matches a compiled copy of the venue's template
-115. ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
-116. ``guidelines.title_page`` — Title page carries the required items
-117. ``guidelines.title_page_file`` — Title page uploaded as a separate file
+98. ``guidelines`` — Author-guideline checks ran (needs a venue with recorded guidelines)
+99. ``guidelines.abstract_abbreviations`` — Abstract defines its abbreviations
+100. ``guidelines.ai_policy`` — Use of generative AI disclosed where the guidelines ask, and no AI tool listed as an author
+101. ``guidelines.counts`` — Number of figures, tables, and supplementary files within the guidelines' limits
+102. ``guidelines.cover_letter`` — Cover letter provided and within length
+103. ``guidelines.formats`` — Files are in formats the guidelines accept
+104. ``guidelines.length`` — Manuscript within the guidelines' word/page limits
+105. ``guidelines.reference_count`` — Reference count within the limit
+106. ``guidelines.reference_list`` — Reference entries follow the guidelines' rules on DOIs, preprints, and unpublished work
+107. ``guidelines.reference_style`` — Citation style matches the guidelines (numbered or author-year)
+108. ``guidelines.section_length`` — Sections within the guidelines' word limits
+109. ``guidelines.section_order`` — Sections in the guidelines' order
+110. ``guidelines.sections`` — Required section headings present
+111. ``guidelines.sizes`` — Files within the guidelines' size limits
+112. ``guidelines.statements`` — Required statements and declarations present
+113. ``guidelines.supplementary`` — Supplementary material bundled and within length as the guidelines ask
+114. ``guidelines.table_placement`` — Tables placed where the guidelines ask
+115. ``guidelines.template`` — Page layout matches a compiled copy of the venue's template
+116. ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
+117. ``guidelines.title_page`` — Title page carries the required items
+118. ``guidelines.title_page_file`` — Title page uploaded as a separate file
 
 **Integrity and external sources**
 
-118. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
-119. ``integrity.dois`` — Reference DOIs match the works they cite
-120. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
-121. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
-122. ``integrity.links`` — Links cited in the files are reachable
-123. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
-124. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
-125. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
-126. ``integrity.retractions`` — No cited work has been retracted
-127. ``integrity.sensitive`` — No secrets or private information in the files
-128. ``integrity.unmatched_references`` — References without a DOI match a registered work
+119. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
+120. ``integrity.dois`` — Reference DOIs match the works they cite
+121. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
+122. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
+123. ``integrity.links`` — Links cited in the files are reachable
+124. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
+125. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
+126. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
+127. ``integrity.retractions`` — No cited work has been retracted
+128. ``integrity.sensitive`` — No secrets or private information in the files
+129. ``integrity.unmatched_references`` — References without a DOI match a registered work
 
 **Page layout**
 
-129. ``layout.font`` — Body font matches the guidelines
-130. ``layout.font_size`` — Body text size matches the guidelines
-131. ``layout.language`` — Spelling follows the required English variant (US or UK)
-132. ``layout.line_numbers`` — Lines numbered continuously
-133. ``layout.line_spacing`` — Text is double-spaced
-134. ``layout.margins`` — Page margins match the guidelines
-135. ``layout.page_numbers`` — Pages are numbered
-136. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
-137. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
+130. ``layout.font`` — Body font matches the guidelines
+131. ``layout.font_size`` — Body text size matches the guidelines
+132. ``layout.language`` — Spelling follows the required English variant (US or UK)
+133. ``layout.line_numbers`` — Lines numbered continuously
+134. ``layout.line_spacing`` — Text is double-spaced
+135. ``layout.margins`` — Page margins match the guidelines
+136. ``layout.page_numbers`` — Pages are numbered
+137. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
+138. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
 
 **Prose**
 
-138. ``prose.acronyms`` — Acronyms spelled out at first use
-139. ``prose.brackets`` — Brackets and quotes pair up
-140. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
-141. ``prose.double_spaces`` — No double spaces between words
-142. ``prose.heading_case`` — Headings of the same level capitalized one way
-143. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
-144. ``prose.punctuation_spacing`` — Spacing around punctuation
-145. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
-146. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
-147. ``prose.spelling`` — Common misspellings (codespell)
+139. ``prose.acronyms`` — Acronyms spelled out at first use
+140. ``prose.brackets`` — Brackets and quotes pair up
+141. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
+142. ``prose.double_spaces`` — No double spaces between words
+143. ``prose.heading_case`` — Headings of the same level capitalized one way
+144. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
+145. ``prose.punctuation_spacing`` — Spacing around punctuation
+146. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
+147. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
+148. ``prose.spelling`` — Common misspellings (codespell)
 
 **Rigor and reproducibility**
 
-148. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
-149. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
-150. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
-151. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
-152. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
-153. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
-154. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
+149. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
+150. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
+151. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
+152. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
+153. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
+154. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
+155. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
 
 .. END VALIDATION CHECK LIST
 

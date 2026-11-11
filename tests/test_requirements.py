@@ -30,9 +30,10 @@ from jsonschema import Draft202012Validator
 from paperpush import manuscript as m
 from paperpush import requirements as r
 from paperpush.database import Field, Venue
-from paperpush.requirements_check import STATEMENT_IN_TEXT, check_manuscript_requirements
+from paperpush.requirements_check import STATEMENT_IN_TEXT, check_manuscript_requirements, latex_compile_check
 from paperpush.schema_models import build_requirements_schema
-from paperpush.validate import ERROR, WARNING, validate
+from paperpush.report import NOT_APPLICABLE, UNCHECKED
+from paperpush.validate import ERROR, WARNING, validate, validate_report
 from paperpush.subfile import SubFile
 from tests.conftest import _build_docx, _build_pdf
 
@@ -562,3 +563,87 @@ def test_section_word_limits_in_latex(tmp_path):
     )
     counts = section_word_counts(path, {"introduction": "Introduction", "materials and methods": "Methods", "results": "Results"})
     assert counts == {"Introduction": 3, "Methods": 4, "Results": 1}  # the subsection title counts too
+
+
+# ===========================================================================
+# checks: the LaTeX source compiles
+# ===========================================================================
+
+
+def _compile_result(tmp_path: Path, body: str, preamble: str = ""):
+    tex = tmp_path / "ms.tex"
+    tex.write_text(f"\\documentclass{{article}}\n{preamble}\n\\begin{{document}}\n{body}\n\\end{{document}}\n", encoding="utf-8")
+    report = validate_report(SubFile(venue="testj", values={"manuscript_file": str(tex)}), _venue(MANUSCRIPT), check_links=False, check_references=False, check_sensitive=False, check_hidden_text=False, check_openreview=False, check_anonymous=False)
+    return next(r for r in report.results if r.id == "details.latex_compiles")
+
+
+def _fake_build(monkeypatch, build):
+    monkeypatch.setattr(m, "tex_toolchain", lambda: "latexmk")
+    monkeypatch.setattr(m, "tex_build", lambda path: build)
+
+
+def test_latex_compile_not_applicable_to_a_pdf(tmp_path):
+    pdf = tmp_path / "ms.pdf"
+    pdf.write_bytes(_build_pdf(pages=1))
+    report = validate_report(SubFile(venue="testj", values={"manuscript_file": str(pdf)}), _venue(MANUSCRIPT), check_links=False, check_references=False, check_sensitive=False, check_hidden_text=False, check_openreview=False, check_anonymous=False)
+    assert next(r for r in report.results if r.id == "details.latex_compiles").status == NOT_APPLICABLE
+
+
+def test_latex_compile_unchecked_without_a_toolchain(tmp_path, monkeypatch):
+    monkeypatch.setattr(m, "tex_toolchain", lambda: None)
+    result = _compile_result(tmp_path, "x")
+    assert result.status == UNCHECKED and "latexmk" in result.detail
+
+
+def test_latex_compile_no_pdf_is_an_error(tmp_path, monkeypatch):
+    _fake_build(monkeypatch, m.TexBuild(None, ("File ended while scanning use of \\textbf.",)))
+    result = _compile_result(tmp_path, "x")
+    assert [i.level for i in result.issues] == [ERROR] and "does not compile" in result.issues[0].message
+
+
+def test_latex_compile_partial_pdf_is_a_warning(tmp_path, monkeypatch):
+    _fake_build(monkeypatch, m.TexBuild(tmp_path / "ms.pdf", ("Undefined control sequence. (l.5 \\badmacro)",)))
+    result = _compile_result(tmp_path, "x")
+    assert [i.level for i in result.issues] == [WARNING] and "\\badmacro" in result.issues[0].message and not result.issues[0].unchecked
+
+
+@pytest.mark.parametrize("error", ["LaTeX Error: File `nosuchpkg.sty' not found.", "Fatal Package fontspec Error: The fontspec package requires either XeTeX or", "Package minted Error: You must invoke LaTeX with the -shell-escape flag."])
+def test_latex_compile_local_setup_failure_is_unchecked(tmp_path, monkeypatch, error):
+    _fake_build(monkeypatch, m.TexBuild(None, (error,)))
+    result = _compile_result(tmp_path, "x")
+    assert result.status == UNCHECKED and all(i.level != ERROR for i in result.issues)
+
+
+def test_latex_compile_no_pdf_and_no_error_is_unchecked(tmp_path, monkeypatch):
+    _fake_build(monkeypatch, m.TexBuild())
+    assert _compile_result(tmp_path, "x").status == UNCHECKED
+
+
+@pytest.mark.skipif(m.tex_toolchain() is None, reason="needs latexmk or pdflatex")
+def test_latex_compile_passes_a_good_source(tmp_path):
+    assert _compile_result(tmp_path, "Hello.").issues == []
+
+
+@pytest.mark.skipif(m.tex_toolchain() is None, reason="needs latexmk or pdflatex")
+def test_latex_compile_warns_on_an_undefined_macro(tmp_path):
+    result = _compile_result(tmp_path, "Page one\n\\newpage\n\\badmacro{x}")
+    assert [i.level for i in result.issues] == [WARNING] and "Undefined control sequence" in result.issues[0].message
+
+
+@pytest.mark.skipif(m.tex_toolchain() is None, reason="needs latexmk or pdflatex")
+def test_latex_compile_errors_on_an_unclosed_brace(tmp_path):
+    result = _compile_result(tmp_path, "\\textbf{unclosed")
+    assert [i.level for i in result.issues] == [ERROR] and "does not compile" in result.issues[0].message
+
+
+@pytest.mark.skipif(m.tex_toolchain() is None, reason="needs latexmk or pdflatex")
+def test_latex_compile_errors_without_end_document(tmp_path):
+    tex = tmp_path / "ms.tex"
+    tex.write_text("\\documentclass{article}\n\\begin{document}\nx\n", encoding="utf-8")
+    issues = latex_compile_check(_venue(MANUSCRIPT), {"manuscript_file": str(tex)})
+    assert [i.level for i in issues] == [ERROR] and "end{document}" in issues[0].message
+
+
+@pytest.mark.skipif(m.tex_toolchain() is None, reason="needs latexmk or pdflatex")
+def test_latex_compile_missing_package_is_unchecked(tmp_path):
+    assert _compile_result(tmp_path, "x", "\\usepackage{nosuchpkg}").status == UNCHECKED

@@ -404,6 +404,66 @@ def format_manuscript(
     return out
 
 
+def convert_manuscript(
+    to: str,
+    manuscript: Optional[str] = None,
+    subfile: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    bib: Optional[str] = None,
+    assets: Optional[str] = None,
+    tracked_changes: str = "accept",
+    citation_style: Optional[str] = None,
+    embed_source: bool = True,
+    compile_pdf: bool = True,
+    update_subfile: bool = False,
+) -> dict[str, Any]:
+    """Convert a manuscript between Markdown, Word, and LaTeX.
+
+    `to` is "docx" or "tex". Supported: .md to either, .docx to tex, and .tex
+    (or a .zip of LaTeX sources) to docx. Equations become editable Word
+    equations, and citations and cross-references stay live.
+
+    Give `manuscript` (absolute path) or `subfile` (absolute path; its
+    manuscript is used). The original is never changed: the result goes to
+    `output_dir` (default: converted_<format> next to the manuscript) with
+    CONVERSION.md. A .docx made from LaTeX embeds the original source so that
+    converting it back restores whatever nobody edited; set
+    `embed_source=False` for a .docx that goes to a journal. `assets` is the
+    directory with the original figures and the venue's style files when the
+    .docx is away from its project. Returns `clean`, `counts` (each item in
+    the source and in the output), `warnings` (tell the author), `changes`,
+    and `upload`, the file to name in the .sub. `update_subfile` points the
+    .sub's manuscript field at it.
+    """
+    from . import convert
+    from .requirements_check import _fields_for, manuscript_files
+    from .subfile import load, replace_scalar
+
+    sub_path = None
+    field = None
+    path = _resolve(manuscript) if manuscript else None
+    if subfile:
+        sub_path, _text, venue_obj = _load_subfile(subfile)
+        if path is not None:
+            field = next(iter(_fields_for(venue_obj, "manuscript")), None)
+        else:
+            files = manuscript_files(venue_obj, dict(load(sub_path).values))
+            if not files:
+                raise ValueError("give `manuscript`, or a subfile whose manuscript file exists")
+            field, path = files[0]
+    if path is None:
+        raise ValueError("give `manuscript` or `subfile`")
+    try:
+        result = convert.convert_manuscript(path, to, out_dir=_resolve(output_dir) if output_dir else None, bib=_resolve(bib) if bib else None, assets=_resolve(assets) if assets else None, tracked=tracked_changes, compile_pdf=compile_pdf, citation_style=citation_style, embed_source=embed_source)
+    except convert.ConvertError as exc:
+        raise ValueError(str(exc)) from exc
+    out = result.to_dict()
+    if update_subfile and sub_path is not None and field is not None:
+        sub_path.write_text(replace_scalar(sub_path.read_text(encoding="utf-8"), field.id, str(result.upload)), encoding="utf-8")
+        out["subfile_updated"] = {"subfile": str(sub_path), "field": field.id}
+    return out
+
+
 def describe_venue(venue: str) -> dict[str, Any]:
     """Describe one venue's submission form, field by field.
 
@@ -1707,6 +1767,7 @@ TOOLS = (
     validate_subfile,
     validation_ai_tasks,
     format_manuscript,
+    convert_manuscript,
     autofill_subfile,
     login_status,
     login,
@@ -1757,7 +1818,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile (format_manuscript reformats a .docx/.tex for the venue, with its template when one is found) -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile (format_manuscript reformats a .docx/.tex for the venue, with its template when one is found; convert_manuscript moves a manuscript between Markdown, Word, and LaTeX) -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
     )
     for tool in TOOLS:
         server.tool()(tool)

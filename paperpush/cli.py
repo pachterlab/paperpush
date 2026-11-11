@@ -2565,6 +2565,78 @@ def _cmd_format(args: argparse.Namespace) -> int:
     return 0
 
 
+@_validate
+def _cmd_convert(args: argparse.Namespace) -> int:
+    """Convert a manuscript between Markdown, Word, and LaTeX."""
+    from . import convert
+    from .requirements_check import _fields_for, manuscript_files
+    from .subfile import find_subfile, load, replace_scalar
+
+    sub_path = None
+    manuscript_field = None
+    manuscript = Path(args.manuscript) if args.manuscript else None
+    if args.subfile:
+        try:
+            sub_path = find_subfile(args.subfile)
+            sub = load(sub_path)
+            venue = get_venue(sub.venue)
+        except (OSError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        except KeyError:
+            print(f"error: unknown venue '{sub.venue}'", file=sys.stderr)
+            return 2
+        if manuscript is not None:
+            manuscript_field = next(iter(_fields_for(venue, "manuscript")), None)
+        else:
+            files = manuscript_files(venue, dict(sub.values))
+            if not files:
+                print("error: give the manuscript (--manuscript FILE), or a .sub whose manuscript file exists", file=sys.stderr)
+                return 1
+            manuscript_field, manuscript = files[0]
+    if manuscript is None:
+        print("error: give the manuscript (--manuscript FILE), or a .sub file", file=sys.stderr)
+        return 1
+    try:
+        result = convert.convert_manuscript(
+            manuscript,
+            args.to,
+            out_dir=Path(args.output) if args.output else None,
+            bib=Path(args.bib) if args.bib else None,
+            assets=Path(args.assets) if args.assets else None,
+            tracked=args.tracked_changes,
+            compile_pdf=not args.no_compile,
+            citation_style=args.citation_style,
+            embed_source=not args.no_source,
+        )
+    except (convert.ConvertError, OSError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    if args.update_sub and sub_path is not None and manuscript_field is not None:
+        text = sub_path.read_text(encoding="utf-8")
+        sub_path.write_text(replace_scalar(text, manuscript_field.id, str(result.upload)), encoding="utf-8")
+    failed = args.strict and not result.clean
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2))
+        return 1 if failed else 0
+    print(f"Converted {result.manuscript.name} to {result.target_format}: {result.output}")
+    if result.pdf:
+        print(f"  PDF: {result.pdf}")
+    if result.restored_blocks or result.generated_blocks:
+        print(f"  {result.restored_blocks} block(s) restored as their original LaTeX, {result.generated_blocks} generated")
+    for name, (before, after) in result.counts.items():
+        if name != "words" and before != after:
+            print(f"  ! {name}: {before} in the source, {after} in the output")
+    for change in result.changes:
+        print(f"  + {change}")
+    for warning in result.warnings:
+        print(f"  ! {warning}")
+    print(f"  {'Clean: everything came through.' if result.clean else 'Needs review.'} Details: {result.report}")
+    if args.update_sub and manuscript_field is not None:
+        print(f"  Updated {manuscript_field.id} in {sub_path.name}")
+    return 1 if failed else 0
+
+
 def _cmd_requirements(args: argparse.Namespace) -> int:
     """Print what a venue's author guidelines require of the manuscript.
 
@@ -2974,6 +3046,27 @@ def build_parser() -> argparse.ArgumentParser:
     p_format.add_argument("--update-sub", action="store_true", help="point the .sub's manuscript field at the formatted file")
     p_format.add_argument("--json", action="store_true", help="print the result as JSON")
     p_format.set_defaults(func=_cmd_format)
+
+    p_convert = sub.add_parser(
+        "convert",
+        parents=[verbosity],
+        help="convert a manuscript between Markdown, Word, and LaTeX: md to docx, md to tex, docx to tex, tex to docx",
+        description="Convert a manuscript: Markdown to Word or LaTeX, or Word to LaTeX and back. Equations become editable Word equations, citations and cross-references stay live, and figures that Word cannot embed are rendered. A .docx made from LaTeX carries the original source, so converting it back restores every block nobody edited, exactly as written. The original is never modified: the result goes to a new directory with CONVERSION.md, which compares the source and the output and lists anything that needs checking.",
+    )
+    p_convert.add_argument("subfile", nargs="?", help="a .sub file: its manuscript file is used")
+    p_convert.add_argument("--to", required=True, choices=["docx", "tex"], help="the format to convert to")
+    p_convert.add_argument("--manuscript", metavar="FILE", help="the manuscript to convert (.md, .docx, .tex, or a .zip of LaTeX sources), instead of the .sub's")
+    p_convert.add_argument("-o", "--output", metavar="DIR", help="directory for the result (default: converted_<format> next to the manuscript)")
+    p_convert.add_argument("--bib", metavar="FILE", help="the .bib file, when the manuscript does not name one that can be found")
+    p_convert.add_argument("--assets", metavar="DIR", help="Word to LaTeX: the directory holding the original figures and the venue's .cls/.sty/.bst files (default: next to the .docx)")
+    p_convert.add_argument("--tracked-changes", choices=["accept", "reject"], default="accept", help="Word: what to do with tracked changes (default: accept, and report how many)")
+    p_convert.add_argument("--citation-style", choices=["numeric", "author-year"], help="how citations read in the output (default: what the source uses)")
+    p_convert.add_argument("--no-source", action="store_true", help="to Word: leave the original LaTeX out of the .docx. Use this for a file that goes to a journal rather than back to the authors")
+    p_convert.add_argument("--no-compile", action="store_true", help="to LaTeX: do not compile the result")
+    p_convert.add_argument("--strict", action="store_true", help="exit 1 when the result needs review")
+    p_convert.add_argument("--update-sub", action="store_true", help="point the .sub's manuscript field at the converted file")
+    p_convert.add_argument("--json", action="store_true", help="print the result as JSON")
+    p_convert.set_defaults(func=_cmd_convert)
 
     p_publishers = sub.add_parser("publishers", parents=[verbosity], help="list the publishers whose house rules back their venues' own", description="List the publishers paperpush knows, whether it holds their house rules, and the listed venues that name each. A venue's own guidelines win; where they are silent, its publisher's house rules apply, and validate reports what those catch as warnings. A journal paperpush does not list can be checked against its publisher's rules with 'paperpush validate --publisher' (or --issn).")
     p_publishers.add_argument("--json", action="store_true", help="print JSON")

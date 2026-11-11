@@ -56,7 +56,7 @@ import re
 from dataclasses import replace
 from pathlib import Path
 
-from . import ai_policy
+from . import ai_policy, manuscript
 from .database import Field, Venue
 from .manuscript import headings as manuscript_headings
 from .manuscript import normalize_heading, pages_before_references, reference_count, section_word_counts, structured_abstract_labels, title_page_text, total_pages, total_words, words_before_references, words_excluding
@@ -264,7 +264,7 @@ def _length_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> li
         pages = count(path)
         where = f" {scope}" if scope else ""
         if pages is None:
-            how = "install latexmk or pdflatex so the LaTeX source can be rendered, or supply the built PDF" if is_tex else "page counts can only be verified for PDF, LaTeX source (rendered with latexmk/pdflatex), or a Word (.docx) file with a saved page count"
+            how = ("the LaTeX source did not compile to a PDF" if manuscript.tex_toolchain() else "install latexmk or pdflatex so the LaTeX source can be rendered, or supply the built PDF") if is_tex else "page counts can only be verified for PDF, LaTeX source (rendered with latexmk/pdflatex), or a Word (.docx) file with a saved page count"
             issues.append(unchecked(field.id, f"could not count pages in {path.name} ({how}); the {limit}-page limit in the author guidelines was not checked"))
         elif pages > limit:
             rendered = " (rendered from the LaTeX source)" if is_tex else ""
@@ -811,6 +811,40 @@ def _manuscript_paths(venue: Venue, values: dict[str, str]) -> list[tuple[Field,
 def manuscript_files(venue: Venue, values: dict[str, str]) -> list[tuple[Field, Path]]:
     """The ``(field, path)`` of each manuscript file the .sub names that exists."""
     return _manuscript_paths(venue, values)
+
+
+# LaTeX errors that can come from this computer rather than the manuscript: a
+# package its TeX installation lacks, or a build needing an engine or flag that
+# paperpush does not use (it compiles with pdfLaTeX and no shell escape).
+_TEX_ENVIRONMENT_ERROR = re.compile(r"file `[^']+\.(?:sty|cls|clo|def)'|can't find file `[^']+\.(?:sty|cls|clo|def)'|metric \(tfm\) file|requires?\b.*\b(?:xetex|luatex|xelatex|lualatex)\b|shell-escape", re.IGNORECASE)
+
+
+def _latex_compile_issues(field: Field, path: Path, build: "manuscript.TexBuild") -> list[Issue]:
+    environment = [e for e in build.errors if _TEX_ENVIRONMENT_ERROR.search(e)]
+    real = [e for e in build.errors if e not in environment]
+    shown = "; ".join(_short(e, 160) for e in real[:3])
+    more = f" (and {len(real) - 3} more)" if len(real) > 3 else ""
+    if build.pdf is not None and real:
+        return [Issue(WARNING, field.id, f"{field.label}: {path.name} compiled with {len(real)} LaTeX error(s), so the PDF may be incomplete: {shown}{more}")]
+    if environment:
+        return [unchecked(field.id, f"could not compile {path.name} here ({_short(environment[0], 160)}); this may come from this computer's TeX setup rather than the manuscript, since paperpush compiles with pdfLaTeX and no shell escape")]
+    if build.pdf is not None:
+        return []
+    if real:
+        return [Issue(ERROR, field.id, f"{field.label}: {path.name} does not compile to a PDF: {shown}{more}")]
+    return [unchecked(field.id, f"compiling {path.name} produced no PDF and no LaTeX error; the build may have timed out or crashed")]
+
+
+def latex_compile_check(venue: Venue, values: dict[str, str]) -> list[Issue]:
+    """Whether the LaTeX manuscript or source upload compiles to a PDF."""
+    files = [(field, path) for field in venue.fields if field.id in (*_ROLE_FIELD_IDS["manuscript"], "latex_source") for path in _existing(_paths(field, values)) if path.suffix.lower() in (".tex", ".zip")]
+    _need(files, "no LaTeX manuscript among the uploads")
+    if manuscript.tex_toolchain() is None:
+        raise Unchecked("compiling the LaTeX source needs latexmk or pdflatex")
+    builds = [(field, path, manuscript.tex_build(path)) for field, path in files]
+    builds = [item for item in builds if item[2].has_root]
+    _need(builds, "no .tex with \\documentclass in the uploaded archive")
+    return [issue for field, path, build in builds for issue in _latex_compile_issues(field, path, build)]
 
 
 def _need(condition, reason: str) -> None:

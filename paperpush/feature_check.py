@@ -259,6 +259,9 @@ def _affiliation_superscripts(venue: Venue, values: dict[str, str]) -> Outcome:
 
 
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
+    from .requirements_check import latex_compile_check
+
+    checks.run("details.latex_compiles", "LaTeX source compiles to a PDF", CATEGORY, latex_compile_check, venue, values)
     checks.run("details.reference_order", "Reference list is alphabetical or follows first citation", CATEGORY, _reference_order, venue, values, bool(checks.options.get("references_alphabetical")), bool(checks.options.get("references_citation_order")))
     checks.run("details.word_cleanliness", "Word files have no tracked changes or EndNote fields", CATEGORY, _word_file_cleanliness, venue, values)
     checks.run("details.placeholders", "No placeholders, to-do notes, comments, or highlighting left in the files", CATEGORY, placeholders.check, venue, values)
