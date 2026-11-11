@@ -90,6 +90,7 @@ transferring between venues, and responding to reviewers).
    venues
    sub-file
    validation-checks
+   submission-portal
    schemas/venues
    schemas/submission_forms
    schemas/manuscript_requirements

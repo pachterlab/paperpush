@@ -73,6 +73,10 @@ except ImportError:  # pragma: no cover
 
 html_title = f"PaperPush {release}"
 html_static_path = ["_static"]
+# Browser-tab icon (.ico for broad support, including Safari) and the logo
+# shown above the sidebar search box.
+html_favicon = "_static/favicon.ico"
+html_logo = "_static/logo.svg"
 
 # -- Autodoc / Napoleon ------------------------------------------------------
 

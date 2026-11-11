@@ -1,0 +1,6 @@
+{% extends "!layout.html" %}
+{% block extrahead %}
+  {{ super() }}
+  <link rel="icon" href="{{ pathto('_static/logo.svg', 1) }}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ pathto('_static/favicon.png', 1) }}">
+{% endblock %}

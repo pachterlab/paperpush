@@ -9,21 +9,23 @@
   Prepare manuscripts for submission to preprint servers, journals, and conferences with just a few commands.
 </p>
 
-<!-- [![PyPI version](https://badge.fury.io/py/paperpush.svg)](https://badge.fury.io/py/paperpush)
-[![PyPI - Downloads](https://img.shields.io/pypi/dm/paperpush)](https://pypistats.org/packages/paperpush)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/paperpush)](https://pypi.org/project/paperpush/)
-[![PyPI - License](https://img.shields.io/pypi/l/paperpush)](https://pypi.org/project/paperpush/)
-[![Tests](https://github.com/pachterlab/paperpush/actions/workflows/test.yml/badge.svg)](https://github.com/pachterlab/paperpush/actions/workflows/test.yml)
-[![Documentation Status](https://readthedocs.org/projects/paperpush/badge/?version=latest)](https://paperpush.readthedocs.io/en/latest/?badge=latest) -->
+<p align="center">
+  <a href="https://paperpush.onrender.com"><img src="https://img.shields.io/badge/website-paperpush.onrender.com-blue" alt="Website"></a>
+  <a href="https://paperpush.readthedocs.io/en/latest/?badge=latest"><img src="https://readthedocs.org/projects/paperpush/badge/?version=latest" alt="Documentation Status"></a>
+  <a href="https://pypistats.org/packages/paperpush"><img src="https://img.shields.io/pypi/dm/paperpush" alt="PyPI - Downloads"></a>
+  <a href="https://pypi.org/project/paperpush/"><img src="https://img.shields.io/pypi/v/paperpush" alt="PyPI version"></a>
+  <a href="https://github.com/pachterlab/paperpush/actions/workflows/ci.yml"><img src="https://github.com/pachterlab/paperpush/actions/workflows/ci.yml/badge.svg" alt="Tests"></a>
+  <a href="https://github.com/pachterlab/paperpush/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/paperpush" alt="License"></a>
+</p>
 
 PaperPush provides the following services:
 - A standardized system to share all metadata submitted to a venue (the .sub file - [see an example here](https://paperpush.readthedocs.io/en/latest/sub-file.html#sub-file-example))
 <!-- BEGIN VALIDATION CHECK COUNT -->
-- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, and anonymization — 155 distinct validation check types. The checks in a report depend on the venue and files. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html).
+- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, anonymization, and much, much more — 155 distinct validation check types in total. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html)
 <!-- END VALIDATION CHECK COUNT -->
-- A central database of journal/conference [manuscript requirements](https://paperpush.readthedocs.io/en/latest/schemas/manuscript_requirements.html) (paperpush/manuscript_requirements.json) and [submission data](https://paperpush.readthedocs.io/en/latest/schemas/submission_forms.html) (paperpush/submission_forms.json)
-- Automated and fast submission portal filling with deterministic scripts
-- AI skills with an MCP server, a [website](https://paperpush.onrender.com), and a [command line interface](https://paperpush.readthedocs.io/en/latest/commands/index.html)
+- A central database of journal/conference [manuscript requirements](https://paperpush.readthedocs.io/en/latest/schemas/manuscript_requirements.html) ([`paperpush/manuscript_requirements.json`](https://github.com/pachterlab/paperpush/blob/main/paperpush/manuscript_requirements.json)) and [submission data](https://paperpush.readthedocs.io/en/latest/schemas/submission_forms.html) ([`paperpush/submission_forms.json`](https://github.com/pachterlab/paperpush/blob/main/paperpush/submission_forms.json))
+- Automated and fast submission portal filling with deterministic scripts - [see an example here](https://paperpush.readthedocs.io/en/latest/submission-portal.html)
+- [AI skills](https://paperpush.readthedocs.io/en/latest/quickstart/ai.html#what-to-ask) with an MCP server, a [website](https://paperpush.onrender.com), and a [command line interface](https://paperpush.readthedocs.io/en/latest/commands/index.html)
 - Free, open-source, actively-maintained, and never stores your data
 
 ## Quickstart

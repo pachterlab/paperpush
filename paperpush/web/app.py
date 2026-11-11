@@ -1399,6 +1399,17 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def add_venue_page() -> FileResponse:
         return FileResponse(STATIC_DIR / "add-venue.html")
 
+    # Browsers (Safari especially) ask for these at the site root regardless
+    # of the <link> tags, e.g. for bookmarks, Favorites, and the home screen.
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon() -> FileResponse:
+        return FileResponse(STATIC_DIR / "favicon.ico")
+
+    @app.get("/apple-touch-icon.png", include_in_schema=False)
+    @app.get("/apple-touch-icon-precomposed.png", include_in_schema=False)
+    def apple_touch_icon() -> FileResponse:
+        return FileResponse(STATIC_DIR / "apple-touch-icon.png")
+
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(STATIC_DIR / "index.html")

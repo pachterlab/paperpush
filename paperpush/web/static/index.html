@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>paperpush</title>
   <meta name="description" content="Fill in and check a manuscript submission against a journal's, preprint server's, or conference's requirements.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M7 3h13l6 6v20H7z' fill='%23fff' stroke='%23283b7a' stroke-width='2.4' stroke-linejoin='round'/%3E%3Cpath d='M20 3v6h6M11 15h11M11 20h11M11 25h7' fill='none' stroke='%23283b7a' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="icon" href="/static/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/style.css">
   <script>
     // Before first paint, so a dark page never flashes light: the author's
@@ -33,7 +35,7 @@
         <button type="button" class="menu-row" id="reset-btn">Clear<small>Forget this venue's form, uploads, and results.</small></button>
       </div>
     </div>
-    <a class="brand" href="./" aria-label="paperpush home"><svg class="logo" viewBox="0 0 20 24" width="15" height="18" aria-hidden="true"><path d="M2 1.5h11l5 5v16H2z" fill="var(--panel)" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M13 1.5v5h5M5.5 11h9M5.5 14.5h9M5.5 18h6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>paperpush</a>
+    <a class="brand" href="./" aria-label="paperpush home"><img class="logo" src="/static/logo.svg" width="24" height="22" alt="">paperpush</a>
     <span class="muted small" id="version"></span>
     <a class="btn btn-small" id="add-venue-link" href="/add-venue" target="_blank" rel="noopener" title="Describe a journal, preprint server, or conference paperpush does not support yet, or fix one it does">
       <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M7.25 2.5h1.5v4.75h4.75v1.5H8.75v4.75h-1.5V8.75H2.5v-1.5h4.75z"/></svg>
