@@ -73,6 +73,7 @@ except ImportError:  # pragma: no cover
 
 html_title = f"PaperPush {release}"
 html_static_path = ["_static"]
+html_css_files = ["custom.css"]
 # Browser-tab icon (.ico for broad support, including Safari) and the logo
 # shown above the sidebar search box.
 html_favicon = "_static/favicon.ico"

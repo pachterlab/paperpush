@@ -76,6 +76,7 @@ transferring between venues, and responding to reviewers).
 
    installation
    quickstart
+   Website <https://paperpush.onrender.com>
 
 .. toctree::
    :maxdepth: 2

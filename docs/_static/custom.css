@@ -1,0 +1,2 @@
+/* Let the page content use the full window width (sphinx_rtd_theme caps it at 800px). */
+.wy-nav-content { max-width: none; }
