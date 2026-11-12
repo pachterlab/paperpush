@@ -90,6 +90,7 @@ def build_parser() -> argparse.ArgumentParser:
     autofill.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(api) LLM provider; defaults to the first of anthropic, openai, google " "whose API key is set")
     autofill.add_argument("--model", help="(api) model to use (default: claude-opus-5-5, gpt-6-astra, or " "gemini-3.8-flash, by provider)")
     autofill.add_argument("--min-confidence", choices=["low", "medium", "high"], default="low", help="do not write any value below this confidence (default: low)")
+    autofill.add_argument("--confirm-attestations", dest="confirm_attestations", action="store_true", help="set every blank required attestation (e.g. author consent) to yes, on behalf of all authors; agents pass this only when the user asks")
     autofill.add_argument("--dry-run", action="store_true", help="show what autofill would write without changing the .sub file")
 
     # login-only.
@@ -157,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
                 provider=args.provider,
                 model=args.model,
                 min_confidence=args.min_confidence,
+                confirm_attestations=args.confirm_attestations,
                 dry_run=args.dry_run,
                 output=None,  # fill the .sub created above in place
                 force=args.force,

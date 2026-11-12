@@ -141,6 +141,7 @@ FieldSection = Literal[
     "reviewers",
     "declarations",
     "additional",
+    "attestations",
 ]
 
 # Heading printed above each section in a .sub template, in render order.
@@ -152,6 +153,10 @@ SECTION_TITLES: dict[str, str] = {
     "reviewers": "Reviewers and editors",
     "declarations": "Declarations",
     "additional": "Additional information",
+    # Required confirmations whose only accepted answer is yes (author consent,
+    # submission terms). They go here whatever section the field names, last, so
+    # the author answers every open question (disclosures, the license) first.
+    "attestations": "Attestations",
 }
 
 
@@ -403,7 +408,7 @@ class Field:
     # read fields by id, and ``paperpush subfile --venue-order`` ignores it.
     section: Annotated[
         Optional[FieldSection],
-        PField(description="Section of the .sub template this field is listed under " "(type, files, metadata, authors, reviewers, declarations, additional). " "Omit to use the section paperpush/common_fields.json gives this field " 'id, or "additional" when it names none. Layout only: ignored by ' "`paperpush subfile --venue-order`, submission and validation."),
+        PField(description="Section of the .sub template this field is listed under " "(type, files, metadata, authors, reviewers, declarations, additional, attestations). " "Omit to use the section paperpush/common_fields.json gives this field " 'id, or "additional" when it names none. Layout only: ignored by ' "`paperpush subfile --venue-order`, submission and validation."),
     ] = None
 
     @classmethod

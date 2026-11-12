@@ -66,7 +66,7 @@ Choose your favorite mode: AI agent skills, website, or command line. All modes 
 - `/paperpush-validate Validate my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.`
 
 #### Manuscript venue transfer reformatting
-- `/paperpush-transfer Transfer my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY to VENUE_2 with PaperPush.`
+- `/paperpush-transfer Transfer my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY to NEW_VENUE with PaperPush.`
 
 #### Respond to reviewers
 - `/paperpush-respond-to-reviewers Prepare my response to reviewers in /PATH/TO/MANUSCRIPT/DIRECTORY with PaperPush.`
@@ -276,15 +276,15 @@ Each venue is listed in `paperpush/venues.json` (the master list of venues and t
 
 | Skill | Use it to | Example prompt |
 | --- | --- | --- |
-| `/paperpush-pick-venue` | suggest venues for a manuscript: journals that publish similar work, checked against your constraints (open access, APC budget) and each supported venue's limits, then hand the chosen one to `/paperpush-prepare-submission` | `/paperpush-pick-venue Where should I submit my manuscript in MANUSCRIPT_DIRECTORY? It must be open access with an APC under $3000.` |
-| `/paperpush-prepare-submission` | go from a manuscript directory to a filled-in portal (autofill, validate, submit if supported) | `/paperpush-prepare-submission Prepare my manuscript in MANUSCRIPT_DIRECTORY for submission to VENUE.` |
-| `/paperpush-autofill` | fill a `.sub` from the manuscript files | `/paperpush-autofill My manuscript files are in MANUSCRIPT_DIRECTORY. Fill out VENUE.sub.txt.` |
+| `/paperpush-pick-venue` | suggest venues for a manuscript: journals that publish similar work, checked against your constraints (open access, APC budget) and each supported venue's limits, then hand the chosen one to `/paperpush-prepare-submission` | `/paperpush-pick-venue Where should I submit my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY? It must be open access with an APC under $3000.` |
+| `/paperpush-prepare-submission` | go from a manuscript directory to a filled-in portal (autofill, validate, submit if supported) | `/paperpush-prepare-submission Prepare my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY for submission to VENUE.` |
+| `/paperpush-autofill` | fill a `.sub` from the manuscript files | `/paperpush-autofill My manuscript files are in /PATH/TO/MANUSCRIPT/DIRECTORY. Fill out VENUE.sub.txt.` |
 | `/paperpush-validate` | run every check, including the ones that need a reader | `/paperpush-validate Validate VENUE.sub.txt and save the report as REPORT.pdf.` |
 | `/paperpush-fix` | fix what validate flags (in the `.tex`/`.docx` sources and the `.sub`), re-validate until nothing fixable is left, and report what needs the author | `/paperpush-fix Fix the issues validate found in VENUE.sub.txt.` |
 | `/paperpush-submit` | log in and fill in the portal from a ready `.sub` (optionally skipping validation) — invokes `/paperpush-portal-debug` if it stalls | `/paperpush-submit Fill out the VENUE submission portal from VENUE.sub.txt.` |
 | `/paperpush-portal-debug` | get a stalled `paperpush submit` run unstuck | `/paperpush-portal-debug paperpush submit VENUE.sub.txt is stuck at the STEP step.` |
-| `/paperpush-transfer` | reformat a manuscript from one venue to another: copy the files into a new `<venue>/` directory, create and autofill its `.sub` (reusing earlier `.sub` files), validate, and write `transfer.txt` describing the changes | `/paperpush-transfer My manuscript in MANUSCRIPT_DIRECTORY was rejected from OLD_VENUE. Transfer it to NEW_VENUE.` |
-| `/paperpush-respond-to-reviewers` | prepare a revision in two phases: (1) copy the manuscript and reviews into a new `revisionN/` directory (e.g., revision1, revision2, etc.) and propose a plan for each comment, then (once you approve) (2) revise the manuscript; write the response to reviewers, the clean revised manuscript, and a marked manuscript; and validate the revised manuscript | `/paperpush-respond-to-reviewers The reviews for my manuscript in MANUSCRIPT_DIRECTORY are in REVIEWS_FILE. Prepare the revision.` |
+| `/paperpush-transfer` | reformat a manuscript from one venue to another: copy the files into a new `<venue>/` directory, create and autofill its `.sub` (reusing earlier `.sub` files), validate, and write `transfer.txt` describing the changes | `/paperpush-transfer My manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY was rejected from OLD_VENUE. Transfer it to NEW_VENUE.` |
+| `/paperpush-respond-to-reviewers` | prepare a revision in two phases: (1) copy the manuscript and reviews into a new `revisionN/` directory (e.g., revision1, revision2, etc.) and propose a plan for each comment, then (once you approve) (2) revise the manuscript; write the response to reviewers, the clean revised manuscript, and a marked manuscript; and validate the revised manuscript | `/paperpush-respond-to-reviewers The reviews for my manuscript in /PATH/TO/MANUSCRIPT/DIRECTORY are in REVIEWS_FILE. Prepare the revision.` |
 | `/paperpush-add-venue-validate` | add or refresh a venue's author guidelines (contributors) | `/paperpush-add-venue-validate Add VENUE's author guidelines from GUIDELINES_URL.` |
 | `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and `submit` support for a venue, with tests (contributors) | `/paperpush-add-venue Add login and submit support for VENUE.` |
 

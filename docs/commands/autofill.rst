@@ -13,7 +13,8 @@ hand.
                              [--supplement FILE]
                              [--provider {anthropic,openai,google}]
                              [--model MODEL]
-                             [--min-confidence {low,medium,high}] [-o OUT]
+                             [--min-confidence {low,medium,high}]
+                             [--confirm-attestations] [--keep-existing] [-o OUT]
                              [--overwrite] [--dry-run] [--web]
                              subfile
 
@@ -103,6 +104,23 @@ Options
    Do not write any value whose extraction confidence is below this threshold.
    Defaults to ``low`` (write everything).
 
+``--confirm-attestations``
+   Set every blank attestation to ``yes``. An attestation is a required yes/no
+   confirmation whose only accepted answer is yes, such as author consent, the
+   submission terms, or a code of ethics. The ``.sub`` marks each one
+   ``must be yes to submit``. You are agreeing on behalf of every author, so the
+   command prints each attestation's full sentence. An attestation already
+   answered with something other than yes is left as written and reported.
+   Without this flag, attestations are left blank for you, like every other
+   policy field. AI agents pass it only when you ask them to.
+
+``--keep-existing``
+   Update an already-filled ``.sub`` without changing any value it holds:
+   write only fields that are blank or still at their template default. Each
+   field where the manuscript now says something different is listed under
+   "Kept your existing value", showing both versions, so you can choose which
+   to take. See `Updating a filled .sub`_.
+
 ``-o OUT``, ``--output OUT``
    Write the filled file here instead of overwriting the input ``.sub``.
 
@@ -156,6 +174,25 @@ Write the result to a new file and only accept high-confidence values:
 
    paperpush autofill -p ./my_manuscript --engine api \
        --min-confidence high -o biorxiv.filled.sub.txt biorxiv.sub.txt
+
+Updating a filled .sub
+----------------------
+
+Run ``autofill`` again on the same ``.sub`` after the manuscript changes. A
+value the file already holds is reported as *unchanged* and not rewritten, and
+a value that replaces an earlier one is marked ``[replaced the previous
+value]``. To protect edits you made by hand, add ``--keep-existing`` (with
+``--dry-run`` to preview first):
+
+.. code-block:: bash
+
+   paperpush autofill -p ./my_manuscript --engine api --keep-existing --dry-run biorxiv.sub.txt
+
+Then update the fields you want from the new draft, either by editing the
+``.sub`` or by rerunning without ``--keep-existing`` with a ``values.json`` that
+holds just those fields. The ``/paperpush-autofill`` skill does this for you:
+it reads the venue and file paths from the existing ``.sub`` and asks you about
+each field the new draft would change.
 
 .. note::
 

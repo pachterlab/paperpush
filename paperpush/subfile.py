@@ -17,8 +17,10 @@ Block syntax (``key: |``) is used for any multi-line value (abstracts, author
 lists, file lists). Everything else is a single ``key: value`` line.
 
 Fields are grouped into the same sections, in the same order, for every venue
-(manuscript type, files, details, authors, reviewers, declarations, additional;
-see :func:`ordered_fields`), so ``.sub`` files for different venues line up.
+(manuscript type, files, details, authors, reviewers, declarations,
+additional, attestations; see :func:`ordered_fields`), so ``.sub`` files for
+different venues line up. Attestations (required confirmations whose only
+accepted answer is yes) always get their own section, last.
 ``venue_order=True`` lists them in the order the venue's portal asks instead.
 """
 
@@ -79,14 +81,22 @@ def common_fields() -> dict[str, tuple[str, int]]:
     return ranks
 
 
+def is_attestation(field: Field) -> bool:
+    """Whether ``field`` is an attestation: a required yes/no confirmation that only yes satisfies."""
+    return field.type == "boolean" and field.confirm and field.required
+
+
 def field_section(field: Field) -> str:
     """The section of a ``.sub`` template that ``field`` is listed under.
 
     The field's own ``section`` wins; otherwise the section
     ``common_fields.json`` gives its id; otherwise :data:`FALLBACK_SECTION`. An
     unknown ``section`` value (e.g. from a newer published database) falls
-    through rather than failing.
+    through rather than failing. An attestation (a required yes/no confirmation
+    whose only accepted answer is yes) is always listed under "attestations".
     """
+    if is_attestation(field):
+        return "attestations"
     if field.section in SECTION_TITLES:
         return field.section
     common = common_fields().get(field.id)
@@ -204,6 +214,11 @@ def default_filename(venue: Venue) -> str:
 def _format_default(field: Field) -> str:
     """Render a field's default value as text for a fresh template."""
     if field.type == "boolean":
+        if is_attestation(field) and not field.default:
+            # An attestation: "no" is not an answer the venue accepts, so a fresh
+            # template leaves it blank for the author (or --confirm-attestations)
+            # rather than pre-filling a refusal nobody chose.
+            return ""
         return "yes" if field.default else "no"
     if field.default is None:
         return ""
@@ -274,6 +289,8 @@ def render_template(
             rule = "# " + "-" * 70
             lines += [rule, f"# {SECTION_TITLES[section]}", rule, ""]
         flag = "REQUIRED" if field.required else "optional"
+        if is_attestation(field):
+            flag += "; must be yes to submit"
         lines.append(f"# {field.label} ({field.type}, {flag})")
         if field.help:
             lines.append(f"#   {field.help}")

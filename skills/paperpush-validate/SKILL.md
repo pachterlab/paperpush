@@ -44,6 +44,18 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
   references, hidden text, citation order, prose, ...). The form checks come
   back not applicable, so the report is about the files, not whether the
   submission is ready. Re-run with the same flags to merge `--ai-results`.
+- **LaTeX source and its compiled PDF: validate both.** `--manuscript` takes
+  one file, and each form sees different things. The `.tex` run reads the
+  `.bib` (DOIs registered to other works, preprints since published,
+  duplicate and uncited entries), the source's headings, acronyms, comments,
+  and secrets; the PDF run measures what was printed (layout, fonts, page
+  count, metadata, links, figure placement). Run step 1 twice with the same
+  other flags, `--manuscript <abs main.tex>` and `--manuscript <abs main.pdf>`
+  (separate `--ai-tasks` files; do the AI tasks once, from the PDF run, and
+  merge them there), and report every Failed and Warnings entry from both.
+  The same goes for a `.sub` whose manuscript is one form while the other is
+  in the directory. Never validate only the PDF because it is "what will be
+  submitted".
 - Whether they want the report saved, and where (default: none; `-o` with no
   path writes `<sub stem>_validation.pdf` next to the `.sub`). Mention
   `--colorblind` if they ask for color-blind-friendly colors.

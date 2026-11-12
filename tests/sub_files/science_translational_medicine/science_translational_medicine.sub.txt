@@ -118,10 +118,6 @@ additional_datasets: |
   Zenodo | https://zenodo.org/record/1234567
   GitHub | https://github.com/paperpush/manuscript
 
-# Agree to submission terms (boolean, REQUIRED)
-#   Confirmation of the Science submission terms and conditions, checked on the terms step. Must be 'yes' to submit.
-agree_terms: yes
-
 # ----------------------------------------------------------------------
 # Additional information
 # ----------------------------------------------------------------------
@@ -130,5 +126,13 @@ agree_terms: yes
 #   Optional. Additional information for the editor, typed into the comments box when that step is present.
 comments_to_editor: |
   
+
+# ----------------------------------------------------------------------
+# Attestations
+# ----------------------------------------------------------------------
+
+# Agree to submission terms (boolean, REQUIRED; must be yes to submit)
+#   Confirmation of the Science submission terms and conditions, checked on the terms step. Must be 'yes' to submit.
+agree_terms: yes
 
 # vim: set filetype=yaml :

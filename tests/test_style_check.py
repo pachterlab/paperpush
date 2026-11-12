@@ -160,7 +160,9 @@ def test_acronym_problems():
     found = sc.acronyms(BODY)
     assert [s.split("'")[1] for s in found.before_definition] == ["SVM"]
     assert found.redefined == ["'CNN' (2 times)"]
-    assert [s.split("'")[1] for s in found.undefined] == ["RF"]
+    # XYZ is only in a legend, but never spelled out anywhere, so a reader cannot decode it.
+    assert [s.split("'")[1] for s in found.undefined] == ["RF", "XYZ"]
+    assert "only in figure legends or tables" in found.undefined[1]
     assert found.rarely_used == ["'GNN'"]
 
 
@@ -183,6 +185,20 @@ def test_split_abstract_drops_front_matter():
     assert abstract == ["We study the CNN on twenty data sets with care."]
     assert body == ["Introduction", "Body text here."]
     assert sc.split_abstract(paragraphs, None) == ([], paragraphs)
+
+
+def test_split_abstract_inside_a_run_together_pdf_paragraph():
+    # A two-column PDF's text often runs the title, abstract, and introduction into one paragraph.
+    abstract_text = "We present a toolkit with a Model Context Protocol (MCP) server for authors.\nIt checks manuscripts against venue guidelines."
+    paragraphs = [
+        "A Title Jane Doe UCLA Abstract We present a toolkit with a Model\nContext Protocol (MCP) server for authors. It checks manu-\nscripts against venue guidelines. 1 Introduction Tools exposed over the Model Context Protocol (MCP) are common.",
+        "The MCP server runs locally. The MCP tools are listed.",
+    ]
+    abstract, body = sc.split_abstract(paragraphs, abstract_text)
+    assert len(abstract) == 1 and abstract[0].startswith("We present") and abstract[0].endswith("guidelines")
+    assert body[0].startswith("1 Introduction")
+    found = sc.acronyms(body, abstract)
+    assert found.redefined == [] and found.abstract_only == [] and found.abstract_undefined == []
 
 
 # --- on a manuscript -------------------------------------------------------------------------

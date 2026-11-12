@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import html
 import logging
+import math
 import re
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -588,17 +589,61 @@ _STOP_WORDS = frozenset(
     couldn didn doesn hadn hasn haven isn ma mightn mustn needn shan shouldn wasn weren won wouldn also may might could would one two
     using used use however within without among whether thus""".split()
 )
-# Transitions, intensifiers, and stock phrases that read as filler when leaned on.
-# Reported when used at least _STYLE_MIN_COUNT times and _STYLE_PER_1000 times per 1,000 words.
-_STYLE_WORDS = frozenset(
-    """however moreover furthermore additionally notably importantly interestingly indeed therefore consequently overall
-    specifically particularly clearly crucially ultimately essentially basically very highly extremely remarkably substantially
-    considerably dramatically strikingly novel robust comprehensive crucial pivotal leverage leverages leveraging utilize utilizes
-    utilizing utilized delve delves intricate underscore underscores highlight highlights highlighting showcase showcases seamless
-    seamlessly paramount multifaceted notable potentially vital landscape realm""".split()
+def _inflections(base: str) -> set[str]:
+    """``base`` with the regular plural and verb endings ("enhance" -> "enhances", "enhanced", "enhancing")."""
+    if base.endswith("e"):
+        return {base, base + "s", base + "d", base[:-1] + "ing"}
+    if base.endswith("y") and base[-2] not in "aeiou":
+        return {base, base[:-1] + "ies", base[:-1] + "ied", base + "ing"}
+    if base.endswith(("s", "x", "ch", "sh")):
+        return {base, base + "es", base + "ed", base + "ing"}
+    return {base, base + "s", base + "ed", base + "ing"}
+
+
+def _word_groups(spec: str) -> dict[str, str]:
+    """Each form in ``spec`` mapped to the name it is reported under.
+
+    ``spec`` is comma-separated groups. A group's first word names it and is
+    inflected; any further words are irregular forms ("shed shedding",
+    "meticulous meticulously").
+    """
+    out: dict[str, str] = {}
+    for group in spec.split(","):
+        name, *extra = group.split()
+        for form in _inflections(name) | set(extra):
+            out[form] = name
+    return out
+
+
+# Stock words: transitions, intensifiers, and the stock verbs and nouns of academic prose, which read as filler when
+# leaned on. Reported at _STYLE_MIN_COUNT uses and _STYLE_PER_1000 per 1,000 words. Many are among the "style" excess
+# words of Kobak et al. 2025 (Science Advances 11:eadt3813; list at github.com/berenslab/llm-excess-vocab, MIT).
+_STOCK_WORDS = _word_groups(
+    """however, moreover, furthermore, additionally, notably, importantly, interestingly, indeed, therefore, consequently,
+    overall, specifically, particularly, clearly, crucially, ultimately, essentially, basically, very, highly, extremely,
+    remarkably, substantially, considerably, dramatically, strikingly, potentially, subsequently, primarily, predominantly,
+    effectively, typically, novel, robust, comprehensive, crucial, notable, vital, substantial, valuable, diverse, various,
+    landscape, leverage, utilize, highlight, emphasize emphasise emphasises emphasised emphasising, perform, enhance
+    enhancement enhancements, improve, demonstrate, facilitate, address, tackle, exhibit, achieve, ensure, explore exploration,
+    examine, empower, problem, challenge, framework, paradigm, insight, aspect, capability capabilities, methodology,
+    advancement"""
+)
+# LLM markers: words that became far more common in papers after ChatGPT (Kobak et al. 2025; also Liang et al. 2024,
+# arXiv:2404.01268) and that ordinary prose rarely needs. A few uses already stand out, hence the lower bar.
+# Left out although on their list: words with a plain technical sense ("elevated levels", "viral shedding").
+_MARKER_WORDS = _word_groups(
+    """delve, showcase, underscore, intricate intricately intricacy intricacies, meticulous meticulously, commendable,
+    pivotal, realm, multifaceted, groundbreaking, unparalleled, invaluable, noteworthy, nuanced nuance nuances, interplay,
+    interconnectedness, unravel unraveling unravelling, unveil, illuminate, elucidate, harness, bolster, burgeoning,
+    transformative, revolutionize revolutionise revolutionizing, seamless seamlessly, uncharted, underexplored, unexplored,
+    pave paving, adept, akin, amidst, amid, endeavor endeavour endeavours, encompass, encapsulate, garner, grapple, surmount,
+    propel propelled propelling, orchestrate, foster, embrace, formidable, swift swiftly, poised, pinpoint, heighten, accentuate, juxtapose, culminate, hinge, furnish, solidify, impactful, imperative, versatility,
+    innovative, pioneering, compelling, remarkable, renowned, strategically, unlock, spearhead, necessitate, intertwine"""
 )
 _STYLE_MIN_COUNT = 5
 _STYLE_PER_1000 = 2.5
+_MARKER_MIN_COUNT = 3
+_MARKER_PER_1000 = 0.3
 # An adjective or adverb (outside the title, abstract, and keywords) is overused at this many uses and this share of all content words.
 # Nouns are left out: a paper's subject ("studies", "devices") recurs by necessity.
 _OVERUSED_MIN_COUNT = 12
@@ -613,14 +658,24 @@ _NOT_ADJECTIVES = frozenset(
     clinic metric topic logic music traffic panic fabric rubric epidemic pandemic tactic mechanic critic statistic republic
     objective archive motive initiative directive narrative perspective detective executive
     summary boundary library salary diary glossary dictionary anniversary secretary commentary
-    table cable variable unless
+    table cable variable unless enable
+    give live five drive arrive derive survive strive thrive deprive revive vary reveal appeal conceal deal
+    want grant represent prevent invent meant spent went sent lent rent bent
     participant plant variant mutant implant assistant applicant consultant inhabitant infant antioxidant occupant
     patient student agent parent event content percent component resident president incident accident client talent gradient
     coefficient opponent recipient ingredient respondent solvent extent intent descent consent dissent""".split()
 )
 _MODIFIER_WORDS = frozenset(
-    """large small big great good bad high low long short strong weak new old recent major minor main key wide broad deep early late
-    many several often always never rarely seldom almost nearly quite rather somewhat together""".split()
+    """great good bad strong weak major minor main key wide broad deep quite somewhat""".split()
+)
+# Verbs that end like adjectives: "receive", "perceive", "achieve", "believe", "retrieve".
+_VERB_ENDINGS = ("eive", "ieve")
+# Plain adjectives and adverbs that carry no style: no reader notices "final" or "additional" repeated,
+# so they are neither listed as most frequent nor reported as overused.
+_PLAIN_MODIFIERS = frozenset(
+    """first final last next initial original additional general total actual available possible different current previous
+    several respective individual potential usual normal internal external less supplementary supplemental experimental
+    empirical theoretical january february""".split()
 )
 # The same content word this many times in one sentence.
 _SENTENCE_REPEATS = 3
@@ -630,8 +685,11 @@ _SAME_OPENINGS = 4
 _MAX_SENTENCE_WORDS = 50
 # Shortest word counted as a content word.
 _MIN_CONTENT_LEN = 4
-# Top words listed in the passing note.
+# Top words listed in the passing note, each used at least _TOP_MIN_COUNT times and _TOP_PER_1000 times per 1,000 words
+# (5 uses in a 3,000-word paper, 12 in an 8,000-word one): a handful of uses in a whole paper is not worth a note.
 _TOP_WORDS = 5
+_TOP_MIN_COUNT = 5
+_TOP_PER_1000 = 1.5
 _ITEM_LABEL = re.compile(r"[A-Za-z]+\.?\s+[A-Z]?\d+[A-Za-z]?\s*[:.]")
 _REPETITION_WORD = re.compile(r"[A-Za-z][A-Za-z'’-]*[A-Za-z]|[A-Za-z]")
 # A sentence break: end punctuation, then space and a capital (or a masked item), not after a common abbreviation.
@@ -671,9 +729,11 @@ def _is_modifier(word: str) -> bool:
     w = word.lower()
     if w in _MODIFIER_WORDS:
         return True
+    if w in _PLAIN_MODIFIERS:
+        return False
     if w.endswith("ly") and len(w) >= 5:
         return w not in _NOT_ADVERBS
-    return w.endswith(_ADJECTIVE_SUFFIXES) and not w.endswith("ment") and w not in _NOT_ADJECTIVES
+    return w.endswith(_ADJECTIVE_SUFFIXES) and not w.endswith(_VERB_ENDINGS) and not w.endswith("ment") and w not in _NOT_ADJECTIVES
 
 
 def _sentences(paragraph: str) -> list[str]:
@@ -703,10 +763,12 @@ class Repetition:
     """What :func:`repetition` found in a text, by kind, plus its most frequent content words."""
 
     style: list[str] = field(default_factory=list)
+    markers: list[str] = field(default_factory=list)
     overused: list[str] = field(default_factory=list)
     in_sentence: list[str] = field(default_factory=list)
     openings: list[str] = field(default_factory=list)
     top: list[tuple[str, int]] = field(default_factory=list)
+    top_min: int = _TOP_MIN_COUNT
     words: int = 0
 
 
@@ -726,20 +788,25 @@ def repetition(paragraphs: list[str], topic: str = "") -> Repetition:
         return out
     per_1000 = 1000 / len(all_words)
 
-    style = Counter(w.lower() for w in all_words if w.lower() in _STYLE_WORDS)
-    for word, count in style.most_common():
-        if count >= _STYLE_MIN_COUNT and count * per_1000 >= _STYLE_PER_1000:
-            out.style.append(f"'{word}' {count} times ({count * per_1000:.1f} per 1,000 words)")
+    topic_words = {w.lower() for w in _words(topic)}
+    topic_stems = {stem(w) for w in topic_words}
+    for forms, least, rate, hits in ((_STOCK_WORDS, _STYLE_MIN_COUNT, _STYLE_PER_1000, out.style), (_MARKER_WORDS, _MARKER_MIN_COUNT, _MARKER_PER_1000, out.markers)):
+        counts = Counter(forms[w.lower()] for w in all_words if w.lower() in forms)
+        for word, count in counts.most_common():
+            if any(forms.get(t) == word for t in topic_words):
+                continue  # "Challenges in ..." as a title: the word is the subject
+            if count >= least and count * per_1000 >= rate:
+                hits.append(f"'{word}' {count} times ({count * per_1000:.1f} per 1,000 words)")
 
     content = [w for w in all_words if _is_content(w)]
-    topic_stems = {stem(w) for w in _words(topic)}
     # Only adjectives and adverbs outside the title, abstract, and keywords can be overused.
     groups = Counter(stem(w) for w in content if _is_modifier(w) and stem(w) not in topic_stems)
     spelling: dict[str, Counter] = {}
     for w in content:
         spelling.setdefault(stem(w), Counter())[w.lower()] += 1
     name = {k: c.most_common(1)[0][0] for k, c in spelling.items()}
-    out.top = [(name[k], n) for k, n in groups.most_common(_TOP_WORDS)]
+    out.top_min = max(_TOP_MIN_COUNT, math.ceil(_TOP_PER_1000 * len(all_words) / 1000))
+    out.top = [(name[k], n) for k, n in groups.most_common(_TOP_WORDS) if n >= out.top_min]
     if topic_stems:
         for key, count in groups.most_common(10):
             if count >= _OVERUSED_MIN_COUNT and count / len(content) >= _OVERUSED_SHARE:
@@ -774,6 +841,7 @@ def repetition(paragraphs: list[str], topic: str = "") -> Repetition:
 
 _REPETITION_KINDS = (
     ("style", "stock word(s) used often"),
+    ("markers", "word(s) that became much more common in papers written with LLMs, used several times"),
     ("overused", "adjective(s) or adverb(s) outside the title, abstract, and keywords used unusually often"),
     ("in_sentence", "sentence(s) repeating a word"),
     ("openings", "run(s) of sentences opening with the same word"),
@@ -801,7 +869,7 @@ def _repetition_check(venue: Venue, values: dict[str, str]) -> Outcome:
                 issues.append(Issue(WARNING, fld.id, f"{text.path.name}: {len(hits)} {noun}: {shown}{more}; vary the wording"))
         top = ", ".join(f"{w} ({n})" for w, n in found.top)
         prefix = f"{text.path.name}: " if len(files) > 1 else ""
-        details.append(f"{prefix}{found.words:,} words; most frequent adjectives and adverbs: {top}" if top else f"{prefix}{found.words:,} words; no adjective or adverb repeated" if found.words else f"{prefix}no words read")
+        details.append(f"{prefix}{found.words:,} words; most frequent adjectives and adverbs: {top}" if top else f"{prefix}{found.words:,} words; no adjective or adverb used {found.top_min} or more times" if found.words else f"{prefix}no words read")
     return Outcome(issues, "; ".join(details))
 
 

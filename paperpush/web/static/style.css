@@ -404,6 +404,7 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .card.review .input { background: var(--review-input-bg); }
 .yesno { display: flex; gap: 14px; align-items: center; }
 .yesno label, .confirm { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
+.field-group > .agree-all { display: flex; font-weight: 600; }
 .multi .checklist { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 2px; padding: 6px 8px; margin-top: 6px; }
 .multi .checklist label { display: flex; gap: 6px; align-items: center; padding: 2px 0; cursor: pointer; }
 .file-pick, .row, .row-actions { display: flex; gap: 6px; align-items: center; }

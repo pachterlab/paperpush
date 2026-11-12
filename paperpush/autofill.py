@@ -20,6 +20,14 @@ Two gates protect the file from a careless or over-reaching extractor:
   is a ``classify`` field, or is below ``high`` confidence, is flagged for the
   author to review rather than presented as settled.
 
+Re-running autofill on a ``.sub`` that is already filled (for example after the
+manuscript changed) is an *update*: a proposal that matches what the file
+already says is reported as unchanged and not rewritten, and every value that
+replaces an earlier one carries that earlier value so the front-ends can show
+the change. With ``keep_existing`` the file's existing values win outright: only
+fields that are blank or still at their template default are written, and each
+differing proposal is reported as kept rather than applied.
+
 Every written field is run back through :func:`paperpush.validate.validate`
 so an autofilled file carries the same guarantees as one filled in by hand.
 
@@ -44,8 +52,8 @@ from dataclasses import field as _dc_field
 from pathlib import Path
 
 from .database import Field, Venue
-from .subfile import _MULTILINE_TYPES, parse, replace_block, replace_scalar
-from .validate import Issue, validate
+from .subfile import _MULTILINE_TYPES, _format_default, is_attestation, parse, replace_block, replace_scalar
+from .validate import Issue, _truthy_bool, validate
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +85,10 @@ SKIPPED_POLICY = "skipped_policy"  # a ``never`` field; left at its default
 SKIPPED_LOW = "skipped_low"  # below the confidence threshold; not written
 SKIPPED_EMPTY = "skipped_empty"  # proposal had no value to write
 UNKNOWN = "unknown"  # not a field in this venue's template
+ATTESTED = "attested"  # a required confirmation set to yes by --confirm-attestations
+ATTESTATION_KEPT = "attestation_kept"  # a confirmation the author answered otherwise; left as is
+UNCHANGED = "unchanged"  # the .sub already holds the proposed (non-default) value; nothing written
+KEPT = "kept"  # --keep-existing: the .sub already holds a different value; left as is
 
 
 def effective_role(field: Field) -> str:
@@ -155,6 +167,9 @@ class Outcome:
     confidence: str = ""
     source: str = ""
     note: str = ""
+    # The value the .sub held before this run, when it held one other than the
+    # template default (set on written, unchanged, and kept outcomes).
+    previous: str = ""
 
 
 @dataclass(frozen=True)
@@ -180,6 +195,31 @@ class AutofillResult:
     @property
     def skipped(self) -> list[Outcome]:
         return self._by_action(SKIPPED_POLICY, SKIPPED_LOW, SKIPPED_EMPTY, UNKNOWN)
+
+    @property
+    def unchanged(self) -> list[Outcome]:
+        """Fields whose proposed value the .sub already held; not rewritten."""
+        return self._by_action(UNCHANGED)
+
+    @property
+    def kept(self) -> list[Outcome]:
+        """Fields --keep-existing left at the value the .sub already held."""
+        return self._by_action(KEPT)
+
+    @property
+    def changed(self) -> list[Outcome]:
+        """Written fields that replaced an earlier (non-default) value."""
+        return [o for o in self._by_action(FILLED, REVIEW) if o.previous]
+
+    @property
+    def attested(self) -> list[Outcome]:
+        """Required confirmations that --confirm-attestations set (or found) to yes."""
+        return self._by_action(ATTESTED)
+
+    @property
+    def attestations_kept(self) -> list[Outcome]:
+        """Required confirmations --confirm-attestations left alone because the author answered otherwise."""
+        return self._by_action(ATTESTATION_KEPT)
 
     @property
     def errors(self) -> list[Issue]:
@@ -290,6 +330,46 @@ def _resolve_filemap(field: Field, value: str, search_dirs: list[Path]) -> str:
     return "\n".join(out_lines)
 
 
+def attestation_fields(venue: Venue) -> list[Field]:
+    """The venue's attestations: required yes/no confirmations whose only acceptable answer is yes.
+
+    These are the boolean fields marked ``confirm: true`` and required in
+    ``submission_forms.json`` (author consent, terms of submission, a code of
+    ethics). A required yes/no *question*, where either answer is valid, is not
+    one of them.
+    """
+    return [f for f in venue.fields if is_attestation(f)]
+
+
+def _confirm_attestations(text: str, venue: Venue) -> tuple[str, list[Outcome]]:
+    """Set each blank attestation to yes; report the ones already answered."""
+    values = parse(text).values
+    outcomes: list[Outcome] = []
+    for field in attestation_fields(venue):
+        raw = values.get(field.id, "").strip()
+        if not raw:
+            text = _write_field(text, field, "yes")
+            outcomes.append(Outcome(field.id, field.label, ATTESTED, value="yes", source="--confirm-attestations", note="set to yes"))
+        elif _truthy_bool(raw):
+            outcomes.append(Outcome(field.id, field.label, ATTESTED, value=raw, source="--confirm-attestations", note="already yes"))
+        else:
+            outcomes.append(Outcome(field.id, field.label, ATTESTATION_KEPT, value=raw, source="--confirm-attestations", note=f"answered {raw!r} in the .sub -- left as written; the venue requires yes to submit"))
+    return text, outcomes
+
+
+def _normalize(value: str) -> str:
+    """Compare values the way the .sub stores them: per line, ignoring indentation and blank lines."""
+    return "\n".join(line.strip() for line in value.strip().splitlines() if line.strip())
+
+
+def _existing_value(values: dict[str, str], field: Field) -> str:
+    """The value ``field`` holds in the .sub, or "" when it is blank or still the template default."""
+    raw = _normalize(values.get(field.id, ""))
+    if not raw or raw == _normalize(_format_default(field)):
+        return ""
+    return raw
+
+
 def _write_field(text: str, field: Field, value: str) -> str:
     """Write ``value`` into ``field`` using the right surgical helper."""
     if field.type in _MULTILINE_TYPES:
@@ -303,6 +383,8 @@ def autofill(
     extraction: Extraction,
     manuscript_dir: str | Path | Sequence[str | Path] | None = None,
     min_confidence: str = "low",
+    confirm_attestations: bool = False,
+    keep_existing: bool = False,
 ) -> AutofillResult:
     """Apply ``extraction`` to the ``.sub`` ``text`` for ``venue``.
 
@@ -316,6 +398,19 @@ def autofill(
     ``manuscript_dir`` is used to resolve relative file paths in ``filemap``
     fields against the directory the files actually live in. It may be a
     single directory or a sequence of them, searched in order.
+
+    ``confirm_attestations`` sets every attestation (see :func:`attestation_fields`)
+    that is blank to ``yes``. It is the author's opt-in (``paperpush autofill
+    --confirm-attestations``) and is never applied to an extraction on its own:
+    an agent passes it only when the user asked for it. A confirmation the
+    author already answered with something other than yes is left as written
+    and reported, never overwritten.
+
+    A proposal equal to the value the file already holds is reported as
+    ``UNCHANGED`` and not rewritten. ``keep_existing`` also leaves every field
+    that already holds a value (other than its template default) as it is,
+    reporting the differing proposal as ``KEPT``: use it to update a ``.sub``
+    the author has edited by hand without losing those edits.
     """
     by_id = {f.id: f for f in venue.fields}
     floor = _CONFIDENCE_ORDER.get(min_confidence.lower(), 0)
@@ -328,6 +423,7 @@ def autofill(
 
     result = text
     outcomes: list[Outcome] = []
+    current = parse(text).values
 
     for prop in extraction.fields:
         field = by_id.get(prop.id)
@@ -354,6 +450,14 @@ def autofill(
             outcomes.append(Outcome(field.id, field.label, SKIPPED_LOW, value=value, confidence=confidence, source=prop.source, note=f"{confidence} confidence is below the {min_confidence} " "threshold"))
             continue
 
+        previous = _existing_value(current, field)
+        if previous and _normalize(value) == previous:
+            outcomes.append(Outcome(field.id, field.label, UNCHANGED, value=value, confidence=confidence, source=prop.source, note="already in the .sub", previous=previous))
+            continue
+        if keep_existing and previous:
+            outcomes.append(Outcome(field.id, field.label, KEPT, value=value, confidence=confidence, source=prop.source, note="the .sub already has a value -- kept it (--keep-existing)", previous=previous))
+            continue
+
         result = _write_field(result, field, value)
 
         needs_review = role == CLASSIFY or confidence != "high"
@@ -363,10 +467,14 @@ def autofill(
             note = f"{confidence} confidence -- please verify"
         else:
             note = ""
-        outcomes.append(Outcome(field.id, field.label, REVIEW if needs_review else FILLED, value=value, confidence=confidence, source=prop.source, note=note))
+        outcomes.append(Outcome(field.id, field.label, REVIEW if needs_review else FILLED, value=value, confidence=confidence, source=prop.source, note=note, previous=previous))
+
+    if confirm_attestations:
+        result, attest_outcomes = _confirm_attestations(result, venue)
+        outcomes.extend(attest_outcomes)
 
     issues = validate(parse(result), venue)
-    logger.info("autofill %s: %d filled, %d to review, %d skipped, %d " "validation issue(s)", venue.slug, sum(1 for o in outcomes if o.action == FILLED), sum(1 for o in outcomes if o.action == REVIEW), sum(1 for o in outcomes if o.action.startswith("skipped") or o.action == UNKNOWN), len(issues))
+    logger.info("autofill %s: %d filled, %d to review, %d unchanged, %d kept, %d skipped, %d " "validation issue(s)", venue.slug, sum(1 for o in outcomes if o.action == FILLED), sum(1 for o in outcomes if o.action == REVIEW), sum(1 for o in outcomes if o.action == UNCHANGED), sum(1 for o in outcomes if o.action == KEPT), sum(1 for o in outcomes if o.action.startswith("skipped") or o.action == UNKNOWN), len(issues))
     return AutofillResult(text=result, outcomes=outcomes, issues=issues)
 
 

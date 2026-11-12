@@ -102,7 +102,9 @@ fly. See step 1.
    Skill tool), passing the `.sub` path from step 1 and the manuscript
    directory. That skill reads the files, extracts field values, and applies
    them through `paperpush autofill`. Let it run to completion and relay its
-   summary of what was filled and what it left for the user.
+   summary of what was filled and what it left for the user. If the user asked
+   you to confirm the attestations (consent, submission terms), tell the
+   autofill skill to add `--confirm-attestations`. Don't add it otherwise.
 
 3. **Validate.** Run the pre-submission checks:
 

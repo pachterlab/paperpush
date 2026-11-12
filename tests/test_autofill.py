@@ -83,6 +83,76 @@ def test_replace_scalar_missing_key_is_noop(skeleton):
     assert replace_scalar(skeleton, "no_such_field", "x") == skeleton
 
 
+# --- updating an already-filled .sub ---------------------------------------
+
+
+def test_rerun_with_same_value_is_unchanged(skeleton):
+    first = af.autofill(skeleton, BIORXIV, _extract({"id": "title", "value": "A New Method", "confidence": "high"}))
+    again = af.autofill(first.text, BIORXIV, _extract({"id": "title", "value": "A New Method", "confidence": "high"}))
+    assert again.text == first.text
+    assert [o.id for o in again.unchanged] == ["title"]
+    assert not again.filled and not again.changed
+
+
+def test_rerun_with_new_value_replaces_and_records_previous(skeleton):
+    first = af.autofill(skeleton, BIORXIV, _extract({"id": "title", "value": "Old Title", "confidence": "high"}))
+    again = af.autofill(first.text, BIORXIV, _extract({"id": "title", "value": "New Title", "confidence": "high"}))
+    assert parse(again.text).values["title"] == "New Title"
+    assert [(o.id, o.previous) for o in again.changed] == [("title", "Old Title")]
+
+
+def test_first_fill_over_template_default_has_no_previous(skeleton):
+    result = af.autofill(skeleton, BIORXIV, _extract({"id": "title", "value": "A New Method", "confidence": "high"}))
+    assert result.filled[0].previous == ""
+    assert not result.changed
+
+
+def test_keep_existing_preserves_hand_edits_and_fills_blanks(skeleton):
+    edited = replace_scalar(skeleton, "title", "My Hand-Edited Title")
+    result = af.autofill(
+        edited,
+        BIORXIV,
+        _extract(
+            {"id": "title", "value": "Title From Manuscript", "confidence": "high"},
+            {"id": "abstract", "value": "We did a thing.", "confidence": "high"},
+        ),
+        keep_existing=True,
+    )
+    values = parse(result.text).values
+    assert values["title"] == "My Hand-Edited Title"
+    assert values["abstract"] == "We did a thing."
+    kept = {o.id: o for o in result.kept}
+    assert kept["title"].previous == "My Hand-Edited Title"
+    assert kept["title"].value == "Title From Manuscript"
+    assert [o.id for o in result.filled] == ["abstract"]
+
+
+def test_keep_existing_writes_over_a_template_default(skeleton):
+    # license is never-role, so use a classify field whose default is blank and
+    # a scalar whose template default is not blank: either way a default counts as unset.
+    by_id = {f.id: f for f in BIORXIV.fields}
+    defaulted = next(f for f in BIORXIV.fields if af.effective_role(f) != af.NEVER and f.type not in ("file", "filelist") and af._format_default(f))
+    proposed = "yes" if af._format_default(defaulted) == "no" else "something else"
+    if defaulted.options:
+        proposed = next(o for o in defaulted.options if o != af._format_default(defaulted))
+    result = af.autofill(skeleton, BIORXIV, _extract({"id": defaulted.id, "value": proposed, "confidence": "high"}), keep_existing=True)
+    assert not result.kept
+    assert by_id[defaulted.id].id in {o.id for o in result.filled + result.review}
+
+
+def test_cli_keep_existing_flag(in_tmp, manuscript_dir, capsys):
+    values = _write_values(in_tmp / "values.json")
+    assert main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values)]) == 0
+    sub = in_tmp / "biorxiv.sub"
+    sub.write_text(replace_scalar(sub.read_text(), "title", "Edited By Hand"))
+    capsys.readouterr()
+    assert main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values), "--keep-existing"]) == 0
+    out = capsys.readouterr().out
+    assert subfile.load(sub).values["title"] == "Edited By Hand"
+    assert "Kept your existing value" in out
+    assert "Unchanged" in out
+
+
 # --- role gate -------------------------------------------------------------
 
 
@@ -105,9 +175,10 @@ def test_never_fields_are_left_at_their_default(skeleton):
         ),
     )
     values = parse(result.text).values
-    # Proposals for never-fields are ignored; defaults stand.
+    # Proposals for never-fields are ignored; defaults stand. An attestation
+    # has no default answer, so it stays blank for the author.
     assert values["license"] == "CC-BY-NC-ND"
-    assert values["author_consent"] == "no"
+    assert values["author_consent"] == ""
     actions = {o.id: o.action for o in result.outcomes}
     assert actions["license"] == af.SKIPPED_POLICY
     assert actions["author_consent"] == af.SKIPPED_POLICY
@@ -639,7 +710,7 @@ def test_autofill_creates_and_fills_subfile(in_tmp, manuscript_dir):
     assert parsed.values["manuscript_file"] == str(manuscript_dir / "paper.pdf")
     # never-field proposal ignored; template default preserved.
     assert parsed.values["license"] == "CC-BY-NC-ND"
-    assert parsed.values["author_consent"] == "no"
+    assert parsed.values["author_consent"] == ""
 
 
 def test_autofill_summary_groups_outcomes(in_tmp, manuscript_dir, capsys):
@@ -650,6 +721,79 @@ def test_autofill_summary_groups_outcomes(in_tmp, manuscript_dir, capsys):
     assert "need your review" in out  # subject_category + authors confidence
     assert "Left for you to set" in out  # license + data_availability_links
     assert "license" in out
+
+
+# --- --confirm-attestations ----------------------------------------------------
+
+
+def test_attestation_fields_are_required_yes_only_confirmations():
+    naacl = get_venue("naacl_2027_demo")
+    assert [f.id for f in af.attestation_fields(naacl)] == ["email_sharing", "data_release"]
+    assert [f.id for f in af.attestation_fields(BIORXIV)] == ["author_consent"]
+    # A required yes/no question, where either answer is valid, is not one.
+    assert "resubmission" not in {f.id for f in af.attestation_fields(get_venue("bioinformatics"))}
+
+
+def test_fresh_template_leaves_attestations_blank_and_marks_them():
+    text = render_template(get_venue("naacl_2027_demo"), fill_defaults=True)
+    assert parse(text).values["email_sharing"] == ""
+    assert "(boolean, REQUIRED; must be yes to submit)" in text
+    # An ordinary required yes/no question gets no such note.
+    assert "must be yes to submit" not in render_template(get_venue("nucleic_acids_research"))
+
+
+def test_attestations_untouched_without_the_flag(skeleton):
+    result = af.autofill(skeleton, BIORXIV, _extract())
+    assert parse(result.text).values["author_consent"] == ""
+    assert result.attested == []
+    assert any(i.field == "author_consent" for i in result.errors)
+
+
+def test_confirm_attestations_sets_blank_to_yes(skeleton):
+    result = af.autofill(skeleton, BIORXIV, _extract(), confirm_attestations=True)
+    assert parse(result.text).values["author_consent"] == "yes"
+    assert [(o.id, o.note) for o in result.attested] == [("author_consent", "set to yes")]
+    assert not any(i.field == "author_consent" for i in result.errors)
+
+
+def test_confirm_attestations_keeps_a_written_no(skeleton):
+    text = replace_scalar(skeleton, "author_consent", "no")
+    result = af.autofill(text, BIORXIV, _extract(), confirm_attestations=True)
+    assert parse(result.text).values["author_consent"] == "no"
+    assert result.attested == []
+    assert [o.id for o in result.attestations_kept] == ["author_consent"]
+
+
+def test_confirm_attestations_reports_existing_yes(skeleton):
+    text = replace_scalar(skeleton, "author_consent", "yes")
+    result = af.autofill(text, BIORXIV, _extract(), confirm_attestations=True)
+    assert [(o.id, o.note) for o in result.attested] == [("author_consent", "already yes")]
+
+
+def test_confirm_attestations_does_not_touch_never_proposals(skeleton):
+    # The flag sets attestations itself; an extractor's proposal for one is still ignored.
+    result = af.autofill(skeleton, BIORXIV, _extract({"id": "author_consent", "value": "no", "confidence": "high"}), confirm_attestations=True)
+    assert parse(result.text).values["author_consent"] == "yes"
+
+
+def test_cli_confirm_attestations_prints_each_sentence(in_tmp, manuscript_dir, capsys):
+    values = _write_values(in_tmp / "values.json", unfilled=[{"id": "author_consent", "reason": "consent is the authors' call"}])
+    rc = main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values), "--confirm-attestations"])
+    assert rc == 0
+    assert subfile.load(in_tmp / "biorxiv.sub").values["author_consent"] == "yes"
+    out = capsys.readouterr().out
+    assert "Confirmed with --confirm-attestations (1)" in out
+    assert "author_consent: All authors consent to deposit and to the chosen license" in out
+    # Not also listed as left for the author.
+    left = out.split("Left for you to set", 1)[1] if "Left for you to set" in out else ""
+    assert "author_consent" not in left.split("\n\n", 1)[0]
+
+
+def test_cli_without_flag_leaves_attestation_blank(in_tmp, manuscript_dir, capsys):
+    values = _write_values(in_tmp / "values.json")
+    main(["autofill", "biorxiv.sub", "-p", str(manuscript_dir), "--values", str(values)])
+    assert subfile.load(in_tmp / "biorxiv.sub").values["author_consent"] == ""
+    assert "--confirm-attestations" not in capsys.readouterr().out
 
 
 def test_autofill_dry_run_writes_nothing(in_tmp, manuscript_dir, capsys):

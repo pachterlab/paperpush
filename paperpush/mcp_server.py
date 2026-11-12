@@ -576,7 +576,7 @@ def create_subfile(
     """Create a blank `.sub` submission template for a venue.
 
     Fields are grouped into the sections every venue shares (manuscript type,
-    files, details, authors, reviewers, declarations, additional). Set
+    files, details, authors, reviewers, declarations, additional, attestations). Set
     `venue_order` to list them in the order the venue's portal asks instead.
 
     `path` is where to write it; pass an absolute path, since a relative one is
@@ -917,6 +917,7 @@ def autofill_subfile(
     min_confidence: Confidence = "low",
     output: Optional[str] = None,
     dry_run: bool = False,
+    keep_existing: bool = False,
 ) -> dict[str, Any]:
     """Write extracted field values into a `.sub` file, through paperpush's gates.
 
@@ -940,6 +941,12 @@ def autofill_subfile(
     `subfile` may name a file that does not exist yet -- a fresh template is
     rendered from the venue in its filename. Relative paths resolve against
     `manuscript_dir`. Set `dry_run` to see the outcome without writing.
+
+    On a `.sub` that is already filled (an update after the manuscript
+    changed), values the file already holds are reported in `unchanged`, and
+    written values that replaced an earlier one carry it in `previous`. Set
+    `keep_existing` to leave every non-blank, non-default value alone; the
+    differing proposals come back in `kept` for the author to decide.
     """
     directory = _resolve(manuscript_dir, None)
     if not directory.is_dir():
@@ -961,7 +968,7 @@ def autofill_subfile(
     except (TypeError, AttributeError, ValueError) as exc:
         raise ValueError(f"`values` is not a valid extraction payload: {exc}") from exc
 
-    result = _apply_autofill(text, venue, extraction, manuscript_dir=directory, min_confidence=min_confidence)
+    result = _apply_autofill(text, venue, extraction, manuscript_dir=directory, min_confidence=min_confidence, keep_existing=keep_existing)
 
     out_path = _resolve(output, str(directory)) if output else sub_path
     if not dry_run:
@@ -980,6 +987,7 @@ def autofill_subfile(
                 "confidence": o.confidence,
                 "source": o.source,
                 "note": o.note,
+                "previous": o.previous,
             }
             for o in items
         ]
@@ -992,6 +1000,8 @@ def autofill_subfile(
         "filled": _outcomes(result.filled),
         "needs_review": _outcomes(result.review),
         "skipped": _outcomes(result.skipped),
+        "unchanged": _outcomes(result.unchanged),
+        "kept": _outcomes(result.kept),
         "left_for_the_author": [{"id": fid, "reason": reason} for fid, reason in extraction.unfilled],
         # autofill is a preparation step, not the final gate -- it leaves policy
         # fields empty on purpose, so leftover errors here are expected. Run

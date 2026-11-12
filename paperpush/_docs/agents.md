@@ -61,7 +61,7 @@ open the `SKILL.md` and follow it as written.
 | --- | --- | --- |
 | `paperpush-prepare-submission` | The whole flow: checks the login, finds or creates the `.sub`, runs autofill, runs validate (stopping on errors or more than 5 warnings and offering `paperpush-fix`), then hands off to `paperpush-submit`. | asks to prepare, get ready, or submit a manuscript to a venue, and has not named a single step. **Start here when in doubt.** |
 | `paperpush-pick-venue` | Reads the manuscript, runs `paperpush pick-venue` (journals that published similar work, from OpenAlex, and the supported venues ranked on subject), corrects the subjects, then checks each candidate against the author's constraints (open access, APC budget, venues already tried) and, for supported venues, against `paperpush requirements` (word, display-item, and reference limits, article types). Reports a short list with the reasons, OpenAlex's 2-year mean citedness and h-index (never called an impact factor, and not used to rank), and paperpush's support for each, then hands the chosen venue to `prepare-submission` (or `transfer`). | asks where to submit, which journals fit a manuscript, or wants to prepare a submission without having chosen a venue. |
-| `paperpush-autofill` | Reads the manuscript directory, writes `values.json`, and applies it with `paperpush autofill --engine manual`. Leaves `never` fields for the author. | wants a `.sub` filled from their files, and nothing else yet. |
+| `paperpush-autofill` | Reads the manuscript directory, writes `values.json`, and applies it with `paperpush autofill --engine manual`. Leaves `never` fields for the author. On an already-filled `.sub` it updates instead: takes the venue and file paths from the file, previews with `--keep-existing`, and asks before replacing any value the new draft contradicts. | wants a `.sub` filled from their files, or refreshed after the manuscript changed, and nothing else yet. |
 | `paperpush-validate` | Runs `paperpush validate`, then does the checks that need a reader (lettering in raster figures, panel labels, figure and panel content vs. legends and text, free-text guideline rules, `.sub` vs manuscript) through `--ai-tasks` / `--ai-results`. Optionally saves the report. For a venue paperpush does not support yet, builds a temporary entry with `paperpush-add-venue-validate` (temporary mode) and validates against it. | asks whether a manuscript or `.sub` is ready, meets a venue's guidelines, or passes validation, or wants the AI checks or a saved report. |
 | `paperpush-fix` | Backs up the files, runs `paperpush validate --json`, finds the editable source behind each file (the `.tex`/`.docx` behind a PDF), fixes the mechanical issues and trims text over a limit by at most 100 words and 50% of the limit, rebuilds the PDF, and validates again, for up to three rounds. For page-layout issues it offers `paperpush format` first (the venue's template, applied to a new copy), and for a file type the venue does not accept it offers `paperpush convert`. Reports what it fixed, what needs the author's decision, and what it can't fix. Never ticks a confirmation or invents content. | asks to fix what validate found, to make a `.sub` pass validation, or to clean up the errors and warnings. |
 | `paperpush-transfer` | Moves a manuscript prepared for one venue to another: copies the files into `<source-dir>/<venue>/` (never touching the originals), creates the new `.sub`, runs `autofill` reusing the values in earlier `.sub` files, converts the manuscript copy with `paperpush convert` when the new venue does not accept its file type, reformats it for the new venue with `paperpush format` (its template when one is found, else its layout rules), runs `validate` (offering `fix`), and writes `transfer.txt` listing every change. For a venue paperpush does not support yet, builds a draft entry with `paperpush-add-venue-validate` (temporary mode), kept in the transfer's `venue_draft/`, and never submits. | wants to transfer, resubmit, or move a manuscript from one venue to another, e.g. after a rejection. |
@@ -107,6 +107,25 @@ path calls an LLM API (Anthropic, OpenAI, or Google) and needs that provider's
 API key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`). You already have
 the manuscript in front of you; extract from it directly. Use `--engine api`
 only if the user has explicitly set an API key and asked for it.
+
+**Don't add `--confirm-attestations` yourself.** `paperpush autofill
+--confirm-attestations` sets every blank attestation to `yes`. An attestation is
+a required yes/no confirmation whose only accepted answer is yes, such as author
+consent, the submission terms, or a code of ethics (`confirm: true` in
+`submission_forms.json`; the `.sub` marks each one "must be yes to submit").
+Passing it agrees to them on behalf of every author. Use it only when the user
+asks you to confirm the attestations, and never to clear a validation error.
+When you do use it, show the user the full sentences the command printed under
+"Confirmed with --confirm-attestations". It leaves an attestation the author
+answered `no` as written. The MCP `autofill_subfile` tool has no equivalent.
+
+**Updating a filled `.sub`: keep the author's edits.** When the manuscript
+changes after the `.sub` was filled, rerun autofill on the same file rather
+than starting over. Preview with `--keep-existing --dry-run`: it writes only
+blank or template-default fields and lists every field where the manuscript now
+differs from the file ("Kept your existing value", both versions shown). Ask
+the user about those before replacing them, since some are hand edits. The MCP
+`autofill_subfile` tool takes `keep_existing` and returns them as `kept`.
 
 **Don't run `--web` or `paperpush web` yourself.** They serve a page in the
 user's browser and keep running until Ctrl-C, so your command never returns.
@@ -467,7 +486,9 @@ since a leak can get a paper desk-rejected.
 `paperpush` deliberately leaves the `never` fields blank. Spell out for the
 user exactly what remains: the `never` fields (each with its `unfilled` reason),
 any review-flagged values to confirm, and any remaining validation errors (the
-file will not submit until those are resolved).
+file will not submit until those are resolved). If attestations are among the
+`never` fields, tell the user they can set them to `yes` in the `.sub` or ask
+you to rerun autofill with `--confirm-attestations`.
 
 ## Claude Code note
 

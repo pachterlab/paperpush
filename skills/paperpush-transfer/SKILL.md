@@ -155,7 +155,9 @@ delete anything in the source directory**; every change happens in the copy.
    - **`never` fields stay unwritten**, as autofill requires, even when the
      earlier `.sub` has a value (suggested reviewers, license, consent).
      Put them in `unfilled` with the reason, and keep the earlier value for
-     `transfer.txt` so the author can re-enter it if it still applies.
+     `transfer.txt` so the author can re-enter it if it still applies. An
+     attestation confirmed for the old venue is not confirmed for the new one.
+     Use `--confirm-attestations` only if the user asks for it for this venue.
    - Write `values.json` in a temporary directory, not the new directory.
 
 6. **Reformat the manuscript for the new venue.** Do this by default; skip

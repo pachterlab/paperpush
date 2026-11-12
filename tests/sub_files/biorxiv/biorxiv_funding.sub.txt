@@ -112,10 +112,6 @@ competing_interest: |
 data_availability_links: |
   
 
-# All authors consent to deposit and to the chosen license (boolean, REQUIRED)
-#   Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.
-author_consent: yes
-
 # ----------------------------------------------------------------------
 # Additional information
 # ----------------------------------------------------------------------
@@ -132,5 +128,13 @@ transfer_to_journal: no
 # Destination journal for B2J (text, optional)
 #   Only needed when transfer_to_journal is yes.
 journal_destination: 
+
+# ----------------------------------------------------------------------
+# Attestations
+# ----------------------------------------------------------------------
+
+# All authors consent to deposit and to the chosen license (boolean, REQUIRED; must be yes to submit)
+#   Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.
+author_consent: yes
 
 # vim: set filetype=yaml :

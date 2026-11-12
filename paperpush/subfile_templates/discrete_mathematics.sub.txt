@@ -87,10 +87,6 @@ authors: |
 funding: |
   
 
-# Final submission declarations confirmed (boolean, REQUIRED)
-#   Confirms the portal's final declarations (ethics-in-publishing policy, copyright terms, and that all sources/conflicts are mentioned). The runner ticks these boxes only when this is yes.
-declarations_confirmed: 
-
 # No competing interests to declare (boolean, optional)
 #   Set to yes to tick the 'I confirm that no authors have competing interests' checkbox instead of uploading a declaration file. Ignored when declaration_file is provided.
 no_competing_interests: 
@@ -123,5 +119,13 @@ dataset_title:
 #   at most 200 characters
 #   options: No data was used for the research described in the article. | The data that has been used is confidential. | Data will be made available upon request. | The authors do not have permission to share data. | The authors are unable or have chosen not to specify which data has been used.
 data_statement: 
+
+# ----------------------------------------------------------------------
+# Attestations
+# ----------------------------------------------------------------------
+
+# Final submission declarations confirmed (boolean, REQUIRED; must be yes to submit)
+#   Confirms the portal's final declarations (ethics-in-publishing policy, copyright terms, and that all sources/conflicts are mentioned). The runner ticks these boxes only when this is yes.
+declarations_confirmed: 
 
 # vim: set filetype=yaml :

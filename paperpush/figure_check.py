@@ -26,6 +26,7 @@ attached raster files, and where the figures are placed (``placement``,
 
 from __future__ import annotations
 
+import bisect
 import logging
 import math
 import re
@@ -33,6 +34,7 @@ import statistics
 import tempfile
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 
 from . import document
@@ -91,6 +93,11 @@ class Figure:
     offset: int = 0  # where a Word picture's drawing starts in document.xml
     number: int | None = None  # figure number, when known
     image_path: Path | None = None  # a viewable image file, for the AI checks
+    # Where an attached raster file is placed in the manuscript PDF: its printed width and page.
+    placed_width_mm: float | None = None
+    placed_page: int = 0
+    pdf_image: str = ""  # an embedded image's XObject name on its page, to read its pixels
+    placements: list = field(default_factory=list, repr=False)  # (pdf, page, ImageBox) of same-sized images
 
 
 def _print_width_mm(rules: FigureRules) -> float | None:
@@ -373,6 +380,7 @@ def _embedded_pdf(doc: document.Document, field_id: str) -> list[Figure]:
             fig = Figure(f"{doc.path.name} page {page.number}, image {n}", doc.path, field_id, False, "raster", page=page.number)
             fig.width_px, fig.height_px, fig.dpi = image.width_px, image.height_px, image.dpi
             fig.print_width_mm = width_pt / 72 * MM_PER_INCH
+            fig.pdf_image = image.name
             if image.figure:
                 taken.add(image.figure)
             figures.append(fig)
@@ -514,7 +522,12 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     # printed or zoomed-in PDF shows as blurry.
     run("figures.dpi", "Figures meet the minimum resolution (dpi)", True, "", _dpi_check, inv, rules, where)
     # With no venue rule, lettering below a general floor is still flagged.
-    run("figures.text_size", "Figure lettering within the guidelines' size range", True, "", _text_size_check, checks, inv, rules, where)
+    if inv.attached:
+        try:
+            _place_rasters(venue, values, inv)
+        except Exception as exc:  # noqa: BLE001 -- placement is extra information only
+            logger.debug("could not find the figures' placement in the manuscript: %s", exc)
+    run("figures.text_size", "Figure lettering within the guidelines' size range", True, "", _text_size_check, checks, inv, rules, where, venue, values)
     run("figures.font", "Figure lettering uses the required typeface", rules.font, "the guidelines name no figure font", _font_check, checks, inv, rules, where)
     run("figures.font_consistency", CONSISTENCY_TITLE, True, "", _font_consistency_check, checks, venue, values, inv, rules, where)
     run("figures.lettering", "Figure panels labeled in the required style (e.g., a, b, c)", True, "", _lettering_check, checks, venue, values, inv, rules)
@@ -573,8 +586,11 @@ def _raster_ai_task(checks: Checks, inv: _Inventory, rules: FigureRules) -> int:
     if not rasters:
         return 0
     wants = []
+    placed = any(f.placed_width_mm for f in rasters)
     if rules.min_font_size_pt:
         wants.append(f"no lettering smaller than {rules.min_font_size_pt:g} pt when printed")
+    elif placed:
+        wants.append(f"no lettering smaller than {GENERAL_MIN_FONT_PT:g} pt as printed in the manuscript (a general readability floor; the guidelines set no minimum)")
     if rules.max_font_size_pt:
         wants.append(f"no lettering larger than {rules.max_font_size_pt:g} pt")
     if rules.font:
@@ -591,11 +607,15 @@ def _raster_ai_task(checks: Checks, inv: _Inventory, rules: FigureRules) -> int:
         source = fig.image_path or fig.path
         files.append(str(source))
         size = ""
-        if fig.print_width_mm and rules.min_font_size_pt:
+        # The width the manuscript actually prints it at, when known, else the venue's print width.
+        width_mm = fig.placed_width_mm or fig.print_width_mm
+        floor = rules.min_font_size_pt or (GENERAL_MIN_FONT_PT if fig.placed_width_mm else None)
+        if width_mm and floor:
             # A capital letter is ~0.7 of the font size tall; as a fraction of the
             # figure's width this does not depend on how the image is scaled.
-            fraction = 0.7 * rules.min_font_size_pt / (fig.print_width_mm / MM_PER_INCH * 72)
-            size = f"; printed {fig.print_width_mm:.0f} mm wide, so a capital letter must be at least {100 * fraction:.2f}% of the image width tall"
+            fraction = 0.7 * floor / (width_mm / MM_PER_INCH * 72)
+            placed_on = f" as placed on page {fig.placed_page} of the manuscript" if fig.placed_width_mm else ""
+            size = f"; printed {width_mm:.0f} mm wide{placed_on}, so a capital letter must be at least {100 * fraction:.2f}% of the image width tall"
             if fig.width_px:
                 size += f" (about {fraction * fig.width_px:.0f} px of its {fig.width_px} px width)"
         where = f" (page {fig.page} of {fig.path.name})" if fig.page and fig.image_path is None else ""
@@ -786,27 +806,353 @@ def _outlined(inv: _Inventory) -> list[str]:
     return [f.name for f in inv.figures if f.kind == "vector" and not f.texts]
 
 
-def _text_size_check(checks: Checks, inv: _Inventory, rules: FigureRules, where: str) -> Outcome:
+# --- lettering size in raster figures -----------------------------------------------
+#
+# A raster figure's lettering is pixels, so its size cannot be read from glyphs.
+# It is estimated instead: dark connected components shaped like letters that
+# line up in rows of three or more are taken as lines of text, and the height of
+# their letters in pixels, times the points per pixel at which the image is
+# printed, gives the printed letter height. Only the printed width as placed in
+# the manuscript PDF is trusted for this (an attached file's own dpi or the
+# venue's maximum width say nothing about how small the author actually set it).
+
+# Larger images are reduced to this many pixels before their letters are found.
+_RASTER_TEXT_MAX_PIXELS = 4_000_000
+# Letter-shaped components: height in pixels, width and ink fill relative to the box.
+_LETTER_MIN_PX = 6
+_LETTER_MAX_PX = 300
+# A figure needs this many lines of lettering, on a mostly light background, to be judged.
+_RASTER_TEXT_MIN_LINES = 5
+_RASTER_TEXT_MIN_LIGHT = 0.5
+# Placements of one image that differ by less than this are the same size.
+_SAME_PLACEMENT = 0.03
+# At most this many same-sized images are compared pixel by pixel to tell which one a file is.
+_MAX_COMPARED = 60
+
+
+def _flatten(img):
+    """The image as greyscale, with any transparency laid on white."""
+    from PIL import Image
+
+    if img.mode in ("RGBA", "LA", "P", "PA") or "transparency" in img.info:
+        rgba = img.convert("RGBA")
+        white = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+        white.alpha_composite(rgba)
+        return white.convert("L")
+    return img.convert("L")
+
+
+def _ink_boxes(grey) -> list[tuple[int, int, int, int, int]]:
+    """Bounding boxes (x0, y0, x1, y1, ink pixels) of the 8-connected dark components."""
+    width, height = grey.size
+    ink = grey.point(lambda v: 1 if v < 128 else 0).tobytes()
+    parent: list[int] = []
+
+    def find(a: int) -> int:
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    runs: list[tuple[int, int, int, int]] = []
+    previous: list[tuple[int, int, int]] = []
+    pattern = re.compile(rb"\x01+")
+    for y in range(height):
+        current: list[tuple[int, int, int]] = []
+        j = 0
+        for match in pattern.finditer(ink, y * width, (y + 1) * width):
+            x0, x1 = match.start() - y * width, match.end() - y * width
+            run = len(parent)
+            parent.append(run)
+            while j < len(previous) and previous[j][1] < x0:
+                j += 1
+            k = j
+            # runs in the row above touching this one, diagonally included
+            while k < len(previous) and previous[k][0] <= x1:
+                a, b = find(run), find(previous[k][2])
+                if a != b:
+                    parent[a] = b
+                k += 1
+            current.append((x0, x1, run))
+            runs.append((y, x0, x1, run))
+        previous = current
+    boxes: dict[int, list[int]] = {}
+    for y, x0, x1, run in runs:
+        root = find(run)
+        box = boxes.get(root)
+        if box is None:
+            boxes[root] = [x0, y, x1, y + 1, x1 - x0]
+        else:
+            box[0], box[2], box[3], box[4] = min(box[0], x0), max(box[2], x1), y + 1, box[4] + x1 - x0
+    return [tuple(b) for b in boxes.values()]  # type: ignore[misc]
+
+
+def _text_rows(boxes) -> list[list[tuple[int, int, int, int]]]:
+    """Rows of three or more letter-shaped components side by side: lines of lettering."""
+    letters = []
+    for x0, y0, x1, y1, ink in boxes:
+        w, h = x1 - x0, y1 - y0
+        if not _LETTER_MIN_PX <= h <= _LETTER_MAX_PX or not 0.12 * h <= w <= 1.6 * h:
+            continue
+        if 0.12 <= ink / (w * h) <= 0.85:
+            letters.append((x0, y0, x1, y1))
+    letters.sort()
+    starts = [c[0] for c in letters]
+    used = [False] * len(letters)
+    rows = []
+    for i in range(len(letters)):
+        if used[i]:
+            continue
+        used[i] = True
+        row = [letters[i]]
+        while True:
+            cur = row[-1]
+            ch = cur[3] - cur[1]
+            best = None
+            for k in range(bisect.bisect_left(starts, cur[2] - 1), len(letters)):
+                c = letters[k]
+                if c[0] > cur[2] + ch:
+                    break
+                if used[k]:
+                    continue
+                h = c[3] - c[1]
+                if max(ch, h) > 1.8 * min(ch, h) or min(cur[3], c[3]) - max(cur[1], c[1]) < 0.6 * min(ch, h):
+                    continue
+                # letters share a baseline or a top line
+                if abs(cur[3] - c[3]) > 0.35 * max(ch, h) and abs(cur[1] - c[1]) > 0.35 * max(ch, h):
+                    continue
+                best = k
+                break
+            if best is None:
+                break
+            used[best] = True
+            row.append(letters[best])
+        # identical marks in a row are a dotted line or markers, not lettering
+        if len(row) >= 3 and len({(c[2] - c[0], c[3] - c[1]) for c in row}) > 1:
+            rows.append(row)
+    return rows
+
+
+def raster_lettering_pt(img, placed_width_pt: float) -> list[float] | None:
+    """Estimated font size (pt) of each line of lettering in a raster image printed
+    ``placed_width_pt`` wide; None when the image is not mostly light (a photo, a
+    dark background) or has too little lettering to judge."""
+    grey = _flatten(img)
+    if not grey.width or placed_width_pt <= 0:
+        return None
+    histogram = grey.histogram()
+    if sum(histogram[200:]) / max(sum(histogram), 1) < _RASTER_TEXT_MIN_LIGHT:
+        return None
+    from PIL import Image
+
+    scale = min(1.0, math.sqrt(_RASTER_TEXT_MAX_PIXELS / (grey.width * grey.height)))
+    if scale < 1.0:
+        grey = grey.resize((max(1, round(grey.width * scale)), max(1, round(grey.height * scale))), Image.BOX)
+    pt_per_px = placed_width_pt / grey.width
+    sizes = []
+    for row in _text_rows(_ink_boxes(grey)):
+        heights = sorted(c[3] - c[1] for c in row)
+        # Capitals, digits and ascenders stand about 0.7 of the font size, the
+        # x-height about 0.5: take whichever reading is larger, so a row of
+        # lower-case letters is not read as smaller than it is.
+        tall = heights[min(len(heights) - 1, int(0.8 * len(heights)))] / 0.7
+        middle = statistics.median(heights) / 0.5
+        sizes.append(max(tall, middle) * pt_per_px)
+    return sizes if len(sizes) >= _RASTER_TEXT_MIN_LINES else None
+
+
+def _too_small(sizes: list[float], floor: float) -> bool:
+    """Most of the lettering under the floor, and even the larger lettering (titles,
+    labels) under 1.5 times it: a figure set too small as a whole, not one with a
+    small inset or code listing among readable labels."""
+    ordered = sorted(sizes)
+    under = sum(1 for s in ordered if s < floor) / len(ordered)
+    return under >= 0.5 and statistics.median(ordered) < floor and ordered[int(0.9 * (len(ordered) - 1))] < 1.5 * floor
+
+
+@lru_cache(maxsize=4)
+def _pdf_reader(path: str, mtime: float = 0.0):  # mtime keys the cache to the file's version
+    try:
+        import pypdf
+
+        return pypdf.PdfReader(path)
+    except Exception as exc:  # noqa: BLE001 -- pypdf missing, or an unreadable PDF
+        logger.debug("cannot open %s with pypdf: %s", path, exc)
+        return None
+
+
+def _pdf_image(pdf: Path, page: int, name: str):
+    """The pixels of the image XObject ``name`` drawn on ``page`` (1-based), or None."""
+    try:
+        reader = _pdf_reader(str(pdf), pdf.stat().st_mtime)
+    except OSError:
+        return None
+    if reader is None or not name or not 0 < page <= len(reader.pages):
+        return None
+    try:
+        for image in reader.pages[page - 1].images:
+            if Path(image.name.split("/")[-1]).stem == name:
+                return image.image
+    except Exception as exc:  # noqa: BLE001 -- an image filter pypdf or Pillow cannot decode
+        logger.debug("cannot read image %s on page %d of %s: %s", name, page, pdf, exc)
+    return None
+
+
+_THUMB = (24, 24)
+
+
+@lru_cache(maxsize=512)
+def _pdf_thumbnail(pdf: str, page: int, name: str, mtime: float = 0.0):
+    image = _pdf_image(Path(pdf), page, name)
+    return None if image is None else _flatten(image).resize(_THUMB)
+
+
+def _thumbnail_distance(a, b) -> float:
+    from PIL import ImageChops
+
+    small = _THUMB
+
+    def thumb(img):
+        return img if img.size == small and img.mode == "L" else _flatten(img).resize(small)
+
+    diff = ImageChops.difference(thumb(a), thumb(b))
+    histogram = diff.histogram()
+    return sum(i * n for i, n in enumerate(histogram)) / (small[0] * small[1])
+
+
+def _place_rasters(venue: Venue, values: dict[str, str], inv: _Inventory) -> None:
+    """Find where each attached raster file is drawn in the manuscript PDF and how wide.
+
+    An image is matched by its pixel size. When images of that size are placed at
+    different widths, the widest is taken for now, so lettering is never judged
+    smaller than it is; :func:`_narrowest_match` tells them apart by their pixels
+    when it matters.
+    """
+    from .requirements_check import manuscript_files
+
+    rasters = [f for f in inv.figures if f.attached and f.kind == "raster" and f.width_px and f.path.suffix.lower() in RASTER]
+    if not rasters:
+        return
+    placed: dict[tuple[int, int], list] = {}
+    for _, path in manuscript_files(venue, values):
+        doc = document.get(path)
+        if not (doc.is_pdf or doc.is_tex) or not doc.glyph_pages or doc.pdf is None:
+            continue
+        for page in doc.glyph_pages:
+            for image in page.images:
+                if image.placed_width > 0:
+                    placed.setdefault((image.width_px, image.height_px), []).append((doc.pdf, page.number, image))
+    for fig in rasters:
+        candidates = placed.get((fig.width_px, fig.height_px))
+        if not candidates:
+            continue
+        fig.placements = candidates
+        widest = max(candidates, key=lambda c: c[2].placed_width)
+        fig.placed_width_mm = widest[2].placed_width / 72 * MM_PER_INCH
+        fig.placed_page = widest[1]
+
+
+def _narrowest_match(fig: Figure, img) -> tuple | None:
+    """The placement whose pixels are this file's, among same-sized images placed at
+    different widths; None when the pixels cannot tell them apart."""
+    candidates = fig.placements
+    try:
+        own = _flatten(img).resize(_THUMB)
+        scored = []
+        for c in candidates[:_MAX_COMPARED]:
+            embedded = _pdf_thumbnail(str(c[0]), c[1], c[2].name, c[0].stat().st_mtime)
+            if embedded is not None:
+                scored.append((_thumbnail_distance(own, embedded), c))
+    except Exception as exc:  # noqa: BLE001 -- keep the widest placement
+        logger.debug("could not compare %s with the manuscript's images: %s", fig.path, exc)
+        return None
+    if not scored:
+        return None
+    # the same picture differs only by compression; similar plots differ by more
+    best, match = min(scored, key=lambda s: s[0])
+    others = [d for d, c in scored if abs(c[2].placed_width - match[2].placed_width) > _SAME_PLACEMENT * match[2].placed_width]
+    if best < 1.0 and all(d > best + 1.0 for d in others):
+        return match
+    return None
+
+
+def _raster_text_size_issues(venue: Venue | None, values: dict[str, str] | None, inv: _Inventory) -> tuple[list[Issue], int]:
+    """Raster figures whose lettering, as placed in the manuscript, is too small to read."""
+    from PIL import Image
+
+    issues: list[Issue] = []
+    measured = 0
+    floor = GENERAL_MIN_FONT_PT
+    for fig in inv.figures:
+        if fig.kind != "raster":
+            continue
+        try:
+            if fig.attached and fig.placed_width_mm:
+                width_pt = fig.placed_width_mm / MM_PER_INCH * 72
+                with Image.open(fig.path) as img:
+                    img.load()
+                    sizes = raster_lettering_pt(img, width_pt)
+                    narrowest = min((c[2].placed_width for c in fig.placements), default=width_pt)
+                    # Placed at several widths and too small only at the narrower ones: find which is this file.
+                    if sizes is not None and not _too_small(sizes, floor) and _too_small([s * narrowest / width_pt for s in sizes], floor):
+                        match = _narrowest_match(fig, img)
+                        if match is not None:
+                            sizes = [s * match[2].placed_width / width_pt for s in sizes]
+                            fig.placed_width_mm = match[2].placed_width / 72 * MM_PER_INCH
+                            fig.placed_page = match[1]
+                where = f"as placed on page {fig.placed_page} of the manuscript, {fig.placed_width_mm:.0f} mm wide"
+            elif not fig.attached and fig.pdf_image and fig.print_width_mm and fig.page:
+                pdf = document.get(fig.path).pdf
+                img = _pdf_image(pdf, fig.page, fig.pdf_image) if pdf else None
+                if img is None:
+                    continue
+                sizes = raster_lettering_pt(img, fig.print_width_mm / MM_PER_INCH * 72)
+                where = f"as placed, {fig.print_width_mm:.0f} mm wide"
+            else:
+                continue
+        except Exception as exc:  # noqa: BLE001 -- an unreadable image is left to the AI check
+            logger.debug("could not measure the lettering of %s: %s", fig.name, exc)
+            continue
+        if sizes is None:
+            continue
+        measured += 1
+        if _too_small(sizes, floor):
+            typical = statistics.median(sizes)
+            issues.append(Issue(WARNING, fig.field_id, f"{fig.name}: its lettering prints at about {typical:.1f} pt {where} (estimated from the pixel height of {len(sizes)} lines of text), under the {floor:g} pt that is readable in print; enlarge the figure or its lettering"))
+    return issues, measured
+
+
+def _text_size_check(checks: Checks, inv: _Inventory, rules: FigureRules, where: str, venue: Venue | None = None, values: dict[str, str] | None = None) -> Outcome:
     issues: list[Issue] = []
     smallest: list[float] = []
-    for fig in inv.figures:
-        if fig.kind != "vector" or not fig.texts:
-            continue
+    vectors = [(f, False) for f in inv.figures if f.kind == "vector" and f.texts]
+    if inv.attached and venue is not None and values is not None:
+        # The attached files are measured at the venue's print width; the drawings in
+        # the manuscript PDF show the size the author actually set them at. Those are
+        # a backstop for a figure set too small as a whole, so only lettering mostly
+        # under the minimum is flagged there.
+        try:
+            vectors += [(f, True) for f in embedded_figures(venue, values) if f.kind == "vector" and f.texts]
+        except Exception as exc:  # noqa: BLE001 -- the attached files are still measured
+            logger.debug("could not read the manuscript's drawings: %s", exc)
+    for fig, as_placed in vectors:
         sizes = [t.size for t in fig.texts]
         smallest.append(min(sizes))
         floor = rules.min_font_size_pt or GENERAL_MIN_FONT_PT
         small = [t for t in fig.texts if t.size < floor - 0.25 and t.text.strip()]
         # the general floor is a readability backstop: flag only when most of the lettering is under it
-        if small and (rules.min_font_size_pt or len(small) >= max(3, len(fig.texts) // 2)):
+        if small and ((rules.min_font_size_pt and not as_placed) or len(small) >= max(3, len(fig.texts) // 2)):
             examples = ", ".join(f"'{t.text[:20]}' {t.size:.1f} pt" for t in sorted(small, key=lambda t: t.size)[:3])
             rule = f"the {rules.min_font_size_pt:g} pt minimum" if rules.min_font_size_pt else f"{GENERAL_MIN_FONT_PT:g} pt, too small to read in print (the guidelines set no minimum; 5-7 pt is usual)"
             issues.append(Issue(WARNING, fig.field_id, f"{fig.name}: {len(small)} text item(s) print smaller than {rule} (e.g. {examples})"))
-        if rules.max_font_size_pt:
+        if rules.max_font_size_pt and not as_placed:
             # Panel labels are often set larger on purpose; leave single letters out.
             large = [t for t in fig.texts if t.size > rules.max_font_size_pt + 0.25 and not _PANEL.match(t.text.strip())]
             if large:
                 examples = ", ".join(f"'{t.text[:20]}' {t.size:.1f} pt" for t in sorted(large, key=lambda t: -t.size)[:3])
                 issues.append(Issue(WARNING, fig.field_id, f"{fig.name}: {len(large)} text item(s) print larger than the {rules.max_font_size_pt:g} pt maximum (e.g. {examples})"))
+    raster_issues, raster_measured = _raster_text_size_issues(venue, values, inv)
+    issues += raster_issues
     queued = _raster_ai_task(checks, inv, rules)
     others = [f.name for f in inv.figures if f.kind == "other"]
     if others:
@@ -814,9 +1160,13 @@ def _text_size_check(checks: Checks, inv: _Inventory, rules: FigureRules, where:
     outlined = _outlined(inv)
     if outlined and smallest:
         issues.append(Issue(WARNING, "", f"no lettering to measure in {', '.join(outlined[:4])} (its text may be outlined to shapes); check its size by hand", unchecked=True))
+    estimated = f"; lettering size estimated in {raster_measured} raster figure(s) as placed" if raster_measured else ""
     if not smallest:
-        raise Unchecked(f"no vector lettering to measure in the {where}" + (f"; {queued} raster figure(s) are queued for the AI check" if queued else ""))
-    detail = f"{len(smallest)} vector figure(s) measured, smallest text {min(smallest):.1f} pt" + (f"; {queued} raster figure(s) need the AI check" if queued else "")
+        why = f"no vector lettering to measure in the {where}{estimated}" + (f"; {queued} raster figure(s) are queued for the AI check" if queued else "")
+        if not raster_issues:
+            raise Unchecked(why)
+        return Outcome(issues, why)
+    detail = f"{len(smallest)} vector figure(s) measured, smallest text {min(smallest):.1f} pt{estimated}" + (f"; {queued} raster figure(s) need the AI check" if queued else "")
     return Outcome(issues, detail)
 
 

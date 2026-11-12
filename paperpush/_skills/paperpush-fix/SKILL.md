@@ -194,7 +194,9 @@ these:
 - Too many references, figures, tables, display items, or supplementary
   files. Removing those changes the science.
 - Confirmations and attestations (`form.required` on a yes/no or a
-  confirmation): never tick them for the author.
+  confirmation): never tick them for the author, and never run `paperpush
+  autofill --confirm-attestations` to clear them. Tell the author they can set
+  them to `yes` in the `.sub`, or ask for `--confirm-attestations`.
 - Missing content the files don't contain: ethics approval, funding, data
   availability, competing interests, ORCIDs, e-mail addresses,
   `front_matter.contact_email`, `front_matter.keywords`, `guidelines.statements`/`guidelines.sections`

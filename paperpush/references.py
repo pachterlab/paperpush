@@ -95,9 +95,14 @@ YEAR_TOLERANCE = 1
 # Outcome of asking doi.org about a DOI.
 DOI_FOUND = "found"  # resolved; CSL JSON metadata returned
 DOI_MISSING = "missing"  # 404/410 -- the DOI is not registered
-# doi.org answers a burst of lookups with HTTP 429: wait and ask again, this many times, this many seconds apart (growing).
+# doi.org answers a burst of lookups with HTTP 429 (Crossref, which serves most
+# DOIs' metadata, limits each address's concurrent requests): wait and ask
+# again, this many times, this many seconds apart (growing, or the server's
+# Retry-After up to _RATE_LIMIT_MAX_WAIT), with jitter so the waiting threads
+# do not come back in one burst.
 _RATE_LIMIT_TRIES = 4
 _RATE_LIMIT_WAIT = 2.0
+_RATE_LIMIT_MAX_WAIT = 10.0
 DOI_UNKNOWN = "unknown"  # offline, blocked, or an agency that won't serve CSL
 
 # The Finding category of a cited work that has been retracted (or withdrawn,
@@ -291,6 +296,9 @@ def normalize_doi(raw: str) -> str:
         value = value[:-1]
     # \_ and friends: a DOI written into LaTeX often escapes its own punctuation.
     value = value.replace("\\_", "_").replace("\\%", "%").replace("\\&", "&").replace("\\#", "#")
+    # ... and a reference manager may brace it too (Mendeley's 10.1162/netn{_}a{_}00033).
+    # Registered DOIs do not contain braces, so any left are grouping.
+    value = value.replace("{", "").replace("}", "")
     return value.lower()
 
 
@@ -314,15 +322,20 @@ def _match_delimiter(text: str, start: int, opener: str) -> int:
     """Index of the delimiter closing the one at ``start``, or -1 if unclosed.
 
     Tracks nesting so a braced group inside a value (``{Notes on the {Analytical}
-    Engine}``) closes at the right place, and skips the character after a
-    backslash so an escaped delimiter does not count.
+    Engine}``) closes at the right place. Braces count as BibTeX counts them,
+    escaped or not: BibTeX balances ``\\{`` and ``\\}`` like any other brace, so a
+    Mendeley export's ``{\\\\\\}National Academy of Sciences}`` (an escaped
+    backslash, then an escaped brace) still closes where BibTeX closes it.
+    Skipping the character after a backslash would leave that entry open and
+    swallow every entry after it. Parentheses (``@article(...)``) do skip an
+    escaped one.
     """
     closer = "}" if opener == "{" else ")"
     depth = 0
     i = start
     while i < len(text):
         char = text[i]
-        if char == "\\":
+        if char == "\\" and opener == "(":
             i += 2
             continue
         if char == opener:
@@ -783,6 +796,17 @@ def _describe(record: dict) -> str:
 # --- registry lookup -------------------------------------------------------
 
 
+def _rate_limit_wait(exc, attempt: int) -> float:
+    """Seconds to wait after a 429: the server's Retry-After (capped), else a growing delay, plus jitter."""
+    import random
+
+    try:
+        wait = float((exc.headers or {}).get("Retry-After", ""))
+    except (TypeError, ValueError, AttributeError):
+        wait = _RATE_LIMIT_WAIT * (attempt + 1)
+    return min(max(wait, 0.0), _RATE_LIMIT_MAX_WAIT) + random.uniform(0, _RATE_LIMIT_WAIT)  # nosec B311 -- jitter, not security
+
+
 def _resolve_doi(doi: str, *, timeout: float = DOI_CHECK_TIMEOUT) -> tuple[str, dict | None]:
     """Ask doi.org what ``doi`` refers to.
 
@@ -814,7 +838,7 @@ def _resolve_doi(doi: str, *, timeout: float = DOI_CHECK_TIMEOUT) -> tuple[str, 
             if exc.code in _MISSING_STATUS:
                 return DOI_MISSING, None
             if exc.code == 429 and attempt + 1 < _RATE_LIMIT_TRIES:
-                time.sleep(_RATE_LIMIT_WAIT * (attempt + 1))
+                time.sleep(_rate_limit_wait(exc, attempt))
                 continue
             logger.debug("DOI %s returned HTTP %s; treating as unknown", doi, exc.code)
             return DOI_UNKNOWN, None
@@ -989,6 +1013,13 @@ def _mismatches(entry: Entry, record: dict) -> list[str]:
     entry_year, registered_year = _year_value(entry.year), _year_value(_year_of(record))
     if entry_year and registered_year and abs(entry_year - registered_year) > YEAR_TOLERANCE:
         problems.append(f"year is {entry_year} but the DOI is registered as {registered_year}")
+
+    # A software DOI (a Zenodo release) is titled and dated by the release
+    # ("bastibe/Violinplot-Matlab: A Good Starting Point", 2021), not by how the
+    # software is cited ("Violin Plots for Matlab", 2016). When its first author
+    # agrees, a different title or year is the release, not a wrong DOI.
+    if str(record.get("type", "")).lower() == "software" and entry_author and registered_author and _same_family(entry_author, registered_author):
+        problems = [p for p in problems if not p.startswith(("title is", "year is"))]
 
     return problems
 

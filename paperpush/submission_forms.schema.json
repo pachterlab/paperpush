@@ -405,7 +405,8 @@
                 "authors",
                 "reviewers",
                 "declarations",
-                "additional"
+                "additional",
+                "attestations"
               ],
               "type": "string"
             },
@@ -413,7 +414,7 @@
               "type": "null"
             }
           ],
-          "description": "Section of the .sub template this field is listed under (type, files, metadata, authors, reviewers, declarations, additional). Omit to use the section paperpush/common_fields.json gives this field id, or \"additional\" when it names none. Layout only: ignored by `paperpush subfile --venue-order`, submission and validation."
+          "description": "Section of the .sub template this field is listed under (type, files, metadata, authors, reviewers, declarations, additional, attestations). Omit to use the section paperpush/common_fields.json gives this field id, or \"additional\" when it names none. Layout only: ignored by `paperpush subfile --venue-order`, submission and validation."
         }
       },
       "required": [
@@ -766,7 +767,8 @@
                 "authors",
                 "reviewers",
                 "declarations",
-                "additional"
+                "additional",
+                "attestations"
               ],
               "type": "string"
             },
@@ -774,7 +776,7 @@
               "type": "null"
             }
           ],
-          "description": "Section of the .sub template this field is listed under (type, files, metadata, authors, reviewers, declarations, additional). Omit to use the section paperpush/common_fields.json gives this field id, or \"additional\" when it names none. Layout only: ignored by `paperpush subfile --venue-order`, submission and validation."
+          "description": "Section of the .sub template this field is listed under (type, files, metadata, authors, reviewers, declarations, additional, attestations). Omit to use the section paperpush/common_fields.json gives this field id, or \"additional\" when it names none. Layout only: ignored by `paperpush subfile --venue-order`, submission and validation."
         }
       },
       "required": [

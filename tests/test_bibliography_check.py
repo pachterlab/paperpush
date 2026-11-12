@@ -69,7 +69,7 @@ def test_citations_in_legends_after_references_count(tmp_path):
 def test_bracket_labels_mid_line(tmp_path):
     text = "Body [1] and [2].\n\nReferences\n\n[1] Doe, J. A thing. arXiv, 2017. [2] Lee, B. Another thing. In ICLR,\n2017. [3] Kim, C. Third thing. 2018.\n"
     status, message, _ = _run(_md(tmp_path, text))["bibliography.uncited"]
-    assert status == report.WARNING and message.endswith(": [3]")
+    assert status == report.WARNING and message.endswith(': [3] "Kim, C. Third thing. 2018."')
 
 
 def test_alpha_labels(tmp_path):
@@ -105,7 +105,7 @@ def test_superscript_citations_in_docx(tmp_path):
         for n, data in members.items():
             z.writestr(n, data)
     status, message, _ = _run(path)["bibliography.uncited"]
-    assert status == report.WARNING and message.endswith("(superscript citations): [2]")
+    assert status == report.WARNING and message.endswith('(superscript citations): [2] "Lee, B. Other. Cell 2 (2020)."')
 
 
 def test_superscripts_unreadable_in_text(tmp_path):

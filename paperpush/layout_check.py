@@ -568,6 +568,13 @@ class TexLayout:
     paper: str | None
 
 
+_DOC_FONTSIZE = re.compile(r"\\AtBeginDocument\s*\{\s*\\fontsize\s*\{\s*(\d+(?:\.\d+)?)\s*(?:pt)?\s*\}|\\begin\s*\{\s*document\s*\}\s*\\fontsize\s*\{\s*(\d+(?:\.\d+)?)\s*(?:pt)?\s*\}")
+
+
+def _uncommented(source: str) -> str:
+    return re.sub(r"(?<!\\)%.*", "", source)
+
+
 def _dims(text: str) -> float | None:
     match = _DIM.search(text)
     return float(match.group(1)) * _DIM_PT[match.group(2)] if match else None
@@ -587,6 +594,10 @@ def measure_tex(source: str) -> TexLayout:
     size = next((float(o[:-2]) for o in options if re.fullmatch(r"\d+(?:\.\d+)?pt", o)), None)
     if size is None and any(c in ("article", "report", "book", "amsart") for c in classes):
         size = 10.0
+    # A \fontsize set for the whole document overrides the class option.
+    whole = _DOC_FONTSIZE.search(_uncommented(source))
+    if whole:
+        size = float(whole.group(1) or whole.group(2))
     font = None
     if {"times", "mathptmx", "newtxtext", "txfonts", "ptm", "tgtermes", "mathptm"} & set(packages):
         font = "Times"

@@ -78,10 +78,6 @@ pdf_file: tests/manuscript_files/iclr_2027/manuscript.pdf
 #   options: run 'paperpush options iclr_2027.primary_area' to list the choices
 primary_area: datasets and benchmarks
 
-# All authors have read and commit to the ICLR Code of Ethics (boolean, REQUIRED)
-#   Confirms that you and all co-authors have read, and commit to adhering to, the ICLR Code of Ethics (https://iclr.cc/public/CodeOfEthics).
-code_of_ethics: yes
-
 # Reciprocal reviewing exemption (choice, REQUIRED)
 #   Whether the submission is exempt from ICLR's reciprocal reviewing requirement, and why. Must be "We do not need an exemption." when an author is marked as the Reciprocal Reviewer in the Authors field, and one of the other reasons when none is. Choose "I believe the submission is exempt for a different reason, specified below." to give a reason of your own in Reciprocal reviewing exemption reason.
 #   options: We do not need an exemption. | We want an exemption because all authors are unqualified (i.e., no author has a publication on the approved venue list). | We want an exemption because all qualified authors have already accepted to serve as ACs/SACs/other chair in the ICLR 2027 Program/Organizing committee. | We want an exemption because all qualified authors will be on medical/parental leave. | We want an exemption because all qualified authors are Program Chairs for other conferences. | I believe the submission is exempt for a different reason, specified below.
@@ -99,5 +95,13 @@ reciprocal_reviewing_exemption_reason: |
 ai_assistance: |
   Yes, to aid or polish writing. Details are described in the paper.
   Yes, for retrieval and discovery (e.g., finding related work). Details are described in the paper.
+
+# ----------------------------------------------------------------------
+# Attestations
+# ----------------------------------------------------------------------
+
+# All authors have read and commit to the ICLR Code of Ethics (boolean, REQUIRED; must be yes to submit)
+#   Confirms that you and all co-authors have read, and commit to adhering to, the ICLR Code of Ethics (https://iclr.cc/public/CodeOfEthics).
+code_of_ethics: yes
 
 # vim: set filetype=yaml :

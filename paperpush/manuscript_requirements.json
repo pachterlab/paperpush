@@ -5721,6 +5721,7 @@
       "template_required": true,
       "template_url": "https://github.com/acl-org/acl-style-files",
       "latex_class": "acl",
+      "font_size_pt": 11,
       "notes": [
         "Long papers: up to 8 pages of content; short papers: up to 4 pages; both with unlimited references. Papers exceeding the limit are desk rejected.",
         "Limitations and the optional ethics section follow the conclusion, do not count toward the page limit, and are included in the single submitted PDF.",
@@ -6638,6 +6639,7 @@
       "anonymized": true,
       "template_required": true,
       "template_url": "https://media.eventhosts.cc/Conferences/CVPR2027/author-kit-CVPR2027-v1-latex.zip",
+      "font_size_pt": 10,
       "notes": [
         "Main paper limited to eight pages including figures and tables; extra pages are allowed only for cited references and the mandatory LLM Usage Statement; papers over the limit are rejected without review.",
         "Papers that do not use the CVPR 2027 submission template, or have substantially altered margins or fonts, are rejected without review.",
@@ -12514,7 +12516,8 @@
   "tmlr": {
     "source_urls": [
       "https://jmlr.org/tmlr/author-guide.html",
-      "https://jmlr.org/tmlr/submissions.html"
+      "https://jmlr.org/tmlr/submissions.html",
+      "https://github.com/JmlrOrg/tmlr-style-file"
     ],
     "retrieved": "2026-10-23",
     "manuscript": {
@@ -12523,6 +12526,7 @@
       ],
       "template_required": true,
       "anonymized": true,
+      "font_size_pt": 10,
       "notes": [
         "Submissions must be PDFs made with the mandatory TMLR LaTeX style file and template; changes to formatting, fonts, or layout may lead to rejection without review.",
         "Length is unrestricted but must be justified by content; unusually long papers (excluding appendices) may delay review.",

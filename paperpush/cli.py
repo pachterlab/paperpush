@@ -2385,7 +2385,9 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
             return 1
         extraction = parse_extraction(data)
 
-    result = autofill(text, venue, extraction, manuscript_dir=search_dirs, min_confidence=args.min_confidence)
+    confirm_attestations = getattr(args, "confirm_attestations", False)
+    keep_existing = getattr(args, "keep_existing", False)
+    result = autofill(text, venue, extraction, manuscript_dir=search_dirs, min_confidence=args.min_confidence, confirm_attestations=confirm_attestations, keep_existing=keep_existing)
 
     out_path = Path(args.output) if args.output else sub_path
     if args.dry_run:
@@ -2457,6 +2459,12 @@ def _autofill_in_browser(args: argparse.Namespace, input_dirs: list[Path], input
     return _open_web(out_path, manuscript_dirs=search_dirs, action="autofill")
 
 
+def _one_line(value: str, width: int = 100) -> str:
+    """Collapse a (possibly multi-line) field value to one line for the summary."""
+    flat = " / ".join(line.strip() for line in value.splitlines() if line.strip())
+    return flat if len(flat) <= width else flat[: width - 3] + "..."
+
+
 def _print_autofill_summary(result, extraction, venue, out_path, dry_run: bool) -> None:
     """Print the filled / review / left-for-you breakdown after an autofill."""
     verb = "Would write" if dry_run else "Wrote"
@@ -2466,19 +2474,42 @@ def _print_autofill_summary(result, extraction, venue, out_path, dry_run: bool) 
         print(f"Filled {len(result.filled)} field(s):")
         for o in result.filled:
             src = f"  ({o.source})" if o.source else ""
-            print(f"  {o.id}{src}")
+            print(f"  {o.id}{src}" + ("  [replaced the previous value]" if o.previous else ""))
 
     if result.review:
         print(f"\n{len(result.review)} field(s) need your review:")
         for o in result.review:
+            print(f"  {o.id}: {o.note}" + ("  [replaced the previous value]" if o.previous else ""))
+
+    if result.unchanged:
+        print(f"\nUnchanged ({len(result.unchanged)}, already in the file): " + ", ".join(o.id for o in result.unchanged))
+
+    if result.kept:
+        print(f"\nKept your existing value ({len(result.kept)}, --keep-existing); the manuscript now suggests otherwise:")
+        for o in result.kept:
+            print(f"  {o.id}:")
+            print(f"    in the file:  {_one_line(o.previous)}")
+            print(f"    manuscript:   {_one_line(o.value)}")
+
+    # Print the full sentence of every attestation --confirm-attestations
+    # agreed to, so the author reads what they are confirming for all authors.
+    if result.attested:
+        print(f"\nConfirmed with --confirm-attestations ({len(result.attested)}); you are agreeing, for every author, that:")
+        for o in result.attested:
+            print(f"  {o.id}: {o.label}" + ("  (already yes)" if o.note == "already yes" else ""))
+    if result.attestations_kept:
+        print(f"\nNot changed by --confirm-attestations ({len(result.attestations_kept)}):")
+        for o in result.attestations_kept:
             print(f"  {o.id}: {o.note}")
 
-    policy = [o for o in result.skipped if o.action == "skipped_policy"]
-    if policy or extraction.unfilled:
-        print(f"\nLeft for you to set ({len(policy) + len(extraction.unfilled)}):")
+    handled = {o.id for o in result.attested} | {o.id for o in result.attestations_kept}
+    policy = [o for o in result.skipped if o.action == "skipped_policy" and o.id not in handled]
+    unfilled = [(fid, reason) for fid, reason in extraction.unfilled if fid not in handled]
+    if policy or unfilled:
+        print(f"\nLeft for you to set ({len(policy) + len(unfilled)}):")
         for o in policy:
             print(f"  {o.id} ({o.label})")
-        for fid, reason in extraction.unfilled:
+        for fid, reason in unfilled:
             print(f"  {fid}" + (f": {reason}" if reason else ""))
 
     low = [o for o in result.skipped if o.action == "skipped_low"]
@@ -3173,6 +3204,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_autofill.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(api) LLM provider; defaults to the first of anthropic, openai, google " "whose API key is set (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY)")
     p_autofill.add_argument("--model", help="(api) model to use (default: claude-opus-5-5, gpt-6-astra, or " "gemini-3.8-flash, by provider)")
     p_autofill.add_argument("--min-confidence", choices=["low", "medium", "high"], default="low", help="do not write any value below this confidence (default: low)")
+    p_autofill.add_argument(
+        "--confirm-attestations",
+        dest="confirm_attestations",
+        action="store_true",
+        help="set every blank required attestation (a yes/no confirmation whose only accepted answer is yes, e.g. author consent or the submission terms) to yes, and print each one in full. You are agreeing on behalf of all authors: agents must pass this only when the user asks for it. An attestation already answered otherwise is left as written",
+    )
+    p_autofill.add_argument(
+        "--keep-existing",
+        dest="keep_existing",
+        action="store_true",
+        help="update an already-filled .sub without touching its values: write only fields that are blank or still at their template default, and list each field where the manuscript now says something different",
+    )
     p_autofill.add_argument("-o", "--output", metavar="OUT", help="write the filled file here instead of overwriting the .sub")
     p_autofill.add_argument("--overwrite", action="store_true", help="overwrite --output if it already exists")
     p_autofill.add_argument("--force", dest="overwrite", action="store_true", help=argparse.SUPPRESS)

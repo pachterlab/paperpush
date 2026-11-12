@@ -847,8 +847,14 @@
     ["paper", "Paper Metadata", "Copied from the manuscript."],
     ["authors", "Authors", ""],
     ["reviewers", "Reviewers", "People you suggest as reviewers and people you ask the editor to exclude. paperpush never fills these in for you."],
-    ["decisions", "Disclosures", "Policies and confirmations only you can answer. paperpush never fills these in for you."],
+    ["decisions", "Disclosures", "Policies and questions only you can answer, where the venue accepts more than one answer. paperpush never fills these in for you."],
+    ["attestations", "Attestations", "Statements you agree to for every author. The venue accepts only yes, so the form cannot be submitted until each is ticked. paperpush never ticks these for you."],
   ];
+
+  // An attestation: a required yes/no confirmation whose only accepted answer
+  // is yes (author consent, the submission terms). Listed last, after every
+  // question the author still has to answer.
+  const isAttestation = (f) => f.type === "boolean" && Boolean(f.confirm) && Boolean(f.required);
 
   // Reviewer fields go in their own group. A venue that takes suggested and
   // excluded reviewers in one field (a stance column) shows it as two tables.
@@ -868,6 +874,7 @@
     if (f.type === "authorlist") return "authors";
     if (f.type === "file" || f.type === "filelist") return "files";
     if (isReviewerField(f)) return "reviewers";
+    if (isAttestation(f)) return "attestations";
     if (f.role === "never") return "decisions";
     return "paper";
   }
@@ -892,9 +899,37 @@
       root.append(el("section", { class: "field-group", id: `group-${key}`, "data-group": key },
         el("div", { class: "group-head" }, el("h2", { text: title }), el("span", { class: "count muted small", "data-count": key })),
         hint ? el("p", { class: "hint group-hint", text: hint }) : null,
+        key === "attestations" && group.length > 1 ? agreeAllControl(group) : null,
         group.map(fieldCard)));
     }
     buildNav(fields, uploads);
+  }
+
+  // "Agree to all" at the top of the Attestations group: ticks (or unticks)
+  // every attestation at once. It is the author's click, never autofill's.
+  function agreeAllControl(group) {
+    const box = el("input", { type: "checkbox", id: "agree-all" });
+    box.addEventListener("change", () => {
+      let text = state.text;
+      for (const f of group) {
+        text = Subfile.setField(text, f, box.checked ? "yes" : "");
+        state.review.delete(f.id);
+        state.widgets.get(f.id)?.card?.classList.remove("review");
+      }
+      setText(text);
+      syncWidgets();
+    });
+    return el("label", { class: "confirm agree-all card" }, box, el("span", { text: `Agree to all ${group.length} attestations below` }));
+  }
+
+  // Keep "Agree to all" in step with the individual boxes.
+  function syncAgreeAll() {
+    const box = $("#agree-all");
+    if (!box) return;
+    const vals = values();
+    const yes = state.venue.fields.filter(isAttestation).map((f) => /^(yes|y|true|1|on)$/i.test(String(vals[f.id] ?? "").trim()));
+    box.checked = yes.length > 0 && yes.every(Boolean);
+    box.indeterminate = !box.checked && yes.some(Boolean);
   }
 
   // The side menu: the manuscript, the guidelines, every field by group
@@ -1072,7 +1107,10 @@
   function booleanWidget(f, id) {
     if (f.confirm) {
       const box = el("input", { id, type: "checkbox" });
-      box.addEventListener("change", () => onWidgetChange(f, box.checked ? "yes" : "no"));
+      // Unticking an attestation clears it rather than writing "no": no is
+      // not an answer the venue accepts, and a blank one reads as unanswered.
+      const off = isAttestation(f) ? "" : "no";
+      box.addEventListener("change", () => onWidgetChange(f, box.checked ? "yes" : off));
       return { node: el("label", { class: "confirm" }, box, el("span", { text: "Yes, I confirm" })), set(v) { box.checked = /^(yes|y|true|1|on)$/i.test(v.trim()); } };
     }
     const name = `${id}-radio`;
@@ -1757,6 +1795,7 @@
       const filled = cards.filter((c) => c.hasAttribute("data-filled")).length;
       count.textContent = `${filled} of ${cards.length} filled`;
     }
+    syncAgreeAll();
     renderCheckStatus();
     window.PaperpushViewer?.apply();
   }

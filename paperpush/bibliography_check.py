@@ -40,7 +40,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import document
@@ -77,6 +77,8 @@ class Bibliography:
     cited: set[str] | None  # keys or numbers cited; None when citations could not be read
     printed_only_cited: bool = False  # BibTeX: only cited entries reach the reference list
     note: str = ""
+    # LaTeX: keys put in the reference list by \\nocite{key} that no \\cite command cites.
+    nocite_only: list[str] = field(default_factory=list)
 
 
 def _fold(text: str) -> str:
@@ -106,10 +108,13 @@ def _tex_bibliography(path: Path, source: str) -> Bibliography | None:
     for macro in _CITE_MACRO.finditer(source):
         cited |= {k for m in re.finditer(r"\\" + macro.group(1) + r"(?![A-Za-z])\s*(?:\[[^\]]*\]\s*)*\{([^{}#]*)\}", source) for k in _keys(m.group(1))}
     nocite = {k for m in _NOCITE.finditer(source) for k in _keys(m.group(1))}
+    # \\nocite{key} prints an entry the text never points to: in the reference list, but uncited.
+    named = list(dict.fromkeys(k for m in _NOCITE.finditer(source) for k in _keys(m.group(1)) if k != "*" and k not in cited))
     items = _BIBITEM.findall(source)
     if items:
         refs = [Ref(key.strip(), key.strip(), re.sub(r"\s+", " ", body).strip()) for key, body in items]
-        return Bibliography("keys", refs, cited | nocite)
+        known = {r.key for r in refs}
+        return Bibliography("keys", refs, cited | nocite, nocite_only=[k for k in named if k in known])
     bibs: list[Path] = []
     for m in _BIB_NAMES.finditer(source):
         for name in _keys(m.group(1)):
@@ -122,7 +127,8 @@ def _tex_bibliography(path: Path, source: str) -> Bibliography | None:
         return None
     refs = [Ref(e.key, e.key, e.author, e.year) for e in entries]
     every = "*" in nocite
-    return Bibliography("keys", refs, cited | (nocite - {"*"}), printed_only_cited=not every, note="\\nocite{*} prints every .bib entry" if every else "")
+    known = {r.key for r in refs}
+    return Bibliography("keys", refs, cited | (nocite - {"*"}), printed_only_cited=not every, note="\\nocite{*} prints every .bib entry" if every else "", nocite_only=[k for k in named if k in known])
 
 
 # --- text reference lists ----------------------------------------------------------------
@@ -399,7 +405,7 @@ def is_self_citation(ref: Ref, authors: list[tuple[str, str, str]]) -> bool:
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("bibliography.uncited", "Every reference is cited, and every citation has a reference", REFERENCES, _uncited_check, venue, values)
     checks.run("bibliography.self_citations", "Self-citations within limits (at most 15, and at most 80% of references)", REFERENCES, _self_citation_check, venue, values)
-    checks.run("bibliography.entries", "BibTeX entries are complete, closed, and have unique keys", REFERENCES, _bib_entries_check, venue, values)
+    checks.run("bibliography.entries", "BibTeX entries are complete, closed, and have unique keys, and no work is listed twice", REFERENCES, _bib_entries_check, venue, values)
 
 
 def _manuscripts(venue: Venue, values: dict[str, str]) -> list[tuple[Field, Path]]:
@@ -416,6 +422,24 @@ def _list(items: list[str]) -> str:
     return shown + (f" and {len(items) - MAX_EXAMPLES} more" if len(items) > MAX_EXAMPLES else "")
 
 
+def _excerpt(text: str, limit: int = 70) -> str:
+    """The opening of a reference entry (its authors and, usually, its title), cut at a word."""
+    text = re.sub(r"\s+", " ", _NUMBER_LABEL.sub("", text, count=1)).strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0] + "..."
+
+
+def _named(ref: Ref, mode: str) -> str:
+    """How a finding names an entry: a LaTeX key as is; a numbered or author-year entry with its opening text.
+
+    "[37]" alone does not say which work it is, so the entry's authors and title come with it.
+    """
+    if mode == "keys":
+        return ref.label
+    return f'{ref.label} "{_excerpt(ref.authors)}"'
+
+
 def _uncited_check(venue: Venue, values: dict[str, str]) -> Outcome:
     field, path = _manuscripts(venue, values)[0]
     bib = read_bibliography(path)
@@ -425,9 +449,13 @@ def _uncited_check(venue: Venue, values: dict[str, str]) -> Outcome:
         raise Unchecked(f"found no bracketed citations ([1]) in {path.name} to match its {len(bib.refs)} numbered references against (superscript citations cannot be told apart from other numbers in extracted text)")
     issues: list[Issue] = []
     defined = [r.key for r in bib.refs]
-    uncited = [r.label for r in bib.refs if r.key not in bib.cited]
+    uncited = [_named(r, bib.mode) for r in bib.refs if r.key not in bib.cited]
     if bib.printed_only_cited:
         uncited = []
+    if bib.nocite_only:
+        n = len(bib.nocite_only)
+        issues.append(Issue(WARNING, field.id, f"{n} {'entry is' if n == 1 else 'entries are'} put in the reference list of {path.name} by \\nocite but never cited in the text: {_list(bib.nocite_only)}"))
+        uncited = [u for u in uncited if u not in bib.nocite_only]
     if uncited:
         what = "entries" if bib.mode != "numbered" else "references"
         why = f" ({bib.note})" if bib.note else ""
@@ -446,16 +474,112 @@ def _uncited_check(venue: Venue, values: dict[str, str]) -> Outcome:
     return Outcome(issues, f"all {len(bib.refs)} references cited{via}")
 
 
+# --- one work listed twice ------------------------------------------------------------------
+
+# A title shorter than this (normalized) is too generic to say two entries are one work.
+MIN_DUPLICATE_TITLE_CHARS = 12
+# A reference-list entry shorter than this (normalized words) is too little text to compare.
+MIN_DUPLICATE_ENTRY_WORDS = 6
+
+
+def _bib_first_surname(author: str) -> str:
+    """The first author's surname in a BibTeX ``author`` field ("Smith, J. and ..." or "John Smith and ...")."""
+    from .references import _normalize_text
+
+    first = re.split(r"\s+and\s+", author.strip(), maxsplit=1)[0]
+    name = first.split(",", 1)[0] if "," in first else first
+    words = _normalize_text(name).split()
+    return words[-1] if words else ""
+
+
+def duplicate_entry_findings(entries: list) -> list:
+    """Two printed ``.bib`` entries, under different keys, for one work: the same title and first author.
+
+    The DOI and arXiv checks catch a duplicate only when both entries carry the
+    identifier; a book or an older article usually has neither, so the title is
+    compared instead. Two volumes or editions of one book (``volume``,
+    ``edition`` differing) are different works and are not reported.
+    """
+    from .references import _normalize_text
+    from .sensitive import Finding
+
+    findings = []
+    groups: dict[tuple[str, str], list] = {}
+    seen_keys: set[str] = set()
+    for entry in entries:
+        key = (entry.key or "").lower()
+        if not key or key in seen_keys:
+            continue
+        seen_keys.add(key)
+        title = _normalize_text(entry.title)
+        surname = _bib_first_surname(entry.author or entry.fields.get("editor", ""))
+        if len(title) < MIN_DUPLICATE_TITLE_CHARS or not surname:
+            continue
+        groups.setdefault((title, surname), []).append(entry)
+    for group in groups.values():
+        first = group[0]
+        for other in group[1:]:
+            if any(_normalize_text(first.fields.get(f, "")) != _normalize_text(other.fields.get(f, "")) and first.fields.get(f, "").strip() and other.fields.get(f, "").strip() for f in ("volume", "edition", "number", "part")):
+                continue
+            years = "" if first.year == other.year or not (first.year and other.year) else f" (years {first.year} and {other.year})"
+            title = re.sub(r"[{}]", "", first.title).strip()
+            findings.append(Finding(other.where, "duplicate reference", f"bibliography entries '{first.key}' and '{other.key}' are the same work (\"{title[:80]}\", {first.author.split(' and ')[0].strip('{} ')}){years}; it is listed twice in the reference list, under two numbers or labels. Cite one key and delete the other"))
+    return findings
+
+
+def _entry_words(text: str) -> list[str]:
+    """A reference-list entry as comparable words, without its number and with "2020a"/"2020b" read as 2020."""
+    from .references import _normalize_text
+
+    text = _NUMBER_LABEL.sub("", text, count=1)
+    # hyperref's back-references: the pages citing the entry, after its closing period ("... 2009. 3, 5").
+    text = re.sub(r"(?<=\.)\s+\d{1,4}(?:\s*[,\u2013-]\s*\d{1,4})*\s*$", "", text)
+    text = re.sub(r"\b((?:19|20)\d{2})[a-z]\b", r"\1", text)
+    return _normalize_text(text).split()
+
+
+def duplicate_ref_findings(refs: list[Ref], where: str) -> list:
+    """Two entries of a printed reference list with the same text: one work listed twice.
+
+    Read from the manuscript itself (a PDF, Word file, or ``\\bibitem`` list),
+    where there are no fields to compare: the entries' words, without the
+    number and the "a"/"b" an author-year style adds to tell the two apart,
+    must be identical.
+    """
+    from .sensitive import Finding
+
+    findings = []
+    seen: dict[tuple[str, ...], Ref] = {}
+    for ref in refs:
+        words = tuple(_entry_words(ref.authors))
+        if len(words) < MIN_DUPLICATE_ENTRY_WORDS:
+            continue
+        first = seen.setdefault(words, ref)
+        if first is not ref:
+            findings.append(Finding(where, "duplicate reference", f'reference-list entries {first.label} and {ref.label} are the same work ("{_excerpt(ref.authors, 90)}"); it is listed twice in the reference list'))
+    return findings
+
+
 def _bib_entries_check(venue: Venue, values: dict[str, str]) -> Outcome:
-    """Structural problems in the submission's ``.bib`` files (see :func:`paperpush.references.bib_structure_findings`)."""
+    """Structural problems in the submission's ``.bib`` files (see :func:`paperpush.references.bib_structure_findings`),
+    and one work listed twice -- in the ``.bib``, or, without one, in the manuscript's printed reference list."""
     from . import references
     from .validate import _findings_to_issues, _iter_upload_paths
 
     paths = list(_iter_upload_paths(venue, values))
     findings, total = references.bib_structure_findings(paths)
-    if not total:
-        raise NotApplicable("no .bib file among the uploads")
-    return Outcome(_findings_to_issues(findings), f"{total} entries read")
+    if total:
+        findings += duplicate_entry_findings(references.printed_entries(paths))
+        return Outcome(_findings_to_issues(findings), f"{total} entries read")
+    try:
+        _, path = _manuscripts(venue, values)[0]
+    except NotApplicable:
+        raise NotApplicable("no .bib file or manuscript among the uploads") from None
+    bib = read_bibliography(path)
+    if bib is None or not bib.refs:
+        raise NotApplicable("no .bib file among the uploads, and no reference list read from the manuscript")
+    findings = duplicate_ref_findings(bib.refs, path.name)
+    return Outcome(_findings_to_issues(findings), f"{len(bib.refs)} reference-list entries read" + ("" if findings else ", none listed twice"))
 
 
 def _self_citation_check(venue: Venue, values: dict[str, str]) -> Outcome:

@@ -256,7 +256,7 @@ def test_repetition_check_reports_and_lists_top_words(tmp_path):
 
 
 def test_is_modifier_keeps_adjectives_and_adverbs_only():
-    for word in ("important", "clinical", "rapidly", "significant", "large"):
+    for word in ("important", "clinical", "rapidly", "significant", "strong"):
         assert pc._is_modifier(word), word
     for word in ("studies", "devices", "patient", "hospital", "trial", "assessment", "family"):
         assert not pc._is_modifier(word), word
@@ -271,3 +271,31 @@ def test_top_words_leave_out_the_topic_and_nouns():
 def test_item_labels_are_not_repeated_openings():
     text = "Appendix S1: Search. Appendix S2: Eligibility. Appendix S3: Appraisal. Appendix S4: Devices. Appendix S5: Checklist."
     assert pc.repetition([text]).openings == []
+
+
+def test_top_words_need_enough_uses_and_skip_plain_words():
+    assert not pc._is_modifier("receive") and not pc._is_modifier("final") and not pc._is_modifier("never")
+    filler = "Other text appears here with many different words to read. " * 30
+    few = pc.repetition(["The elegant widget moved. " * 4 + filler])
+    assert few.top == [] and few.top_min == 5  # four uses in a short text is no pattern
+    many = pc.repetition(["The elegant widget moved. " * 8 + filler])
+    assert many.top == [("elegant", 8)]
+    long = pc.repetition(["The elegant widget moved. " * 8 + filler * 20])  # 6,000+ words: more than 8 uses needed
+    assert long.top == [] and long.top_min > 8
+
+
+def test_stock_verbs_and_nouns_count_with_their_inflections():
+    text = ["We enhance it. It enhances them. They were enhanced. Enhancing helps. This is a problem. " * 2 + "Plain words follow here without anything special. " * 4]
+    found = pc.repetition(text)
+    assert any(s.startswith("'enhance' 8 times") for s in found.style)
+    assert not any("problem" in s for s in found.style)  # two uses: under the minimum
+    assert not any("enhance" in s for s in pc.repetition(text, topic="Enhancing widgets").style)
+
+
+def test_llm_marker_words_have_a_lower_bar():
+    plain = "Plain words follow here without anything special. " * 40
+    found = pc.repetition(["We delve into it. Delving deeper, we delved again. " + plain])
+    assert any(s.startswith("'delve' 3 times") for s in found.markers)
+    assert pc.repetition(["We delve into it. Delving deeper. " + plain]).markers == []  # two uses: no pattern
+    assert any(s.startswith("'meticulous' 3 times") for s in pc.repetition(["A meticulous, meticulously meticulous plan. " + plain]).markers)
+    assert pc.repetition(["We delve into it. Delving deeper, we delved again. " + plain], topic="Delve: a tool").markers == []

@@ -76,7 +76,7 @@ Venue rules marked *not implemented* are excluded.
 
 43. ``bibliography.age`` — Share of references more than 10 years old
 44. ``bibliography.density`` — Citation density (citations per 1,000 words), reported for information
-45. ``bibliography.entries`` — BibTeX entries are complete, closed, and have unique keys
+45. ``bibliography.entries`` — BibTeX entries are complete, closed, and have unique keys, and no work is listed twice
 46. ``bibliography.self_citations`` — Self-citations within limits (at most 15, and at most 80% of references)
 47. ``bibliography.uncited`` — Every reference is cited, and every citation has a reference
 
@@ -574,8 +574,10 @@ files).
 **Confirmations and yes/no questions** (error)
    A ``boolean`` must read as yes or no. Accepted values are ``yes``/``no``,
    ``y``/``n``, ``true``/``false``, ``1``/``0``, and ``on``/``off``. A required
-   confirmation, such as an author-consent checkbox, must be *yes*. A plain
-   required yes/no question only needs an answer.
+   confirmation, such as an author-consent checkbox, must be *yes*. The
+   ``.sub`` marks these ``must be yes to submit``, and ``paperpush autofill
+   --confirm-attestations`` sets the blank ones to yes. A plain required yes/no
+   question only needs an answer.
 
 **Unknown fields** (error)
    A key that is not part of the venue's template is rejected. This is usually
@@ -1195,14 +1197,23 @@ looks for one kind of slip that a pattern finds with few false alarms:
 - **Repetitive word choice**, counted the way
   `word_counter <https://github.com/josephrich98/word_counter>`_ does: case
   folded, stop words dropped, and inflections grouped ("result", "results",
-  "resulted"). Four patterns are reported:
+  "resulted"). Five patterns are reported:
 
-  - a stock word -- a transition, intensifier, or stock phrase such as
-    "however", "notably", "novel", "robust", or "leverage" -- used at least 5
-    times and at least 2.5 times per 1,000 words;
-  - a word that is not in the title, abstract, or keywords making up more than
-    2.5% of the content words (with at least 25 uses). Words of the paper's
-    subject are expected to recur, which is why those are left out; with no
+  - a stock word -- a transition, intensifier, or stock verb or noun such as
+    "however", "notably", "robust", "leverage", "enhance", "problem", or
+    "challenge", counted with its inflections -- used at least 5 times and at
+    least 2.5 times per 1,000 words;
+  - a word that became much more common in papers after LLM writing tools
+    arrived and that ordinary prose rarely needs, such as "delve",
+    "showcase", "meticulous", "intricate", or "pivotal", used at least 3 times
+    (and at least 0.3 times per 1,000 words). The words come from the "style"
+    excess words of Kobak et al. (2025, *Science Advances* 11:eadt3813),
+    leaving out those with a plain technical sense ("elevated", "shedding").
+    Both kinds of word are skipped when the title, abstract, or keywords use
+    them;
+  - an adjective or adverb that is not in the title, abstract, or keywords
+    making up at least 0.5% of the content words (with at least 12 uses).
+    Words of the paper's subject are expected to recur, which is why those are left out; with no
     title or abstract to go by, this pattern is skipped;
   - the same content word three times in one sentence (again leaving out the
     title, abstract, and keyword words; sentences over 50 words, which are
@@ -1210,7 +1221,10 @@ looks for one kind of slip that a pattern finds with few false alarms:
   - four or more sentences in a row that open with the same word ("We ... We
     ... We ... We").
 
-  The passing note lists the five most frequent content words.
+  The passing note lists up to five of the most frequent adjectives and
+  adverbs, each used at least 5 times and at least 1.5 times per 1,000 words.
+  Plain words that carry no style ("final", "additional", "never", "many",
+  "high", "large") are left out.
 
 What is checked depends on the file. Word, Markdown, and plain-text files are
 read as written, so every check runs. LaTeX source is read with its math,
@@ -1256,10 +1270,18 @@ PDF's text included):
   spelled out in the abstract but not again in the main text, or used in the
   abstract without the definition the main text gives it; spelled out but
   never used; spelled out with two different meanings; or used three or more
-  times and never spelled out. Headings,
-  figure and table legends, and the title and author block before the abstract
-  are not first use. Acronyms every reader knows (DNA, RNA, USA, GPU, MRI,
-  PCR, ...), Roman numerals, and tokens with digits (gene names such as TP53)
+  times and never spelled out; or spelled out only in a figure or table legend.
+  The abstract and the main text are separate scopes, so defining an acronym
+  once in each is expected (a PDF's abstract is found even when its text runs
+  into the title and introduction). Each legend is read on its own: spelling an
+  acronym out again there is not a second definition, but it does not define
+  the acronym for the main text either, and a legend that uses an acronym
+  without spelling it out is not reported. A legend's glossary entry ("FA:
+  false alarms") counts as spelling the acronym out there. In a PDF, code
+  lines ("# ...", "key_name: ...") and table rows are not read as prose.
+  Headings, figure and table legends, and the title and author block before
+  the abstract are not first use. Acronyms every reader knows (DNA, RNA, USA,
+  GPU, MRI, PCR, LaTeX, ...), Roman numerals, and tokens with digits (gene names such as TP53)
   are skipped; a gene, unit, or name that is reported as never spelled out
   can be ignored.
 

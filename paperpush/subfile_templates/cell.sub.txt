@@ -111,10 +111,6 @@ code_url:
 #   options: Yes | No
 related_work: 
 
-# Submission declarations confirmed (boolean, REQUIRED)
-#   Confirms the standard Cell submission declarations (the paper conforms to all requirements, all contributors are listed, all authors have seen the manuscript, and status updates will be shared). The runner checks these boxes only when this is yes.
-declarations_confirmed: 
-
 # ----------------------------------------------------------------------
 # Additional information
 # ----------------------------------------------------------------------
@@ -123,5 +119,13 @@ declarations_confirmed:
 #   On the Publishing Options step shown after 'Build PDF for Approval', Cell offers an open-access publishing model that carries an article-publishing charge. Choose 'Yes' to select open access or 'No' to keep the standard (subscription) model. The runner opens the Publishing Options popup and applies this choice best-effort.
 #   options: Yes | No
 open_access: 
+
+# ----------------------------------------------------------------------
+# Attestations
+# ----------------------------------------------------------------------
+
+# Submission declarations confirmed (boolean, REQUIRED; must be yes to submit)
+#   Confirms the standard Cell submission declarations (the paper conforms to all requirements, all contributors are listed, all authors have seen the manuscript, and status updates will be shared). The runner checks these boxes only when this is yes.
+declarations_confirmed: 
 
 # vim: set filetype=yaml :

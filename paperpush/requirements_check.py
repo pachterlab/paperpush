@@ -517,6 +517,37 @@ def _manuscript_abstract_length_issues(venue: Venue, reqs: ManuscriptRequirement
     return []
 
 
+def _manuscript_title_length_issues(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
+    """The title length limits applied to the manuscript's own title.
+
+    Used when the .sub has no title to check (validating files without a
+    .sub, or before autofill), as for the abstract.
+    """
+    rules = reqs.title_page
+    if (rules.title_max_characters is None and rules.title_max_words is None) or any(values.get(f.id, "").strip() for f in _fields_for(venue, "title")):
+        return []
+    from . import document
+    from .consistency import manuscript_title
+
+    files = manuscript_files(venue, values)
+    if not files:
+        return []
+    field, path = files[0]
+    try:
+        title = manuscript_title(document.get(path))
+    except Exception:  # noqa: BLE001 -- an unreadable manuscript is reported elsewhere
+        return []
+    title = re.sub(r"\s+", " ", title or "").strip()
+    if not title:
+        return []
+    issues: list[Issue] = []
+    if rules.title_max_characters is not None and len(title) > rules.title_max_characters:
+        issues.append(Issue(ERROR, field.id, f"{path.name}: the title is {len(title)} characters, over the {rules.title_max_characters}-character limit in the author guidelines ('{_short(title)}')"))
+    if rules.title_max_words is not None and len(title.split()) > rules.title_max_words:
+        issues.append(Issue(ERROR, field.id, f"{path.name}: the title is {len(title.split())} words, over the {rules.title_max_words}-word limit in the author guidelines ('{_short(title)}')"))
+    return issues
+
+
 def _text_field_issues(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
     """Abstract, title, running title, and keyword limits read from the .sub.
 
@@ -548,6 +579,7 @@ def _text_field_issues(venue: Venue, reqs: ManuscriptRequirements, values: dict[
             issues.append(Issue(ERROR, field.id, f"{field.label}: {len(raw)} characters exceeds the {rules.title_max_characters}-character limit in the author guidelines"))
         if rules.title_max_words is not None and field.word_count is None and len(raw.split()) > rules.title_max_words:
             issues.append(Issue(ERROR, field.id, f"{field.label}: {len(raw.split())} words exceeds the {rules.title_max_words}-word limit in the author guidelines"))
+    issues += _manuscript_title_length_issues(venue, reqs, values)
     for field in _fields_for(venue, "running_title"):
         raw = values.get(field.id, "").strip()
         limit = reqs.title_page.running_title_max_characters

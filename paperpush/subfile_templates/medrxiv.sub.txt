@@ -100,10 +100,6 @@ data_availability: |
 data_availability_links: |
   
 
-# All authors consent to deposit and to the chosen license (boolean, REQUIRED)
-#   Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.
-author_consent: 
-
 # Does the study use human data, samples, or involve human subjects? (choice, REQUIRED)
 #   medRxiv screening question. Answer 'Yes' if the work uses human data/samples or involves human subjects (including public datasets, surveys, patient records, or clinical protocols); otherwise 'No'.
 #   options: Yes | No
@@ -145,5 +141,13 @@ transfer_to_journal:
 # Destination journal for B2J (text, optional)
 #   Only needed when transfer_to_journal is yes.
 journal_destination: 
+
+# ----------------------------------------------------------------------
+# Attestations
+# ----------------------------------------------------------------------
+
+# All authors consent to deposit and to the chosen license (boolean, REQUIRED; must be yes to submit)
+#   Confirms every author has agreed to deposit the manuscript on bioRxiv under the selected license.
+author_consent: 
 
 # vim: set filetype=yaml :

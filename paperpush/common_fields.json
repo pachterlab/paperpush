@@ -65,10 +65,7 @@
     "related_work",
     "dual_publication",
     "dual_publication_statement",
-    "preprint_doi",
-    "author_consent",
-    "declarations_confirmed",
-    "agree_terms"
+    "preprint_doi"
   ],
   "additional": [
     "comments_to_editor",
@@ -77,5 +74,10 @@
     "license",
     "transfer_to_journal",
     "journal_destination"
+  ],
+  "attestations": [
+    "author_consent",
+    "declarations_confirmed",
+    "agree_terms"
   ]
 }

@@ -209,7 +209,8 @@ _SOURCE_EDITS = [
     (re.compile(r"\\(?:setlength|addtolength)\s*\{?\s*\\(baselineskip|parskip|abovedisplayskip|belowdisplayskip|textfloatsep|floatsep|intextsep|abovecaptionskip|belowcaptionskip)\b"), "changes \\{0}"),
     (re.compile(r"\\usepackage\s*(?:\[[^\]]*\])?\s*\{\s*(?:savetrees|titlesec|fullpage|a4wide)\s*\}"), "loads a space-saving package"),
     # Document-wide only: \fontsize and \small inside a table or caption are routine.
-    (re.compile(r"\\begin\s*\{\s*document\s*\}\s*\\(?:small|footnotesize|scriptsize)\b"), "shrinks the body font"),
+    (re.compile(r"(?:\\begin\s*\{\s*document\s*\}|\\AtBeginDocument\s*\{)\s*\\(?:small|footnotesize|scriptsize)\b"), "shrinks the body font"),
+    (re.compile(r"(?:\\begin\s*\{\s*document\s*\}|\\AtBeginDocument\s*\{)\s*\\fontsize\b"), "sets the body font size with \\fontsize"),
 ]
 _NEGATIVE_VSPACE = re.compile(r"\\vspace\*?\s*\{\s*-")
 # Negative \vspace this many times or more is reported (a few are routine).

@@ -75,14 +75,14 @@ authors: |
   
 
 # ----------------------------------------------------------------------
-# Declarations
+# Attestations
 # ----------------------------------------------------------------------
 
-# We authorize the sharing of all author emails with Program Chairs. (boolean, REQUIRED)
+# We authorize the sharing of all author emails with Program Chairs. (boolean, REQUIRED; must be yes to submit)
 #   Confirms you are aware that all author emails will be shared with the Program Chairs.
 email_sharing: 
 
-# We authorize the release of our submission and author names to the public in the event of acceptance. (boolean, REQUIRED)
+# We authorize the release of our submission and author names to the public in the event of acceptance. (boolean, REQUIRED; must be yes to submit)
 #   Confirms you are aware that accepted submissions, with their author names, will be released to the public after the conference.
 data_release: 
 

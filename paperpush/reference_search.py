@@ -119,6 +119,18 @@ _ARXIV_ID = r"(\d{4}\.\d{4,5}|[a-z][a-z.-]+(?:\.[A-Z]{2})?/\d{7})(?:v(\d+))?"
 _ARXIV_IN_TEXT = re.compile(r"(?:arxiv\s*[:.]?\s*(?:abs/)?|arxiv\.org/(?:abs|pdf)/|10\.48550/arxiv\.)" + _ARXIV_ID, re.IGNORECASE)
 _ARXIV_BARE = re.compile(r"^\s*" + _ARXIV_ID + r"\s*$", re.IGNORECASE)
 _PREPRINT_DOI_PREFIXES = ("10.1101/",)  # bioRxiv and medRxiv
+# A venue that is the preprint server itself: "arXiv preprint arXiv:...", "CoRR", "ArXiv", "arXiv e-prints".
+_PREPRINT_VENUE = re.compile(r"\barxiv\b|\bcorr\b|\bpreprint\b|\be-?prints?\b", re.IGNORECASE)
+# Semantic Scholar's and DBLP's exports put the id in the volume: journal={ArXiv}, volume={abs/1810.04805}.
+_ARXIV_VOLUME = re.compile(r"^\s*abs/" + _ARXIV_ID + r"\s*$", re.IGNORECASE)
+# At most this many arXiv preprints per run are searched for a published version.
+MAX_PUBLISHED_SEARCHES = 30
+# The registered types a preprint's peer-reviewed version takes.
+_PUBLISHED_TYPES = {"journal-article", "proceedings-article", "book-chapter"}
+# A published version appears at most this many years before / after the preprint.
+_PUBLISHED_YEARS_BEFORE, _PUBLISHED_YEARS_AFTER = 1, 5
+# The published version found for each arXiv id this process (None: Crossref answered, and has none).
+_PUBLISHED_CACHE: dict[str, dict | None] = {}
 
 _ATOM = "{http://www.w3.org/2005/Atom}"
 _ARXIV_NS = "{http://arxiv.org/schemas/atom}"
@@ -281,7 +293,7 @@ def _services() -> _Services:
 
 # --- registry queries -------------------------------------------------------------------
 
-_CROSSREF_FIELDS = "DOI,title,author,issued,type,relation,container-title,updated-by,update-to"
+_CROSSREF_FIELDS = "DOI,title,author,issued,type,relation,container-title,short-container-title,updated-by,update-to"
 
 
 def crossref_search(query: str, service: _Service) -> list[dict] | None:
@@ -408,6 +420,10 @@ def arxiv_id_of(entry: Entry) -> tuple[str, int | None]:
     eprint = f.get("eprint", "")
     prefix = (f.get("archiveprefix", "") or f.get("eprinttype", "")).lower()
     m = _ARXIV_BARE.match(_strip_latex(eprint)) if eprint and prefix in ("arxiv", "") else None
+    # Mendeley writes arxivId = {1206.4358}; Semantic Scholar journal = {ArXiv}, volume = {abs/1810.04805}.
+    m = m or (_ARXIV_BARE.match(_strip_latex(f.get("arxivid", ""))) if f.get("arxivid") else None)
+    venue = f.get("journal", "") or f.get("journaltitle", "")
+    m = m or (_ARXIV_VOLUME.match(_strip_latex(f.get("volume", ""))) if re.search(r"arxiv|corr", venue, re.IGNORECASE) else None)
     if m:
         return _arxiv_key(m.group(1)), int(m.group(2)) if m.group(2) else None
     for name in ("doi", "eprint", "journal", "url", "note", "howpublished", "journaltitle", "booktitle", "publisher"):
@@ -712,6 +728,82 @@ def _is_preprint(record: dict) -> bool:
     return kind in ("posted-content", "preprint") or str(record.get("subtype", "")).lower() == "preprint"
 
 
+def _cites_as_preprint(ref: Reference) -> bool:
+    """Whether a reference citing an arXiv id cites it as the preprint, not as a published work that also gives the id."""
+    if ref.doi and not ref.doi.startswith("10.48550/"):
+        return False  # the journal DOI is there: the entry already cites the article
+    if ref.text:
+        return bool(_PREPRINT_VENUE.search(ref.text))
+    return not ref.venue or bool(_PREPRINT_VENUE.search(ref.venue))
+
+
+def _venue_named_in(text: str, record: dict) -> bool:
+    """Whether reference-list ``text`` already names ``record``'s venue (its full name, short name, or acronym)."""
+    words = set(_normalize_text(text).split())
+    names = [str(n) for key in ("container-title", "short-container-title") for n in (record.get(key) or []) if n]
+    for name in names:
+        significant = _significant_words(name)
+        if significant and sum(1 for w in significant if w in words) / len(significant) >= 0.8:
+            return True
+        for acronym in re.findall(r"\(([A-Z][A-Za-z]{1,9})\)|\b([A-Z]{3,9})\b", name):
+            token = (acronym[0] or acronym[1]).lower()
+            if token and token in words:
+                return True
+    return False
+
+
+def _search_published(arxiv_id: str, title: str, author: str, year: int | None, service: _Service) -> dict | None:
+    """Crossref's record of the published version of a preprint (see :func:`published_version`), cached by arXiv id."""
+    if arxiv_id in _PUBLISHED_CACHE:
+        return _PUBLISHED_CACHE[arxiv_id]
+    if not title or len(_normalize_text(title).split()) < MIN_TITLE_WORDS or not author or not service.available:
+        return None
+    items = crossref_search(" ".join(x for x in (title, author, str(year or "")) if x), service)
+    if items is None:
+        return None  # not answered: not cached, so a later run asks again
+    want = _family(author)
+    ranked = []
+    for item in items:
+        doi = normalize_doi(str(item.get("DOI") or ""))
+        kind = str(item.get("type", "")).lower()
+        if not doi or doi.startswith(("10.48550/",) + _PREPRINT_DOI_PREFIXES) or kind not in _PUBLISHED_TYPES or _is_preprint(item) or not _is_candidate(item):
+            continue
+        score = title_similarity(title, _title_of(item))
+        if score < TITLE_MATCH_RATIO or _family(_first_author_of(item)) != want:
+            continue
+        got = _year_value(_year_of(item))
+        if year and got and not (year - _PUBLISHED_YEARS_BEFORE <= got <= year + _PUBLISHED_YEARS_AFTER):
+            continue
+        # The closest title first ("Invited Talk: U-Net ..." is a talk about the paper), then the nearest year.
+        ranked.append((-round(score, 3), abs(got - year) if got and year else 0, len(ranked), item))
+    found = min(ranked)[3] if ranked else None
+    _PUBLISHED_CACHE[arxiv_id] = found
+    return found
+
+
+def published_version(ref: Reference, arxiv_record: dict | None, service: _Service) -> dict | None:
+    """Crossref's record of the peer-reviewed version of the arXiv preprint ``ref`` cites, or None.
+
+    arXiv's own record names a journal DOI only when the authors added one, and
+    most never do (U-Net, ResNet, and BERT all lack it), so the preprint's title
+    and first author are searched in Crossref. A journal article, conference
+    paper, or book chapter with the same title (at least
+    :data:`TITLE_MATCH_RATIO` similar), the same first author, and a year close
+    to the preprint's is its published version. Other preprint servers'
+    copies, and a registry that does not answer, give None. So does a
+    reference-list entry that already names the venue ("In CVPR, 2016.
+    arXiv:1512.03385"), which cites the published version with its preprint.
+    """
+    rec = arxiv_record or {}
+    title = rec.get("title") or ref.title
+    author = _first_author_of(rec) if rec.get("author") else ref.author
+    year = _year_value(_year_of(rec)) if rec.get("issued") else None
+    found = _search_published(ref.arxiv_id, title, author, year or _year_value(ref.year), service)
+    if found is None or (ref.text and _venue_named_in(ref.text, found)):
+        return None
+    return found
+
+
 def version_findings(
     cited: list[Cited],
     arxiv_refs: list[Reference],
@@ -754,12 +846,20 @@ def version_findings(
     checked = set(arxiv_checked)
     missing = sorted({r.arxiv_id for r in arxiv_refs} - checked)
     if missing and svc.arxiv.available:
-        records.update(arxiv_lookup(missing, svc.arxiv) or {})
+        answer = arxiv_lookup(missing, svc.arxiv)
+        if answer is not None:
+            records.update(answer)
+            checked |= set(missing)
+    searches = 0
     for r in arxiv_refs:
         rec = records.get(r.arxiv_id)
         # An entry with the journal DOI and an eprint field (an ADS export) already cites the article.
-        if rec is None or r.label in done or (r.doi and not r.doi.startswith("10.48550/")):
+        if r.label in done or (r.doi and not r.doi.startswith("10.48550/")):
             continue
+        # An id arXiv was asked about and does not know is reported by the search; one it was not asked about (arXiv down) can still be searched by title.
+        if rec is None and r.arxiv_id in checked:
+            continue
+        rec = rec or {}
         journal = rec.get("journal_doi") or ""
         if journal:
             published(r.label, r.where, f"arXiv:{r.arxiv_id}", journal)
@@ -769,6 +869,19 @@ def version_findings(
             findings.append(Finding(r.where, "older preprint version", f"{r.label} cites arXiv:{r.arxiv_id}v{r.arxiv_version}, but the latest version is v{latest}; cite the latest version (or drop the version number)"))
         elif rec.get("journal_ref") and (not r.venue or "arxiv" in r.venue.lower()) and not r.text:
             findings.append(Finding(r.where, "preprint has been published", f'{r.label} cites arXiv:{r.arxiv_id}, which arXiv lists as published in "{rec["journal_ref"]}"; cite the published version if it is the same work'))
+        elif _cites_as_preprint(r) and (r.arxiv_id in _PUBLISHED_CACHE or searches < MAX_PUBLISHED_SEARCHES):
+            searches += r.arxiv_id not in _PUBLISHED_CACHE
+            found = published_version(r, rec or None, svc.crossref)
+            if found:
+                doi = normalize_doi(str(found["DOI"]))
+                venue = next((str(v) for v in found.get("container-title") or [] if v), "")
+                year = _year_of(found)
+                where = (f" in {venue}" if venue else "") + (f" ({year})" if year else "")
+                if doi in all_dois:
+                    findings.append(Finding(r.where, "preprint and article both cited", f"{r.label} cites the preprint arXiv:{r.arxiv_id}, and the bibliography also cites its published version (DOI {doi}); the same work is listed twice. Keep only the published version"))
+                else:
+                    findings.append(Finding(r.where, "preprint has been published", f"{r.label} cites the preprint arXiv:{r.arxiv_id}, which has since been published{where} (DOI {doi}); cite the peer-reviewed version instead"))
+                done.add(r.label)
     return findings
 
 

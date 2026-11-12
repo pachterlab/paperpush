@@ -73,14 +73,6 @@ organizations: |
   
 
 # ----------------------------------------------------------------------
-# Declarations
-# ----------------------------------------------------------------------
-
-# I have the right to publish this content on alphaXiv (boolean, REQUIRED)
-#   You must confirm this yourself before the portal allows submission.
-agree_terms: 
-
-# ----------------------------------------------------------------------
 # Additional information
 # ----------------------------------------------------------------------
 
@@ -88,5 +80,13 @@ agree_terms:
 #   Optional. Shown as the BibTeX citation on the publication page. Left empty, the entry alphaXiv generates is kept.
 bibtex: |
   
+
+# ----------------------------------------------------------------------
+# Attestations
+# ----------------------------------------------------------------------
+
+# I have the right to publish this content on alphaXiv (boolean, REQUIRED; must be yes to submit)
+#   You must confirm this yourself before the portal allows submission.
+agree_terms: 
 
 # vim: set filetype=yaml :

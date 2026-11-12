@@ -65,10 +65,10 @@ authors: |
 handling_editor: 
 
 # ----------------------------------------------------------------------
-# Declarations
+# Attestations
 # ----------------------------------------------------------------------
 
-# EditFlow author agreement accepted (boolean, REQUIRED)
+# EditFlow author agreement accepted (boolean, REQUIRED; must be yes to submit)
 #   Author-only attestation on EditFlow Step 0. Set to yes only after every coauthor has authorized the submission and you personally confirm the article is a genuinely new Combinatorica submission, is not under consideration or published elsewhere, is not an uninvited resubmission of a rejected article, and every author has their own valid email address. Paperpush never autofills this consent.
 author_agreement: 
 
