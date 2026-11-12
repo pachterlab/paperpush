@@ -668,3 +668,4 @@ body.add-venue #crumb { margin-right: auto; }
   .nav-progress span { transition: none; }
   .spinner { animation-duration: 2.4s; }
 }
+.accept-types { margin: 4px 0 0; }

@@ -1,4 +1,9 @@
 {
+  "https://2027.naacl.org/calls/system_demonstration/": {
+    "chars": 9910,
+    "recorded": "2026-11-11",
+    "sha256": "d9710646dff4ebf0e5e3972649b8f08294b429ddc6ba49f365eb91e47cb888c6"
+  },
   "https://aclrollingreview.org/authorchecklist": {
     "chars": 10657,
     "recorded": "2026-10-23",

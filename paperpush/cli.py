@@ -1798,7 +1798,9 @@ def _cmd_submit(args: argparse.Namespace) -> int:
                 if answer not in ("y", "yes"):
                     print("Not submitted.", file=sys.stderr)
                     return 1
-    if venue_def is not None and getattr(args, "skip_validate", False):
+    if venue_def is not None and getattr(args, "_validated", False):
+        logger.info("submit: %s was validated by prepare-submission just now", args.subfile)
+    elif venue_def is not None and getattr(args, "skip_validate", False):
         logger.info("submit: --skip-validate given; not validating %s", args.subfile)
         print(f"warning: --skip-validate given; submitting {args.subfile} without running validate.", file=sys.stderr)
     elif venue_def is not None:
@@ -1886,6 +1888,223 @@ def _cmd_submit(args: argparse.Namespace) -> int:
         _print_recovery_report_hint(handler)
     logger.info("submit: %s runner returned", venue)
     return 0
+
+
+def _ask(question: str) -> bool:
+    """Ask a yes/no question on the terminal; anything but y/yes (or Ctrl-C) is no."""
+    try:
+        return input(f"{question} [y/N] ").strip().lower() in ("y", "yes")
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return False
+
+
+# More warnings than this and prepare-submission asks before going on (as the
+# paperpush-prepare-submission skill offers paperpush-fix).
+_PREPARE_MAX_WARNINGS = 5
+
+
+def _cmd_prepare_submission(args: argparse.Namespace) -> int:
+    """Run subfile, autofill (API engine), validate, login, and submit in one go.
+
+    The CLI counterpart of the paperpush-prepare-submission skill, for authors
+    without an agent. Resolves the .sub (``--sub``, else ``<venue>.sub.txt`` in
+    the manuscript directory, else a new one there), autofills it with an LLM
+    API (a .sub that already exists is left as it is unless ``--refill``, so a
+    re-run keeps the author's fixes), pauses for the author to review the
+    values, validates, and -- when nothing blocks -- checks the login and runs
+    ``submit``, which stops before the final submit button.
+    """
+    from . import report as report_mod
+    from . import venues
+    from .autofill import AutofillApiError, resolve_provider
+    from .subfile import load
+
+    # The venue may come last, after the -p paths ('-p DIR biorxiv'): -p takes
+    # every word up to the next flag, so take it back from there.
+    if args.venue is None:
+        last = args.inputs[-1] if len(args.inputs) > 1 else None
+        if last is None or Path(last).expanduser().exists():
+            print("error: no venue given, e.g. 'paperpush prepare-submission biorxiv -p MANUSCRIPT_DIR'", file=sys.stderr)
+            return 2
+        args.venue = last
+        args.inputs = args.inputs[:-1]
+    try:
+        venue = get_venue(args.venue)
+    except KeyError:
+        print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
+        print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
+        return 2
+    if venue.is_general:
+        print("error: prepare-submission needs a venue, not 'general'; for the general checks run 'paperpush subfile general' and 'paperpush validate'", file=sys.stderr)
+        return 2
+    if not venue.supports_validate:
+        print(f"error: paperpush has no author guidelines for {venue.slug}, so it cannot validate a submission to it. Run 'paperpush venues' to see supported venues.", file=sys.stderr)
+        return 2
+    submit_too = not args.no_submit
+    if submit_too and not venue.supports_submit:
+        print(f"note: {_validate_only_message(venue)} Stopping after validation.")
+        submit_too = False
+    interactive = sys.stdin.isatty()
+    try:
+        check_flags = _check_flags(args)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    checked = _check_autofill_inputs(args.inputs)
+    if checked is None:
+        return 1
+    input_dirs, input_files = checked
+    if args.sub:
+        sub_path = find_subfile(with_subfile_suffix(Path(args.sub).expanduser()))
+    else:
+        home = input_dirs[0] if input_dirs else input_files[0].parent
+        sub_path = find_subfile(home / default_filename(venue))
+
+    reuse = sub_path.exists() and not args.overwrite
+    run_autofill = not reuse or args.refill
+    # Fail on a missing API key now, not after the .sub has been written.
+    provider = None
+    if run_autofill or args.ai_checks:
+        try:
+            provider = resolve_provider(args.provider, alternative="use the paperpush-prepare-submission skill in Claude Code, which needs no key")
+        except AutofillApiError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+
+    # 1. The .sub.
+    print(f"== 1/5  Submission file ({venue.slug})")
+    if reuse:
+        try:
+            existing = load(str(sub_path)).venue
+        except OSError as exc:
+            print(f"error: cannot read {sub_path}: {exc}", file=sys.stderr)
+            return 1
+        if existing and existing.lower() != venue.slug.lower():
+            print(f"error: {sub_path} is for {existing}, not {venue.slug}; pass --sub to write another file", file=sys.stderr)
+            return 1
+        print(f"Using the existing {sub_path}.")
+    else:
+        rc = _cmd_subfile(argparse.Namespace(venue=venue.slug, output=str(sub_path), fill_defaults=True, overwrite=args.overwrite, venue_order=False, web=False))
+        if rc:
+            return rc
+
+    # 2. Autofill.
+    print("\n== 2/5  Autofill")
+    if run_autofill:
+        rc = _cmd_autofill(
+            argparse.Namespace(
+                subfile=str(sub_path),
+                inputs=args.inputs,
+                engine="api",
+                values=None,
+                manuscript=args.manuscript,
+                title_page=args.title_page,
+                supplement=args.supplement,
+                provider=provider,
+                model=args.model,
+                min_confidence="low",
+                output=None,
+                overwrite=False,
+                dry_run=False,
+                web=False,
+                _subfile_from_inputs=None,
+                _autofill_parser=None,
+            )
+        )
+        if rc:
+            return rc
+    else:
+        print(f"Skipped: {sub_path} already existed, so its values are kept (pass --refill to autofill it again, which replaces the values the model extracts).")
+
+    # The values came from a model: let the author look before anything checks or sends them.
+    if not args.yes and interactive:
+        print(f"\nReview the values in {sub_path} (in your editor, or with 'paperpush web {shlex.quote(str(sub_path))}') and save any changes.")
+        if not _ask("Validate it now?"):
+            print(f"Stopped. Run 'paperpush prepare-submission {venue.slug} -p ...' again to carry on; the .sub is kept.")
+            return 0
+
+    # 3. Validate.
+    print("\n== 3/5  Validate")
+    try:
+        subfile = load(str(sub_path))
+    except OSError as exc:
+        print(f"error: cannot read {sub_path}: {exc}", file=sys.stderr)
+        return 1
+    ai = None
+    if args.ai_checks:
+        from .ai_validate import AiOptions
+
+        ai = AiOptions.api(provider=provider, model=args.model)
+    with _validate_progress_bar() as progress:
+        result = validate_report_for(subfile, venue, str(sub_path), ai=ai, progress=progress, **check_flags)
+    result.command = shlex.join(["paperpush", *getattr(args, "raw_argv", sys.argv[1:])])
+    result.cwd = os.getcwd()
+    report_mod.print_report(result)
+    fix_hint = f"Fix them (the paperpush-fix skill can do much of it), then run 'paperpush validate {shlex.quote(str(sub_path))}', or this command again."
+    if result.errors:
+        print(f"\n{len(result.errors)} error(s) block the submission. {fix_hint}", file=sys.stderr)
+        return 1
+    if not args.ai_checks and result.ai_tasks:
+        print(f"\nnote: {len(result.ai_tasks)} check(s) need AI and were not run; add --ai-checks to run them through the {provider or 'LLM'} API, or use the paperpush-validate skill.")
+    if not submit_too:
+        print(f"\n{sub_path} passed validation for {venue.slug}.")
+        return 0
+    if len(result.warnings) > _PREPARE_MAX_WARNINGS and not args.yes:
+        print(f"\n{len(result.warnings)} warnings. {fix_hint}")
+        if not interactive or not _ask("Go on to the portal anyway?"):
+            print("Stopped before the portal." + ("" if interactive else " Pass --yes to go on despite the warnings."))
+            return 1
+
+    # 4. Login.
+    print("\n== 4/5  Login")
+    cred_slug = venues.submission_base(venue.slug)
+    if not venues.login_required(cred_slug):
+        print(f"{venue.slug}'s portal does not need a login.")
+    elif credentials.get_credential(cred_slug) is None:
+        if not interactive:
+            print(f"error: not logged in to {cred_slug}. Run 'paperpush login {cred_slug}' in a terminal, then run this again.", file=sys.stderr)
+            return 1
+        print(f"Not logged in to {cred_slug}; starting 'paperpush login {cred_slug}' (Ctrl-C to skip and sign in by hand in the browser).")
+        try:
+            _cmd_login(_login_args(cred_slug))
+        except (KeyboardInterrupt, EOFError):
+            print()
+    elif _check_login(get_venue(cred_slug), args) != 0:
+        if not interactive:
+            return 1
+        if _ask(f"Sign in to {cred_slug} again now?"):
+            try:
+                _cmd_login(_login_args(cred_slug))
+            except (KeyboardInterrupt, EOFError):
+                print()
+
+    # 5. Submit (validated above, so submit does not run the checks again).
+    print("\n== 5/5  Submit")
+    if not args.yes and not interactive:
+        print("Stopping before the portal: pass --yes to open it without a terminal to confirm in.", file=sys.stderr)
+        return 1
+    return _cmd_submit(
+        argparse.Namespace(
+            subfile=str(sub_path),
+            headless=False,
+            debug=False,
+            new_session=False,
+            yes=args.yes,
+            skip_validate=True,
+            timeout=args.timeout,
+            close_on_failure=False,
+            recover=args.recover,
+            ai=False,
+            provider=provider,
+            model=args.model,
+            recover_dir=None,
+            cdp_port=None,
+            enable_network_checks=False,
+            _validated=True,
+        )
+    )
 
 
 def _print_recovery_report_hint(handler) -> None:
@@ -2896,7 +3115,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # metavar lists only the public commands; the internal 'schema' command is
     # registered below but deliberately left out so it does not appear in --help.
-    sub = parser.add_subparsers(dest="command", metavar="{venues,subfile,options,autofill,validate,requirements,login,submit,codegen,web,pick-venue,find-reviewers,add-venue,update-venues,install-skills}")
+    sub = parser.add_subparsers(dest="command", metavar="{venues,subfile,options,autofill,validate,requirements,login,submit,prepare-submission,codegen,web,pick-venue,find-reviewers,add-venue,update-venues,install-skills}")
 
     p_venues = sub.add_parser(
         "venues",
@@ -3179,6 +3398,32 @@ def build_parser() -> argparse.ArgumentParser:
     submit_checks.add_argument("--enable-network-checks", action="store_true", help="also run the link, reference, and OpenReview lookups before opening the browser")
     p_submit.set_defaults(func=_cmd_submit)
 
+    p_prepare = sub.add_parser(
+        "prepare-submission",
+        aliases=["prepare"],
+        parents=[verbosity],
+        help="subfile, autofill (LLM API), validate, login, and submit in one command",
+        description="Prepare and send a manuscript in one command: make the .sub (or reuse <venue>.sub.txt in the manuscript directory), autofill it through an LLM API, pause for you to review the values, validate, then check the login and fill in the portal, stopping before the final submit button. "
+        "It stops at the first step that fails: on any validation error, and (unless --yes) when there are more than 5 warnings. An existing .sub is not autofilled again unless --refill, so running it again after fixing the .sub keeps your fixes.",
+    )
+    p_prepare.add_argument("venue", nargs="?", help="venue slug, e.g. biorxiv; may also come last, after the -p paths ('paperpush venues' lists them)")
+    p_prepare.add_argument("-p", "--path", dest="inputs", nargs="+", required=True, metavar="PATH", help="(required) the manuscript directory and/or document files, as for 'autofill -p'")
+    p_prepare.add_argument("--sub", metavar="FILE", help="the .sub file to use or create (default: VENUE.sub.txt in the manuscript directory)")
+    p_prepare.add_argument("--overwrite", action="store_true", help="start from a fresh template even if the .sub exists")
+    p_prepare.add_argument("--refill", action="store_true", help="autofill an existing .sub again (replaces the values the model extracts)")
+    p_prepare.add_argument("--manuscript", metavar="FILE", help="the manuscript file; inferred from the directory if omitted")
+    p_prepare.add_argument("--title-page", dest="title_page", metavar="FILE", help="a standalone title page, if separate")
+    p_prepare.add_argument("--supplement", metavar="FILE", help="a supplementary materials file, if any")
+    p_prepare.add_argument("--provider", choices=["anthropic", "openai", "google"], help="LLM provider; defaults to the first of anthropic, openai, google whose API key is set")
+    p_prepare.add_argument("--model", help="model to use (default: the provider's default, as for autofill)")
+    p_prepare.add_argument("--ai-checks", dest="ai_checks", action="store_true", help="also run validate's AI checks through the API (as 'validate --ai'); costs more API calls")
+    p_prepare.add_argument("--no-submit", dest="no_submit", action="store_true", help="stop after validation")
+    p_prepare.add_argument("-y", "--yes", action="store_true", help="do not stop to ask: skip the review pause, go on despite more than 5 warnings, and open the portal without a terminal")
+    p_prepare.add_argument("--recover", choices=["off", "by-hand", "ai"], default=None, help="what submit does when a portal step fails (as for 'submit --recover')")
+    p_prepare.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, metavar="SECONDS", help=f"browser wait cap for login and submit (default: {DEFAULT_TIMEOUT_SECONDS:g}s; 0 waits forever)")
+    _add_check_options(p_prepare, documented=False)
+    p_prepare.set_defaults(func=_cmd_prepare_submission, check_anonymous=None, initial_submission=False)
+
     p_codegen = sub.add_parser("codegen", parents=[verbosity], help="record a venue's submission wizard as runner code")
     p_codegen.add_argument("url", nargs="?", help="page to start on (default: the venue's portal, else a blank page)")
     p_codegen.add_argument("--venue", help="venue slug: its fields become the variables and its saved sign-in is reused")
@@ -3369,7 +3614,7 @@ def _expand_check_flags(argv: list[str]) -> list[str]:
 
     argparse needs its options declared up front, and NAME is any check ID.
     """
-    if not {"validate", "submit"} & set(argv):
+    if not {"validate", "submit", "prepare-submission", "prepare"} & set(argv):
         return argv
     out = []
     for arg in argv:

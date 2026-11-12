@@ -1039,5 +1039,35 @@
       "subcategories": "cs.AI, cs.LG",
       "agree_terms": "yes"
     }
+  },
+  "naacl_2027_demo.sub.txt": {
+    "venue": "naacl_2027_demo",
+    "fields": {
+      "title": "PAPERPUSH TEST - DO NOT REVIEW",
+      "authors": " | Joseph Rich | caltech.edu, usc.edu\n | Lior Pachter | caltech.edu\n",
+      "keywords": "submission tools, demonstration, reproducibility",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "pdf_file": "tests/manuscript_files/naacl_2027_demo/manuscript.pdf",
+      "demo_video_url": "https://youtu.be/hn1RNcvHuYw",
+      "live_demo_url": "https://github.com/pachterlab/paperpush",
+      "email_sharing": "yes",
+      "data_release": "yes"
+    }
+  },
+  "naacl_2027_demo_optional.sub.txt": {
+    "venue": "naacl_2027_demo",
+    "fields": {
+      "title": "PAPERPUSH TEST - DO NOT REVIEW",
+      "authors": " | Joseph Rich | caltech.edu, usc.edu\n | Lior Pachter | caltech.edu\n",
+      "keywords": "submission tools, demonstration, reproducibility",
+      "abstract": "Abstract goes here. It's a really good abstract.",
+      "tldr": "A one-sentence summary of the demo.",
+      "pdf_file": "tests/manuscript_files/naacl_2027_demo/manuscript.pdf",
+      "demo_video_url": "https://youtu.be/hn1RNcvHuYw",
+      "live_demo_url": "https://github.com/pachterlab/paperpush",
+      "ethics_statement": "The system handles only manuscripts its users supply and sends nothing without their review.",
+      "email_sharing": "yes",
+      "data_release": "yes"
+    }
   }
 }

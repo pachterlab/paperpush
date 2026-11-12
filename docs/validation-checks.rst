@@ -184,7 +184,7 @@ Venue rules marked *not implemented* are excluded.
 120. ``integrity.dois`` — Reference DOIs match the works they cite
 121. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
 122. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
-123. ``integrity.links`` — Links cited in the files are reachable
+123. ``integrity.links`` — Links cited in the files and URL fields are reachable
 124. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
 125. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
 126. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint

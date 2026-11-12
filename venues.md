@@ -1,7 +1,7 @@
 ## Supported venues
 
 <!-- BEGIN SUPPORTED VENUES -->
-_77 supported venues (auto-generated from `paperpush/venues.json`)._
+_78 supported venues (auto-generated from `paperpush/venues.json`)._
 
 | Slug | Venue | Keywords | Venue type | Validate | Submit | Submission platform | Description | Submit walkthrough |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -47,6 +47,7 @@ _77 supported venues (auto-generated from `paperpush/venues.json`)._
 | `medical_image_analysis` | [Medical Image Analysis](https://www.sciencedirect.com/journal/medical-image-analysis) | radiology, computer vision, machine learning | Journal | yes | no | - | Official journal of the MICCAI Society publishing original research on the analysis and use of biomedical images, including segmentation, registration, computer-aided diagnosis, and image-guided intervention. | ➖ |
 | `medrxiv` | [medRxiv](https://www.medrxiv.org) | medicine | Preprint | yes | yes | openRxiv | Free online archive and distribution server for complete but unpublished manuscripts (preprints) in the medical, clinical, and related health sciences. | ✅ 2026-11-03 |
 | `molecular_cell` | [Molecular Cell](https://www.cell.com/molecular-cell) | biology | Journal | yes | no | - | Cell Press journal in the life and medical sciences. | ➖ |
+| `naacl_2027_demo` | [NAACL 2027 Demo Track](https://2027.naacl.org) | natural language processing, machine learning | Conference | yes | yes | — | System demonstrations track of NAACL 2027 (San Francisco, June 1-5, 2027): short papers with a demo video and a live demo or installable package, published in a companion volume of the proceedings. | ✅ 2026-11-11 |
 | `nar_cancer` | [NAR Cancer](https://academic.oup.com/narcancer) | biology, genetics, medicine | Journal | yes | no | - | Fully open-access Oxford University Press journal publishing original research and review articles at the intersection of the nucleic acids and cancer fields. | ➖ |
 | `nar_genomics_bioinformatics` | [NAR Genomics and Bioinformatics](https://academic.oup.com/nargab) | genetics, bioinformatics | Journal | yes | no | - | Fully open-access Oxford University Press journal focused on genomics and bioinformatics large-scale data analysis, publishing novel methods and biological findings. | ➖ |
 | `nature` | [Nature](https://www.nature.com) | general, biology, medicine, physics | Journal | yes | yes | eJournalPress | Weekly multidisciplinary journal publishing peer-reviewed research of outstanding significance across all fields of science and technology, alongside news and commentary. | ✅ 2026-11-03 |

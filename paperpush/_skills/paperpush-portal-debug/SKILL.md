@@ -28,7 +28,9 @@ the recovery part of `AGENTS.md` first.
   the CDP endpoint, `javascript_tool`, or any other route to get around the
   recovery guardrails.
 - Never ask for the user's password. A sign-in failure is a `login()` bug: have
-  the user run `! paperpush login <slug>` after you fix it.
+  the user run `paperpush login <slug>` in a separate terminal after you fix
+  it (not with `!` in this session: that gets no keyboard input, so the
+  password prompt fails).
 - **Installed copy vs source checkout.** Run `python -c "import paperpush, os;
   print(os.path.dirname(paperpush.__file__))"`. Edit runner code only when that
   path is inside this git checkout (an editable install). For a pip install,

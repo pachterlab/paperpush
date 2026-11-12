@@ -166,7 +166,7 @@ def test_integrity_checks_are_not_rerun_for_publisher_rules(tmp_path, monkeypatc
 
 def test_link_finding_is_not_labelled_a_house_rule(tmp_path, monkeypatch):
     finding = sensitive.Finding("x.pdf", "broken link", "https://a is gone")
-    monkeypatch.setattr(sensitive, "scan_links", lambda paths, stats=None: [finding])
+    monkeypatch.setattr(sensitive, "scan_links", lambda paths, stats=None, urls=None: [finding])
     result = _check(_run("bmc_biology", {"manuscript_file": str(_pdf(tmp_path))}, check_links=True), "integrity.links")
     assert "house rule" not in result.issues[0].message
 

@@ -958,7 +958,7 @@ def _broken_link_finding(where: str, url: str) -> Finding:
     return Finding(where, "broken link", f"link {_redact(url)} is not reachable (returned 404/gone); check the URL before submitting")
 
 
-def scan_links(paths: Iterable[Path], *, check_access: bool = True, stats: dict | None = None) -> list[Finding]:
+def scan_links(paths: Iterable[Path], *, check_access: bool = True, stats: dict | None = None, urls: dict[str, str] | None = None) -> list[Finding]:
     """Report URLs in the manuscript files that an anonymous reader can't reach.
 
     Collects every http(s) URL from the text of the submission files
@@ -974,8 +974,11 @@ def scan_links(paths: Iterable[Path], *, check_access: bool = True, stats: dict 
     ``stats``, if given, is filled with ``probed`` (how many URLs were probed)
     and ``unanswered`` (those with no definite answer), so a caller can tell a
     clean scan from one that could not look.
+
+    ``urls``, if given, maps further URLs to where they came from (a ``.sub``
+    field's label, say); they are probed first, alongside the files' own.
     """
-    urls: dict[str, str] = {}
+    urls = {_strip_userinfo(url): where for url, where in (urls or {}).items()}
     for path in _dedup_paths(paths):
         # A PDF's link annotations hold the exact targets. URLs read from its
         # text can be mangled: a review copy's margin line numbers glued on
