@@ -141,7 +141,9 @@ _AUTHOR_SPLIT = re.compile(r"\s+and\s+", re.IGNORECASE)
 # without leaving a space, so ``Gr{\"u}nbaum`` and ``Fran\c{c}ois`` fold to one
 # word rather than two. The lookaheads keep ``\citep`` and ``\vspace`` out of it.
 _TEX_LETTER = re.compile(r"\\(i|j|aa|AA)(?![A-Za-z])\s*")
-_TEX_ACCENT = re.compile(r"\\[`'^~\"=.](?=[A-Za-z{])|\\[cvuHdbrkt](?=\s*\{)")
+_TEX_ACCENT = re.compile(r"\\[`'^~\"=.](?=[A-Za-z{])|\\[cvuHdbrkt](?:\s*(?=\{)|\s+(?=[A-Za-z]))")
+# Letters LaTeX writes as control words (dotless i, o-slash, eszett, ...), read as the plain letter(s).
+_TEX_SPECIAL_LETTER = re.compile(r"\\(ss|ae|AE|oe|OE|aa|AA|i|j|o|O|l|L)(?![A-Za-z])\s*(?:\{\})?")
 # Any other LaTeX control word (``\emph``, ``\textbf``), which separates words
 # and so becomes a space.
 _TEX_COMMAND = re.compile(r"\\[A-Za-z]+")
@@ -839,7 +841,12 @@ def _strip_accents(text: str) -> str:
     A ``.bib`` writes an accent as LaTeX markup and the registry as a composed
     character; folding both makes the two comparable.
     """
+    text = text.translate(_FOLD_SPECIAL)
     return "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))
+
+
+# Letters with no Unicode decomposition, folded by hand (Soğancıoğlu, Łukasz, Søren, Straße).
+_FOLD_SPECIAL = str.maketrans({"ı": "i", "ł": "l", "Ł": "L", "ø": "o", "Ø": "O", "đ": "d", "Đ": "D", "ß": "ss", "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE", "þ": "th", "ð": "d"})
 
 
 def _strip_latex(value: str) -> str:
@@ -851,6 +858,7 @@ def _strip_latex(value: str) -> str:
     and ``\\emph{C. elegans}`` as `` C. elegans``.
     """
     text = _TEX_LETTER.sub(lambda m: m.group(1)[0], value)
+    text = _TEX_SPECIAL_LETTER.sub(lambda m: m.group(1), text)
     text = _TEX_ACCENT.sub("", text)
     text = _TEX_COMMAND.sub(" ", text)
     text = _TEX_ESCAPE.sub(r"\1", text)

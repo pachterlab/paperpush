@@ -1095,5 +1095,72 @@ def get_venue(slug: str) -> Venue:
         if candidate.lower() == key or data.get("name", "").lower() == key:
             logger.debug("Resolved venue %r to %r", slug, candidate)
             return _build(candidate, info, forms)
+    # Then the full name and the abbreviation in its parentheses ("ACL Rolling
+    # Review (ARR)" answers to "arr"), but only when exactly one venue matches.
+    hits = [c for c, data in info.items() if key in _venue_aliases(c, data)]
+    if len(set(hits)) == 1:
+        logger.debug("Resolved venue %r to %r by alias", slug, hits[0])
+        return _build(hits[0], info, forms)
     logger.debug("No venue matches %r", slug)
     raise KeyError(slug)
+
+
+def _norm_name(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def _venue_aliases(slug: str, data: dict) -> set[str]:
+    """Lowercase names a venue answers to besides its slug and display name."""
+    out = set()
+    full = data.get("full_name", "") or ""
+    for text in (slug, slug.replace("_", " "), data.get("name", ""), full, full.split(" - ")[0], re.sub(r"\s*\([^)]*\)", "", full)):
+        if text:
+            out.add(text.lower().strip())
+            out.add(_norm_name(text))
+    for abbr in re.findall(r"\(([^)]{2,15})\)", full):
+        out.add(abbr.lower().strip())
+    return {a for a in out if a}
+
+
+def suggest_venues(query: str, limit: int = 5) -> list[str]:
+    """Slugs of the supported venues closest to ``query``, best first.
+
+    For "did you mean" hints when a name does not resolve: matches the slug,
+    display name, full name, and the abbreviation in the full name, by
+    substring and by fuzzy similarity.
+    """
+    import difflib
+
+    q = _norm_name(query)
+    if not q:
+        return []
+    info = _load_info()
+    scored: list[tuple[float, str]] = []
+    for slug, data in info.items():
+        if data.get("deprecated"):
+            continue
+        best = 0.0
+        for alias in _venue_aliases(slug, data):
+            a = _norm_name(alias)
+            if not a:
+                continue
+            if q == a:
+                score = 1.0
+            elif re.search(rf"\b{re.escape(q)}\b", a) or re.search(rf"\b{re.escape(a)}\b", q):
+                score = 0.9
+            else:
+                score = difflib.SequenceMatcher(None, q, a).ratio()
+            best = max(best, score)
+        if best >= 0.7:
+            scored.append((best, slug))
+    scored.sort(key=lambda t: (-t[0], t[1]))
+    return [s for _, s in scored[:limit]]
+
+
+def unknown_venue_message(name: str) -> str:
+    """The error text for an unknown venue, with close matches when there are any."""
+    hints = suggest_venues(name)
+    msg = f"unknown venue '{name}'"
+    if hints:
+        msg += ". Did you mean: " + ", ".join(hints) + "?"
+    return msg + " Run 'paperpush venues' to list every supported venue (slug, name, full name)."

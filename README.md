@@ -5,7 +5,7 @@
 <h1 align="center">PaperPush</h1>
 
 <p align="center">
-  <strong>A tool and AI companion for scientific publishing.</strong><br>
+  <strong>A toolkit and AI companion for scientific publishing</strong><br>
   Prepare manuscripts for submission to preprint servers, journals, and conferences with just a few commands.
 </p>
 
@@ -27,6 +27,21 @@ PaperPush provides the following services:
 - Automated and fast submission portal filling with deterministic scripts - [see an example here](https://paperpush.readthedocs.io/en/latest/submission-portal.html)
 - [AI skills](https://paperpush.readthedocs.io/en/latest/quickstart/ai.html#what-to-ask) with an MCP server, a [website](https://paperpush.onrender.com), and a [command line interface](https://paperpush.readthedocs.io/en/latest/commands/index.html)
 - Free, open-source, actively-maintained, and never stores your data
+
+## Install
+
+For AI agent skills and CLI usage:
+
+```bash
+pip install paperpush["all"]  # Recommended — for AI API usage, MCP server, local web deployment, and additional manuscript validation checks
+pip install paperpush  # basic CLI usage
+```
+
+(Required for `submit`): To install the playwright dependency and the required chromium browser, run:
+
+```bash
+playwright install chromium
+```
 
 ## Quickstart
 
@@ -60,6 +75,8 @@ Choose your favorite mode: AI agent skills, website, or command line. All modes 
 
 [paperpush.onrender.com](https://paperpush.onrender.com)
 
+No installation required.
+
 #### Venue-specific metadata collection, venue-tailored checking, and submission portal filling for a supported venue
 - Visit [paperpush.onrender.com](https://paperpush.onrender.com)
 - Select the VENUE (or upload a .sub file)
@@ -72,9 +89,6 @@ Choose your favorite mode: AI agent skills, website, or command line. All modes 
 ### Command line interface
 
 #### Venue-specific metadata collection, venue-tailored checking, and submission portal filling for a supported venue
-- To install:
-  - `pip install paperpush["all"]`  # Recommended — ["all"] enables AI API usage, MCP server, local web deployment, and additional manuscript validation checks
-  - `playwright install chromium`  # Required for `submit` - installs the playwright dependency and the required chromium browser
 - `paperpush subfile VENUE`  # create a .sub file (`paperpush subfile general` if you have not chosen a venue yet)
 - Fill out VENUE.sub.txt  # or agent skill /paperpush-autofill
 - `paperpush validate VENUE.sub.txt`  # validate the files and data in VENUE.sub.txt  # or agent skill /paperpush-validate
@@ -83,19 +97,6 @@ Choose your favorite mode: AI agent skills, website, or command line. All modes 
 - (If available) `paperpush login VENUE`  # log in to the VENUE submission portal
 - (If available) `paperpush submit VENUE.sub.txt`  # fill out the VENUE submission portal with information in VENUE.sub.txt  # or agent skill /paperpush-submit
   - `submit` is for **initial submissions only**. Upload a revision through the venue's own "submit revision" link for the existing manuscript (prepare it with `/paperpush-respond-to-reviewers`)
-
-## Install
-
-```bash
-pip install paperpush["all"]  # Recommended — for AI API usage, MCP server, local web deployment, and additional manuscript validation checks
-pip install paperpush  # basic CLI usage
-```
-
-(Required for `submit`): To install the playwright dependency and the required chromium browser, run:
-
-```bash
-playwright install chromium
-```
 
 ## Use with AI
 
@@ -271,19 +272,19 @@ Each venue is listed in `paperpush/venues.json` (the master list of venues and t
 
 ## AI Skills
 
-| Skill | Use it to |
-| --- | --- |
-| `/paperpush-pick-venue` | suggest venues for a manuscript: journals that publish similar work, checked against your constraints (open access, APC budget) and each supported venue's limits, then hand the chosen one to `/paperpush-prepare-submission` |
-| `/paperpush-prepare-submission` | go from a manuscript directory to a filled-in portal (autofill, validate, submit if supported) |
-| `/paperpush-autofill` | fill a `.sub` from the manuscript files |
-| `/paperpush-validate` | run every check, including the ones that need a reader |
-| `/paperpush-fix` | fix what validate flags (in the `.tex`/`.docx` sources and the `.sub`), re-validate until nothing fixable is left, and report what needs the author |
-| `/paperpush-submit` | log in and fill in the portal from a ready `.sub` (optionally skipping validation) — invokes `/paperpush-portal-debug` if it stalls |
-| `/paperpush-portal-debug` | get a stalled `paperpush submit` run unstuck |
-| `/paperpush-transfer` | reformat a manuscript from one venue to another: copy the files into a new `<venue>/` directory, create and autofill its `.sub` (reusing earlier `.sub` files), validate, and write `transfer.txt` describing the changes |
-| `/paperpush-respond-to-reviewers` | prepare a revision in two phases: (1) copy the manuscript and reviews into a new `revisionN/` directory (e.g., revision1, revision2, etc.) and propose a plan for each comment, then (once you approve) (2) revise the manuscript; write the response to reviewers, the clean revised manuscript, and a marked manuscript; and validate the revised manuscript |
-| `/paperpush-add-venue-validate` | add or refresh a venue's author guidelines (contributors) |
-| `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and `submit` support for a venue, with tests (contributors) |
+| Skill | Use it to | Example prompt |
+| --- | --- | --- |
+| `/paperpush-pick-venue` | suggest venues for a manuscript: journals that publish similar work, checked against your constraints (open access, APC budget) and each supported venue's limits, then hand the chosen one to `/paperpush-prepare-submission` | `/paperpush-pick-venue Where should I submit my manuscript in MANUSCRIPT_DIRECTORY? It must be open access with an APC under $3000.` |
+| `/paperpush-prepare-submission` | go from a manuscript directory to a filled-in portal (autofill, validate, submit if supported) | `/paperpush-prepare-submission Prepare my manuscript in MANUSCRIPT_DIRECTORY for submission to VENUE.` |
+| `/paperpush-autofill` | fill a `.sub` from the manuscript files | `/paperpush-autofill My manuscript files are in MANUSCRIPT_DIRECTORY. Fill out VENUE.sub.txt.` |
+| `/paperpush-validate` | run every check, including the ones that need a reader | `/paperpush-validate Validate VENUE.sub.txt and save the report as REPORT.pdf.` |
+| `/paperpush-fix` | fix what validate flags (in the `.tex`/`.docx` sources and the `.sub`), re-validate until nothing fixable is left, and report what needs the author | `/paperpush-fix Fix the issues validate found in VENUE.sub.txt.` |
+| `/paperpush-submit` | log in and fill in the portal from a ready `.sub` (optionally skipping validation) — invokes `/paperpush-portal-debug` if it stalls | `/paperpush-submit Fill out the VENUE submission portal from VENUE.sub.txt.` |
+| `/paperpush-portal-debug` | get a stalled `paperpush submit` run unstuck | `/paperpush-portal-debug paperpush submit VENUE.sub.txt is stuck at the STEP step.` |
+| `/paperpush-transfer` | reformat a manuscript from one venue to another: copy the files into a new `<venue>/` directory, create and autofill its `.sub` (reusing earlier `.sub` files), validate, and write `transfer.txt` describing the changes | `/paperpush-transfer My manuscript in MANUSCRIPT_DIRECTORY was rejected from OLD_VENUE. Transfer it to NEW_VENUE.` |
+| `/paperpush-respond-to-reviewers` | prepare a revision in two phases: (1) copy the manuscript and reviews into a new `revisionN/` directory (e.g., revision1, revision2, etc.) and propose a plan for each comment, then (once you approve) (2) revise the manuscript; write the response to reviewers, the clean revised manuscript, and a marked manuscript; and validate the revised manuscript | `/paperpush-respond-to-reviewers The reviews for my manuscript in MANUSCRIPT_DIRECTORY are in REVIEWS_FILE. Prepare the revision.` |
+| `/paperpush-add-venue-validate` | add or refresh a venue's author guidelines (contributors) | `/paperpush-add-venue-validate Add VENUE's author guidelines from GUIDELINES_URL.` |
+| `/paperpush-add-venue` | run `/paperpush-add-venue-validate` and add `login` and `submit` support for a venue, with tests (contributors) | `/paperpush-add-venue Add login and submit support for VENUE.` |
 
 [![PaperPush schematic](docs/_static/schematic.png)](docs/_static/schematic.pdf)
 

@@ -121,8 +121,12 @@ def _venue_or_error(slug: str) -> Venue:
     try:
         return get_venue(slug)
     except KeyError:
+        from .database import suggest_venues
+
         known = ", ".join(v.slug for v in list_venues())
-        raise ValueError(f"unknown venue {slug!r}. Supported venues: {known}") from None
+        hints = suggest_venues(slug)
+        hint = f" Did you mean: {', '.join(hints)}?" if hints else ""
+        raise ValueError(f"unknown venue {slug!r}.{hint} Supported venues: {known}") from None
 
 
 def _slug_from_reference(reference: str) -> str:

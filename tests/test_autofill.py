@@ -1017,3 +1017,14 @@ def test_field_brief_partitions_by_role_for_any_venue(venue):
             assert f.id not in ids, f"never-field {f.id!r} leaked into {venue.slug} brief"
         else:
             assert f.id in ids, f"fillable field {f.id!r} missing from {venue.slug} brief"
+
+
+def test_single_file_field_given_several_paths_keeps_the_main_document(tmp_path):
+    from paperpush import database
+    from paperpush.autofill import _resolve_filemap
+
+    field = next(f for f in database.get_venue("arxiv").fields if f.id == "manuscript_file")
+    (tmp_path / "paper.tex").write_text("x")
+    (tmp_path / "fig.png").write_bytes(b"x")
+    value = "\n".join(["fig.png", "refs.bib", "paper.tex"] + ["very_long_name_%03d.png" % i for i in range(40)])
+    assert _resolve_filemap(field, value, [tmp_path]) == str(tmp_path / "paper.tex")

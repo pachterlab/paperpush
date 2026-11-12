@@ -61,6 +61,17 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
 
 ## Steps
 
+**Before step 0, resolve the venue to its slug.** Every command takes the venue's
+slug (`acl_arr`, `nature_methods`), not the name the user typed ("ACL
+Rolling Review", "Nat Methods", "ARR"). Don't guess a slug. Run
+`paperpush venues` and match the user's name against each row's slug,
+name, and full name (abbreviations in parentheses count). `paperpush`
+also accepts the exact name or full name, and an unknown name fails with
+`unknown venue '...'. Did you mean: <slugs>?`: retry with the suggested
+slug that fits. Only when no row is the venue the user means is it
+unsupported (step 0). Never drop to a manual review because a slug
+guess failed.
+
 0. **Venue paperpush does not support yet?** If the user names a venue
    (`--venue`, or the venue they want a `.sub` for) that `paperpush venues`
    does not list (try its name, abbreviation, and publisher's title), don't
@@ -108,7 +119,15 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
    offline. Read the report it prints: note every **Failed** and **Warnings**
    entry for your summary. (MCP alternative: `validation_ai_tasks(subfile)`.)
 
-2. **Do each task in the task file.** `tasks[]` gives each check's `id`,
+2. **Do each task in the task file. This step is required.** The
+   deterministic checks alone miss what only a reader can see: fabricated
+   references (`ai.unverified_references`), figures that don't show what the
+   text says, prose errors, misplaced content, and the venue's free-text
+   rules. Do every task unless the user said in so many words to skip the AI
+   checks. "Write a findings file", a time budget, or a long task list are
+   not reasons to skip. If a task can't be done (no web access for
+   reference lookups, an unreadable file), mark it `unclear` with the reason;
+   never leave it out. `tasks[]` gives each check's `id`,
    `instructions`, and the `files` to read. For each:
 
    - Read every listed file. PDFs: read the pages (figures included); images:
@@ -204,7 +223,11 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
 4. **Summarize for the user**, in this order: blocking errors (must fix),
    warnings (deterministic first, then AI), what could not be checked and why
    (could not run / not implemented), and where the saved report is. Relay
-   heuristics as things to confirm, not as certainties.
+   heuristics as things to confirm, not as certainties. List every AI task
+   with its verdict (one line each), so it is visible that none was skipped.
+   If the user asked for the findings in a file or another format, include
+   the failed and warning items from **both** the deterministic report and
+   the AI verdicts there, each with its location.
 
 ## Rules
 
@@ -219,5 +242,8 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
   sessions passed to it).
 - A temporary venue entry (step 0) never goes into paperpush's own databases
   or the repo: always `--data-dir` plus `PAPERPUSH_VENUE_DATA`.
+- Skipping step 2 is only for an explicit request ("deterministic checks
+  only", "skip the AI checks"). Then say in the summary that the AI checks
+  were not run and what they would have covered.
 - If the user has an API key and prefers it, `paperpush validate <sub> --ai`
   does steps 1–3 in one call through the provider's API instead.

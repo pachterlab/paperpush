@@ -734,3 +734,10 @@ def test_validate_reports_retractions_as_their_own_check(tmp_path, monkeypatch):
     assert results["integrity.retractions"].status == report.WARNING
     assert "has been retracted" in results["integrity.retractions"].issues[0].message
     assert {res.id: res for res in off.results}["integrity.retractions"].status == report.UNCHECKED
+
+
+def test_latex_accents_and_special_letters_fold_like_the_registry():
+    from paperpush.references import _entry_first_author, _normalize_text
+
+    assert _normalize_text(_entry_first_author(r"So{\u g}anc{\i}o{\u g}lu, Gizem and Ozturk, H")) == _normalize_text("Soğancıoğlu") == "sogancioglu"
+    assert _normalize_text(r"{\L}ukasz S{\o}ren") == _normalize_text("Łukasz Søren")

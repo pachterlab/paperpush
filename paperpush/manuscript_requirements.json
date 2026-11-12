@@ -5674,7 +5674,8 @@
   "acl_arr": {
     "source_urls": [
       "https://aclrollingreview.org/cfp",
-      "https://aclrollingreview.org/authorchecklist"
+      "https://aclrollingreview.org/authorchecklist",
+      "https://acl-org.github.io/ACLPUB/formatting.html"
     ],
     "retrieved": "2026-10-23",
     "article_type_field": "paper_type",
@@ -5727,12 +5728,11 @@
         "Appendices go after the references in the same PDF, in double-column format (except approved exceptions), and do not count toward the page limit; the paper must be understandable without them.",
         "Remove comments and leftover revision text; text must be addressed to human readers, and prompt injection aimed at generative tools is desk rejected.",
         "Submission is through OpenReview; resubmissions need an explanation of revisions (may be prepended to the main PDF and also uploaded separately)."
-      ]
+      ],
+      "line_numbers": true
     },
     "abstract": {
-      "notes": [
-        "No abstract length limit is stated in the guidelines."
-      ]
+      "max_words": 200
     },
     "sections": {
       "required": [
@@ -6644,7 +6644,8 @@
         "Do not include external links that expand content or subvert review; when in doubt leave links out, including from the reference list. Code may be described as 'will be made publicly available' without citing the codebase.",
         "Hidden prompts or instructions aimed at reviewers or automated tools (prompt injection) lead to desk rejection.",
         "Submission is through OpenReview; paper enrollment (title, abstract, authors) is due Nov 10, 2026 and the paper Nov 16, 2026."
-      ]
+      ],
+      "line_numbers": true
     },
     "abstract": {
       "notes": [

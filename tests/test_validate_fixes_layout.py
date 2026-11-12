@@ -476,3 +476,13 @@ def test_double_spacing_allows_for_tall_fonts(tmp_path, font, skip, size, warns)
     pdf = L.PdfLayout(3, 612, 792, size, Counter({font: 100}), Counter({font: 100}), 72, 72, 72, 72, skip, 0, 0, 3)
     issues, _ = L._spacing(_Field(), L._Measured(Path("m.pdf"), pdf=pdf))
     assert bool(issues) is warns
+
+
+def test_general_dpi_floor_applies_when_the_venue_sets_no_minimum(tmp_path):
+    rules = r.FigureRules()
+    Image.new("RGB", (600, 600), "white").save(tmp_path / "low.png", dpi=(60, 60))
+    Image.new("RGB", (600, 600), "white").save(tmp_path / "ok.png", dpi=(300, 300))
+    figs = [F._raster_figure(tmp_path / n, "fig", rules, 1) for n in ("low.png", "ok.png")]
+    out = F._dpi_check(F._Inventory(figs, True), rules, "x")
+    assert len(out.issues) == 1 and "low.png is 60 dpi" in out.issues[0].message
+    assert f"{F.GENERAL_MIN_DPI} dpi" in out.issues[0].message and "set no minimum" in out.issues[0].message

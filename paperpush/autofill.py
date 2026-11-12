@@ -227,18 +227,46 @@ def _resolve_one_path(path_str: str, search_dirs: list[Path]) -> str:
     path_str = path_str.strip()
     if not path_str or not search_dirs:
         return path_str
-    if Path(path_str).expanduser().exists():
+
+    def exists(p: Path) -> bool:
+        try:
+            return p.expanduser().exists()
+        except OSError:  # a name too long, or otherwise not a path
+            return False
+
+    if exists(Path(path_str)):
         return path_str
     for base in search_dirs:
         candidate = base / path_str
-        if candidate.exists():
+        if exists(candidate):
             return str(candidate)
     # Also try just the basename, in case the engine quoted a longer path.
     for base in search_dirs:
         candidate = base / Path(path_str).name
-        if candidate.exists():
+        if exists(candidate):
             return str(candidate)
     return path_str
+
+
+_MAIN_DOCUMENT_SUFFIXES = (".pdf", ".docx", ".tex", ".doc", ".odt", ".rtf", ".md")
+
+
+def _pick_single_file(field: Field, value: str) -> str:
+    """One path for a single-file field the engine gave several paths for.
+
+    Keeps the first path whose type the field accepts, preferring a main
+    document (PDF, Word, LaTeX) over figures and bibliographies; the rest are
+    dropped with a warning instead of being written as one long "path".
+    """
+    lines = [line.split("|")[0].strip() for line in value.splitlines() if line.strip()]
+    if len(lines) <= 1:
+        return value
+    accept = [a.lower() for a in (field.accept or [])] if isinstance(field.accept, (list, tuple)) else [a.strip().lower() for a in str(field.accept or "").split(",") if a.strip()]
+    ok = [p for p in lines if not accept or Path(p).suffix.lower() in accept]
+    docs = [p for p in ok if Path(p).suffix.lower() in _MAIN_DOCUMENT_SUFFIXES]
+    chosen = (docs or ok or lines)[0]
+    logger.warning("%s takes one file but %d were proposed; kept %s", field.id, len(lines), chosen)
+    return chosen
 
 
 def _resolve_filemap(field: Field, value: str, search_dirs: list[Path]) -> str:
@@ -250,7 +278,7 @@ def _resolve_filemap(field: Field, value: str, search_dirs: list[Path]) -> str:
     preserved as written.
     """
     if field.type == "file":
-        return _resolve_one_path(value, search_dirs)
+        return _resolve_one_path(_pick_single_file(field, value), search_dirs)
 
     out_lines: list[str] = []
     for line in value.splitlines():

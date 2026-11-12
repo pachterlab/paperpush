@@ -72,6 +72,7 @@ from .sensitive import (
     _decode,
     _dedup_paths,
     _GITHUB_RE,
+    _GITHUB_RESERVED_OWNERS,
     _find_github_repos,
     _iter_archive_members,
     _latex_comment,
@@ -384,16 +385,38 @@ def scan_text(
                 "identifying information",
                 f"anonymity: non-anonymized GitHub link github.com/{owner}/{repo} shows its owner ('{owner}'); if it is your or your lab's code, link an anonymous.4open.science mirror instead (ignore this if it is third-party software you cite)",
             )
+    # github.com/<owner> with no repository: a person's or lab's profile page.
+    for match in _GITHUB_PROFILE_RE.finditer(text):
+        if any(a <= match.start() < b for a, b in ref_spans):
+            continue
+        owner = match.group(1)
+        if owner.lower() in _GITHUB_RESERVED_OWNERS or any(o == owner for o, _ in seen):
+            continue
+        seen.add((owner, ""))
+        yield Finding(where, "identifying information", f"anonymity: link to the GitHub account github.com/{owner} identifies its owner; remove it for anonymous review or link an anonymous.4open.science mirror")
     yield from _home_path_findings(where, text)
     if not is_manuscript:
         return
     body = _strip_latex_comments(text) if is_latex else text
+    plain = _detex(body) if is_latex else body
+    for match in _SELF_REFERENCE_RE.finditer(plain):
+        if any(a <= match.start() < b for a, b in _reference_spans(plain)):
+            continue
+        snippet = " ".join(plain[match.start():match.end() + 60].split())
+        yield Finding(where, "identifying information", f"anonymity: first-person reference to the authors' own earlier work ('{snippet}...'); refer to it in the third person for anonymous review")
+        break
     if (_TEX_ACK if is_latex else _ACK_HEADING).search(body):
         yield Finding(where, "identifying information", "anonymity: has an Acknowledgments section; remove it for anonymous review (it usually names funders, colleagues, and grants)")
     if is_latex:
         final = _TEX_FINAL.search(body)
         if final:
             yield Finding(where, "identifying information", f"anonymity: LaTeX is in camera-ready mode ({final.group(0).strip()}), which prints the author names; use the submission/anonymous option")
+
+
+# A GitHub account link (no repository after the owner).
+_GITHUB_PROFILE_RE = re.compile(r"(?i)github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))/?(?=[\s}{)\]\"'<>,;]|\.(?:\s|$)|$)")
+# "our previous work", "our earlier system developed at ...", "in our prior paper": self-identifying in a blind paper.
+_SELF_REFERENCE_RE = re.compile(r"(?i)\b(?:extends|extending|builds on|building on|in|as in|following|unlike|than)\s+our\s+(?:own\s+)?(?:previous|prior|earlier|recent|past)\s+(?:work|paper|study|studies|system|method|model|approach|framework|tool|publication|results?)\b")
 
 
 def _author_handles(terms: list[tuple[str, str]]) -> set[str]:

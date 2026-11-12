@@ -456,6 +456,30 @@ def _iter_upload_paths(venue: Venue, values: dict[str, str]):
             path = _usable_path(candidate)
             if path is not None and path.is_file():
                 yield path
+                if path.suffix.lower() == ".tex":
+                    yield from _tex_bib_files(path)
+
+
+def _tex_bib_files(tex: Path) -> list[Path]:
+    """The .bib files a LaTeX source names (``\\bibliography{a,b}``, ``\\addbibresource{x.bib}``) that exist beside it.
+
+    A LaTeX manuscript's references live in its .bib, so the reference checks
+    (DOIs, duplicates, entry structure) read it without the author having to
+    attach it separately.
+    """
+    try:
+        text = tex.read_text(errors="replace")
+    except OSError:
+        return []
+    names: list[str] = []
+    for m in re.finditer(r"(?<!%)\\(?:bibliography|addbibresource|addglobalbib)\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}", text):
+        names += [n.strip() for n in m.group(1).split(",") if n.strip()]
+    out = []
+    for name in names:
+        cand = tex.parent / (name if name.lower().endswith(".bib") else name + ".bib")
+        if cand.is_file() and cand not in out:
+            out.append(cand)
+    return out
 
 
 def _upload_size_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:

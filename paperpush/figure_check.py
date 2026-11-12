@@ -47,6 +47,8 @@ MM_PER_INCH = 25.4
 RASTER = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".gif", ".bmp", ".webp"}
 # Embedded images narrower than this (points) are logos and icons, not figures.
 MIN_EMBEDDED_WIDTH_PT = 108.0
+# A vector drawing with lettering counts as a figure down to this width.
+MIN_EMBEDDED_DRAWING_WIDTH_PT = 54.0
 # A raster figure with at most this many colours is line art.
 LINE_ART_COLOURS = 16
 # Letters that can label panels.
@@ -103,6 +105,13 @@ def _figure_number(path: Path, label: str, index: int) -> int:
             if match:
                 return int(match.group(1))
     return index
+
+
+# Below this a raster figure looks blurry in print or when zoomed; applied when
+# the venue's guidelines set no minimum of their own.
+GENERAL_MIN_DPI = 150
+# Printed lettering below this is unreadable; applied when the venue sets no minimum of its own.
+GENERAL_MIN_FONT_PT = 4
 
 
 # --- attached figure files ------------------------------------------------------
@@ -374,7 +383,8 @@ def _embedded_pdf(doc: document.Document, field_id: str) -> list[Figure]:
                 by_figure.setdefault(g.figure, []).append(g)
         for number, glyphs in sorted(by_figure.items()):
             box = page.figure_boxes[number - 1] if number - 1 < len(page.figure_boxes) else None
-            if box is None or box[2] - box[0] < MIN_EMBEDDED_WIDTH_PT:
+            # A small drawing with real lettering is a figure placed too small, not a logo.
+            if box is None or box[2] - box[0] < (MIN_EMBEDDED_DRAWING_WIDTH_PT if len(glyphs) >= 8 else MIN_EMBEDDED_WIDTH_PT):
                 continue
             fig = Figure(f"{doc.path.name} page {page.number}, drawing {number}", doc.path, field_id, False, "vector", page=page.number)
             fig.print_width_mm = (box[2] - box[0]) / 72 * MM_PER_INCH
@@ -500,8 +510,11 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         else:
             checks.run(check_id, title, FIGURES, fn, *args)
 
-    run("figures.dpi", "Figures meet the minimum resolution (dpi)", rules.min_dpi or rules.min_dpi_line_art, "the guidelines set no minimum resolution", _dpi_check, inv, rules, where)
-    run("figures.text_size", "Figure lettering within the guidelines' size range", rules.min_font_size_pt or rules.max_font_size_pt, "the guidelines set no figure lettering size", _text_size_check, checks, inv, rules, where)
+    # With no venue minimum, still flag figures below a general floor that any
+    # printed or zoomed-in PDF shows as blurry.
+    run("figures.dpi", "Figures meet the minimum resolution (dpi)", True, "", _dpi_check, inv, rules, where)
+    # With no venue rule, lettering below a general floor is still flagged.
+    run("figures.text_size", "Figure lettering within the guidelines' size range", True, "", _text_size_check, checks, inv, rules, where)
     run("figures.font", "Figure lettering uses the required typeface", rules.font, "the guidelines name no figure font", _font_check, checks, inv, rules, where)
     run("figures.font_consistency", CONSISTENCY_TITLE, True, "", _font_consistency_check, checks, venue, values, inv, rules, where)
     run("figures.lettering", "Figure panels labeled in the required style (e.g., a, b, c)", True, "", _lettering_check, checks, venue, values, inv, rules)
@@ -528,6 +541,8 @@ def _dpi_check(inv: _Inventory, rules: FigureRules, where: str) -> Outcome:
                 unknown.append(fig.name)
             continue
         minimum = rules.min_dpi_line_art if fig.line_art and rules.min_dpi_line_art else rules.min_dpi or rules.min_dpi_line_art
+        general = not minimum
+        minimum = minimum or GENERAL_MIN_DPI
         measured.append(fig.dpi)
         if fig.dpi < minimum - 0.5:
             kind = "line art" if fig.line_art and rules.min_dpi_line_art else "figure"
@@ -538,7 +553,10 @@ def _dpi_check(inv: _Inventory, rules: FigureRules, where: str) -> Outcome:
                 where_from = f" at the {fig.print_width_mm:g} mm print width"
             else:
                 where_from = ""
-            issues.append(Issue(WARNING, fig.field_id, f"{fig.name} is {fig.dpi:.0f} dpi{where_from} ({fig.width_px} px wide); the author guidelines ask for at least {minimum} dpi for {kind}"))
+            if general:
+                issues.append(Issue(WARNING, fig.field_id, f"{fig.name} is {fig.dpi:.0f} dpi{where_from} ({fig.width_px} px wide), below the {GENERAL_MIN_DPI} dpi that prints sharply (the guidelines set no minimum; journals usually ask for 300 dpi)"))
+            else:
+                issues.append(Issue(WARNING, fig.field_id, f"{fig.name} is {fig.dpi:.0f} dpi{where_from} ({fig.width_px} px wide); the author guidelines ask for at least {minimum} dpi for {kind}"))
     why = f"could not tell the resolution of {', '.join(unknown[:4])}: the image records no dpi, or could not be read, and the guidelines give no print width to work it out from"
     if not measured:
         raise Unchecked(why if unknown else f"no raster images among the {where}; vector figures have no resolution to check")
@@ -776,11 +794,13 @@ def _text_size_check(checks: Checks, inv: _Inventory, rules: FigureRules, where:
             continue
         sizes = [t.size for t in fig.texts]
         smallest.append(min(sizes))
-        if rules.min_font_size_pt:
-            small = [t for t in fig.texts if t.size < rules.min_font_size_pt - 0.25 and t.text.strip()]
-            if small:
-                examples = ", ".join(f"'{t.text[:20]}' {t.size:.1f} pt" for t in sorted(small, key=lambda t: t.size)[:3])
-                issues.append(Issue(WARNING, fig.field_id, f"{fig.name}: {len(small)} text item(s) print smaller than the {rules.min_font_size_pt:g} pt minimum (e.g. {examples})"))
+        floor = rules.min_font_size_pt or GENERAL_MIN_FONT_PT
+        small = [t for t in fig.texts if t.size < floor - 0.25 and t.text.strip()]
+        # the general floor is a readability backstop: flag only when most of the lettering is under it
+        if small and (rules.min_font_size_pt or len(small) >= max(3, len(fig.texts) // 2)):
+            examples = ", ".join(f"'{t.text[:20]}' {t.size:.1f} pt" for t in sorted(small, key=lambda t: t.size)[:3])
+            rule = f"the {rules.min_font_size_pt:g} pt minimum" if rules.min_font_size_pt else f"{GENERAL_MIN_FONT_PT:g} pt, too small to read in print (the guidelines set no minimum; 5-7 pt is usual)"
+            issues.append(Issue(WARNING, fig.field_id, f"{fig.name}: {len(small)} text item(s) print smaller than {rule} (e.g. {examples})"))
         if rules.max_font_size_pt:
             # Panel labels are often set larger on purpose; leave single letters out.
             large = [t for t in fig.texts if t.size > rules.max_font_size_pt + 0.25 and not _PANEL.match(t.text.strip())]

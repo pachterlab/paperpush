@@ -376,3 +376,14 @@ def test_scan_file_on_plain_text_no_findings(tmp_path):
     p = tmp_path / "clean.tex"
     p.write_text("\\documentclass{article}\n\\begin{document}Hi\\end{document}\n")
     assert scan_file(p) == []
+
+
+def test_pdf_text_urls_mangled_by_line_numbers_defer_to_link_annotations():
+    from paperpush.sensitive import _covered_by_annotation, _find_urls
+
+    annotated = ["https://github.com/pachterlab/paperpush", "https://aaai.org/conference/aaai/aaai-26/review-process-update/"]
+    assert _covered_by_annotation("https://github.com/pachterlab/paperpush.043", annotated)
+    assert _covered_by_annotation("https://aaai.org/conference/407", annotated)
+    assert _covered_by_annotation("https://aaai.org/conference/aaai", annotated)
+    assert not _covered_by_annotation("https://github.com/pachterlab/paperpush/missing-page", annotated)
+    assert list(_find_urls("see https://477 and https://example.org/x.")) == ["https://example.org/x"]

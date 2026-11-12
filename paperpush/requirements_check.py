@@ -483,6 +483,40 @@ def _reference_issues(field: Field, path: Path, reqs: ManuscriptRequirements) ->
 # --- .sub text fields --------------------------------------------------------
 
 
+def _manuscript_abstract_length_issues(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
+    """The abstract word limit applied to the manuscript's own abstract.
+
+    Used when the .sub has no abstract to check (validating files without a
+    .sub, or before autofill): the limit is the guidelines', and the abstract
+    is the one the reader sees in the manuscript.
+    """
+    rules = reqs.abstract
+    if rules.max_words is None or any(values.get(f.id, "").strip() for f in _fields_for(venue, "abstract")):
+        return []
+    from . import document
+    from .front_matter_check import manuscript_abstract
+
+    files = manuscript_files(venue, values)
+    if not files:
+        return []
+    field, path = files[0]
+    try:
+        found = manuscript_abstract(document.get(path))
+    except Exception:  # noqa: BLE001 -- an unreadable manuscript is reported elsewhere
+        return []
+    if not found:
+        return []
+    text, is_tex = found
+    if is_tex:
+        text = re.sub(r"\\(cite[a-zA-Z]*|ref|eqref|label)\*?(\[[^\]]*\])*\{[^}]*\}", " ", text)
+        text = re.sub(r"\\[A-Za-z]+\*?", " ", text)
+        text = re.sub(r"(?<!\\)%.*", " ", text)
+    words = len([w for w in re.split(r"\s+", text) if re.search(r"[A-Za-z0-9]", w)])
+    if words > rules.max_words:
+        return [Issue(ERROR, field.id, f"{path.name}: the abstract is {words} words, over the {rules.max_words}-word limit in the author guidelines")]
+    return []
+
+
 def _text_field_issues(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
     """Abstract, title, running title, and keyword limits read from the .sub.
 
@@ -504,6 +538,7 @@ def _text_field_issues(venue: Venue, reqs: ManuscriptRequirements, values: dict[
         if rules.max_characters is not None and field.character_count is None and len(raw) > rules.max_characters:
             issues.append(Issue(ERROR, field.id, f"{field.label}: {len(raw)} characters exceeds the {rules.max_characters}-character limit in the author guidelines"))
         # abstract.structured and abstract.no_references: see front_matter_check.
+    issues += _manuscript_abstract_length_issues(venue, reqs, values)
     for field in _fields_for(venue, "title"):
         raw = values.get(field.id, "").strip()
         if not raw:

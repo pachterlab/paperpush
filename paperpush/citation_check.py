@@ -924,6 +924,14 @@ def _missing_caption_check(venue: Venue, values: dict[str, str]) -> Outcome:
     for _, path in _document_files(venue, values, ("manuscript", "figures", "tables")):
         doc = document.get(path)
         if doc.is_tex and doc.tex_source is not None:
+            for env, series, number in _tex_envs(doc.tex_source):
+                body = env.group(2)
+                caps = list(re.finditer(r"\\caption\*?\s*(?:\[[^\]]*\])?\s*\{\s*(?:\\label\s*\{[^}]*\}\s*)*\}", body))
+                if caps and not re.search(r"\\caption\*?\s*(?:\[[^\]]*\])?\s*\{\s*(?:\\label\s*\{[^}]*\}\s*)*[^\s}]", body):
+                    kind = "table" if series.endswith("table") else "figure"
+                    label = _LABEL.search(body)
+                    no_caption.setdefault(series, set()).add(number)
+                    issues.append(Issue(WARNING, field_id, f"{path.name}: the {kind} '{label.group(1) if label else number}' has an empty \\caption (it prints its number with no text)"))
             for series, number, caption, name in _tex_float_captions(doc.tex_source):
                 if caption is None:
                     kind = "table" if series.endswith("table") else "figure"

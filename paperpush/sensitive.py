@@ -225,8 +225,35 @@ def _not_scanned(where: str, why: str, prefix: str = "") -> Finding:
     return Finding(where, NOT_SCANNED, f"{prefix}could not be scanned ({why}); inspect it by hand before submitting")
 
 
+# Identifiers of a study participant or patient written into the text. Each needs
+# its label next to it, so a bare number or date never matches.
+_MONTH = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
+_DATE = rf"(?:\d{{1,2}}[ ./-]{_MONTH}[ ./-]\d{{4}}|\d{{1,2}}\s+{_MONTH}\s+\d{{4}}|{_MONTH}\s+\d{{1,2}},?\s+\d{{4}}|\d{{4}}-\d{{2}}-\d{{2}}|\d{{1,2}}/\d{{1,2}}/\d{{2,4}})"
+_PERSONAL_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("medical record / patient number", re.compile(r"(?i)\b(?:medical record (?:number|no\.?)|MRN|patient (?:id|identifier|number|no\.?)|hospital number)\s*[:#]?\s*([A-Z]?\d{5,})\b")),
+    ("date of birth", re.compile(rf"(?i)\b(?:date of birth|d\.?o\.?b\.?|born(?: on)?)\s*[:,]?\s*({_DATE})")),
+    ("social security number", re.compile(r"(?i)\b(?:SSN|social security(?: number| no\.?)?)\s*[:#]?\s*(\d{3}-\d{2}-\d{4})\b")),
+    ("phone number", re.compile(r"(?i)\b(?:tel\.?|phone|mobile|cell)\s*[:.]?\s*(\+?\d[\d ()./-]{7,}\d)")),
+]
+
+
+def _iter_personal_findings(where: str, text: str) -> Iterator[Finding]:
+    """Yield a finding for each labeled personal identifier (patient number, date of birth, SSN, phone)."""
+    seen: set[str] = set()
+    for label, pattern in _PERSONAL_PATTERNS:
+        for match in pattern.finditer(text):
+            if label == "phone number" and re.search(r"(?i)\b(?:corresponding|correspondence|e-?mail|fax)\b", text[max(0, match.start() - 120):match.start()]):
+                continue  # an author's contact line, not a participant's data
+            raw = match.group(1)
+            if raw in seen:
+                continue
+            seen.add(raw)
+            yield Finding(where, "personal data", f"possible personal data: {label} ({_mask(raw)}); remove identifying details of study participants before submitting")
+
+
 def _iter_secret_findings(where: str, text: str) -> Iterator[Finding]:
     """Yield credential / editable-link findings for one blob of text."""
+    yield from _iter_personal_findings(where, text)
     seen: set[tuple[str, str]] = set()
     for label, pattern, group in _SECRET_PATTERNS:
         for match in pattern.finditer(text):
@@ -367,7 +394,9 @@ def _scan_text_blob(where: str, data: bytes, *, is_latex: bool) -> Iterator[Find
     if text is None:
         return
     yield from _iter_secret_findings(where, text)
-    if is_latex:
+    # A .bib's "%" is not a LaTeX comment (BibTeX has none; inside a field it is
+    # literal text, e.g. in a URL), so only real LaTeX files get the comment pass.
+    if is_latex and not where.lower().endswith(".bib"):
         yield from _iter_latex_findings(where, text)
 
 
@@ -861,10 +890,15 @@ LINK_SCAN_SKIP_EXTS = {".bib", ".bst", ".cls", ".sty"}
 
 
 def _find_urls(text: str) -> Iterator[str]:
-    """Yield each cleaned http(s) URL in ``text`` (trailing punctuation trimmed)."""
+    """Yield each cleaned http(s) URL in ``text`` (trailing punctuation trimmed).
+
+    A "URL" whose host has no letters ("https://477", a line number after a
+    URL scheme cut at a line break) is not a link and is skipped.
+    """
     for match in _URL_RE.finditer(text):
         url = match.group(0).rstrip(_URL_TRAILING)
-        if url:
+        host = re.sub(r"(?i)^https?://", "", url).split("/")[0]
+        if url and re.search(r"[A-Za-z]", host) and "." in host:
             yield url
 
 
@@ -943,8 +977,16 @@ def scan_links(paths: Iterable[Path], *, check_access: bool = True, stats: dict 
     """
     urls: dict[str, str] = {}
     for path in _dedup_paths(paths):
+        # A PDF's link annotations hold the exact targets. URLs read from its
+        # text can be mangled: a review copy's margin line numbers glued on
+        # ("github.com/org/repo.043"), or a URL cut at a line break.
+        annotated = _pdf_uris(path) if path.suffix.lower() == ".pdf" else []
+        for url in annotated:
+            urls.setdefault(_strip_userinfo(url), path.name)
         for where, text in _iter_text_blobs(path):
             for url in _find_urls(text):
+                if annotated and _covered_by_annotation(url, annotated):
+                    continue
                 # Credentials in a URL are never sent anywhere or printed.
                 urls.setdefault(_strip_userinfo(url), where)
 
@@ -966,6 +1008,49 @@ def scan_links(paths: Iterable[Path], *, check_access: bool = True, stats: dict 
         stats["probed"] = len(checked)
         stats["unanswered"] = [_redact(url) for (url, _), ok in zip(checked, reachable) if ok is None]
     return [_broken_link_finding(where, url) for (url, where), ok in zip(checked, reachable) if ok is False]
+
+
+def _pdf_uris(path: Path) -> list[str]:
+    """The http(s) targets of a PDF's link annotations, in page order."""
+    try:
+        from pypdf import PdfReader
+
+        out: list[str] = []
+        for page in PdfReader(str(path)).pages:
+            for annot in page.get("/Annots") or []:
+                try:
+                    obj = annot.get_object()
+                    uri = (obj.get("/A") or {}).get("/URI")
+                except Exception:  # noqa: BLE001 -- a malformed annotation
+                    continue
+                if isinstance(uri, bytes):
+                    uri = uri.decode("latin-1", "replace")
+                if uri and re.match(r"(?i)https?://", str(uri)) and str(uri) not in out:
+                    out.append(str(uri).strip())
+        return out
+    except Exception:  # noqa: BLE001 -- unreadable PDF: fall back to the text alone
+        logger.debug("could not read link annotations of %s", path, exc_info=True)
+        return []
+
+
+def _covered_by_annotation(url: str, annotated: list[str]) -> bool:
+    """Whether a URL read from PDF text is a mangled copy of an annotated link.
+
+    True when it is a prefix of one (cut at a line break), or one plus a short
+    tail of digits and punctuation (line numbers glued on in a review copy).
+    """
+    u = url.rstrip("/").lower()
+    for a in annotated:
+        t = a.rstrip("/").lower()
+        if u == t or t.startswith(u):
+            return True
+        if u.startswith(t) and re.fullmatch(r"[/.\d]{1,8}", u[len(t):]):
+            return True
+        # cut at a line break, then the next line's number glued on
+        head = re.sub(r"[/.]?\d{1,4}$", "", u)
+        if head != u and len(head) > len("https://x.y") and t.startswith(head):
+            return True
+    return False
 
 
 def scan_missing_code_link(paths: Iterable[Path]) -> list[Finding]:

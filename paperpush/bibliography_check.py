@@ -242,6 +242,31 @@ def _first_surname(entry: str) -> str:
     return ""
 
 
+_AUTHOR_YEAR_HEAD = re.compile(r"^[^.]{0,250}?(?:\.[^.]{0,60}?){0,8}?[.,]\s*\(?(?:19|20)\d{2}[a-z]?\)?[.,:]")
+
+
+def _surname_candidates(entry: str) -> list[str]:
+    """The first author's possible surnames, for either name order.
+
+    "Smith, J., ..." gives Smith; "Jacob Devlin, Ming-Wei Chang, ..." (the
+    *ACL style, given name first) gives Devlin as well as Jacob, so the entry
+    is matched to "Devlin et al. (2019)" in the text.
+    """
+    out = []
+    first = _first_surname(entry)
+    if first:
+        out.append(first)
+    head = re.split(r",| and |\.\s+(?=\(?(?:19|20)\d{2})", _NUMBER_LABEL.sub("", entry, count=1), maxsplit=1)[0]
+    words = [w.strip(",.;:()[]") for w in head.split()]
+    words = [w for w in words if w and not re.fullmatch(r"[A-Z]\.?(?:-[A-Z]\.?)?", w)]
+    if 1 < len(words) <= 5:
+        last = words[-1]
+        m = _SURNAME.match(last)
+        if m and m.group(0)[0].isupper() and m.group(0) not in out:
+            out.append(m.group(0))
+    return out
+
+
 def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | None:
     from .manuscript import author_year_starts
 
@@ -278,22 +303,30 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
     entries: list[str] = []
     for a, b in zip(starts, starts[1:] + [len(tail)]):
         entry = re.sub(r"\s+", " ", tail[a:b]).strip()
-        if entries and len(entry) < 25:
+        # A real entry opens with its authors and year ("..., Name. 2015.", "Smith, J. (2015)."); a
+        # line that does not is the previous entry running on (a venue, "Preprint, arXiv:...").
+        if entries and (len(entry) < 25 or not _AUTHOR_YEAR_HEAD.search(entry[:300])):
             entries[-1] += " " + entry
         elif entry:
             entries.append(entry)
     folded = _unwrap(_fold(body))
+    folded_tail = _unwrap(_fold(tail))
     refs: list[Ref] = []
     cited: set[str] = set()
     for entry in entries:
-        surname = _first_surname(entry)
         year = _YEAR.search(entry)
-        if not surname or year is None:
+        candidates = _surname_candidates(entry)
+        if not candidates or year is None:
             continue
+        suffix = year.group(2) or "[a-z]?"
+        hit = next((c for c in candidates if re.search(rf"(?<![A-Za-z]){re.escape(_fold(c))}(?![a-z])[^;\n]{{0,80}}?\b{year.group(1)}{suffix}(?![\da-z])", folded)), None)
+        if not hit:
+            # An appendix after the reference list cites in the same shape: "Boteva et al., 2016", "Holm (2024)".
+            hit = next((c for c in candidates if re.search(rf"(?<![A-Za-z]){re.escape(_fold(c))}(?: et al\.?| (?:and|&) [A-Z][\w-]+)?,? \(?{year.group(1)}{suffix}(?![\da-z])", folded_tail)), None)
+        surname = hit or candidates[0]
         key = f"{surname} {year.group(0)}"
         refs.append(Ref(key, f"{surname} ({year.group(0)})", entry, year.group(0)))
-        suffix = year.group(2) or "[a-z]?"
-        if re.search(rf"(?<![A-Za-z]){re.escape(_fold(surname))}(?![a-z])[^;\n]{{0,80}}?\b{year.group(1)}{suffix}(?![\da-z])", folded):
+        if hit:
             cited.add(key)
     return Bibliography("author-year", refs, cited) if refs else None
 

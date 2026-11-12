@@ -66,7 +66,7 @@ from pydantic import ConfigDict, validate_call
 
 from . import __url__, __version__, credentials, venue_data
 from ._logging import configure_logging
-from .database import GENERAL_SLUG, Venue, general_venue, get_venue, list_venues
+from .database import GENERAL_SLUG, Venue, general_venue, get_venue, list_venues, unknown_venue_message
 from .subfile import default_filename, find_subfile, is_subfile_name, subfile_stem, with_subfile_suffix, write_template
 from .venues.common import DEFAULT_TIMEOUT_SECONDS
 
@@ -423,7 +423,7 @@ def _cmd_add_venue(args: argparse.Namespace) -> int:
         try:
             text = venuefile.template(slug, from_slug=args.from_slug, filename=Path(out).name if out != "-" else "VENUE.txt")
         except KeyError:
-            print(f"error: unknown venue '{args.from_slug}'", file=sys.stderr)
+            print(f"error: {unknown_venue_message(args.from_slug)}", file=sys.stderr)
             print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
             return 2
         if out == "-":
@@ -842,7 +842,7 @@ def _cmd_subfile(args: argparse.Namespace) -> int:
         venue = get_venue(args.venue)
     except KeyError:
         logger.warning("subfile: unknown venue %r", args.venue)
-        print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
+        print(f"error: {unknown_venue_message(args.venue)}", file=sys.stderr)
         print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
@@ -1004,7 +1004,7 @@ def _cmd_login(args: argparse.Namespace) -> int:
         venue = get_venue(args.venue)
     except KeyError:
         logger.warning("login: unknown venue %r", args.venue)
-        print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
+        print(f"error: {unknown_venue_message(args.venue)}", file=sys.stderr)
         print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
@@ -1518,8 +1518,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             venue_def = get_venue(venue)
         except KeyError:
             logger.error("validate: unknown venue %r", venue)
-            print(f"error: unknown venue '{venue}'", file=sys.stderr)
-            print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
+            print(f"error: {unknown_venue_message(venue)}", file=sys.stderr)
             return 2
     else:
         venue_def = general_venue()
@@ -2144,7 +2143,7 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
     try:
         venue = get_venue(slug)
     except KeyError:
-        print(f"error: unknown venue '{slug}'", file=sys.stderr)
+        print(f"error: {unknown_venue_message(slug)}", file=sys.stderr)
         print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
     if text is None:
@@ -2218,7 +2217,7 @@ def _autofill_in_browser(args: argparse.Namespace, input_dirs: list[Path], input
     try:
         venue = get_venue(slug)
     except KeyError:
-        print(f"error: unknown venue '{slug}'", file=sys.stderr)
+        print(f"error: {unknown_venue_message(slug)}", file=sys.stderr)
         print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
     if text is None:
@@ -2412,7 +2411,7 @@ def _cmd_codegen(args: argparse.Namespace) -> int:
         try:
             venue_def = get_venue(slug)
         except KeyError:
-            print(f"error: unknown venue {slug!r} (see 'paperpush venues')", file=sys.stderr)
+            print(f"error: {unknown_venue_message(slug)}", file=sys.stderr)
             return 1
         fields = [f.id for f in venue_def.fields]
         file_fields = [f.id for f in venue_def.fields if f.type in ("file", "filelist")]
@@ -2453,7 +2452,7 @@ def _cmd_schema(args: argparse.Namespace) -> int:
     try:
         venue = get_venue(args.venue)
     except KeyError:
-        print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
+        print(f"error: {unknown_venue_message(args.venue)}", file=sys.stderr)
         print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
@@ -2497,7 +2496,7 @@ def _cmd_format(args: argparse.Namespace) -> int:
     try:
         venue = get_venue(slug)
     except KeyError:
-        print(f"error: unknown venue '{slug}'", file=sys.stderr)
+        print(f"error: {unknown_venue_message(slug)}", file=sys.stderr)
         print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
@@ -2597,7 +2596,7 @@ def _cmd_convert(args: argparse.Namespace) -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 1
         except KeyError:
-            print(f"error: unknown venue '{sub.venue}'", file=sys.stderr)
+            print(f"error: {unknown_venue_message(sub.venue)}", file=sys.stderr)
             return 2
         if manuscript is not None:
             manuscript_field = next(iter(_fields_for(venue, "manuscript")), None)
@@ -2665,7 +2664,7 @@ def _cmd_requirements(args: argparse.Namespace) -> int:
     try:
         venue = get_venue(args.venue)
     except KeyError:
-        print(f"error: unknown venue '{args.venue}'", file=sys.stderr)
+        print(f"error: {unknown_venue_message(args.venue)}", file=sys.stderr)
         print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
     reqs = get_requirements(venue.slug)
@@ -2773,7 +2772,7 @@ def _cmd_options(args: argparse.Namespace) -> int:
     try:
         venue = get_venue(venue_slug)
     except KeyError:
-        print(f"error: unknown venue '{venue_slug}'", file=sys.stderr)
+        print(f"error: {unknown_venue_message(venue_slug)}", file=sys.stderr)
         print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 2
 
@@ -2882,7 +2881,7 @@ def build_parser() -> argparse.ArgumentParser:
     # look up a URL, so the pointer to the packaged guide belongs here.
     parser = argparse.ArgumentParser(
         prog="paperpush",
-        description="Make venue submission as easy as a single click.",
+        description="Prepare manuscripts for submission to preprint servers, journals, and conferences with just a few commands",
         epilog=("AI agents: run 'paperpush --agent-guide' before driving this CLI.\n" f"Docs and issues: {__url__}"),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -3302,7 +3301,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_skills = sub.add_parser(
         "install-skills",
         parents=[verbosity],
-        help="install paperpush's agent skills (autofill, validate, submit, portal debugging) for Claude Code or Codex",
+        help="install paperpush's agent skills for Claude Code or Codex",
         description="Install the agent skills that ship with paperpush, so an AI agent knows how to autofill, validate, and submit with it.\n\n"
         "  paperpush install-skills                  the author skills, for Claude Code in every project\n"
         "  paperpush install-skills --all           also the contributor skills (adding and fixing venues)\n"
