@@ -3703,5 +3703,132 @@
         "autofill": "never"
       }
     ]
+  },
+  "naacl_2027_demo": {
+    "submission_url": "https://openreview.net/group?id=aclweb.org/NAACL/2027/Demo_Track&referrer=%5BHomepage%5D(%2F)#tab-recent-activity",
+    "fields": [
+      {
+        "id": "title",
+        "label": "Title",
+        "type": "text",
+        "required": true,
+        "character_count": 250,
+        "autofill": "extract",
+        "help": "Title of the paper. TeX formulas are supported with $In-line Formula$ or $$Block Formula$$."
+      },
+      {
+        "id": "authors",
+        "label": "Authors",
+        "type": "authorlist",
+        "required": true,
+        "autofill": "extract",
+        "fields": [
+          "open_review_id?",
+          "name",
+          "email_suffixes?"
+        ],
+        "help": "One author per line, in order. Format: Open Review ID | Name | Email suffixes. Every author must already have an OpenReview profile (new profiles without an institutional email can take up to two weeks to be activated). If an Open Review ID is given, the name and email suffixes are optional; otherwise each author is added by a profile search on the Name column, so the name must match the author's OpenReview profile. Email suffixes are comma-separated, in decreasing order of likelihood of association with the author. At least one author is required. Review is single-blind, so author names must also be in the PDF."
+      },
+      {
+        "id": "keywords",
+        "label": "Keywords",
+        "type": "text",
+        "required": true,
+        "autofill": "extract",
+        "help": "Comma-separated list of keywords; each keyword at most 250 characters."
+      },
+      {
+        "id": "abstract",
+        "label": "Abstract",
+        "type": "textarea",
+        "required": true,
+        "autofill": "extract",
+        "help": "Abstract of the demonstration paper (Markdown and TeX formulas are supported)."
+      },
+      {
+        "id": "tldr",
+        "label": "TL;DR",
+        "type": "text",
+        "required": false,
+        "section": "metadata",
+        "character_count": 250,
+        "autofill": "extract",
+        "help": "Optional. \"Too Long; Didn't Read\": a short sentence describing the paper."
+      },
+      {
+        "id": "pdf_file",
+        "label": "PDF",
+        "type": "file",
+        "required": true,
+        "section": "files",
+        "accept": [
+          ".pdf"
+        ],
+        "max_file_size_mb": 50,
+        "max_pages_before_refs": 6,
+        "main_text_end_headings": [
+          "Ethics Statement",
+          "Ethical Considerations",
+          "Ethics and Broader Impact",
+          "Broader Impact",
+          "Broader Impact Statement",
+          "Appendix",
+          "Appendices"
+        ],
+        "autofill": "filemap",
+        "help": "The paper PDF, at most 50 MB, in the official NAACL 2027 style. Up to 6 pages of content (longer submissions are desk rejected), plus unlimited pages for an optional ethics / broader impact statement and references, and at most 2 pages of appendix. Page counting stops at the first ethics / broader impact / appendix heading or the references (main_text_end_headings)."
+      },
+      {
+        "id": "demo_video_url",
+        "label": "Demo video URL",
+        "type": "text",
+        "required": true,
+        "section": "metadata",
+        "require_url": true,
+        "autofill": "extract",
+        "help": "Required. A link (http:// or https://) to a screencast video of up to 2.5 minutes demonstrating the system, e.g. on YouTube, Vimeo, or Google Drive. Narration or captions are encouraged."
+      },
+      {
+        "id": "live_demo_url",
+        "label": "Live demo URL",
+        "type": "text",
+        "required": true,
+        "section": "metadata",
+        "require_url": true,
+        "autofill": "extract",
+        "help": "Required. A link (http:// or https://) to the live interactive system or to a downloadable installation package. Submissions without a link are desk rejected unless sharing one is clearly impossible (e.g. specific hardware is required); the authors must then explain why, in the paper."
+      },
+      {
+        "id": "ethics_statement",
+        "label": "Ethics statement",
+        "type": "textarea",
+        "required": false,
+        "section": "metadata",
+        "autofill": "extract",
+        "help": "Optional. Ethics or broader impact statement (Markdown supported)."
+      },
+      {
+        "id": "email_sharing",
+        "label": "We authorize the sharing of all author emails with Program Chairs.",
+        "type": "boolean",
+        "required": true,
+        "confirm": true,
+        "section": "declarations",
+        "default": false,
+        "autofill": "never",
+        "help": "Confirms you are aware that all author emails will be shared with the Program Chairs."
+      },
+      {
+        "id": "data_release",
+        "label": "We authorize the release of our submission and author names to the public in the event of acceptance.",
+        "type": "boolean",
+        "required": true,
+        "confirm": true,
+        "section": "declarations",
+        "default": false,
+        "autofill": "never",
+        "help": "Confirms you are aware that accepted submissions, with their author names, will be released to the public after the conference."
+      }
+    ]
   }
 }

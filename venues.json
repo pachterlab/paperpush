@@ -1133,5 +1133,18 @@
       "machine learning",
       "statistics"
     ]
+  },
+  "naacl_2027_demo": {
+    "name": "NAACL 2027 Demo Track",
+    "full_name": "2027 Annual Conference of the Nations of the Americas Chapter of the Association for Computational Linguistics (NAACL 2027), System Demonstrations Track",
+    "venue_type": "conference",
+    "anonymous": false,
+    "site_url": "https://2027.naacl.org",
+    "submission_guide": "https://2027.naacl.org/calls/system_demonstration/",
+    "description": "System demonstrations track of NAACL 2027 (San Francisco, June 1-5, 2027): short papers with a demo video and a live demo or installable package, published in a companion volume of the proceedings.",
+    "keywords": [
+      "natural language processing",
+      "machine learning"
+    ]
   }
 }
