@@ -657,6 +657,53 @@ def test_submit_status_with_no_pid_lists_every_run(fake_launch):
     assert len(mcp_server.submit_status()["submissions"]) == 2
 
 
+def test_submit_status_says_filling_until_the_wizard_parks(fake_launch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    result = mcp_server.submit(str(VALID_SUB))
+    Path(result["log_path"]).write_text("Opening biorxiv…\nStep 3 of 7\n", encoding="utf-8")
+    status = mcp_server.submit_status(result["pid"])
+    assert status["state"] == "filling"
+    assert "next_step" not in status
+
+
+def test_submit_status_says_ready_for_review_once_the_wizard_parks(fake_launch):
+    """The process stays alive to hold the browser; `state` must still say it is done, so agents stop polling."""
+    from paperpush.venues.common import HOLD_OPEN_FINISHED_BANNER
+
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    result = mcp_server.submit(str(VALID_SUB))
+    Path(result["log_path"]).write_text(f"Step 7 of 7\n\n{HOLD_OPEN_FINISHED_BANNER}\nPress Ctrl+C here (or close this terminal) to close the browser.\n", encoding="utf-8")
+    status = mcp_server.submit_status(result["pid"])
+    assert status["running"] is True
+    assert status["state"] == "ready_for_review"
+    assert "stop polling" in status["next_step"]
+
+
+def test_submit_status_says_stopped_on_error_when_a_failed_run_holds_open(fake_launch):
+    from paperpush.venues.common import HOLD_OPEN_FAILED_BANNER
+
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    result = mcp_server.submit(str(VALID_SUB))
+    Path(result["log_path"]).write_text(f"\nThe run failed: TimeoutError: Next\n{HOLD_OPEN_FAILED_BANNER}\n", encoding="utf-8")
+    status = mcp_server.submit_status(result["pid"])
+    assert status["state"] == "stopped_on_error"
+    assert "portal-debug" in status["next_step"]
+
+
+def test_submit_status_says_exited_once_the_process_ends(fake_launch):
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    pid = mcp_server.submit(str(VALID_SUB))["pid"]
+    fake_launch.instances[0]._exit_code = 1
+    assert mcp_server.submit_status(pid)["state"] == "exited"
+
+
+def test_submit_runs_the_child_unbuffered(fake_launch):
+    """Otherwise log_tail stays empty while the wizard fills."""
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    mcp_server.submit(str(VALID_SUB))
+    assert fake_launch.instances[0].kwargs["env"]["PYTHONUNBUFFERED"] == "1"
+
+
 def test_submit_status_rejects_an_unknown_pid(fake_launch):
     with pytest.raises(ValueError, match="no submission with pid 999"):
         mcp_server.submit_status(999)
@@ -785,6 +832,7 @@ def test_status_reports_a_pause_and_the_tools_reach_the_run(fake_launch, monkeyp
 
     status = mcp_server.submit_status(pid)
     assert status["recovery"]["paused"] == {"summary": "click() failed during 'Authors page'"}
+    assert status["state"] == "paused"
     assert "submit_page" in status["next_step"]
 
     sent = []

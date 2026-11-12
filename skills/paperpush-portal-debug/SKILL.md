@@ -41,8 +41,10 @@ the recovery part of `AGENTS.md` first.
 
 **Handed a run that is already paused** (from `paperpush-submit`, with a
 `pid`): do not start a new one. Call `submit_status(pid)` to read
-`recovery.paused` and go straight to step 2. Once it reaches the review
-page, wait for the author: they review and send it themselves.
+`recovery.paused` and go straight to step 2. Once `submit_status` reports
+`state` `ready_for_review`, stop polling and leave it to the author: they
+review and send it themselves (the process keeps running to hold the browser
+open until `submit_close`).
 
 Find the `.sub`, the venue, and where the run stopped (the user's output, or
 the last `step(...)` label in the runner). Read the runner around that step
@@ -77,7 +79,8 @@ time, and resume it rather than restarting from the beginning.
    selector or behavior, the new one, and what you did. The note goes into
    `recoveries.jsonl` and is how the fix gets into the runner.
 
-Repeat for each pause until the run reaches the review page. For a
+Repeat for each pause until `submit_status` reports `state`
+`ready_for_review` (the wizard reached the review page). For a
 long-running fix (a PDF build, a slow upload), use bounded waits, tell the user
 what you are waiting for, and stop after the wait limit instead of
 retrying forever. If MCP is not available, attach to the CDP endpoint with

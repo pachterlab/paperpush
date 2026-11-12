@@ -201,8 +201,10 @@ you.
 `submit` is the one tool that does not finish its work before returning. The
 wizard fills the form and then parks holding the browser open for the author, so
 the tool hands back a `pid` as soon as the run has started: poll `submit_status`
-for progress, tell the user to review and send the form themselves, and call
-`submit_close` when they say they are done. It refuses to open a browser at all
+while its `state` is `filling`. At `ready_for_review` the process keeps running
+on purpose to hold the browser open, so stop polling there: tell the user to
+review and send the form themselves, end your turn, and call `submit_close`
+when they say they are done. It refuses to open a browser at all
 unless the `.sub` validates and, when the portal requires authentication, the
 venue already has a stored login — so run the login check above first.
 

@@ -1272,25 +1272,49 @@ class SubmissionRun:
 
     def snapshot(self) -> dict[str, Any]:
         """Current state plus the tail of the run's output."""
+        from .venues.common import HOLD_OPEN_FAILED_BANNER, HOLD_OPEN_FINISHED_BANNER
+
         exit_code = self.process.poll()
         try:
             lines = self.log_path.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             lines = []
+        paused = None
+        if self.recover_dir is not None and exit_code is None:
+            from .venues import recovery_channel
+
+            paused = recovery_channel.read_paused(self.recover_dir)
+        # The banner hold_open printed last says why the process is parked: a
+        # finished wizard and a failed one both stay `running` to keep the window.
+        held = next((line.strip() for line in reversed(lines) if line.strip() in (HOLD_OPEN_FINISHED_BANNER, HOLD_OPEN_FAILED_BANNER)), None)
+        if exit_code is not None:
+            state = "exited"
+        elif paused:
+            state = "paused"
+        elif held == HOLD_OPEN_FINISHED_BANNER:
+            state = "ready_for_review"
+        elif held == HOLD_OPEN_FAILED_BANNER:
+            state = "stopped_on_error"
+        else:
+            state = "filling"
         report: dict[str, Any] = {
             "pid": self.pid,
             "venue": self.venue,
             "subfile": str(self.subfile),
             "started_at": self.started_at,
+            "state": state,
             "running": exit_code is None,
             "exit_code": exit_code,
             "log_path": str(self.log_path),
             "log_tail": lines[-LOG_TAIL_LINES:],
         }
+        if state == "ready_for_review":
+            report["next_step"] = _READY_NEXT_STEP
+        elif state == "stopped_on_error":
+            report["next_step"] = _STOPPED_NEXT_STEP
         if self.recover_dir is not None:
             from .venues import recovery_channel
 
-            paused = recovery_channel.read_paused(self.recover_dir) if exit_code is None else None
             report["recovery"] = {
                 "enabled": True,
                 "directory": str(self.recover_dir),
@@ -1340,6 +1364,20 @@ _PAUSED_NEXT_STEP = (
     "select, check, upload a .sub file). Finally call submit_resume with 'resolved' if the step is "
     "now done, 'retry' to have the script try it again, or 'abort' to stop. Never try to send the "
     "submission; it is refused, and that step is the author's."
+)
+
+_READY_NEXT_STEP = (
+    "The wizard has finished: the form is filled and the browser is parked open for the author. "
+    "This is the normal end state, so the process stays `running` until they close it. Tell the "
+    "user to review the form and click the final submit themselves, then stop polling and end your "
+    "turn. Call submit_close only when they say they are done."
+)
+
+_STOPPED_NEXT_STEP = (
+    "A step failed and the run could not pause for recovery, so it is holding the browser open at "
+    "the failed page. Tell the user which step it stopped at (from log_tail) and stop polling; the "
+    "state will not change. Offer the paperpush-portal-debug skill, and call submit_close when the "
+    "user is done with the window."
 )
 
 
@@ -1558,6 +1596,9 @@ def submit(
             stdout=log_file,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            # Unbuffered, so the log (and submit_status's log_tail) shows the
+            # wizard's progress as it happens rather than when a buffer fills.
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
     except OSError as exc:
         log_file.close()
@@ -1576,7 +1617,7 @@ def submit(
         "headless": headless,
         "recovery": recover_dir is not None,
         **({"cdp_endpoint": f"http://127.0.0.1:{cdp_port}"} if cdp_port is not None else {}),
-        "next_step": ("The browser is opening and the wizard will fill itself in from the .sub file. " "Poll submit_status for progress. If it reports recovery.paused, a step failed: " "inspect it with submit_page, fix it with submit_act, then call submit_resume. " "It stops before the final submit -- tell the " "user to review the form in the browser and click submit themselves, then call " "submit_close to shut the browser."),
+        "next_step": ("The browser is opening and the wizard will fill itself in from the .sub file. " "Poll submit_status for progress until its `state` is no longer `filling`. If it reports recovery.paused, a step failed: " "inspect it with submit_page, fix it with submit_act, then call submit_resume. " "It stops before the final submit (state `ready_for_review`) -- tell the " "user to review the form in the browser and click submit themselves, then stop polling; call " "submit_close to shut the browser once they say they are done."),
     }
 
 
@@ -1590,8 +1631,13 @@ def submit_status(pid: Optional[int] = None) -> dict[str, Any]:
     not, and the tail of its output -- which is where the step it reached, or
     the traceback that stopped it, will appear.
 
-    A run that is still `running` with the wizard finished is the normal, good
-    end state: it is parked holding the browser open for the author.
+    `state` says where the run is: `filling` (keep polling), `paused` (a step
+    failed and waits for submit_page / submit_act / submit_resume),
+    `ready_for_review` (the wizard finished and the browser is parked open for
+    the author -- the normal, good end state; stop polling), `stopped_on_error`
+    (a step failed and the window is held open at it; stop polling), or
+    `exited` (see `exit_code`). The process stays `running` in the
+    `ready_for_review` and `stopped_on_error` states until submit_close.
     """
     if pid is not None:
         run = _RUNS.get(pid)
@@ -1839,7 +1885,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile (format_manuscript reformats a .docx/.tex for the venue, with its template when one is found; convert_manuscript moves a manuscript between Markdown, Word, and LaTeX) -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status; if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile (format_manuscript reformats a .docx/.tex for the venue, with its template when one is found; convert_manuscript moves a manuscript between Markdown, Word, and LaTeX) -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status until `state` is `ready_for_review` (then stop polling; the process stays running to hold the browser); if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
     )
     for tool in TOOLS:
         server.tool()(tool)

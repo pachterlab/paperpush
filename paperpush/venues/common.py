@@ -116,6 +116,13 @@ def wait_for_manual_sign_in(name: str, slug: str) -> None:
         )
 
 
+# The banners hold_open prints. The MCP server's submit_status looks for them in
+# the run's log to report ``ready_for_review`` / ``stopped_on_error``, so change
+# them here only (never inline) to keep the two in step.
+HOLD_OPEN_FINISHED_BANNER = "Script finished. The browser is left open for you to take over."
+HOLD_OPEN_FAILED_BANNER = "The browser is left open where the run stopped, so you can see the page and finish (or debug) by hand."
+
+
 def hold_open(reason: str | None = None) -> None:
     """Keep the script (and so the launched browser) alive indefinitely.
 
@@ -130,10 +137,12 @@ def hold_open(reason: str | None = None) -> None:
     """
     if reason:
         print(f"\n{reason}")
-        print("The browser is left open where the run stopped, so you can see " "the page and finish (or debug) by hand.")
+        print(HOLD_OPEN_FAILED_BANNER)
     else:
-        print("\nScript finished. The browser is left open for you to take over.")
-    print("Press Ctrl+C here (or close this terminal) to close the browser.")
+        print(f"\n{HOLD_OPEN_FINISHED_BANNER}")
+    # flush: under the MCP server stdout is a log file, and submit_status reads
+    # these banners from it to tell a finished wizard from one still filling.
+    print("Press Ctrl+C here (or close this terminal) to close the browser.", flush=True)
     try:
         while True:
             input()

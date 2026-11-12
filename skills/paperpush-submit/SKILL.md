@@ -167,19 +167,23 @@ portal: point that out and suggest autofill first.
 ### 3. Follow the run and recover from a failed step
 
 **MCP run.** `submit` returns a `pid` as soon as the browser opens. Poll
-`submit_status(pid)`:
+`submit_status(pid)` while its `state` is `filling`, then act on the state:
 
-- It reaches the review page: tell the user the form is filled and waiting
-  for them in the browser.
-- `recovery.paused`: a step failed and the run is waiting (for 30 minutes).
+- `ready_for_review`: the wizard finished. Tell the user the form is filled
+  and waiting for them in the browser, then **stop polling and end your
+  turn**. The process stays `running` on purpose (it holds the browser open
+  until `submit_close`), so a still-running process is not a reason to keep
+  checking.
+- `paused` (`recovery.paused`): a step failed and the run is waiting (for 30 minutes).
   Invoke the `paperpush-portal-debug` skill (via the Skill tool) with the
   `pid`, the `.sub`, and the venue. From then on it owns the run, through
   the review page, the change log, the bug report, and `submit_close`. Do not
   fix the page yourself first, and skip step 4 below.
-- The run has ended with a non-zero exit code instead of pausing (the
-  venue's runner cannot pause, or a pause ran past its 30 minutes): tell the
-  user which step it stopped at (from the output tail) and offer to hand it
-  to `paperpush-portal-debug`, which starts a fresh run to reproduce it.
+- `stopped_on_error`, or `exited` with a non-zero exit code, instead of
+  pausing (the venue's runner cannot pause, or a pause ran past its 30
+  minutes): stop polling, tell the user which step it stopped at (from the
+  output tail), and offer to hand it to `paperpush-portal-debug`, which starts
+  a fresh run to reproduce it.
 - `action_required` (no stored login): go back to step 1.
 
 **CLI run in the user's terminal.** With `--recover by-hand`, a failed step
