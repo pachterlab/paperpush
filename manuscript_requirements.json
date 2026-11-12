@@ -5674,7 +5674,8 @@
   "acl_arr": {
     "source_urls": [
       "https://aclrollingreview.org/cfp",
-      "https://aclrollingreview.org/authorchecklist"
+      "https://aclrollingreview.org/authorchecklist",
+      "https://acl-org.github.io/ACLPUB/formatting.html"
     ],
     "retrieved": "2026-10-23",
     "article_type_field": "paper_type",
@@ -5720,6 +5721,7 @@
       "template_required": true,
       "template_url": "https://github.com/acl-org/acl-style-files",
       "latex_class": "acl",
+      "font_size_pt": 11,
       "notes": [
         "Long papers: up to 8 pages of content; short papers: up to 4 pages; both with unlimited references. Papers exceeding the limit are desk rejected.",
         "Limitations and the optional ethics section follow the conclusion, do not count toward the page limit, and are included in the single submitted PDF.",
@@ -5727,12 +5729,11 @@
         "Appendices go after the references in the same PDF, in double-column format (except approved exceptions), and do not count toward the page limit; the paper must be understandable without them.",
         "Remove comments and leftover revision text; text must be addressed to human readers, and prompt injection aimed at generative tools is desk rejected.",
         "Submission is through OpenReview; resubmissions need an explanation of revisions (may be prepended to the main PDF and also uploaded separately)."
-      ]
+      ],
+      "line_numbers": true
     },
     "abstract": {
-      "notes": [
-        "No abstract length limit is stated in the guidelines."
-      ]
+      "max_words": 200
     },
     "sections": {
       "required": [
@@ -6638,13 +6639,15 @@
       "anonymized": true,
       "template_required": true,
       "template_url": "https://media.eventhosts.cc/Conferences/CVPR2027/author-kit-CVPR2027-v1-latex.zip",
+      "font_size_pt": 10,
       "notes": [
         "Main paper limited to eight pages including figures and tables; extra pages are allowed only for cited references and the mandatory LLM Usage Statement; papers over the limit are rejected without review.",
         "Papers that do not use the CVPR 2027 submission template, or have substantially altered margins or fonts, are rejected without review.",
         "Do not include external links that expand content or subvert review; when in doubt leave links out, including from the reference list. Code may be described as 'will be made publicly available' without citing the codebase.",
         "Hidden prompts or instructions aimed at reviewers or automated tools (prompt injection) lead to desk rejection.",
         "Submission is through OpenReview; paper enrollment (title, abstract, authors) is due Nov 10, 2026 and the paper Nov 16, 2026."
-      ]
+      ],
+      "line_numbers": true
     },
     "abstract": {
       "notes": [
@@ -12513,7 +12516,8 @@
   "tmlr": {
     "source_urls": [
       "https://jmlr.org/tmlr/author-guide.html",
-      "https://jmlr.org/tmlr/submissions.html"
+      "https://jmlr.org/tmlr/submissions.html",
+      "https://github.com/JmlrOrg/tmlr-style-file"
     ],
     "retrieved": "2026-10-23",
     "manuscript": {
@@ -12522,6 +12526,7 @@
       ],
       "template_required": true,
       "anonymized": true,
+      "font_size_pt": 10,
       "notes": [
         "Submissions must be PDFs made with the mandatory TMLR LaTeX style file and template; changes to formatting, fonts, or layout may lead to rejection without review.",
         "Length is unrestricted but must be justified by content; unusually long papers (excluding appendices) may delay review.",
