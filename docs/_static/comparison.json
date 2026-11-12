@@ -27,7 +27,7 @@
     ],
     "portal_filling": [
       "yes",
-      "25 venues"
+      "26 venues"
     ],
     "respond_reviewers": [
       "yes",
@@ -43,7 +43,7 @@
     ],
     "tailored_checks": [
       "yes",
-      "77 venues",
+      "78 venues",
       "(+ any venue, via online guideline scraping)"
     ],
     "non_ai_checks": [
@@ -84,11 +84,11 @@
     ],
     "requirement_db": [
       "yes",
-      "77 venues, open JSON"
+      "78 venues, open JSON"
     ],
     "portal_db": [
       "yes",
-      "25 venues, open JSON"
+      "26 venues, open JSON"
     ],
     "metadata_file": [
       "yes",

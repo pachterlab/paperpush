@@ -82,6 +82,7 @@ Choose your favorite mode: AI agent skills, website, or command line. All modes 
 - Share VENUE.sub.txt with co-authors (it can be viewed in a text editor, with `paperpush web VENUE.sub.txt`, or via upload onto [paperpush.onrender.com](https://paperpush.onrender.com))
 - (If available) `paperpush login VENUE`  # log in to the VENUE submission portal
 - (If available) `paperpush submit VENUE.sub.txt`  # fill out the VENUE submission portal with information in VENUE.sub.txt  # or agent skill /paperpush-submit
+  - Or run every step above in one command: `paperpush prepare-submission VENUE -p MANUSCRIPT_DIR` (autofills through an LLM API key)
   - `submit` is for **initial submissions only**. Upload a revision through the venue's own "submit revision" link for the existing manuscript (prepare it with `/paperpush-respond-to-reviewers`)
 
 ## Install
@@ -257,6 +258,7 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 | --- | --- | :---: | :---: |
 | [ACL Rolling Review](https://aclrollingreview.org) | `acl_arr` | ✅ |  |
 | [CVPR 2027](https://cvpr.thecvf.com/Conferences/2027) | `cvpr_2027` | ✅ |  |
+| [NAACL 2027 Demo Track](https://2027.naacl.org) | `naacl_2027_demo` | ✅ | ✅ |
 <!-- END SUPPORTED VENUES -->
 
 View the list on the command line with `paperpush venues`.

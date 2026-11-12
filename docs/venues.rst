@@ -26,7 +26,7 @@ find venues that fit your manuscript's topic.
 
 .. BEGIN SUPPORTED VENUES
 
-*77 supported venues.*
+*78 supported venues.*
 
 .. list-table::
    :header-rows: 1
@@ -578,6 +578,13 @@ find venues that fit your manuscript's topic.
      - https://cvpr.thecvf.com/Conferences/2027
      - ✅
      -
+   * - ``naacl_2027_demo``
+     - NAACL 2027 Demo Track
+     - natural language processing, machine learning
+     - Conference
+     - https://2027.naacl.org
+     - ✅
+     - ✅
 
 .. END SUPPORTED VENUES
 

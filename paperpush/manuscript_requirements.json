@@ -19444,5 +19444,85 @@
         "Papers that are entirely AI generated, with little or no human writing, are not accepted."
       ]
     }
+  },
+  "naacl_2027_demo": {
+    "source_urls": [
+      "https://2027.naacl.org/calls/system_demonstration/"
+    ],
+    "retrieved": "2026-11-11",
+    "notes": [
+      "Single-blind review: the submission is not anonymous; the paper includes the authors' names and affiliations, and self-references are allowed.",
+      "The submission must include a paper, a demonstration video of up to 2.5 minutes, and a link to a live demo website or a downloadable installation package; submissions without such a link are desk rejected unless sharing one is clearly impossible and the authors explain why.",
+      "Submissions must be original and unpublished (the proceedings are archival) and may not be under review at another conference, workshop, journal, or ARR during NAACL 2027 review; multiple submissions to the demo track must not overlap by more than 25% in content or results.",
+      "The Demonstrations Program is not for commercial sales or marketing.",
+      "Reviewers are expected to interact with the provided live demo or installable package.",
+      "At least one author is expected to present a live demo with a poster at NAACL 2027 in San Francisco.",
+      "Authors must follow the ACM Code of Ethics."
+    ],
+    "manuscript": {
+      "formats": [
+        ".pdf"
+      ],
+      "max_file_size_mb": 50,
+      "max_pages_before_refs": 6,
+      "main_text_end_headings": [
+        "Ethics Statement",
+        "Ethical Considerations",
+        "Ethics and Broader Impact",
+        "Broader Impact",
+        "Broader Impact Statement",
+        "Appendix",
+        "Appendices"
+      ],
+      "count_excludes": [
+        "references",
+        "ethics/broader impact statement",
+        "appendices"
+      ],
+      "anonymized": false,
+      "template_required": true,
+      "notes": [
+        "Papers are at most 6 pages of content; longer submissions are desk rejected.",
+        "An optional ethics/broader impact statement and the references may use unlimited extra space after the 6th page.",
+        "Appendices are permitted but limited to 2 pages.",
+        "Submissions must follow the official NAACL 2027 style guidelines (the style files of the NAACL main conference); submissions that do not follow the guidelines or page limits are desk rejected.",
+        "Accepted papers get one additional page to address reviewers' feedback."
+      ]
+    },
+    "title_page": {
+      "required_items": [
+        "title",
+        "authors",
+        "affiliations"
+      ]
+    },
+    "sections": {
+      "optional": [
+        "Ethics statement"
+      ],
+      "notes": [
+        "The paper should describe the system's design with enough technical detail to judge its validity, quality, and relevance to NLP, including visual aids (screenshots, snapshots, or diagrams).",
+        "The paper should address: what problem the system solves; why it is important and its impact; what is novel; the target audience; how it works; how it compares to existing systems; how it is licensed; and how it was evaluated, including any user studies or human evaluations.",
+        "Submissions with no form of evaluation are desk rejected.",
+        "An ethical considerations section is not required, but papers working with sensitive data or on sensitive tasks that do not discuss these issues will not be accepted."
+      ]
+    },
+    "statements": {
+      "optional": [
+        "ethics_statement"
+      ],
+      "ai_use_if_used": true,
+      "ai_use_locations": [
+        "acknowledgements"
+      ],
+      "notes": [
+        "Any use of generative AI to create content, whether for the research, building the demo, or writing, must be appropriate and fully disclosed in the Acknowledgements (e.g. \"The interface shown in Figure 4 was developed with Claude Code.\"), following the ACL policy on publication ethics."
+      ]
+    },
+    "supplementary": {
+      "notes": [
+        "The demo video may be published on a platform such as YouTube with a link in the paper, or submitted as supplementary material in MPEG4 format; the video is used for evaluation and is not published unless requested."
+      ]
+    }
   }
 }

@@ -91,10 +91,12 @@ password changed since they logged in. Over MCP, call
   venue "could not be checked", or `check.status` `unchecked`, also counts as a
   pass. Some venues need no login (`login_status` says so); go on to step 2.
 - Exit 1, or `failed` / `timed_out`, means nothing is stored or the sign-in
-  failed. **Stop and ask the user** to run, in their own terminal,
+  failed. **Stop and ask the user** to run, in their own terminal window
+  (not with `!` in this session, which gets no keyboard input, so the
+  username and password prompts fail),
 
   ```
-  ! paperpush login <venue>
+  paperpush login <venue>
   ```
 
   This opens a browser and may need their password, ORCID, CAPTCHA, or

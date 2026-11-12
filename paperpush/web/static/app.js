@@ -949,7 +949,6 @@
     }
     if (g.structured_headings) bits.push(`structured: ${g.structured_headings.join(", ")}`);
     if (f.require_url) bits.push("http(s) links");
-    if (f.accept) bits.push(f.accept.join(" "));
     if (f.max_file_size_mb) bits.push(`up to ${f.max_file_size_mb} MB each`);
     if (f.min_value != null || f.max_value != null) bits.push(`${f.min_value ?? ""}–${f.max_value ?? ""}`);
     return bits.join(" · ");
@@ -1328,7 +1327,15 @@
   // opens the Finder itself so the .sub gets the file's real path; on the
   // website the browser's picker uploads a copy), or drop files onto it.
   const acceptOf = (f) => f.accept || (f.id === state.venue.manuscript_field && state.venue.manuscript_formats?.length ? state.venue.manuscript_formats : null);
-  const acceptOk = (f, name) => { const acc = acceptOf(f); return !acc || acc.some((ext) => name.toLowerCase().endsWith(ext.toLowerCase())); };
+  // The manuscript box also takes Word and Markdown sources (autofill reads
+  // them, and paperpush can convert them) even when the venue lists neither.
+  const SOURCE_FORMATS = [".docx", ".md"];
+  const pickerAccept = (f) => {
+    const acc = acceptOf(f);
+    if (!acc) return null;
+    return f.id === state.venue.manuscript_field ? [...new Set([...acc, ...SOURCE_FORMATS])] : acc;
+  };
+  const acceptOk = (f, name) => { const acc = pickerAccept(f); return !acc || acc.some((ext) => name.toLowerCase().endsWith(ext.toLowerCase())); };
   // The listed file a path names. A local session lists files relative to
   // where paperpush runs, so an absolute path in the .sub matches by its tail.
   const fileInfo = (path) => {
@@ -1361,7 +1368,7 @@
 
   // `shown` is the chosen file's path (a single-file box shows it inside).
   function uploadBox(f, id, { multiple, shown, onPicked, onRemove }) {
-    const acc = acceptOf(f);
+    const acc = pickerAccept(f);
     const input = el("input", { type: "file", hidden: true, multiple, accept: acc ? acc.join(",") : null });
     input.addEventListener("change", async () => {
       const files = Array.from(input.files);
@@ -1388,7 +1395,8 @@
       const saved = await uploadFiles(files);
       if (saved.length) onPicked(saved);
     });
-    return el("div", { class: "upload-wrap" }, box, input);
+    const types = acc ? el("p", { class: "hint small accept-types", text: `Accepted file types: ${acc.join(", ")}` }) : null;
+    return el("div", { class: "upload-wrap" }, box, types, input);
   }
 
   function fileWidget(f, id) {

@@ -50,11 +50,15 @@ command line.**
    or to tell you if they already have one. Ask whether they sign in with
    ORCID.
 3. Once `login()` is written (step A4), ask the user to run
-   `! paperpush login <slug>` in this session. This prompts them for the
-   password, verifies it with your `login()` in a real browser, and stores
-   it in the OS keyring (or paperpush's encrypted file fallback). If it fails,
-   the error tells you what to fix in `login()`. Ask them to run it again
-   after the fix.
+   `paperpush login <slug> -u <their username>` **in a separate terminal
+   window** (from the repo root), not in this session. A `!` command here
+   gets no keyboard input, so the username and password prompts fail
+   ("a username is required"). Never suggest `--password` or
+   `PAPERPUSH_PASSWORD` to get around that: both expose the password. The
+   command prompts for the password, verifies it with your `login()` in a
+   real browser, and stores it in the OS keyring (or paperpush's encrypted
+   file fallback). If it fails, ask them to paste the error: it tells you
+   what to fix in `login()`. Ask them to run it again after the fix.
 4. Until then, explore the signed-in portal through a browser the user signs
    into themselves: `paperpush codegen <login_url>`, or a headed Playwright
    page you open and they type into. Save the session state to a scratch file
@@ -119,7 +123,8 @@ python scripts/gen_subfile_templates.py
 - Stop before the final submit and hand off with `hold_open`, as the
   template does. **Never click the send control, in code or by hand.**
 
-Then do credentials step 3 and have the user run `paperpush login <slug>`.
+Then do credentials step 3: have the user run `paperpush login <slug>` in a
+separate terminal (not with `!` in this session).
 
 **A5. Ground-truth sample and tests.**
 - Add `<slug>.sub.txt` to `tests/sample_subfiles.json`, with values for every

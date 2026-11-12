@@ -755,11 +755,23 @@ def _findings_to_issues(findings) -> list[Issue]:
     return issues
 
 
-def _link_issues(venue: Venue, values: dict[str, str]) -> Outcome:
-    """Flag URLs in the manuscript files that an anonymous reader can't reach.
+def _field_urls(venue: Venue, values: dict[str, str]) -> dict[str, str]:
+    """The http(s) URLs typed into the venue's ``require_url`` fields, mapped to the field label."""
+    urls: dict[str, str] = {}
+    for field in venue.fields:
+        if field.require_url:
+            for line in values.get(field.id, "").splitlines():
+                if _is_http_url(line.strip()):
+                    urls.setdefault(line.strip(), field.label)
+    return urls
 
-    Scans the referenced upload files (and archive/PDF text) for http(s) links
-    and reports the ones that are definitively broken -- a 404/gone page, or a
+
+def _link_issues(venue: Venue, values: dict[str, str]) -> Outcome:
+    """Flag URLs in the manuscript files and URL fields that an anonymous reader can't reach.
+
+    Scans the referenced upload files (and archive/PDF text) for http(s) links,
+    adds the URLs given in the venue's ``require_url`` fields (a demo-video link,
+    say), and reports the ones that are definitively broken -- a 404/gone page, or a
     still-private GitHub repository. Runs by default (disable with
     ``--disable-integrity.links``) and makes network requests. Links that get no
     answer (timeouts, bot blocks, no network) are not reported as broken, but
@@ -768,13 +780,16 @@ def _link_issues(venue: Venue, values: dict[str, str]) -> Outcome:
     """
     from . import sensitive
 
-    paths = _upload_paths_or_skip(venue, values)
-    logger.info("Checking %d upload file(s) for unreachable links (%s)", len(paths), venue.slug)
+    paths = list(_iter_upload_paths(venue, values))
+    field_urls = _field_urls(venue, values)
+    if not paths and not field_urls:
+        raise NotApplicable("no files attached")
+    logger.info("Checking %d upload file(s) and %d URL field value(s) for unreachable links (%s)", len(paths), len(field_urls), venue.slug)
     stats: dict = {}
-    issues = _findings_to_issues(sensitive.scan_links(paths, stats=stats))
+    issues = _findings_to_issues(sensitive.scan_links(paths, stats=stats, urls=field_urls))
     probed, unanswered = stats.get("probed", 0), stats.get("unanswered", [])
     if probed and len(unanswered) == probed and not issues:
-        raise Unchecked(f"none of the {probed} link(s) in the files could be reached (no network, or the sites did not answer)")
+        raise Unchecked(f"none of the {probed} link(s) could be reached (no network, or the sites did not answer)")
     if unanswered:
         issues.append(unchecked("", f"{len(unanswered)} of {probed} link(s) got no answer and were not verified: {_listed(unanswered)}"))
     unread = [path.name for path in paths if path.suffix.lower() in (".pdf", ".docx") and not any(True for _ in sensitive._iter_text_blobs(path))]
@@ -1761,9 +1776,9 @@ def validate_report(
 
     integrity = "Integrity"
     if check_links:
-        bar.run("Links", checks.run, "integrity.links", "Links cited in the files are reachable", integrity, _link_issues, venue, values)
+        bar.run("Links", checks.run, "integrity.links", "Links cited in the files and URL fields are reachable", integrity, _link_issues, venue, values)
     else:
-        _record_switched_off(checks, "integrity.links", "Links cited in the files are reachable", integrity, venue, values, "switched off (--disable-integrity.links)")
+        _record_switched_off(checks, "integrity.links", "Links cited in the files and URL fields are reachable", integrity, venue, values, "switched off (--disable-integrity.links)")
     retractions_title = "No cited work has been retracted"
     unmatched_title = "References without a DOI match a registered work"
     versions_title = "References cite the journal article, or the latest preprint"
