@@ -925,14 +925,22 @@ def title_similarity(a: str, b: str) -> float:
 
 
 def _first_author_of(record: dict) -> str:
-    """The registered first author's family name (or a literal/organization name)."""
+    """The registered first author's family name (or a literal/organization name).
+
+    A consortium registered ahead of the people ("the Alzheimer's Disease
+    Neuroimaging Initiative", then Vogel) is passed over for the first person,
+    since a reference lists the people; it is used only when no person is listed.
+    """
     authors = record.get("author")
     if not isinstance(authors, list):
         return ""
+    authors = [a for a in authors if isinstance(a, dict)]
     for author in authors:
-        if not isinstance(author, dict):
-            continue
-        name = author.get("family") or author.get("literal") or author.get("name") or ""
+        name = author.get("family") or ""
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    for author in authors:
+        name = author.get("literal") or author.get("name") or ""
         if isinstance(name, str) and name.strip():
             return name.strip()
     return ""
@@ -1007,7 +1015,8 @@ def _mismatches(entry: Entry, record: dict) -> list[str]:
 
     entry_author = _normalize_text(_entry_first_author(entry.author))
     registered_author = _normalize_text(_first_author_of(record))
-    if entry_author and registered_author and "author" not in entry.unresolved and not _same_family(entry_author, registered_author):
+    groups = [_normalize_text(a.get("name") or a.get("literal") or "") for a in record.get("author") or [] if isinstance(a, dict) and not a.get("family")]
+    if entry_author and registered_author and "author" not in entry.unresolved and not _same_family(entry_author, registered_author) and not any(g and (entry_author in g or g in entry_author) for g in groups):
         problems.append(f"first author is {_entry_first_author(entry.author).strip()} but the DOI is registered to {_first_author_of(record).strip()}")
 
     entry_year, registered_year = _year_value(entry.year), _year_value(_year_of(record))
@@ -1326,8 +1335,8 @@ def bib_structure_findings(paths: Iterable[Path]) -> tuple[list[Finding], int]:
     * an entry with no citation key, which nothing can cite;
     * an entry whose closing brace is missing, which swallows the entries after it;
     * a journal or conference entry with no title or no author;
-    * two keys citing the same arXiv preprint, which lists the work twice (the
-      same DOI on two keys is reported by the DOI check).
+    * two cited keys for the same arXiv preprint, which lists the work twice
+      (the same DOI on two keys is reported by the DOI check).
     """
     from .reference_search import arxiv_id_of
 
@@ -1336,6 +1345,9 @@ def bib_structure_findings(paths: Iterable[Path]) -> tuple[list[Finding], int]:
     keys: dict[str, Entry] = {}
     arxiv: dict[str, Entry] = {}
     seen_files: set[str] = set()
+    paths = list(paths)
+    # A work listed twice prints twice only when both keys are cited.
+    printed = _printed_keys(paths)
     for where, text in _iter_bib_blobs(paths):
         content = " ".join(text.split())
         if content in seen_files:
@@ -1357,7 +1369,7 @@ def bib_structure_findings(paths: Iterable[Path]) -> tuple[list[Finding], int]:
                 if missing:
                     findings.append(Finding(where, "incomplete entry", f"{_cite(entry)} (@{entry.kind}) has no {' or '.join(missing)}"))
             arxiv_id, _ = arxiv_id_of(entry)
-            if arxiv_id and entry.key:
+            if arxiv_id and entry.key and (printed is None or entry.key.lower() in printed):
                 other = arxiv.setdefault(arxiv_id, entry)
                 if other is not entry and other.key.lower() != entry.key.lower():
                     findings.append(Finding(where, "duplicate arXiv preprint", f"{_cite(entry)} and '{other.key}' both cite arXiv:{arxiv_id}; the same work is in the bibliography twice"))

@@ -579,6 +579,12 @@ class Acronyms:
     defined: int = 0
 
 
+def _meaning_key(expansion: str) -> str:
+    """An expansion with case, hyphens, and plural endings set aside: "regions of interest" is "Region of Interest"."""
+    words = re.findall(r"[a-z0-9]+", expansion.lower())
+    return " ".join(w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w for w in words)
+
+
 def acronyms(body: list[str], abstract: list[str] | None = None, floats: list[str] | None = None, tables: list[str] | None = None) -> Acronyms:
     """Acronyms in ``body`` (the main text) and ``abstract`` not introduced at first use.
 
@@ -603,7 +609,7 @@ def acronyms(body: list[str], abstract: list[str] | None = None, floats: list[st
             if a.first_use is not None and a.first_use < a.definitions[0]:
                 out.before_definition.append(f"'{acr}' first appears in {a.snippet}, before it is spelled out")
             meanings = list(dict.fromkeys(a.expansions + (abs_found[acr].expansions if acr in abs_found else [])))
-            if len(meanings) > 1:
+            if len({_meaning_key(m) for m in meanings}) > 1:
                 out.conflicting.append(f"'{acr}' (" + ", ".join(f"'{m}'" for m in meanings) + ")")
             elif len(a.definitions) > 1 and a.expansions:
                 out.redefined.append(f"'{acr}' ({len(a.definitions)} times)")

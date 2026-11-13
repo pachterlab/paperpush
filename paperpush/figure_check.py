@@ -365,18 +365,59 @@ def attached_figures(venue: Venue, values: dict[str, str], rules: FigureRules) -
 
 # --- figures embedded in the manuscript -----------------------------------------------
 
+# Images at least this wide (points) can be the panels of an image grid.
+MIN_GRID_PANEL_WIDTH_PT = 36.0
+
+
+def _grid_panels(images) -> set[int]:
+    """ids of the small images that are panels of a grid, not logos, and much coarser than
+    their neighbors: images under MIN_EMBEDDED_WIDTH_PT in a row of at least three images,
+    or in a row of two whose columns line up with another row of two or more (a 2x2 grid),
+    printed at under half the resolution of the row's sharpest image. A logo or icon stands alone or
+    beside one other."""
+    cands = [im for im in images if im.placed_width >= MIN_GRID_PANEL_WIDTH_PT and im.y1 > im.y0]
+
+    def same_row(a, b):
+        overlap = min(a.y1, b.y1) - max(a.y0, b.y0)
+        return overlap >= 0.5 * min(a.y1 - a.y0, b.y1 - b.y0)
+
+    def same_col(a, b):
+        overlap = min(a.x1, b.x1) - max(a.x0, b.x0)
+        return overlap >= 0.5 * min(a.x1 - a.x0, b.x1 - b.x0)
+
+    rows: list[list] = []
+    for im in sorted(cands, key=lambda i: i.y0):
+        for row in rows:
+            if same_row(row[0], im):
+                row.append(im)
+                break
+        else:
+            rows.append([im])
+    out: set[int] = set()
+    for row in rows:
+        grid = len(row) >= 3 or (len(row) == 2 and any(
+            sum(any(same_col(a, b) for b in r) for a in row) >= 2
+            for r in rows if r is not row and len(r) >= 2))
+        if not grid:
+            continue
+        best = max((im.dpi for im in row if im.dpi), default=0)
+        # Only a panel far coarser than the sharpest in its row: a grid of thumbnails that are
+        # all small (dataset samples, a deliberate low-resolution strip) is the authors' choice.
+        out.update(id(im) for im in row
+                   if im.placed_width < MIN_EMBEDDED_WIDTH_PT and im.dpi and im.dpi < 0.5 * best)
+    return out
+
 
 def _embedded_pdf(doc: document.Document, field_id: str) -> list[Figure]:
     pages = doc.glyph_pages or []
     figures: list[Figure] = []
     for page in pages:
         taken: set[int] = set()
-        n = 0
-        for image in page.images:
+        panels = _grid_panels(page.images)
+        for n, image in enumerate(page.images, 1):
             width_pt = image.placed_width
-            if width_pt < MIN_EMBEDDED_WIDTH_PT or image.dpi is None:
+            if image.dpi is None or (width_pt < MIN_EMBEDDED_WIDTH_PT and id(image) not in panels):
                 continue
-            n += 1
             fig = Figure(f"{doc.path.name} page {page.number}, image {n}", doc.path, field_id, False, "raster", page=page.number)
             fig.width_px, fig.height_px, fig.dpi = image.width_px, image.height_px, image.dpi
             fig.print_width_mm = width_pt / 72 * MM_PER_INCH

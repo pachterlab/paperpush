@@ -119,13 +119,14 @@ def _tex_bibliography(path: Path, source: str) -> Bibliography | None:
     for m in _BIB_NAMES.finditer(source):
         for name in _keys(m.group(1)):
             bibs.append(path.parent / (name if name.lower().endswith(".bib") else name + ".bib"))
-    sources = [p for p in bibs if p.is_file()]
-    if path.suffix.lower() == ".zip":
-        sources.append(path)
+    # A .zip carries its own .bib: the files beside it (often the unzipped sources)
+    # are not what is uploaded, and reading both would count every entry twice.
+    sources = [path] if path.suffix.lower() == ".zip" else [p for p in bibs if p.is_file()]
     entries = references.collect_entries(sources) if sources else []
     if not entries:
         return None
-    refs = [Ref(e.key, e.key, e.author, e.year) for e in entries]
+    # One entry per key: BibTeX keeps the first definition of a key.
+    refs = list({e.key: Ref(e.key, e.key, e.author, e.year) for e in reversed(entries)}.values())[::-1]
     every = "*" in nocite
     known = {r.key for r in refs}
     return Bibliography("keys", refs, cited | (nocite - {"*"}), printed_only_cited=not every, note="\\nocite{*} prints every .bib entry" if every else "", nocite_only=[k for k in named if k in known])

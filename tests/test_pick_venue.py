@@ -11,6 +11,7 @@ shipped database, the ``pick-venue`` CLI end to end via
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -313,7 +314,8 @@ def test_cli_venue_name_and_aliases(capsys):
     for flag in ("--venue-name", "--journal-name", "--conference-name"):
         assert main(["pick-venue", "-n", "1", flag, "nature methods"]) == 0
         out = capsys.readouterr().out
-        assert out.startswith("nature_methods")
+        first_row = out.splitlines()[1]
+        assert first_row.split()[:3] == ["1", "Nature", "Methods"] and "nature_methods" in first_row
 
 
 def test_cli_json_is_machine_readable(capsys):
@@ -331,11 +333,13 @@ def test_cli_json_is_machine_readable(capsys):
 def test_cli_type_filter(capsys):
     from paperpush.cli import main
 
+    assert main(["pick-venue", "--json", "--all", "-t", "preprint"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert len(data["venues"]) == 4
+    assert {v["venue_type"] for v in data["venues"]} == {"preprint"}
     assert main(["pick-venue", "--all", "-t", "preprint"]) == 0
     out = capsys.readouterr().out
-    venue_lines = [line for line in out.splitlines() if line and not line.startswith("Use ")]
-    assert len(venue_lines) == 4
-    assert all("(preprint)" in line for line in venue_lines)
+    assert out.count("Preprint ") == 4 and "Journal " not in out
 
 
 def test_cli_limit_and_hint(capsys):
@@ -343,8 +347,8 @@ def test_cli_limit_and_hint(capsys):
 
     assert main(["pick-venue", "-n", "1", "genetics"]) == 0
     out = capsys.readouterr().out
-    listed = [line for line in out.splitlines() if " (journal)" in line or " (preprint)" in line or " (conference)" in line]
-    assert len(listed) == 1
+    listed = [line for line in out.splitlines() if re.match(r"\s*\d+\s", line)]
+    assert len(listed) == 1 and listed[0].split()[0] == "1"
     # Even a single displayed row keeps the next-step hint, pointing at the top-ranked hit.
     assert f"paperpush subfile {select(keywords=['genetics']).hits[0].venue.slug}" in out
 
@@ -471,8 +475,9 @@ def test_cli_ai_prints_the_models_ranking(fake_llm, capsys):
     assert main(["pick-venue", "--ai", "--provider", "anthropic", "--title", _TCELL_TITLE, "--abstract", _TCELL_ABSTRACT]) == 0
     out = capsys.readouterr().out
     assert "Subjects (anthropic" in out
-    lines = [line for line in out.splitlines() if line.startswith(("science_immunology", "biorxiv"))]
-    assert lines[0].startswith("science_immunology") and "strong: T cell exhaustion" in lines[0]
+    rows = [line for line in out.splitlines() if re.match(r"\s*\d+\s", line)]
+    assert len(rows) == 2 and "science_immunology" in rows[0] and "strong: T cell exhaustion" in rows[0]
+    assert "biorxiv" in out and "Why" in out.splitlines()[1]
     assert "paperpush subfile science_immunology" in out
 
 

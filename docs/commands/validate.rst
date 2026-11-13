@@ -47,6 +47,10 @@ on the line below, or because paperpush has no check for the rule yet (gray)
 exist, or a choice value that isn't one of the venue's allowed options);
 warnings are worth reviewing but don't block submission. See
 :ref:`how findings are reported <vc-report>` and :doc:`../validation-checks`.
+For an example, see this `saved report <../_static/arxiv_validation.pdf>`_:
+an arXiv ``.sub`` for a published CC BY 4.0 paper (`arXiv:2501.09805
+<https://arxiv.org/abs/2501.09805>`_), validated with the AI checks done by
+an agent (``--ai-results``) and saved with ``-o``.
 
 The command exits non-zero if any errors are found, so it fits cleanly into
 scripts and CI.

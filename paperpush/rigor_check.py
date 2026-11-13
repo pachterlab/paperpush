@@ -155,6 +155,21 @@ def _cell_line_matches(text: str) -> list[re.Match[str]]:
     return out
 
 
+# Strain names that are also common abbreviations ("FCSRT-ICR", Immediate Cued
+# Recall; "NSG", a gene; "CD-1", a marker): taken as a strain only with an animal
+# word nearby, and never as part of a hyphenated compound.
+_AMBIGUOUS_STRAINS = {"ICR", "NSG", "CD-1"}
+_ANIMAL_NEAR = re.compile(r"(?i)\b(?:mice|mouse|murine|rats?|animals?|strains?|outbred|inbred)\b")
+
+
+def _is_strain(text: str, m: re.Match[str]) -> bool:
+    if m.group(1) not in _AMBIGUOUS_STRAINS:
+        return True
+    if text[m.start() - 1 : m.start()] == "-" or text[m.end() : m.end() + 1] == "-":
+        return False
+    return bool(_ANIMAL_NEAR.search(text[max(0, m.start() - 80) : m.end() + 80]))
+
+
 def _resource_spans(text: str) -> list[tuple[str, str, int, int]]:
     """``(kind, name, start, end)`` of every research resource named in ``text``, in order."""
     spans: list[tuple[str, str, int, int]] = []
@@ -168,6 +183,8 @@ def _resource_spans(text: str) -> list[tuple[str, str, int, int]]:
         spans.append(("antibody", name, m.start(), m.end()))
     for matches, kind in ((_cell_line_matches(text), "cell line"), (_GENERIC_CELL_LINE.finditer(text), "cell line"), (_STRAIN.finditer(text), "organism"), (_SOFTWARE.finditer(text), "software")):
         for m in matches:
+            if kind == "organism" and not _is_strain(text, m):
+                continue
             spans.append((kind, m.group(1), m.start(), m.end()))
     spans.sort(key=lambda s: s[2])
     # Drop a span inside another (a listed cell line also caught by the generic pattern).

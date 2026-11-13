@@ -115,6 +115,27 @@ def _no_network_openreview(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_network_conference_feeds(monkeypatch, tmp_path_factory):
+    """Keep the suite offline: the conference feeds (conference-agent, CORE, ccfddl, ccfddl acceptance rates) are "unreachable".
+
+    The cache is pointed at an empty per-test directory, so neither a download
+    nor a copy cached on this machine is read. A test exercising the feeds
+    re-patches ``conferences._download`` itself.
+    """
+    import paperpush.conferences as conferences
+
+    def offline(url):
+        raise OSError("offline (test suite)")
+
+    cache = tmp_path_factory.mktemp("conference-cache")
+    monkeypatch.setattr(conferences, "_download", offline)
+    monkeypatch.setattr(conferences, "cache_dir", lambda: cache)
+    conferences.clear_cache()
+    yield
+    conferences.clear_cache()
+
+
+@pytest.fixture(autouse=True)
 def _no_network_doi_checks(monkeypatch):
     """Keep the suite offline: stub DOI resolution to "unknown".
 

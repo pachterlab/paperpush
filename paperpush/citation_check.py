@@ -455,6 +455,10 @@ _WORD_FIELD_ERRORS = re.compile(r"Error!\s+(?:Reference\s+source\s+not\s+found|B
 MAX_XREF_EXAMPLES = 5
 
 
+# Labels a package defines itself, so \\pageref{LastPage} resolves with no \\label.
+_PACKAGE_LABELS = {"lastpage": ("LastPage", "LastPages"), "zref-lastpage": ("LastPage",), "pageslts": ("LastPage", "VeryLastPage", "LastPages")}
+
+
 def tex_undefined_refs(source: str) -> list[str] | None:
     """Keys referenced in ``source`` that no label defines, in order of first use.
 
@@ -465,7 +469,7 @@ def tex_undefined_refs(source: str) -> list[str] | None:
     """
     if re.search(r"\\(?:externaldocument|externalcitedocument)\b", source):
         return None
-    labels: set[str] = set()
+    labels: set[str] = {label for package, defined in _PACKAGE_LABELS.items() if re.search(r"\\usepackage\s*(?:\[[^\]]*\])?\s*\{[^}]*\b" + package + r"\b", source) for label in defined}
     macro_prefixes: list[str] = []
     for m in _XLABEL.finditer(source):
         key = (m.group(1) if m.group(1) is not None else m.group(2)).strip()
@@ -811,15 +815,23 @@ _FILE_NUMBER = re.compile(r"(?:fig(?:ure)?|tab(?:le)?|tbl)[\W_]*(\d{1,3})", re.I
 _NO_OWN_CAPTION = (".xlsx", ".xls", ".csv", ".tsv")  # a spreadsheet carries its title in the file
 
 
+_SI_PARAGRAPH = re.compile(r"\\paragraph\*?\s*\{\s*S\d+\s+(?:Fig|Figure|Table)\b[^}]*\}")
+
+
 def _tex_float_captions(source: str) -> list[tuple[str, int, str | None, str]]:
     """``(series, number, caption text or None, what identifies the float)`` for each figure and table environment."""
     from .manuscript import _tex_to_text
 
     out: list[tuple[str, int, str | None, str]] = []
+    previous_end = 0
     for env, series, number in _tex_envs(source):
         body = env.group(2)
+        before, previous_end = source[previous_end : env.start()], env.end()
         found = list(re.finditer(r"\\caption\*?\s*(?:\[[^\]]*\])?\s*\{", body))
         caption = None
+        # PLOS-style supporting information: the legend is the "\paragraph*{S1 Fig.}"
+        # block just before the float, which has no \caption of its own.
+        lead_in = None if found else next(reversed(list(_SI_PARAGRAPH.finditer(before[-4000:]))), None)
         if found:  # the last \\caption is the float's own; earlier ones belong to its subfigures
             depth, i = 1, found[-1].end()
             while i < len(body) and depth:
@@ -828,6 +840,8 @@ def _tex_float_captions(source: str) -> list[tuple[str, int, str | None, str]]:
             caption = _tex_to_text(body[found[-1].end() : i - 1])
         elif re.search(r"\\\w*caption\w*\b|\\\w*legend\b", body):
             caption = ""  # a package's or the author's own caption macro: there is a caption, its text unread
+        elif lead_in:
+            caption = _tex_to_text(before[-4000:][lead_in.end() :])
         label = _LABEL.search(body)
         graphic = re.search(r"\\includegraphics\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}", body)
         out.append((series, number, caption, (label.group(1) if label else Path(graphic.group(1)).name if graphic else f"number {number}")))

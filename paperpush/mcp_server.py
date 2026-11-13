@@ -237,8 +237,10 @@ def pick_venue(
     venue_types: Optional[list[Literal["preprint", "journal", "conference"]]] = None,
     limit: int = 10,
     paperpush_supported_only: bool = False,
+    venue_type: Literal["all", "journal", "conference"] = "all",
+    archival: Literal["archival", "non-archival", "all"] = "archival",
 ) -> dict[str, Any]:
-    """Find journals for a manuscript, rank the supported venues for it, or search them by name.
+    """Find journals and conferences for a manuscript, rank the supported venues for it, or search them by name.
 
     Give the manuscript's `title`, `abstract`, and `keywords`, or `manuscript`
     (an absolute path to a .tex/.zip/.docx/.pdf, or a .txt/.md holding them)
@@ -266,23 +268,55 @@ def pick_venue(
     says why and only `matches` is filled. Venues are ranked on thematic fit
     alone; follow up with `describe_venue` and `create_subfile` for a
     supported slug, or `validate_subfile` with venue "general" otherwise.
+
+    `venues` is the shortlist as one table, best first, whatever found each
+    venue: name, venue_type, `score` (0-100) and its `basis` ("similar works"
+    from OpenAlex; "subject" for a conference matched on its subjects alone,
+    at most 60; "keywords" for paperpush's own ranking), keywords, link,
+    similar_works, h_index, mean_citedness_2yr, and, for conferences,
+    `core_rank`/`ccf_rank`, the next `abstract_deadline`/`paper_deadline`
+    (`deadline_estimated` when last cycle's dates were moved forward a year),
+    `format` (paper, abstract, or abstract + paper), `limit`, and `archival`
+    (whether its proceedings count as publication). Conference data comes from
+    conference-agent, CORE, and ccfddl; `conference_data.errors` names any feed
+    that could not be read. `venue_type` ("journal", "conference", or "all")
+    picks the kind of venue (`venue_types` overrides it). `archival` filters
+    conferences by whether their proceedings count as publication:
+    "archival" (default) leaves out non-archival meetings (abstract, poster,
+    talk); "non-archival" lists only those (journals and preprint servers are
+    archival, so they are left out); "all" lists both.
     """
     from .database import VENUE_KEYWORDS
     from .openalex import OpenAlexError
-    from .venue_select import find_journals, select
+    from .venue_select import VENUE_TYPE_CHOICES, archival_venue_types, find_journals, select, shortlist
 
-    if not (keywords or title.strip() or abstract.strip() or manuscript or venue_name.strip() or venue_types):
-        raise ValueError("give keywords, a title, abstract, manuscript, venue_name, or venue_types")
-    selection = select(keywords=keywords or (), title=title, abstract=abstract, manuscript=str(_resolve(manuscript)) if manuscript else None, name=venue_name, venue_types=tuple(venue_types or ()))
+    if venue_type not in VENUE_TYPE_CHOICES:
+        raise ValueError(f"venue_type must be one of {', '.join(VENUE_TYPE_CHOICES)}")
+    types = archival_venue_types(archival, tuple(venue_types or ()) or VENUE_TYPE_CHOICES[venue_type])
+    if not (keywords or title.strip() or abstract.strip() or manuscript or venue_name.strip() or types):
+        raise ValueError("give keywords, a title, abstract, manuscript, venue_name, venue_type, or venue_types")
+    selection = select(keywords=keywords or (), title=title, abstract=abstract, manuscript=str(_resolve(manuscript)) if manuscript else None, name=venue_name, venue_types=types)
     result = selection.to_dict(limit=limit)
     result["subject_vocabulary"] = [k for k in VENUE_KEYWORDS if k != "general"]
     result["openalex"] = None
-    if selection.manuscript is not None and not paperpush_supported_only:
+    journals = None
+    beyond_supported = selection.manuscript is not None and not paperpush_supported_only
+    if beyond_supported:
         try:
-            journals = find_journals(selection.manuscript, venue_types=tuple(venue_types or ()))
+            journals = find_journals(selection.manuscript, venue_types=types)
             result["openalex"] = journals.to_dict(limit=limit)
         except (OpenAlexError, ValueError) as exc:
-            result["openalex"] = {"error": f"{exc}; only the supported venues were ranked"}
+            result["openalex"] = {"error": f"{exc}; only the supported venues (and conferences matched on subject) were ranked"}
+    catalog = None
+    if (not types or "conference" in types) and (beyond_supported or any(h.venue.venue_type == "conference" for h in selection.hits)):
+        from .conferences import load_catalog
+
+        catalog = load_catalog()
+    rows = shortlist(selection, journals, catalog, venue_types=types, archival=archival, subject_conferences=beyond_supported)
+    result["venues"] = [r.to_dict() for r in rows[: max(limit, 0)]]
+    result["total_venues"] = len(rows)
+    result["archival"] = archival
+    result["conference_data"] = None if catalog is None else {"errors": dict(catalog.errors)}
     if selection.manuscript is not None and not selection.subjects and not (result["openalex"] or {}).get("journals"):
         result["note"] = "No subject could be inferred; read the manuscript and pass subjects from subject_vocabulary as `keywords`."
     return result

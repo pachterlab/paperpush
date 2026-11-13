@@ -243,8 +243,19 @@ def rerank(works: list[dict], title: str = "", abstract: str = "", keywords: Ite
     return sorted(kept, key=lambda w: -w["similarity"])
 
 
-def similar_works(title: str = "", abstract: str = "", keywords: Iterable[str] = (), *, since_year: int | None = None, per_page: int = MAX_PER_PAGE, types: str = "article|preprint|review") -> tuple[str, list[dict]]:
+#: The OpenAlex work types searched for journal (and preprint) venues.
+JOURNAL_WORK_TYPES = "article|preprint|review"
+#: The OpenAlex work type of a paper in conference proceedings.
+CONFERENCE_WORK_TYPES = "conference-paper"
+
+
+def similar_works(title: str = "", abstract: str = "", keywords: Iterable[str] = (), *, since_year: int | None = None, per_page: int = MAX_PER_PAGE, types: str | Iterable[str] = JOURNAL_WORK_TYPES) -> tuple[str, list[dict]]:
     """The works most similar to a manuscript, best match first (see :func:`rerank`), and the search used.
+
+    ``types`` is an OpenAlex work-type filter (``"article|review"``), or
+    several, searched one request each and reranked together: journal
+    articles far outnumber conference papers, so searching both in one request
+    would leave few conference papers in the top results.
 
     Raises :class:`ValueError` when there is nothing to search on, and
     :class:`OpenAlexError` when OpenAlex does not answer.
@@ -252,18 +263,25 @@ def similar_works(title: str = "", abstract: str = "", keywords: Iterable[str] =
     query = search_terms(title, abstract, keywords)
     if not query:
         raise ValueError("nothing to search on: give a title, abstract, or keywords")
-    filters = [f"type:{types}"] if types else []
-    if since_year:
-        filters.append(f"from_publication_date:{since_year}-01-01")
-    data = get_json("/works", {"search": query, "filter": ",".join(filters), "per_page": min(per_page, MAX_PER_PAGE), "select": _WORK_FIELDS})
-    works = [w for w in data.get("results") or [] if isinstance(w, dict)]
+    groups = [types] if isinstance(types, str) else list(types)
+    works: list[dict] = []
+    seen: set[str] = set()
+    for group in groups or [""]:
+        filters = [f"type:{group}"] if group else []
+        if since_year:
+            filters.append(f"from_publication_date:{since_year}-01-01")
+        data = get_json("/works", {"search": query, "filter": ",".join(filters), "per_page": min(per_page, MAX_PER_PAGE), "select": _WORK_FIELDS})
+        for w in data.get("results") or []:
+            if isinstance(w, dict) and (w.get("id") or id(w)) not in seen:
+                seen.add(w.get("id") or id(w))
+                works.append(w)
     return query, rerank(works, title, abstract, keywords)
 
 
 def sources(ids: Iterable[str]) -> dict[str, dict]:
     """Source records (journals, repositories, ...) keyed by short id, fetched 50 at a time."""
     out: dict[str, dict] = {}
-    select = "id,display_name,issn_l,homepage_url,host_organization_name,is_oa,is_in_doaj,apc_usd,summary_stats,type"
+    select = "id,display_name,issn_l,homepage_url,host_organization_name,is_oa,is_in_doaj,apc_usd,summary_stats,type,topics"
     for batch in _batches(short_id(i) for i in ids):
         data = get_json("/sources", {"filter": "openalex_id:" + "|".join(batch), "per_page": len(batch), "select": select})
         for src in data.get("results") or []:

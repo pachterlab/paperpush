@@ -1,13 +1,18 @@
 ``paperpush pick-venue``
 ========================
 
-Find journals for a manuscript, from its keywords, title, and abstract.
+Find journals and conferences for a manuscript, from its keywords, title, and abstract.
 
 .. code-block:: text
 
    usage: paperpush pick-venue [-h] [-v] [-q] [--manuscript PATH] [--title TEXT]
                                [--abstract TEXT] [-k KW[,KW...]]
-                               [--venue-name NAME] [-t TYPE] [--portal PORTAL]
+                               [--venue-name NAME]
+                               [--venue-type {all,journal,conference}]
+                               [--archival {archival,non-archival,all} | --non-archival]
+                               [-t TYPE]
+                               [--columns COL[,COL...]]
+                               [--hide-columns COL[,COL...]] [--portal PORTAL]
                                [-n N] [--all] [--paperpush-supported-only] [--ai]
                                [--provider {anthropic,openai,google}]
                                [--model MODEL] [--json]
@@ -16,12 +21,15 @@ Find journals for a manuscript, from its keywords, title, and abstract.
 ``pick-venue`` ranks venues on thematic fit only, not on impact or the chance
 of acceptance. It has two rankings.
 
-Any journal (the default)
--------------------------
+Any journal or conference (the default)
+---------------------------------------
 
 Given a manuscript (or its title, abstract, or keywords), ``pick-venue`` looks
 up the works most similar to it in `OpenAlex <https://openalex.org>`_ and
-groups them by the journal, conference, or preprint server that published them:
+groups them by the journal, conference, or preprint server that published them.
+Journal articles and conference papers are searched separately (OpenAlex types
+the latter ``conference-paper``, and journal articles would otherwise crowd
+them out) and scored together:
 
 - The search ORs together the keywords, the title's words, and the abstract's
   most frequent words. Each work found is then scored by how much of its title
@@ -30,26 +38,70 @@ groups them by the journal, conference, or preprint server that published them:
   already has it.
 - A journal scores the sum of its works' similarity, with works from the last
   three years counting fully and older ones less; only works from the last
-  eight years count. The best journal scores 100.
+  eight years count. The best journal or conference scores 100 (a preprint
+  server, which collects similar work from every field, is capped at 100).
 - Aggregators such as PubMed Central are left out; preprint servers (bioRxiv,
-  arXiv, ...) are kept. ``-t journal``, ``-t conference``, or ``-t preprint``
-  narrows the kinds kept.
+  arXiv, ...) are kept. ``--venue-type journal`` or ``--venue-type
+  conference`` keeps one kind (``all``, the default, keeps every kind);
+  ``-t journal``, ``-t conference``, or ``-t preprint`` (repeatable) does the
+  same at a finer grain and overrides ``--venue-type``.
 
-Each journal is listed with its publisher, how many similar works it
-published (and the closest one), its h-index, whether it is open access (and
-in DOAJ), and its article processing charge, as OpenAlex records them. A
-journal PaperPush supports is marked with its slug and what PaperPush can do
-for it (``validate``, ``submit``), and the output ends with the
-``paperpush subfile`` command for the best-ranked supported one. For a
-journal PaperPush does not support, ``paperpush validate --manuscript FILE``
-still runs the general checks, and ``/paperpush-add-venue-validate`` can add
-its guidelines.
+The result is one table, best fit first. Each venue is listed with its
+keywords (PaperPush's subjects for a venue it supports, the conference's
+subjects, or OpenAlex's main topics), its fit score, how many similar works it
+published, its 2-year mean citedness and h-index (OpenAlex; the citedness is an
+open counterpart of the Journal Impact Factor, not the Clarivate figure), its
+publisher, whether it is open access (and in DOAJ), its article processing
+charge, its length limit (from PaperPush's copy of its author guidelines, or
+the conference's call for papers), and a link. A venue PaperPush supports is
+marked with its slug and what PaperPush can do for it (``validate``,
+``submit``), and the output ends with the ``paperpush subfile`` command for the
+best-ranked supported one. For a venue PaperPush does not support,
+``paperpush validate --manuscript FILE`` still runs the general checks, and
+``/paperpush-add-venue-validate`` can add its guidelines.
+
+**Conferences** also get their CORE and CCF ranks, the next abstract and paper
+deadlines, whether they take a full paper, an abstract, or both, and whether
+they are archival. These come from three open feeds, downloaded at most once a
+day and cached under ``~/.cache/paperpush/conferences`` (``PAPERPUSH_OFFLINE=1``
+uses only the cached copies):
+
+- `conference-agent <https://conferenceagent.vercel.app>`_: curated
+  conferences in AI, medicine, genomics, and more, with deadlines, submission
+  format, size, and guidelines;
+- `CORE <https://portal.core.edu.au/conf-ranks/>`_: the CORE rankings of about
+  950 computer-science conferences;
+- `ccfddl <https://ccfddl.com>`_: deadlines and CCF ranks of about 400
+  computer-science conferences.
+
+A deadline marked ``~ ... (est.)`` is last cycle's, moved forward a year,
+because the next one has not been announced; check the conference's site. A
+feed that cannot be reached is named on stderr and its columns stay empty.
+
+Conferences are matched in two ways. Those that published similar papers come
+from OpenAlex as above. conference-agent's conferences that fit the
+manuscript's subjects are added too, since most meetings in biology and
+medicine publish no proceedings and so are not in OpenAlex; their fit score is
+marked ``*`` and is at most 60, so similar-works evidence ranks above it.
+
+**Archival** means the conference publishes full papers in proceedings that
+count as a publication (most computer-science conferences). A non-archival
+meeting takes an abstract, poster, or talk, and leaves the work free to go to
+a journal afterwards. By default only archival conferences are listed;
+``--non-archival`` lists only the non-archival ones (and no journals, which are
+archival), and ``--archival all`` lists both.
+
+Columns that no venue fills are hidden. ``--columns`` and ``--hide-columns``
+choose them by name: ``rank``, ``venue``, ``type``, ``keywords``, ``fit``,
+``works``, ``citedness``, ``h_index``, ``core``, ``ccf``, ``deadline``,
+``format``, ``limit``, ``archival``, ``size``, ``access``, ``paperpush``,
+``link``, and ``reason`` (the ``--ai`` reasons).
 
 This needs network access. OpenAlex's free tier is shared by everyone on the
 same IP address; set ``OPENALEX_API_KEY`` to use your own key. No e-mail
 address or other personal information is sent. If OpenAlex cannot be reached
 (or finds nothing), a note says so on stderr and ``pick-venue`` ranks the
-supported venues instead, as below.
+supported venues instead, as below, plus the conferences matched on subject.
 
 Venues PaperPush supports (``--paperpush-supported-only``)
 ----------------------------------------------------------
@@ -111,8 +163,12 @@ Synopsis
 
 .. code-block:: bash
 
-   paperpush pick-venue manuscript.pdf                    # any journal, from OpenAlex
-   paperpush pick-venue manuscript.pdf -t journal -n 10   # journals only, ten of them
+   paperpush pick-venue manuscript.pdf                    # any journal or conference, from OpenAlex
+   paperpush pick-venue manuscript.pdf --venue-type journal -n 10        # journals only, ten of them
+   paperpush pick-venue manuscript.pdf --venue-type conference           # archival conferences
+   paperpush pick-venue manuscript.pdf --non-archival     # only abstract and poster meetings
+   paperpush pick-venue manuscript.pdf --venue-type conference --archival all   # conferences, archival or not
+   paperpush pick-venue manuscript.pdf --columns venue,fit,core,deadline,archival
    paperpush pick-venue manuscript.pdf --paperpush-supported-only   # supported venues only, offline
    paperpush pick-venue hippocampus, place cells          # keywords
    paperpush pick-venue immunology, genetics              # subjects, directly
@@ -148,10 +204,29 @@ Options
 ``--venue-name NAME``, ``--journal-name NAME``, ``--conference-name NAME``
    Search venues by slug, name, and full name.
 
+``--venue-type {all,journal,conference}``
+   The kind of venue to suggest. Default: ``all`` (journals, conferences, and
+   preprint servers).
+
+``--archival {archival,non-archival,all}``
+   Which conferences to suggest by whether their proceedings count as
+   publication. ``archival`` (default): only archival conferences, plus
+   journals and preprint servers, which are archival. ``non-archival``: only
+   abstract, poster, and talk meetings whose presentations do not count as
+   publication; journals are left out, and ``--venue-type journal`` with it is
+   an error. ``all``: both.
+
+``--non-archival``
+   Short for ``--archival non-archival``.
+
 ``-t TYPE``, ``--type TYPE``
    Only venues of this kind: ``preprint``, ``journal``, or ``conference``.
-   May be repeated. For the any-journal ranking, ``preprint`` keeps preprint
-   servers.
+   May be repeated; overrides ``--venue-type``. For the OpenAlex ranking,
+   ``preprint`` keeps preprint servers.
+
+``--columns COL[,COL...]``, ``--hide-columns COL[,COL...]``
+   The table columns to show (in this order), or to leave out. See above for
+   the names.
 
 ``--portal PORTAL``
    Only venues that submit through this portal (e.g. ``scholarone``). May be
@@ -162,7 +237,7 @@ Options
 
 ``--paperpush-supported-only``
    Rank only the venues PaperPush supports, offline, instead of searching
-   OpenAlex for any journal.
+   OpenAlex for any journal or conference.
 
 ``--ai``
    Ask an LLM to choose the subjects and rank the supported venues, with a reason for
@@ -173,7 +248,18 @@ Options
    model.
 
 ``--json``
-   Print the result as JSON. It includes ``matches`` (each with ``slug``,
+   Print the result as JSON. ``venues`` is the table, best first: each with
+   ``name``, ``venue_type``, ``score`` and its ``basis`` (``similar works``,
+   ``subject``, ``keywords``, or ``ai``), ``keywords``, ``link``,
+   ``publisher``, ``similar_works``, ``example``, ``h_index``,
+   ``mean_citedness_2yr``, ``is_oa``, ``apc_usd``, ``core_rank``,
+   ``ccf_rank``, ``deadlines``, ``abstract_deadline``, ``paper_deadline``,
+   ``deadline_estimated``, ``format``, ``limit``, ``archival`` (true, false,
+   or null when unknown), ``size``, ``paperpush_slug``, ``paperpush_support``,
+   ``reason``, and ``conference`` (everything the feeds say, with their
+   ``sources``); ``total_venues`` counts them all. ``venue_type`` and
+   ``archival`` echo the flags, and ``conference_data.errors`` names any
+   feed that could not be read. It also includes ``matches`` (each with ``slug``,
    ``name``, ``venue_type``, ``portal``, ``keywords``, ``score``, and
    ``reasons``), ``total_matches``, the ``subjects`` used and the
    ``inferred_subjects`` behind them, what was read from the ``manuscript``,
@@ -183,10 +269,11 @@ Options
    ``journals`` (each with ``name``, ``openalex_id``, ``source_type``,
    ``score``, ``similar_works``, ``examples``, ``publisher``, ``issn_l``,
    ``homepage``, ``is_oa``, ``is_in_doaj``, ``apc_usd``, ``h_index``,
-   ``paperpush_slug``, and ``paperpush_support``). It is ``{"error": ...}``
+   ``paperpush_slug``, ``paperpush_support``, and ``topics``). It is ``{"error": ...}``
    when OpenAlex could not be reached, and ``null`` when OpenAlex was not
    asked. The MCP tool ``pick_venue`` returns the same, with
-   ``paperpush_supported_only`` for the flag.
+   ``paperpush_supported_only``, ``venue_type``, and ``archival`` for the
+   flags.
 
 Exit status
 -----------

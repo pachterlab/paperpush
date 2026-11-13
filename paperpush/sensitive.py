@@ -233,7 +233,8 @@ _PERSONAL_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("medical record / patient number", re.compile(r"(?i)\b(?:medical record (?:number|no\.?)|MRN|patient (?:id|identifier|number|no\.?)|hospital number)\s*[:#]?\s*([A-Z]?\d{5,})\b")),
     ("date of birth", re.compile(rf"(?i)\b(?:date of birth|d\.?o\.?b\.?|born(?: on)?)\s*[:,]?\s*({_DATE})")),
     ("social security number", re.compile(r"(?i)\b(?:SSN|social security(?: number| no\.?)?)\s*[:#]?\s*(\d{3}-\d{2}-\d{4})\b")),
-    ("phone number", re.compile(r"(?i)\b(?:tel\.?|phone|mobile|cell)\s*[:.]?\s*(\+?\d[\d ()./-]{7,}\d)")),
+    # The label stands as its own word: never the end of a DOI or URL ("10.1016/J.CELL.2015.12.056").
+    ("phone number", re.compile(r"(?i)(?<![\w./-])(?:tel\.?|phone|mobile|cell)\s*[:.]?\s*(\+?\d[\d ()./-]{7,}\d)")),
 ]
 
 
@@ -286,7 +287,9 @@ def _iter_latex_findings(where: str, text: str) -> Iterator[Finding]:
     total = 0
     for lineno, line in enumerate(text.splitlines(), start=1):
         comment = _latex_comment(line)
-        if comment is None:
+        # A bare "%" ending a line only keeps LaTeX from adding a space (as in a
+        # macro definition); it says nothing, so there is nothing to strip.
+        if comment is None or not comment.strip():
             continue
         total += 1
         if _LATEX_NOTE.search(comment):

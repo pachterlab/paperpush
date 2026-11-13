@@ -54,14 +54,14 @@ def test_build_keeps_pinned_ids_skips_preprints_and_reports_failures(monkeypatch
     assert failed == ["down (HTTP 429)"] and unmatched == []
 
 
-def test_venues_table_shows_citedness_after_type(monkeypatch, capsys):
+def test_venues_table_shows_citedness_in_the_rank_column(monkeypatch, capsys):
     monkeypatch.setattr(venue_metrics, "load", lambda: {"nature": {"mean_citedness_2yr": 21.04}})
-    assert main(["venues", "--columns", "slug,type,citedness"]) == 0
+    assert main(["venues", "-t", "journal", "--columns", "slug,type,rank"]) == 0
     out = capsys.readouterr().out
     header = next(line for line in out.splitlines() if line.startswith("Slug"))
-    assert header.index("Type") < header.index("2-yr citedness")
+    assert header.index("Type") < header.index("Rank")
     nature = next(line for line in out.splitlines() if line.startswith("nature "))
-    assert nature.rstrip().endswith("21.0")
+    assert nature.rstrip().endswith("citedness 21.0")
     assert "not the Clarivate figure" in out
 
 

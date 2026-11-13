@@ -149,6 +149,10 @@ def compare_passage(label: str, field_id: str, value: str, hay: list[str], where
     ratio, start, end = locate(needle, hay)
     if start is not None and ratio >= 0.999:
         return [], f"{label} matches {where}"
+    # Text read from a PDF can lose the spaces around inline math or a change of
+    # font ("that nQ would" read as "thatnQwould"): the same letters are a match.
+    if needle and "".join(needle) in "".join(hay):
+        return [], f"{label} matches {where}"
     if start is None or ratio < min_similarity:
         closest = f" (closest passage {100 * ratio:.0f}% similar)" if start is not None else ""
         return [Issue(WARNING, field_id, f"{label} in the .sub was not found in {where}{closest}; paste the manuscript's text, or update the manuscript")], ""
@@ -226,7 +230,14 @@ def manuscript_title(doc: document.Document) -> str | None:
                     rows.setdefault(round(g.y0), []).append(g)
             from .pdf_layout import join_glyphs
 
-            lines = [join_glyphs(sorted(row, key=lambda g: g.x0)) for _, row in sorted(rows.items(), reverse=True)]
+            # The title is the first block of display-size lines; a heading set in
+            # the same size further down ("Abstract") is not part of it.
+            block: list = []
+            for y, row in sorted(rows.items(), reverse=True):
+                if block and block[-1][0] - y > 2.5 * big:
+                    break
+                block.append((y, row))
+            lines = [join_glyphs(sorted(row, key=lambda g: g.x0)) for _, row in block]
             text = " ".join(lines).strip()
             return text if 2 <= len(text.split()) <= 40 else None
     return None

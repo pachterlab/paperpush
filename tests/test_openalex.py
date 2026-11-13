@@ -204,8 +204,9 @@ def test_find_journals_groups_similar_work_by_source(fake):
     assert {h.name: h.slug for h in found.hits}["bioRxiv (Cold Spring Harbor Laboratory)"] == "biorxiv"
     assert {h.name: h.slug for h in found.hits}["Bioinformatics"] == ""
     assert found.since_year == 2026 - 8
-    # One batched sources call after the works search.
-    assert [c[0] for c in fake.calls] == ["/works", "/sources"]
+    # A journal search, a conference-paper search, then one batched sources call.
+    assert [c[0] for c in fake.calls] == ["/works", "/works", "/sources"]
+    assert [c[1]["filter"].split(",")[0] for c in fake.calls[:2]] == ["type:article|preprint|review", "type:conference-paper"]
 
 
 def test_find_journals_type_filter_keeps_only_preprint_servers(fake):
@@ -236,8 +237,8 @@ def test_cli_pick_venue_lists_any_journal_by_default(fake, capsys):
 
     assert main(["pick-venue", "--title", TITLE, "--abstract", ABSTRACT]) == 0
     out = capsys.readouterr().out
-    assert "Journals publishing similar work (OpenAlex:" in out
-    assert "Bioinformatics -- Oxford University Press" in out
+    assert "Venues publishing similar work (OpenAlex:" in out
+    assert "Bioinformatics" in out and "Oxford University Press" in out
     assert "Use 'paperpush subfile genome_biology'" in out
 
 

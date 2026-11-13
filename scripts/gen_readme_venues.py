@@ -3,7 +3,9 @@
 
 Two artifacts are kept in sync with the database:
 
-* the detailed "Supported venues" table in ``venues.md``, between
+* the detailed "Supported venues" table in ``venues.md`` (with each venue's
+  rank and conference deadlines, from OpenAlex and the conference feeds;
+  ``--check`` ignores those two columns, which change without any edit here), between
 
       <!-- BEGIN SUPPORTED VENUES -->
       <!-- END SUPPORTED VENUES -->
@@ -33,9 +35,11 @@ The ``--check`` form is suitable for CI or a pre-commit hook.
 from __future__ import annotations
 
 import argparse
-import os
 import json
+import os
+import re
 import sys
+from datetime import date
 from pathlib import Path
 
 # Import the package directly from the repo without requiring an install.
@@ -153,20 +157,110 @@ def _linked_name(venue) -> str:
     return f"[{name}]({link})" if link else name
 
 
-def build_table() -> str:
-    """Render the supported-venues Markdown table from the database."""
+# The venues.md columns that come from live feeds (OpenAlex metrics, the
+# conference feeds): --check ignores them, since they change without any edit
+# to the venue databases.
+TABLE_HEADER = ["Slug", "Venue", "Keywords", "Venue type", "Rank", "Next deadline", "Validate", "Submit", "Submission platform", "Description", "Submit walkthrough"]
+LIVE_COLUMNS = ("Rank", "Next deadline")
+LIVE_NOTE = "_Rank and Next deadline as of "
+
+
+def _row_cells(line: str) -> list[str]:
+    """The cells of one Markdown table row (escaped ``\\|`` stays inside its cell)."""
+    return [c.strip() for c in re.split(r"(?<!\\)\|", line.strip())[1:-1]]
+
+
+def _existing_live_cells(path: Path) -> dict[str, dict[str, str]]:
+    """slug -> {live column -> cell} from the venues.md table as it stands."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    header, out = None, {}
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = _row_cells(line)
+        if header is None:
+            header = cells
+        elif "Slug" in header and len(cells) == len(header) and cells[0].startswith("`"):
+            row = dict(zip(header, cells))
+            out[row["Slug"].strip("`")] = {c: row.get(c, "") for c in LIVE_COLUMNS}
+    return out
+
+
+def _live_cells(venues) -> tuple[dict[str, dict[str, str]], bool]:
+    """slug -> {"Rank", "Next deadline"} cells, and whether every conference feed answered."""
+    from paperpush import venue_metrics
+    from paperpush.cli import _venue_deadline_cell, _venue_rank_cell
+    from paperpush.conferences import load_catalog
+
+    catalog = load_catalog()
+    for feed, error in catalog.errors.items():
+        print(f"note: conference data from {feed} is unavailable ({error}); keeping venues.md's cells", file=sys.stderr)
+    out = {}
+    for v in venues:
+        info = catalog.find(v.name, v.full_name, acronym=v.name) if v.venue_type == "conference" else None
+        out[v.slug] = {
+            "Rank": _venue_rank_cell(venue_metrics.mean_citedness_2yr(v.slug), info).replace("\n", "<br>"),
+            "Next deadline": _venue_deadline_cell(info).replace("\n", "<br>"),
+        }
+    return out, not catalog.errors
+
+
+def build_table(*, live: bool = True) -> str:
+    """Render the supported-venues Markdown table from the database.
+
+    ``live`` fetches the Rank and Next deadline cells (cached for a day); a
+    conference cell the feeds could not supply keeps its value in venues.md.
+    Without it, those cells are left blank (``--check`` ignores them anyway).
+    """
     venues = list_venues()
+    cells: dict[str, dict[str, str]] = {}
+    complete = True
+    if live:
+        cells, complete = _live_cells(venues)
+    existing = _existing_live_cells(VENUES_PATH) if live and not complete else {}
     lines = [
         f"_{len(venues)} supported venue" + ("s" if len(venues) != 1 else "") + " (auto-generated from `paperpush/venues.json`)._",
         "",
-        "| Slug | Venue | Keywords | Venue type | Validate | Submit | Submission platform | Description | Submit walkthrough |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        f"{LIVE_NOTE}{date.today().isoformat() if live else '-'}. Rank: OpenAlex's 2-year mean citedness (an open counterpart of the Journal Impact Factor, not comparable across fields), "
+        "and for conferences the CORE and CCF ranks, the latest acceptance rate (ccfddl), and size (conference-agent). "
+        "Deadlines are from conference-agent and ccfddl (~ marks last cycle's dates moved forward a year); check the conference's site. "
+        "`paperpush venues --columns slug,rank,deadline` shows the current values._",
+        "",
+        "| " + " | ".join(TABLE_HEADER) + " |",
+        "| " + " | ".join("---" for _ in TABLE_HEADER) + " |",
     ]
     for j in venues:
         validate, submit = ("yes" if j.supports_validate else "no"), ("yes" if j.supports_submit else "no")
         platform = platform_of(j) if j.has_form else "-"
-        lines.append(f"| `{j.slug}` | {_linked_name(j)} | {_cell(', '.join(j.keywords))} | {_cell(j.venue_type.capitalize())} | {validate} | {submit} | {_cell(platform)} | {_cell(j.description)} | {walkthrough_cell(j.slug, j.supports_submit)} |")
+        live_row = dict(cells.get(j.slug, {}))
+        for column in LIVE_COLUMNS:
+            if not live_row.get(column) and j.venue_type == "conference":
+                live_row[column] = existing.get(j.slug, {}).get(column, "")
+        lines.append(
+            f"| `{j.slug}` | {_linked_name(j)} | {_cell(', '.join(j.keywords))} | {_cell(j.venue_type.capitalize())} | "
+            f"{live_row.get('Rank', '')} | {live_row.get('Next deadline', '')} | {validate} | {submit} | {_cell(platform)} | {_cell(j.description)} | "
+            f"{walkthrough_cell(j.slug, j.supports_submit)} |"
+        )
     return "\n".join(lines)
+
+
+def _without_live_columns(text: str) -> str:
+    """``text`` with the live-feed table cells and the as-of note blanked, for ``--check``."""
+    out, live_idx = [], None
+    for line in text.splitlines():
+        if line.startswith(LIVE_NOTE):
+            line = LIVE_NOTE
+        elif line.startswith("|"):
+            cells = _row_cells(line)
+            if cells and cells[0] == "Slug":
+                live_idx = {i for i, c in enumerate(cells) if c in LIVE_COLUMNS}
+            elif live_idx and not set(cells) <= {"---"}:
+                line = "| " + " | ".join("" if i in live_idx else c for i, c in enumerate(cells)) + " |"
+        out.append(line)
+    return "\n".join(out)
 
 
 def build_venue_groups() -> str:
@@ -251,15 +345,15 @@ def _replace_section(text: str, begin: str, end: str, body: str, where: str) -> 
     return f"{pre}{begin}\n{body}\n{end}{post}"
 
 
-def _sync(path: Path, begin: str, end: str, body: str, *, check: bool) -> bool:
+def _sync(path: Path, begin: str, end: str, body: str, *, check: bool, normalize=None) -> bool:
     """Rewrite (or, in ``check`` mode, verify) one file's generated section.
 
     Returns True when the file is already up to date, False when it is (or would
-    be) changed.
+    be) changed. ``normalize`` maps both sides before ``check`` compares them.
     """
     current = path.read_text(encoding="utf-8")
     updated = _replace_section(current, begin, end, body, path.name)
-    if current == updated:
+    if current == updated or (check and normalize and normalize(current) == normalize(updated)):
         return True
     if check:
         print(
@@ -282,7 +376,8 @@ def main() -> int:
     args = parser.parse_args()
 
     # Evaluate both so --check reports every stale file, not just the first.
-    venues_ok = _sync(VENUES_PATH, BEGIN, END, build_table(), check=args.check)
+    # --check stays offline: the live columns are compared blanked out.
+    venues_ok = _sync(VENUES_PATH, BEGIN, END, build_table(live=not args.check), check=args.check, normalize=_without_live_columns)
     readme_ok = _sync(README_PATH, BEGIN_VENUES, END_VENUES, build_venue_groups(), check=args.check)
     docs_ok = _sync(DOCS_VENUES_PATH, BEGIN_RST, END_RST, "\n" + build_venue_groups_rst() + "\n", check=args.check)
 

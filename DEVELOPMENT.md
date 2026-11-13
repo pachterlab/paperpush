@@ -295,10 +295,16 @@ Update venues.md checklist after running `pytest tests/test_submit.py --run-port
 python scripts/gen_readme_venues.py
 ```
 
+It also refreshes venues.md's Rank and Next deadline columns from OpenAlex
+metrics and the conference feeds (cached for a day). Those two columns change
+without any edit to the venue databases, so `--check` (CI) ignores them, and a
+conference feed that cannot be reached leaves that venue's existing cells in
+place. Rerun the script now and then to keep the deadlines current.
+
 ## Venue citation metrics
 
 `paperpush/venue_metrics.json` holds each venue's OpenAlex 2-year mean
-citedness, shown in the `2-yr citedness` column of `paperpush venues` and as
+citedness, shown in the `Rank` column of `paperpush venues --columns ...,rank` and `venues.md`, and as
 `mean_citedness_2yr` in the MCP `list_supported_venues`. It lives outside
 `venues.json` so older releases keep accepting the published venue data. The
 numbers come from the network, so the pre-commit hook doesn't refresh them;
@@ -505,7 +511,7 @@ rather than in GitHub Actions because datacenter addresses are bot-walled by
 several publishers and the agent runs on the local Claude Code subscription:
 
 ```
-0 3 1 * * /home/jrich/Desktop/paperpush/scripts/scheduled_guidelines.sh
+0 3 1 * * ./scripts/scheduled_guidelines.sh
 ```
 
 ## Venue data updates without a release

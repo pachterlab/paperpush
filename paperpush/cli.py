@@ -152,10 +152,13 @@ def _parse_keywords(text: str) -> list[str]:
 
 # Columns of the `paperpush venues` table, in display order: the names --columns and
 # --hide-columns take.
-_VENUE_COLUMNS = ("slug", "venue", "keywords", "type", "citedness", "link", "validate", "submit")
+_VENUE_COLUMNS = ("slug", "venue", "keywords", "type", "rank", "deadline", "link", "validate", "submit")
+# Shown when --columns is not given: rank and deadline (from the conference
+# feeds and OpenAlex) are opt-in, and listed in full in venues.md.
+_VENUE_DEFAULT_COLUMNS = tuple(c for c in _VENUE_COLUMNS if c not in ("rank", "deadline"))
 
 
-def _parse_columns(text: str, flag: str) -> list[str]:
+def _parse_columns(text: str, flag: str, allowed: tuple[str, ...] = _VENUE_COLUMNS) -> list[str]:
     """Split a ``--columns``/``--hide-columns`` value into known column names, or raise ValueError."""
     from difflib import get_close_matches
 
@@ -164,17 +167,17 @@ def _parse_columns(text: str, flag: str) -> list[str]:
         raise ValueError(f"{flag} needs at least one column")
     problems = []
     for c in wanted:
-        if c not in _VENUE_COLUMNS:
-            close = get_close_matches(c, _VENUE_COLUMNS, n=1)
+        if c not in allowed:
+            close = get_close_matches(c, allowed, n=1)
             problems.append(f"unknown column {c!r}" + (f" (did you mean {close[0]!r}?)" if close else ""))
     if problems:
-        raise ValueError("; ".join(problems) + ". Columns: " + ", ".join(_VENUE_COLUMNS))
+        raise ValueError("; ".join(problems) + ". Columns: " + ", ".join(allowed))
     return list(dict.fromkeys(wanted))
 
 
-def _select_columns(columns: list[str] | None, hidden: list[str] | None) -> list[str]:
-    """The columns to show: ``columns`` in the order given (default: all), minus ``hidden``."""
-    shown = [c for c in (columns or _VENUE_COLUMNS) if c not in set(hidden or ())]
+def _select_columns(columns: list[str] | None, hidden: list[str] | None, default: tuple[str, ...] = _VENUE_DEFAULT_COLUMNS) -> list[str]:
+    """The columns to show: ``columns`` in the order given (else ``default``), minus ``hidden``."""
+    shown = [c for c in (columns or default) if c not in set(hidden or ())]
     if not shown:
         raise ValueError("no columns left to show")
     return shown
@@ -183,6 +186,68 @@ def _select_columns(columns: list[str] | None, hidden: list[str] | None) -> list
 @_validate
 def _fmt_citedness(value: float | None) -> str:
     return f"{value:.1f}" if value is not None else ""
+
+
+# The `paperpush venues` columns that shrink (wrapping or folding) when the terminal is narrow.
+_VENUE_FLEX_COLUMNS = ("slug", "venue", "keywords", "link")
+
+
+def _fit_widths(headers: list[str], rows: list[list[str]], flex: list[bool], available: int, floor: int = 6) -> list[int | None]:
+    """Column widths that fit ``available`` characters, or all None when the table fits as is.
+
+    rich shrinks an over-wide table by cutting every column evenly, and a column
+    that cannot wrap (a type, a check mark) then springs back and pushes the table
+    past the edge. This keeps those columns whole instead: the ``flex`` columns
+    give up width, widest first, down to ``floor``; the others shrink only to
+    their longest word (a header may wrap) and only once the flex ones are spent.
+    """
+    natural = [max([len(h)] + [len(line) for r in rows for line in r[i].splitlines()]) for i, h in enumerate(headers)]
+    if sum(natural) <= available:
+        return [None] * len(headers)
+    longest_word = [max([len(w) for h in [headers[i]] for w in h.split()] + [len(w) for r in rows for w in r[i].split()], default=1) for i in range(len(headers))]
+    widths = list(natural)
+    minimum = [min(natural[i], max(floor, len(headers[i]))) if flex[i] else min(natural[i], max(longest_word[i], 1)) for i in range(len(headers))]
+    # Fixed columns (no word breaks allowed) keep their longest word; their header can wrap.
+    for group in ([i for i in range(len(widths)) if flex[i]], [i for i in range(len(widths)) if not flex[i]]):
+        while sum(widths) > available:
+            shrinkable = [i for i in group if widths[i] > minimum[i]]
+            if not shrinkable:
+                break
+            widest = max(shrinkable, key=lambda i: widths[i])
+            widths[widest] -= 1
+    return widths
+
+
+def _venue_deadline_cell(info) -> str:
+    """A conference's next deadlines, one per line (``abstract DATE`` / ``paper DATE``)."""
+    if info is None:
+        return ""
+    text = info.deadlines_text()
+    estimated = text.startswith("~")
+    if estimated:
+        text = text.removeprefix("~").removesuffix(" (est.)")
+    return "\n".join(("~" if estimated else "") + part for part in text.split(", ") if part)
+
+
+def _venue_rank_cell(citedness: float | None, info) -> str:
+    """Everything known about a venue's standing, one item per line.
+
+    OpenAlex's 2-year citedness for any venue; for a conference, also its CORE
+    and CCF ranks, latest acceptance rate (ccfddl), and size (conference-agent).
+    """
+    lines = []
+    if citedness is not None:
+        lines.append(f"citedness {_fmt_citedness(citedness)}")
+    if info is not None:
+        if info.core_rank:
+            lines.append(f"CORE {info.core_rank}")
+        if info.ccf_rank:
+            lines.append(f"CCF {info.ccf_rank}")
+        if info.acceptance_rate:
+            lines.append(f"accept rate {info.acceptance_rate}")
+        if info.size:
+            lines.append(f"size {info.size}")
+    return "\n".join(lines)
 
 
 def _print_venues(
@@ -218,35 +283,65 @@ def _print_venues(
     order = {venue_type: i for i, (venue_type, _) in enumerate(_VENUE_GROUPS)}
     venues = sorted(venues, key=lambda v: (order.get(v.venue_type, len(order)), v.name.lower()))
 
+    # Conference data (conference-agent, CORE, ccfddl; cached for a day): only
+    # when the list has conferences, since it is blank for everything else.
+    conferences = [v for v in venues if v.venue_type == "conference"]
+    shown = [c for c in (columns or _VENUE_DEFAULT_COLUMNS) if c != "deadline" or conferences]
+    conference_info: dict[str, object] = {}
+    if conferences and {"deadline", "rank"} & set(shown):
+        from .conferences import load_catalog
+
+        catalog = load_catalog()
+        for feed, error in catalog.errors.items():
+            print(f"note: conference data from {feed} is unavailable ({error}).", file=sys.stderr)
+        conference_info = {v.slug: catalog.find(v.name, v.full_name, acronym=v.name) for v in conferences}
+
     # name -> (header, rich column options, cell value for a venue)
     specs = {
-        # Slug and name never truncate; keywords and link wrap instead when space is short.
-        "slug": ("Slug", dict(style="cyan", no_wrap=True, min_width=max(len(v.slug) for v in venues)), lambda v: v.slug),
-        "venue": ("Venue", dict(no_wrap=True, min_width=max(len(v.name) for v in venues)), lambda v: v.name),
-        "keywords": ("Keywords", dict(ratio=1, min_width=12), lambda v: ", ".join(v.keywords)),
+        # Nothing truncates: when the terminal is narrow every text column wraps
+        # (long words folded) rather than pushing columns off the table.
+        "slug": ("Slug", dict(style="cyan", overflow="fold", min_width=6), lambda v: v.slug),
+        "venue": ("Venue", dict(overflow="fold", min_width=6), lambda v: v.name),
+        "keywords": ("Keywords", dict(overflow="fold", ratio=1, min_width=6), lambda v: ", ".join(v.keywords)),
         "type": ("Type", dict(no_wrap=True), lambda v: _TYPE_LABELS.get(v.venue_type, v.venue_type.capitalize())),
-        # OpenAlex 2-year mean citedness (see paperpush/venue_metrics.py); blank for preprint servers and unmatched venues.
-        "citedness": ("2-yr citedness", dict(justify="right", no_wrap=True), lambda v: _fmt_citedness(venue_metrics.mean_citedness_2yr(v.slug))),
-        "link": ("Link", dict(style="dim", overflow="fold", ratio=1, min_width=12), lambda v: v.site_url or v.submission_url),
+        # OpenAlex 2-year mean citedness (see paperpush/venue_metrics.py) for any
+        # venue OpenAlex matched; CORE, CCF, acceptance rate, and size for conferences.
+        "rank": ("Rank", dict(min_width=9), lambda v: _venue_rank_cell(venue_metrics.mean_citedness_2yr(v.slug), conference_info.get(v.slug))),
+        "deadline": ("Next deadline", dict(min_width=10), lambda v: _venue_deadline_cell(conference_info.get(v.slug))),
+        "link": ("Link", dict(style="dim", overflow="fold", ratio=1, min_width=6), lambda v: v.site_url or v.submission_url),
         "validate": ("Validate", dict(justify="center", style="green", no_wrap=True), lambda v: _CHECK if v.supports_validate else ""),
         "submit": ("Submit", dict(justify="center", style="green", no_wrap=True), lambda v: _CHECK if v.supports_submit else ""),
     }
-    shown = list(columns or _VENUE_COLUMNS)
-    table = Table(box=None, header_style="bold", pad_edge=False)
-    for name in shown:
-        header, options, _ = specs[name]
-        table.add_column(header, **options)
-    for venue in venues:
-        table.add_row(*(specs[name][2](venue) for name in shown))
-
+    # Rank (blank for preprint servers and unmatched venues) and deadlines drop
+    # out when no listed venue has one, leaving the room to the other columns.
+    shown = [c for c in shown if c not in ("rank", "deadline") or any(specs[c][2](v) for v in venues)]
     console = Console()
     if not console.is_terminal:
         # Piped or captured: one row per line rather than squeezing to 80 columns.
         console = Console(width=max(console.width, 250))
+    cells = [[specs[name][2](venue) for name in shown] for venue in venues]
+    gap = 1 if console.width < 100 else 2  # one space between columns when narrow
+    widths = _fit_widths([specs[n][0] for n in shown], cells, [n in _VENUE_FLEX_COLUMNS for n in shown], console.width - gap * (len(shown) - 1))
+    table = Table(box=None, header_style="bold", pad_edge=False, collapse_padding=gap == 1)
+    for name, width in zip(shown, widths):
+        header, options, _ = specs[name]
+        table.add_column(header, **(options | ({"width": width} if width else {})))
+    for row in cells:
+        table.add_row(*row)
     console.print(table)
-    if "citedness" in shown:
-        console.print("\n2-yr citedness: OpenAlex's 2-year mean citations per work, an open counterpart of the Journal Impact Factor (not the Clarivate figure). Not comparable across fields.", highlight=False, soft_wrap=True)
-    console.print(f"\nFor more details, see {_VENUES_URL}", highlight=False, soft_wrap=True)
+    if "rank" in shown:
+        console.print(
+            "\nRank: citedness is OpenAlex's 2-year mean citations per work, an open counterpart of the Journal Impact Factor "
+            "(not the Clarivate figure), not comparable across fields. For conferences: CORE rank (A*, A, B, C), CCF rank "
+            "(China Computer Federation: A, B, C), the latest acceptance rate from ccfddl, and size from conference-agent.",
+            highlight=False,
+            soft_wrap=True,
+        )
+    if "deadline" in shown:
+        console.print("\nNext deadline: from conference-agent and ccfddl; ~ marks last cycle's dates moved forward a year. Check the conference's site.", highlight=False, soft_wrap=True)
+    if conferences:
+        console.print("\nSee more information on major conferences at https://conferenceagent.vercel.app", highlight=False, soft_wrap=True)
+    console.print(f"\nFor ranks, deadlines, and more details, see {_VENUES_URL} (or add rank,deadline to --columns)", highlight=False, soft_wrap=True)
     console.print(f"Venue data: {venue_data.active_source().describe()} (refresh with 'paperpush update-venues')", highlight=False, soft_wrap=True)
     console.print(
         "'paperpush validate --manuscript FILE' runs general-purpose checks on any manuscript, whether or not its venue is listed; "
@@ -631,11 +726,92 @@ def _cmd_web(args: argparse.Namespace) -> int:
     )
 
 
+# Columns of the `paperpush pick-venue` table, in display order: the names its
+# --columns and --hide-columns take. A column left empty by every row is hidden.
+_PICK_COLUMNS = ("rank", "venue", "type", "keywords", "fit", "works", "citedness", "h_index", "core", "ccf", "deadline", "format", "limit", "archival", "size", "access", "paperpush", "link", "reason")
+
+
+def _print_pick_table(rows, columns: list[str] | None = None) -> None:
+    """The pick-venue shortlist as a table (``rows``: :class:`~paperpush.venue_select.VenueRow`)."""
+    from rich.console import Console
+    from rich.table import Table
+
+    def yes_no(value: str) -> str:
+        return {"yes": "yes", "no": "no"}.get(value, "")
+
+    specs = {
+        "rank": ("#", dict(justify="right", no_wrap=True, style="dim"), lambda i, r: str(i)),
+        "venue": ("Venue", dict(min_width=18, ratio=2), lambda i, r: r.name + (f"\n[dim]{r.publisher}[/dim]" if r.publisher and r.venue_type != "conference" else "")),
+        "type": ("Type", dict(no_wrap=True), lambda i, r: _TYPE_LABELS.get(r.venue_type, r.venue_type.capitalize())),
+        "keywords": ("Keywords", dict(ratio=1, min_width=8), lambda i, r: ", ".join(r.keywords[:3])),
+        "fit": ("Fit", dict(justify="right", no_wrap=True), lambda i, r: "" if r.score is None else f"{r.score}" + ("*" if r.basis == "subject" else "")),
+        "works": ("Similar", dict(justify="right", no_wrap=True), lambda i, r: "" if r.similar_works is None else str(r.similar_works)),
+        "citedness": ("2-yr cit.", dict(justify="right", no_wrap=True), lambda i, r: _fmt_citedness(r.mean_citedness_2yr)),
+        "h_index": ("h-index", dict(justify="right", no_wrap=True), lambda i, r: "" if r.h_index is None else str(r.h_index)),
+        "core": ("CORE", dict(no_wrap=True), lambda i, r: r.core_rank),
+        "ccf": ("CCF", dict(no_wrap=True), lambda i, r: r.ccf_rank),
+        "deadline": ("Next deadline", dict(min_width=12), lambda i, r: r.deadlines.replace(", ", "\n")),
+        "format": ("Submit", dict(no_wrap=True), lambda i, r: r.format),
+        "limit": ("Limit", dict(min_width=8), lambda i, r: r.limit),
+        "archival": ("Archival", dict(justify="center", no_wrap=True), lambda i, r: yes_no(r.archival)),
+        "size": ("Size", dict(no_wrap=True), lambda i, r: r.size),
+        "access": ("Access", dict(), lambda i, r: r.access),
+        "paperpush": ("paperpush", dict(style="cyan"), lambda i, r: f"{r.slug}\n[dim]{r.support}[/dim]" if r.slug else ""),
+        "link": ("Link", dict(style="dim", overflow="fold", ratio=1, min_width=8), lambda i, r: r.link),
+        "reason": ("Why", dict(ratio=2, min_width=16), lambda i, r: r.reason),
+    }
+    wanted = list(columns or _PICK_COLUMNS)
+    cells = {name: [specs[name][2](i, r) for i, r in enumerate(rows, 1)] for name in wanted}
+    # Hide what no row has (a journals-only list has no deadlines), unless asked for by name.
+    shown = [n for n in wanted if columns or (any(cells[n]) and (n != "reason" or any(r.basis == "ai" for r in rows)))]
+    table = Table(box=None, header_style="bold", pad_edge=False)
+    for name in shown:
+        table.add_column(specs[name][0], **specs[name][1])
+    for i in range(len(rows)):
+        table.add_row(*(cells[name][i] for name in shown))
+    console = Console()
+    if not console.is_terminal:
+        console = Console(width=max(console.width, 250))
+    console.print(table)
+    notes = []
+    if "fit" in shown:
+        bases = {r.basis for r in rows if r.score is not None}
+        if "similar works" in bases:
+            text = "Fit: how closely the venue's recent papers match (OpenAlex similar works; the best journal or conference is 100)" + ("; * = a conference matched on its subjects alone (at most 60)" if "subject" in bases else "")
+        elif "subject" in bases:
+            text = "Fit: how well the venue's subjects match the manuscript's (best = 100; * = a conference matched on its subjects, at most 60)"
+        else:
+            text = "Fit: how well the venue's paperpush subject keywords (and name) match the input (best = 100)"
+        notes.append(text + ". It is not a measure of impact or of the chance of acceptance.")
+    if "citedness" in shown:
+        notes.append("2-yr cit.: OpenAlex's 2-year mean citations per work, an open counterpart of the Journal Impact Factor (not the Clarivate figure); not comparable across fields.")
+    if "core" in shown or "ccf" in shown:
+        notes.append("CORE / CCF: the CORE (portal.core.edu.au) and China Computer Federation rankings of computer-science conferences.")
+    if "deadline" in shown:
+        notes.append("Next deadline: from conference-agent and ccfddl; ~ (est.) marks last cycle's dates moved forward a year. Check the conference's site.")
+    if "archival" in shown:
+        notes.append("Archival: whether the conference publishes full papers in proceedings that count as publication; a non-archival meeting (abstract, poster, talk) leaves the work free for a journal.")
+    for note in notes:
+        console.print(note, highlight=False, soft_wrap=True, style="dim")
+
+
 @_validate
 def _cmd_pick_venue(args: argparse.Namespace) -> int:
     from .autofill import AutofillApiError
     from .openalex import OpenAlexError
-    from .venue_select import find_journals, format_hits, format_journals, pick_venues, rank_via_api, select
+    from .venue_select import VENUE_TYPE_CHOICES, archival_venue_types, find_journals, pick_venues, rank_via_api, rows_from_hits, select, shortlist
+
+    try:
+        columns = None
+        if args.columns is not None or args.hide_columns is not None:
+            columns = _select_columns(
+                _parse_columns(args.columns, "--columns", _PICK_COLUMNS) if args.columns is not None else None,
+                _parse_columns(args.hide_columns, "--hide-columns", _PICK_COLUMNS) if args.hide_columns is not None else None,
+                _PICK_COLUMNS,
+            )
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
     positional = list(args.keywords_pos or [])
     manuscript = args.manuscript
@@ -645,13 +821,20 @@ def _cmd_pick_venue(args: argparse.Namespace) -> int:
     # Positional words form phrases; commas separate keywords ("single cell, T cell exhaustion").
     keywords = ([" ".join(positional)] if positional else []) + list(args.keywords or [])
     name = args.venue_name or ""
-    if not (keywords or args.title or args.abstract or manuscript or name or args.types or args.portal):
-        print("error: pick-venue needs keywords, --title, --abstract, --manuscript, --venue-name, --type, or --portal", file=sys.stderr)
+    types = tuple(args.types or ()) or VENUE_TYPE_CHOICES[args.venue_type]
+    archival = args.archival
+    try:
+        types = archival_venue_types(archival, types)
+    except ValueError as exc:
+        print(f"error: --archival non-archival: {exc}", file=sys.stderr)
+        return 2
+    if not (keywords or args.title or args.abstract or manuscript or name or args.types or args.portal or args.venue_type != "all" or archival == "non-archival"):
+        print("error: pick-venue needs keywords, --title, --abstract, --manuscript, --venue-name, --venue-type, or --portal", file=sys.stderr)
         print("Run 'paperpush pick-venue --help' for usage.", file=sys.stderr)
         return 2
 
     try:
-        selection = select(keywords=keywords, title=args.title or "", abstract=args.abstract or "", manuscript=manuscript, name=name, venue_types=tuple(args.types or ()), portals=tuple(args.portal or ()))
+        selection = select(keywords=keywords, title=args.title or "", abstract=args.abstract or "", manuscript=manuscript, name=name, venue_types=types, portals=tuple(args.portal or ()))
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -660,34 +843,53 @@ def _cmd_pick_venue(args: argparse.Namespace) -> int:
         print(f"error: found no title, abstract, or text to go on in {mq.source}", file=sys.stderr)
         return 1
 
-    # Any journal, from OpenAlex: the default for manuscript input. A venue-name
-    # search, a portal filter, and --ai are about the supported venues only.
+    # Any journal or conference, from OpenAlex: the default for manuscript input.
+    # A venue-name search, a portal filter, and --ai are about the supported venues only.
     journals = None
     openalex_error = ""
-    use_openalex = mq is not None and not args.paperpush_supported_only and not args.ai and not args.portal
-    if use_openalex:
+    beyond_supported = mq is not None and not args.paperpush_supported_only and not args.ai and not args.portal
+    if beyond_supported:
         try:
-            journals = find_journals(mq, venue_types=tuple(args.types or ()))
+            journals = find_journals(mq, venue_types=types)
         except (OpenAlexError, ValueError) as exc:
             openalex_error = str(exc)
         if journals is not None and not journals.hits:
-            openalex_error = "OpenAlex found no journals publishing similar work"
+            openalex_error = "OpenAlex found no venues publishing similar work"
         if openalex_error:
-            print(f"note: {openalex_error}; ranking only the venues paperpush supports.", file=sys.stderr)
+            print(f"note: {openalex_error}; ranking only the venues paperpush supports" + (" and conferences matched on subject." if "conference" in (types or ("conference",)) else "."), file=sys.stderr)
+
+    # Conference rankings, deadlines, and formats: loaded only when conferences can show up.
+    catalog = None
+    wants_conferences = not types or "conference" in types
+    if wants_conferences and (beyond_supported or any(h.venue.venue_type == "conference" for h in selection.hits)):
+        from .conferences import load_catalog
+
+        catalog = load_catalog()
+        for feed, error in catalog.errors.items():
+            print(f"note: conference data from {feed} is unavailable ({error}).", file=sys.stderr)
 
     ranking = None
+    candidates = []
     if args.ai:
         if mq is None:
             print("error: --ai needs something to judge: keywords, --title, --abstract, or --manuscript", file=sys.stderr)
             return 2
-        judged = mq
-        candidates = [h.venue for h in pick_venues("", venue_types=tuple(args.types or ()), portals=tuple(args.portal or ()))]
+        candidates = [h.venue for h in pick_venues("", venue_types=types, portals=tuple(args.portal or ()))]
         limit = len(candidates) if args.all else max(args.limit, 1)
         try:
-            ranking = rank_via_api(judged, candidates, limit=limit, provider=args.provider, model=args.model)
+            ranking = rank_via_api(mq, candidates, limit=limit, provider=args.provider, model=args.model)
         except AutofillApiError as exc:
             print(f"error: --ai: {exc}", file=sys.stderr)
             return 1
+
+    # The table: OpenAlex's venues, else paperpush's ranking (or the --ai one);
+    # plus, for a manuscript, conferences matched on subject.
+    if ranking is not None:
+        by_slug = {h.venue.slug: h for h in pick_venues("", venues=candidates)}
+        rows = rows_from_hits([by_slug[p.slug] for p in ranking.picks if p.slug in by_slug], catalog, reasons={p.slug: f"{p.fit}: {p.reason}" for p in ranking.picks}, basis="ai")
+    else:
+        rows = shortlist(selection, journals, catalog, venue_types=types, archival=archival, subject_conferences=beyond_supported)
+    shown = rows if args.all else rows[: max(args.limit, 0)]
 
     if args.json:
         data = selection.to_dict(limit=None if args.all else args.limit)
@@ -698,32 +900,24 @@ def _cmd_pick_venue(args: argparse.Namespace) -> int:
         if journals is not None and journals.hits:
             data["openalex"] = journals.to_dict(limit=None if args.all else args.limit)
         else:
-            data["openalex"] = {"error": openalex_error} if use_openalex else None
+            data["openalex"] = {"error": openalex_error} if beyond_supported else None
+        data["venues"] = [r.to_dict() for r in shown]
+        data["total_venues"] = len(rows)
+        data["venue_type"] = args.venue_type if not args.types else list(args.types)
+        data["archival"] = archival
+        data["conference_data"] = None if catalog is None else {"errors": dict(catalog.errors)}
         json.dump(data, sys.stdout, indent=2)
         print()
-        return 0 if (selection.hits or (ranking and ranking.picks) or (journals is not None and journals.hits)) else 1
+        return 0 if (rows or selection.hits or (ranking and ranking.picks)) else 1
 
     if mq is not None and mq.source not in ("query", "options"):
-        found = [name for name, value in (("title", mq.title), ("abstract", mq.abstract), ("keywords", mq.keywords)) if value]
+        found = [part for part, value in (("title", mq.title), ("abstract", mq.abstract), ("keywords", mq.keywords)) if value]
         if found:
             print(f"Read the {' and '.join(found) if len(found) < 3 else 'title, abstract, and keywords'} from {mq.source}.")
         else:
             print(f"No title or abstract found in {mq.source}; used the start of its text.")
         if mq.title:
             print(f"  Title: {mq.title}")
-    if journals is not None and journals.hits:
-        shown_journals = journals.hits if args.all else journals.hits[: max(args.limit, 0)]
-        print(f"Journals publishing similar work (OpenAlex: {journals.works} similar works since {journals.since_year}):")
-        for line in format_journals(shown_journals):
-            print(line)
-        supported = [h for h in journals.hits if h.slug]
-        if supported:
-            print(f"\nUse 'paperpush subfile {supported[0].slug}' to create the submission template for {supported[0].name}, the best match paperpush supports.")
-        elif selection.hits:
-            print(f"\npaperpush supports none of these; the closest supported venue is {selection.hits[0].venue.slug} (rank only supported venues with --paperpush-supported-only).")
-        print("For a venue paperpush does not support, 'paperpush validate --manuscript FILE' runs the general checks.")
-        print("Ranked by how many similar works each published, how closely they match, and how recent they are -- not by impact or the chance of acceptance.")
-        return 0
 
     if ranking is not None:
         if ranking.subjects:
@@ -731,23 +925,18 @@ def _cmd_pick_venue(args: argparse.Namespace) -> int:
         if not ranking.picks:
             print("error: the model picked no venues", file=sys.stderr)
             return 1
-        by_slug = {h.venue.slug: h for h in pick_venues("", venues=candidates)}
-        shown = [by_slug[p.slug] for p in ranking.picks]
-        reasons = {p.slug: f"{p.fit}: {p.reason}" for p in ranking.picks}
-        for line in format_hits(shown, reasons=reasons):
-            print(line)
-        print(f"\nUse 'paperpush subfile {ranking.picks[0].slug}' to create its submission template.")
-        return 0
+    elif journals is not None and journals.hits:
+        kinds = {"journal": "Journals", "conference": "Conferences"}.get(types[0], "Venues") if len(types) == 1 else "Venues"
+        print(f"{kinds} publishing similar work (OpenAlex: {journals.works} similar works since {journals.since_year}):")
+    else:
+        if selection.inferred:
+            print("Subjects inferred: " + ", ".join(f"{s.subject} ({', '.join(s.terms[:3])})" for s in selection.inferred))
+        elif mq is not None and not selection.subjects and not name and not rows:
+            print(f"error: could not tell the subject; add --keywords with one or more venue subjects ({', '.join(k for k in _venue_keywords() if k != 'general')}) or use --ai", file=sys.stderr)
+            return 1
 
-    if selection.inferred:
-        print("Subjects inferred: " + ", ".join(f"{s.subject} ({', '.join(s.terms[:3])})" for s in selection.inferred))
-    elif mq is not None and not selection.subjects and not name:
-        print(f"error: could not tell the subject; add --keywords with one or more venue subjects ({', '.join(k for k in _venue_keywords() if k != 'general')}) or use --ai", file=sys.stderr)
-        return 1
-
-    hits = selection.hits
-    if not hits:
-        # Reaching here with no hits means the input matched nothing -- an
+    if not rows:
+        # Reaching here with no rows means the input matched nothing -- an
         # unusable answer for both humans and agents, hence a failing exit code
         # rather than an empty list.
         what = f" the venue name {name!r}" if name and mq is None else " the given input"
@@ -755,14 +944,21 @@ def _cmd_pick_venue(args: argparse.Namespace) -> int:
         print("Run 'paperpush venues' to see supported venues.", file=sys.stderr)
         return 1
 
-    shown = hits if args.all else hits[: max(args.limit, 0)]
-    for line in format_hits(shown, show_keywords=bool(selection.subjects)):
-        print(line)
+    _print_pick_table(shown, columns)
+    if not args.all and len(rows) > len(shown):
+        print(f"({len(rows) - len(shown)} more: raise -n or add --all)")
+    if wants_conferences and beyond_supported and archival == "archival":
+        print("Non-archival conferences (abstract and poster meetings) are left out; --non-archival lists only those, --archival all lists both.")
 
-    # The subfile hint always names the top-ranked hit, even when --limit
-    # hides it, so a scripted run stays actionable with a single glance.
-    print(f"\nUse 'paperpush subfile {hits[0].venue.slug}' to create its submission template.")
-    if mq is not None:
+    # The subfile hint names the best supported venue, even when --limit hides it.
+    supported = [r for r in rows if r.slug]
+    if supported:
+        print(f"\nUse 'paperpush subfile {supported[0].slug}' to create the submission template for {supported[0].name}, the best match paperpush supports.")
+    elif selection.hits:
+        print(f"\npaperpush supports none of these; the closest supported venue is {selection.hits[0].venue.slug} (rank only supported venues with --paperpush-supported-only).")
+    if journals is not None and journals.hits:
+        print("For a venue paperpush does not support, 'paperpush validate --manuscript FILE' runs the general checks.")
+    elif mq is not None and ranking is None:
         print("This matched words against each venue's subject keywords; add --ai for an LLM's ranking with reasons.")
     return 0
 
@@ -3159,7 +3355,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_venues.add_argument("--submit", action="store_true", help="only venues paperpush can submit to")
     p_venues.add_argument("-k", "--keywords", metavar="KW[,KW...]", help="only venues tagged with any of these comma-separated subject keywords (e.g. 'medicine,biology,bioinformatics')")
     p_venues.add_argument("-t", "--type", dest="types", action="append", choices=[t for t, _ in _VENUE_GROUPS], metavar="TYPE", help="only venues of this kind: preprint, journal, or conference (repeatable)")
-    p_venues.add_argument("--columns", metavar="COL[,COL...]", help=f"show only these comma-separated columns, in this order (from: {', '.join(_VENUE_COLUMNS)})")
+    p_venues.add_argument("--columns", metavar="COL[,COL...]", help=f"show only these comma-separated columns, in this order (from: {', '.join(_VENUE_COLUMNS)}; rank and deadline are shown only when named here)")
     p_venues.add_argument("--hide-columns", dest="hide_columns", metavar="COL[,COL...]", help="hide these comma-separated columns")
     p_venues.set_defaults(func=_cmd_venues)
 
@@ -3503,11 +3699,16 @@ def build_parser() -> argparse.ArgumentParser:
         "  paperpush pick-venue --title T --abstract A memory  the parts separately\n"
         "  paperpush pick-venue --venue-name 'nature neuro'    venues by name\n"
         "  paperpush pick-venue paper.pdf --paperpush-supported-only   only the venues paperpush supports (offline)\n"
-        "  paperpush pick-venue paper.pdf --ai                 an LLM's ranking of the supported venues, with a reason each\n\n"
-        "By default a manuscript (or its title, abstract, or keywords) is matched against any journal: the most similar "
-        "works in OpenAlex are grouped by the journal or preprint server that published them, and the journals paperpush "
-        "supports are marked with their slug. Needs network access; set OPENALEX_API_KEY to use your own OpenAlex budget. "
-        "If OpenAlex cannot be reached, only the supported venues are ranked.\n\n"
+        "  paperpush pick-venue paper.pdf --ai                 an LLM's ranking of the supported venues, with a reason each\n"
+        "  paperpush pick-venue paper.pdf --non-archival      only non-archival conferences (abstract and poster meetings)\n"
+        "  paperpush pick-venue paper.pdf --venue-type conference --archival all   conferences, archival or not\n\n"
+        "By default a manuscript (or its title, abstract, or keywords) is matched against any journal or conference: the "
+        "most similar works in OpenAlex are grouped by the journal, conference, or preprint server that published them, "
+        "and the venues paperpush supports are marked with their slug. Conferences are filled in from conference-agent, "
+        "CORE, and ccfddl (rank, next deadline, abstract or paper, length limit, archival or not; cached for a day), and "
+        "conference-agent's meetings that fit the manuscript's subjects are added. Needs network access; set "
+        "OPENALEX_API_KEY to use your own OpenAlex budget. If OpenAlex cannot be reached, only the supported venues "
+        "(and conferences matched on subject) are ranked.\n\n"
         "With --paperpush-supported-only (and for --venue-name, --portal, and --ai), only the venues paperpush supports are "
         "ranked: keywords and the title count three times as much as the abstract when they are matched to venue subjects "
         "with a built-in word list (offline); --ai asks an LLM instead and needs a provider API key. "
@@ -3520,7 +3721,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_pick.add_argument("--abstract", metavar="TEXT", help="the manuscript's abstract (replaces the one read from --manuscript)")
     p_pick.add_argument("-k", "--keywords", action="append", metavar="KW[,KW...]", help="more keywords, as for KEYWORD (repeatable; added to those read from --manuscript)")
     p_pick.add_argument("--venue-name", "--journal-name", "--conference-name", dest="venue_name", metavar="NAME", help="search venues by slug, name, or full name, e.g. 'nature methods' or 'neuro'")
-    p_pick.add_argument("-t", "--type", dest="types", action="append", choices=["preprint", "journal", "conference"], metavar="TYPE", help="only venues of this kind (repeatable)")
+    p_pick.add_argument("--venue-type", choices=["all", "journal", "conference"], default="all", help="the kind of venue to suggest: journals, conferences, or all (default; also preprint servers)")
+    p_archival = p_pick.add_mutually_exclusive_group()
+    p_archival.add_argument("--archival", choices=["archival", "non-archival", "all"], default="archival", help="conferences to suggest by whether their proceedings count as publication: archival ones only (default; journals and preprint servers count as archival), non-archival ones only (abstract, poster, and talk meetings, as in most of biology and medicine; journals are left out), or all")
+    p_archival.add_argument("--non-archival", dest="archival", action="store_const", const="non-archival", help="short for --archival non-archival: only non-archival conferences")
+    p_pick.add_argument("-t", "--type", dest="types", action="append", choices=["preprint", "journal", "conference"], metavar="TYPE", help="only venues of this kind (repeatable; overrides --venue-type)")
+    p_pick.add_argument("--columns", metavar="COL[,COL...]", help="table columns to show, in this order: " + ", ".join(_PICK_COLUMNS) + " (default: every column some row fills)")
+    p_pick.add_argument("--hide-columns", metavar="COL[,COL...]", help="table columns to leave out")
     p_pick.add_argument("--portal", dest="portal", action="append", metavar="PORTAL", help="only venues submitting through this portal (repeatable), e.g. scholarone")
     p_pick.add_argument("-n", "--limit", type=int, default=5, metavar="N", help="show at most N matches (default: 5)")
     p_pick.add_argument("--all", action="store_true", help="show every match instead of limiting")
@@ -3528,7 +3735,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pick.add_argument("--ai", action="store_true", help="ask an LLM to choose the subjects and rank the venues, with a reason each (needs ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY)")
     p_pick.add_argument("--provider", choices=["anthropic", "openai", "google"], help="(--ai) LLM provider; defaults to the first whose API key is set")
     p_pick.add_argument("--model", help="(--ai) model to use (default: the provider's autofill default)")
-    p_pick.add_argument("--json", action="store_true", help="print the result as JSON for agents: matches (the supported venues: slug, name, venue_type, portal, keywords, score, reasons), openalex (any journal: name, publisher, similar works, open access, APC, h-index, 2-year mean citedness, paperpush slug), the subjects used, subject_vocabulary (the subjects venues are tagged with), what was read from the manuscript, and the --ai ranking")
+    p_pick.add_argument("--json", action="store_true", help="print the result as JSON for agents: venues (the table: name, venue_type, score and its basis, keywords, link, similar works, h-index, 2-year mean citedness, CORE/CCF rank, deadlines, format, limit, archival, paperpush slug), matches (the supported venues: slug, name, venue_type, portal, keywords, score, reasons), openalex (the raw OpenAlex sources), the subjects used, subject_vocabulary (the subjects venues are tagged with), what was read from the manuscript, and the --ai ranking")
     p_pick.set_defaults(func=_cmd_pick_venue)
 
     p_rev = sub.add_parser(

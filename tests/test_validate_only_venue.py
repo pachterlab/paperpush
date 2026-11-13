@@ -10,6 +10,7 @@ These tests add one through a local data override.
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -128,10 +129,17 @@ def test_venues_validate_lists_validate_only(validate_only, capsys):
 
 def test_venues_type_filters_listing(capsys):
     assert main(["venues", "-t", "preprint", "--type", "conference", "--columns", "slug,type"]) == 0
-    rows = [line.split() for line in capsys.readouterr().out.split("For more details")[0].splitlines()[1:] if line.strip()]
+    out = capsys.readouterr().out
+    rows = [line.split() for line in re.split(r"See more information|For more details", out)[0].splitlines()[1:] if line.strip()]
     types = {row[1] for row in rows}
     assert types == {"Preprint", "Conference"}
     assert "biorxiv" in {row[0] for row in rows}
+    assert "conferenceagent.vercel.app" in out
+
+
+def test_venues_conference_link_only_with_conferences(capsys):
+    assert main(["venues", "-t", "journal"]) == 0
+    assert "conferenceagent.vercel.app" not in capsys.readouterr().out
 
 
 def test_venues_validate_and_submit_combine(validate_only, capsys):
@@ -181,7 +189,7 @@ def test_venues_keywords_rejects_unknown_with_suggestion(capsys):
     assert "unknown keyword 'bioinforamtics'" in err and "did you mean 'bioinformatics'" in err
 
 
-def test_venues_slug_never_truncated_on_narrow_terminal(monkeypatch, capsys):
+def test_venues_fits_narrow_terminal_without_truncating(monkeypatch, capsys):
     import rich.console
 
     orig = rich.console.Console.__init__
@@ -195,9 +203,16 @@ def test_venues_slug_never_truncated_on_narrow_terminal(monkeypatch, capsys):
     monkeypatch.setattr(rich.console.Console, "__init__", narrow)
     assert main(["venues"]) == 0
     out = capsys.readouterr().out
-    first_cells = {line.split()[0] for line in out.splitlines() if line.strip()}
+    table = re.sub(r"\x1b\[[0-9;]*m", "", out).split("For more details")[0].split("\n\n")[0]
+    lines = table.splitlines()
+    # Wraps instead of cutting off: every column fits, nothing is ellipsized.
+    assert all(len(line) <= 80 for line in lines)
+    assert "\u2026" not in table
+    assert "Submit" in "".join(lines[:3])
+    # Long slugs fold onto the next line rather than being truncated.
+    slug_text = "".join(line[: line.index(" ")] if " " in line else line for line in lines if line.strip())
     for venue in list_venues():
-        assert venue.slug in first_cells
+        assert venue.slug in slug_text
 
 
 def test_published_entry_without_keywords_keeps_bundled_ones():
@@ -219,12 +234,12 @@ def test_venues_columns_selects_and_orders(capsys):
     assert main(["venues", "--columns", "Submit, slug"]) == 0
     out = capsys.readouterr().out
     assert _header(out) == ["Submit", "Slug"]
-    assert "https://" not in out.split("For more details")[0]
+    assert "https://" not in re.split(r"See more information|For more details", out)[0]
 
 
 def test_venues_hide_columns(capsys):
     assert main(["venues", "--hide-columns", "link,keywords"]) == 0
-    assert _header(capsys.readouterr().out) == ["Slug", "Venue", "Type", "2-yr", "citedness", "Validate", "Submit"]
+    assert _header(capsys.readouterr().out) == ["Slug", "Venue", "Type", "Validate", "Submit"]
 
 
 def test_venues_columns_and_hide_columns_combine(capsys):
@@ -237,3 +252,60 @@ def test_venues_columns_rejects_unknown_and_empty(capsys):
     assert "unknown column 'lnk' (did you mean 'link'?)" in capsys.readouterr().err
     assert main(["venues", "--columns", "slug", "--hide-columns", "slug"]) == 2
     assert "no columns left to show" in capsys.readouterr().err
+
+
+def test_venues_deadline_column_only_with_conferences(monkeypatch, capsys):
+    import paperpush.conferences as conferences
+
+    info = conferences.ConferenceInfo(acronym="CVPR", name="CVPR", abstract_deadline="2027-11-06", paper_deadline="2027-11-13")
+
+    class FakeCatalog:
+        errors: dict = {}
+
+        def find(self, *names, acronym=""):
+            return info if "CVPR 2027" in names else None
+
+    monkeypatch.setattr(conferences, "load_catalog", lambda **k: FakeCatalog())
+    # Rank and deadline are opt-in: the default table leaves them out.
+    assert main(["venues", "-t", "conference"]) == 0
+    assert "Next deadline" not in capsys.readouterr().out
+    assert main(["venues", "-t", "conference", "--columns", "slug,rank,deadline"]) == 0
+    out = capsys.readouterr().out
+    assert "Next deadline" in out
+    # Abstract and paper deadlines sit on separate lines of the one cell.
+    lines = out.splitlines()
+    row = next(i for i, line in enumerate(lines) if line.startswith("cvpr_2027"))
+    assert "abstract 2027-11-06" in lines[row] and "paper 2027-11-13" in lines[row + 1]
+    # This conference has no rank data, so that empty column is dropped.
+    assert "Rank" not in out.split("Next deadline:")[0]
+
+    assert main(["venues", "-t", "journal", "--columns", "slug,deadline"]) == 0
+    out = capsys.readouterr().out
+    assert "Next deadline" not in out and "conferenceagent" not in out
+
+
+def test_venues_rank_lists_what_each_venue_has(monkeypatch, capsys):
+    import paperpush.conferences as conferences
+    from paperpush import venue_metrics
+
+    info = conferences.ConferenceInfo(acronym="CVPR", name="CVPR", core_rank="A*", ccf_rank="A", acceptance_rate="25.4% (2026)", size="massive")
+
+    class FakeCatalog:
+        errors: dict = {}
+
+        def find(self, *names, acronym=""):
+            return info if "CVPR 2027" in names else None
+
+    monkeypatch.setattr(conferences, "load_catalog", lambda **k: FakeCatalog())
+    monkeypatch.setattr(venue_metrics, "load", lambda: {"nature": {"mean_citedness_2yr": 21.04}})
+    assert main(["venues", "-t", "conference", "-t", "journal", "--columns", "slug,rank"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    row = next(i for i, line in enumerate(lines) if line.startswith("cvpr_2027"))
+    assert [line.split(maxsplit=1)[-1].strip() if i == 0 else line.strip() for i, line in enumerate(lines[row : row + 4])] == [
+        "CORE A*",
+        "CCF A",
+        "accept rate 25.4% (2026)",
+        "size massive",
+    ]
+    nature = next(line for line in lines if line.startswith("nature "))
+    assert nature.split(maxsplit=1)[1].strip() == "citedness 21.0"

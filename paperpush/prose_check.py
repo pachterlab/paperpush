@@ -630,15 +630,17 @@ _STOCK_WORDS = _word_groups(
 )
 # LLM markers: words that became far more common in papers after ChatGPT (Kobak et al. 2025; also Liang et al. 2024,
 # arXiv:2404.01268) and that ordinary prose rarely needs. A few uses already stand out, hence the lower bar.
-# Left out although on their list: words with a plain technical sense ("elevated levels", "viral shedding").
+# Left out although on their list: words with a plain technical sense ("elevated levels", "viral shedding"), and words
+# whose share of PubMed abstracts grew less than 1.5-fold from 2021-22 to 2024 in their yearly counts ("embrace", "amid").
 _MARKER_WORDS = _word_groups(
     """delve, showcase, underscore, intricate intricately intricacy intricacies, meticulous meticulously, commendable,
-    pivotal, realm, multifaceted, groundbreaking, unparalleled, invaluable, noteworthy, nuanced nuance nuances, interplay,
-    interconnectedness, unravel unraveling unravelling, unveil, illuminate, elucidate, harness, bolster, burgeoning,
-    transformative, revolutionize revolutionise revolutionizing, seamless seamlessly, uncharted, underexplored, unexplored,
-    pave paving, adept, akin, amidst, amid, endeavor endeavour endeavours, encompass, encapsulate, garner, grapple, surmount,
-    propel propelled propelling, orchestrate, foster, embrace, formidable, swift swiftly, poised, pinpoint, heighten, accentuate, juxtapose, culminate, hinge, furnish, solidify, impactful, imperative, versatility,
-    innovative, pioneering, compelling, remarkable, renowned, strategically, unlock, spearhead, necessitate, intertwine"""
+    pivotal, realm, multifaceted, groundbreaking, unparalleled, invaluable, noteworthy, nuanced nuance nuances,
+    interplay, interconnectedness, unravel unraveling unravelling, unveil, illuminate, elucidate, harness, bolster,
+    burgeoning, transformative, revolutionize revolutionise revolutionizing, seamless seamlessly, uncharted,
+    underexplored, unexplored, pave paving, adept, akin, amidst, endeavor endeavour endeavours, encompass, garner,
+    grapple, surmount, propel propelled propelling, foster, formidable, swift swiftly, poised, pinpoint, heighten,
+    juxtapose, culminate, hinge, furnish, solidify, impactful, imperative, versatility, innovative, pioneering,
+    compelling, remarkable, renowned, strategically, unlock, necessitate"""
 )
 _STYLE_MIN_COUNT = 5
 _STYLE_PER_1000 = 2.5

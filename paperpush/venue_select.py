@@ -46,6 +46,7 @@ import logging
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from dataclasses import replace as dataclasses_replace
 from datetime import date
 from pathlib import Path
 
@@ -784,7 +785,7 @@ class JournalHit:
     source_id: str
     name: str
     source_type: str
-    score: int  # 0-100, the best match is 100
+    score: int  # 0-100, the best journal or conference is 100 (preprint servers are capped at 100)
     works: int  # similar works it published
     examples: tuple[tuple[str, int | None], ...] = ()  # (title, year) of its closest matches
     publisher: str = ""
@@ -797,6 +798,7 @@ class JournalHit:
     mean_citedness_2yr: float | None = None  # OpenAlex's open analogue of the impact factor
     slug: str = ""  # the paperpush venue, when supported
     support: str = ""  # what paperpush supports for it (see support_level)
+    topics: tuple[str, ...] = ()  # OpenAlex's main topics for the source
 
 
 def journal_dict(hit: JournalHit) -> dict:
@@ -818,6 +820,7 @@ def journal_dict(hit: JournalHit) -> dict:
         "mean_citedness_2yr": hit.mean_citedness_2yr,
         "paperpush_slug": hit.slug or None,
         "paperpush_support": hit.support or None,
+        "topics": list(hit.topics),
     }
 
 
@@ -850,7 +853,10 @@ def find_journals(
     over its works, of the work's similarity to the manuscript (relative to the
     best match) times a recency factor, scaled so the top source is 100. The manuscript itself,
     when OpenAlex already has it, is left out. ``venue_types`` (``journal``,
-    ``conference``, ``preprint``) narrows the source types kept.
+    ``conference``, ``preprint``) narrows the source types kept. Conference
+    papers are searched separately from journal articles and reranked with
+    them (see :func:`paperpush.openalex.similar_works`), since OpenAlex types
+    them ``conference-paper`` and they would otherwise be crowded out.
 
     Raises :class:`paperpush.openalex.OpenAlexError` when OpenAlex does not
     answer and :class:`ValueError` when ``query`` has nothing to search on.
@@ -860,7 +866,9 @@ def find_journals(
     this_year = this_year or date.today().year
     since = this_year - years
     abstract = query.abstract or query.body
-    search, works = openalex.similar_works(query.title, abstract, query.keywords, since_year=since)
+    wanted = set(venue_types) or {"journal", "conference", "preprint"}
+    work_types = ([openalex.JOURNAL_WORK_TYPES] if wanted & {"journal", "preprint"} else []) + ([openalex.CONFERENCE_WORK_TYPES] if "conference" in wanted else [])
+    search, works = openalex.similar_works(query.title, abstract, query.keywords, since_year=since, types=work_types)
     kept_types = set().union(*(_TYPE_TO_SOURCE[t] for t in venue_types if t in _TYPE_TO_SOURCE)) if venue_types else None
     own_title = openalex.fold(query.title)
     scores: dict[str, float] = {}
@@ -891,7 +899,9 @@ def find_journals(
     ranked = sorted(scores, key=lambda s: (-scores[s], names[s][0].lower()))
     details = openalex.sources(ranked[: openalex.BATCH])
     supported = _supported_by_name(venues)
-    best = scores[ranked[0]]
+    # Scores are relative to the best journal or conference: a preprint server
+    # collects similar work from every field, and would otherwise squash the rest.
+    best = max((scores[s] for s in ranked if names[s][1] != "repository"), default=scores[ranked[0]])
     hits: list[JournalHit] = []
     for sid in ranked:
         info = details.get(sid, {})
@@ -903,7 +913,7 @@ def find_journals(
                 source_id=sid,
                 name=name,
                 source_type=info.get("type") or names[sid][1],
-                score=max(1, round(100 * scores[sid] / best)),
+                score=min(100, max(1, round(100 * scores[sid] / best))),
                 works=counts[sid],
                 examples=tuple(examples[sid][:3]),
                 publisher=info.get("host_organization_name") or "",
@@ -916,6 +926,7 @@ def find_journals(
                 mean_citedness_2yr=round(stats["2yr_mean_citedness"], 1) if isinstance(stats.get("2yr_mean_citedness"), (int, float)) else None,
                 slug=venue.slug if venue else "",
                 support=support_level(venue) if venue else "",
+                topics=tuple(t.get("display_name") or "" for t in (info.get("topics") or [])[:3] if isinstance(t, dict) and t.get("display_name")),
             )
         )
     return JournalSearch(hits, search, len(works), since)
@@ -946,3 +957,420 @@ def format_journals(hits: list[JournalHit]) -> list[str]:
             title = " ".join(title.split())
             lines.append(f"{'':>{width}}  e.g. {title[:90]}{'…' if len(title) > 90 else ''}" + (f" ({year})" if year else ""))
     return lines
+
+
+# ---------------------------------------------------------------------------
+# One table for every kind of venue (the ``pick-venue`` output)
+# ---------------------------------------------------------------------------
+
+#: ``--venue-type`` values and the venue types they keep.
+VENUE_TYPE_CHOICES = {"journal": ("journal",), "conference": ("conference",), "all": ()}
+# Which conferences to keep by whether their proceedings count as publication:
+# archival ones only (the default), non-archival ones only, or both.
+ARCHIVAL_CHOICES = ("archival", "non-archival", "all")
+
+
+def archival_venue_types(archival: str, venue_types: tuple[str, ...]) -> tuple[str, ...]:
+    """The venue types to search for an ``archival`` mode.
+
+    Journals and preprint servers are archival, so ``non-archival`` narrows the
+    search to conferences; asking for non-archival journals is an error.
+    """
+    if archival not in ARCHIVAL_CHOICES:
+        raise ValueError(f"archival must be one of {', '.join(ARCHIVAL_CHOICES)}")
+    if archival != "non-archival":
+        return venue_types
+    if venue_types and "conference" not in venue_types:
+        raise ValueError("non-archival venues are conferences (abstract, poster, and talk meetings); journals and preprint servers are archival")
+    return ("conference",)
+
+#: The most a conference found only by subject (not by similar works) scores,
+#: so similar-works evidence ranks above it.
+SUBJECT_FIT_CAP = 60
+
+_SIZE_ORDER = {"massive": 4, "large": 3, "medium": 2, "small": 1}
+_CORE_ORDER = {"A*": 0, "A": 1, "B": 2, "C": 3}
+
+
+@dataclass(frozen=True)
+class VenueRow:
+    """One venue in the ``pick-venue`` table, whatever it was found by.
+
+    ``basis`` says what the row's ``score`` (0-100) rests on: ``similar works``
+    (OpenAlex), ``subject`` (a conference matched on its subjects, capped at
+    :data:`SUBJECT_FIT_CAP`), ``keywords`` (paperpush's subject ranking of the
+    venues it supports), or ``ai`` (``--ai``).
+    """
+
+    name: str
+    venue_type: str
+    score: int | None = None
+    basis: str = ""
+    keywords: tuple[str, ...] = ()
+    link: str = ""
+    publisher: str = ""
+    similar_works: int | None = None
+    example: str = ""
+    h_index: int | None = None
+    mean_citedness_2yr: float | None = None
+    is_oa: bool | None = None
+    is_in_doaj: bool | None = None
+    apc_usd: int | None = None
+    slug: str = ""
+    support: str = ""
+    limit: str = ""
+    reason: str = ""
+    openalex_id: str = ""
+    conference: "ConferenceInfo | None" = None  # noqa: F821 -- paperpush.conferences, imported lazily
+
+    @property
+    def archival(self) -> str:
+        """``yes``/``no``/``""`` for a conference; ``""`` for anything else."""
+        if self.venue_type != "conference":
+            return ""
+        return (self.conference.archival if self.conference else "") or ("yes" if self.similar_works or self.slug else "")
+
+    @property
+    def format(self) -> str:
+        if self.venue_type != "conference":
+            return ""
+        return (self.conference.format if self.conference else "") or ("paper" if self.archival == "yes" else "")
+
+    @property
+    def deadlines(self) -> str:
+        return self.conference.deadlines_text() if self.conference else ""
+
+    @property
+    def core_rank(self) -> str:
+        return self.conference.core_rank if self.conference else ""
+
+    @property
+    def ccf_rank(self) -> str:
+        return self.conference.ccf_rank if self.conference else ""
+
+    @property
+    def size(self) -> str:
+        c = self.conference
+        if not c or not (c.size or c.attendance):
+            return ""
+        return " ".join(p for p in (c.size, f"(~{c.attendance:,})" if c.attendance else "") if p)
+
+    @property
+    def access(self) -> str:
+        parts = []
+        if self.is_oa:
+            parts.append("OA" + (" (DOAJ)" if self.is_in_doaj else ""))
+        if self.apc_usd:
+            parts.append(f"APC ${self.apc_usd:,}")
+        return ", ".join(parts)
+
+    def to_dict(self) -> dict:
+        conf = self.conference.to_dict() if self.conference else None
+        return {
+            "name": self.name,
+            "venue_type": self.venue_type,
+            "score": self.score,
+            "basis": self.basis or None,
+            "keywords": list(self.keywords),
+            "link": self.link or None,
+            "publisher": self.publisher or None,
+            "similar_works": self.similar_works,
+            "example": self.example or None,
+            "h_index": self.h_index,
+            "mean_citedness_2yr": self.mean_citedness_2yr,
+            "is_oa": self.is_oa,
+            "apc_usd": self.apc_usd,
+            "core_rank": self.core_rank or None,
+            "ccf_rank": self.ccf_rank or None,
+            "deadlines": self.deadlines or None,
+            "abstract_deadline": conf["abstract_deadline"] if conf else None,
+            "paper_deadline": conf["paper_deadline"] if conf else None,
+            "deadline_estimated": conf["deadline_estimated"] if conf else None,
+            "format": self.format or None,
+            "limit": self.limit or None,
+            "archival": {"yes": True, "no": False}.get(self.archival),
+            "size": self.size or None,
+            "paperpush_slug": self.slug or None,
+            "paperpush_support": self.support or None,
+            "reason": self.reason or None,
+            "openalex_id": self.openalex_id or None,
+            "conference": conf,
+        }
+
+
+def limit_text(slug: str) -> str:
+    """A venue's length limit from its author guidelines, e.g. ``"9 pages"`` or ``"4,300 words"``.
+
+    The main-text limit when there is one, else the whole-document limit, else
+    the first article type's. ``""`` when paperpush records none.
+    """
+    from .requirements import get_requirements
+
+    try:
+        reqs = get_requirements(slug)
+    except Exception:  # a broken entry must not break pick-venue
+        return ""
+    if reqs is None:
+        return ""
+
+    def one(m: Mapping) -> str:
+        for key, unit in (("max_pages_before_refs", "pages"), ("max_pages", "pages"), ("max_words_before_refs", "words"), ("max_words", "words")):
+            value = m.get(key)
+            if isinstance(value, int):
+                return f"{value:,} {unit}"
+        return ""
+
+    m = reqs.manuscript
+    text = one({k: getattr(m, k, None) for k in ("max_pages_before_refs", "max_pages", "max_words_before_refs", "max_words")})
+    if not text:
+        for name, override in reqs.article_types.items():
+            text = one((override or {}).get("manuscript") or {})
+            if text:
+                return f"{text} ({name})"
+    return text
+
+
+def _supported_by_slug() -> dict[str, Venue]:
+    return {v.slug: v for v in list_venues()}
+
+
+def _conference_key(row: VenueRow) -> str:
+    c = row.conference
+    return re.sub(r"[^a-z]", "", (c.acronym or c.name).lower()) if c and (c.acronym or c.name) else ""
+
+
+def rows_from_search(search: JournalSearch, catalog=None) -> list[VenueRow]:
+    """The OpenAlex hits as table rows, conferences enriched from ``catalog`` (:mod:`paperpush.conferences`).
+
+    Two OpenAlex sources that turn out to be one conference (its proceedings
+    under two names) are merged into the higher-scoring row.
+    """
+    supported = _supported_by_slug()
+    # Supported conferences by the conference they are ("CVPR 2027" is CVPR),
+    # since OpenAlex names the proceedings rather than the year's edition.
+    supported_conf: dict[str, Venue] = {}
+    if catalog is not None:
+        for v in supported.values():
+            if v.venue_type == "conference":
+                info = catalog.find(v.name, v.full_name, acronym=v.name)
+                key = re.sub(r"[^a-z]", "", (info.acronym or info.name).lower()) if info else ""
+                if key and key not in supported_conf:
+                    supported_conf[key] = v
+    rows: list[VenueRow] = []
+    by_conf: dict[str, int] = {}
+    for hit in search.hits:
+        venue = supported.get(hit.slug) if hit.slug else None
+        vtype = "preprint" if hit.source_type == "repository" else ("conference" if hit.source_type == "conference" or (venue and venue.venue_type == "conference") else "journal")
+        conf = None
+        if vtype == "conference" and catalog is not None:
+            conf = catalog.find(*(n for n in (hit.name, venue.name if venue else "", venue.full_name if venue else "") if n))
+            if venue is None and conf is not None:
+                venue = supported_conf.get(re.sub(r"[^a-z]", "", (conf.acronym or conf.name).lower()))
+                if venue is not None:
+                    hit = dataclasses_replace(hit, slug=venue.slug, support=support_level(venue))
+        name = hit.name
+        if conf is not None and (conf.name or conf.acronym):
+            name = f"{conf.name} ({conf.acronym})" if conf.name and conf.acronym and conf.acronym.lower() not in conf.name.lower() else (conf.name or conf.acronym)
+        # OpenAlex topics are long phrases ("Domain Adaptation and Few-Shot Learning"): two are enough.
+        keywords = tuple(venue.keywords) if venue and venue.keywords else (conf.keywords if conf and conf.keywords else hit.topics[:2])
+        title, year = hit.examples[0] if hit.examples else ("", None)
+        row = VenueRow(
+            name=name,
+            venue_type=vtype,
+            score=hit.score,
+            basis="similar works",
+            keywords=tuple(keywords),
+            link=hit.homepage or (conf.link if conf else "") or (venue.site_url or venue.submission_url if venue else ""),
+            publisher=hit.publisher,
+            similar_works=hit.works,
+            example=(" ".join(title.split()) + (f" ({year})" if year else "")) if title else "",
+            h_index=hit.h_index,
+            mean_citedness_2yr=None if vtype == "preprint" else hit.mean_citedness_2yr,
+            is_oa=hit.is_oa,
+            is_in_doaj=hit.is_in_doaj,
+            apc_usd=hit.apc_usd,
+            slug=hit.slug,
+            support=hit.support,
+            limit=(limit_text(hit.slug) if hit.slug else "") or (conf.limit if conf else ""),
+            openalex_id=hit.source_id,
+            conference=conf,
+        )
+        key = _conference_key(row)
+        if key and key in by_conf:
+            kept = rows[by_conf[key]]
+            rows[by_conf[key]] = _merge_rows(kept, row)
+            continue
+        if key:
+            by_conf[key] = len(rows)
+        rows.append(row)
+    return rows
+
+
+def _merge_rows(kept: VenueRow, other: VenueRow) -> VenueRow:
+    from dataclasses import replace as dc_replace
+
+    updates: dict = {"similar_works": (kept.similar_works or 0) + (other.similar_works or 0)}
+    for f in ("h_index", "mean_citedness_2yr"):
+        if getattr(kept, f) is None or (getattr(other, f) is not None and getattr(other, f) > getattr(kept, f)):
+            updates[f] = getattr(other, f)
+    for f in ("slug", "support", "limit", "link", "publisher"):
+        if not getattr(kept, f) and getattr(other, f):
+            updates[f] = getattr(other, f)
+    return dc_replace(kept, **updates)
+
+
+def rows_from_hits(hits: Iterable[VenueHit], catalog=None, reasons: Mapping[str, str] | None = None, basis: str = "keywords") -> list[VenueRow]:
+    """paperpush's supported venues (a :func:`pick_venues` ranking) as table rows."""
+    from . import venue_metrics
+
+    hits = list(hits)
+    top = max((h.score for h in hits), default=0) or 1
+    rows = []
+    for hit in hits:
+        v = hit.venue
+        conf = catalog.find(v.name, v.full_name, acronym=v.name) if catalog is not None and v.venue_type == "conference" else None
+        rows.append(
+            VenueRow(
+                name=v.name,
+                venue_type=v.venue_type,
+                score=max(1, round(100 * hit.score / top)) if hit.score > 0 and basis != "ai" else None,
+                basis=basis,
+                keywords=tuple(v.keywords),
+                link=v.site_url or v.submission_url or (conf.link if conf else ""),
+                mean_citedness_2yr=venue_metrics.mean_citedness_2yr(v.slug),
+                slug=v.slug,
+                support=support_level(v),
+                limit=limit_text(v.slug) or (conf.limit if conf else ""),
+                reason=(reasons or {}).get(v.slug, ""),
+                conference=conf,
+            )
+        )
+    return rows
+
+
+#: conference-agent subcategories and the venue subjects (:data:`SUBJECT_TERMS`) whose terms signal them.
+CONFERENCE_SUBJECTS = {
+    "genomics": ("genetics", "bioinformatics"),
+    "computational biology": ("bioinformatics",),
+    "neurology": ("neuroscience",),
+    "neurosurgery": ("neuroscience",),
+    "psychiatry": ("neuroscience",),
+    "allergy and immunology": ("immunology",),
+    "infectious disease": ("immunology",),
+    "learning theory": ("machine learning",),
+    "data mining": ("machine learning",),
+}
+
+
+def _phrase_patterns(phrase: str) -> list[re.Pattern[str]]:
+    """Patterns for a conference keyword ("allergy and immunology"): its subjects' terms, and a stem of each long word."""
+    terms = list(SUBJECT_TERMS.get(phrase, ()))
+    for subject in CONFERENCE_SUBJECTS.get(phrase, ()):
+        terms += SUBJECT_TERMS.get(subject, ())
+    terms += [w[: max(5, len(w) - 3)] for w in re.findall(r"[a-z]+", phrase.lower()) if len(w) >= 5 and w not in ("other", "studies", "science", "sciences")]
+    return [re.compile(_term_pattern(t), re.IGNORECASE) for t in dict.fromkeys(terms)]
+
+
+def subject_fit(query: ManuscriptQuery, keywords: Iterable[str]) -> tuple[int, list[str]]:
+    """How strongly a manuscript is about any of a conference's ``keywords`` (title and keywords x3), and which matched."""
+    total, matched = 0, []
+    sections = query.sections()
+    for phrase in keywords:
+        score = 0
+        for pattern in _phrase_patterns(phrase):
+            for section, text in sections.items():
+                if text:
+                    score += min(len(pattern.findall(text)), _MAX_TERM_HITS) * _SECTION_WEIGHTS[section]
+        if score:
+            total += score
+            matched.append(phrase)
+    return total, matched
+
+
+_NAME_STOPWORDS = frozenset(
+    "annual meeting conference congress symposium society international american european asian world national general "
+    "college association advances workshop forum summit expo scientific sessions research clinical biology science sciences "
+    "technology technologies cshl".split()
+)
+
+
+def _name_words(name: str) -> list[str]:
+    """The topical words of a conference name ("CSHL Biology of Genomes" -> ["genomes"])."""
+    return [w for w in re.findall(r"[a-z]+", (name or "").lower()) if len(w) >= 5 and w not in _NAME_STOPWORDS]
+
+
+def rows_from_conferences(query: ManuscriptQuery, catalog, *, exclude: Iterable[str] = (), min_score: int = 3) -> list[VenueRow]:
+    """conference-agent's conferences that a manuscript's subjects fit, as table rows.
+
+    These are found without similar works -- most are meetings that publish no
+    proceedings, which OpenAlex cannot see -- so they score on subject fit,
+    scaled so the best is :data:`SUBJECT_FIT_CAP`; ties go to the higher CORE
+    rank, then the bigger meeting. ``exclude`` holds conference keys already in the table.
+    """
+    skip = set(exclude)
+    scored = []
+    for conf in catalog.agent_conferences():
+        key = re.sub(r"[^a-z]", "", (conf.acronym or conf.name).lower())
+        if key in skip:
+            continue
+        score, matched = subject_fit(query, conf.keywords)
+        if score >= min_score:
+            # The name says what a meeting is about more narrowly than its
+            # subcategory: "CSHL Biology of Genomes" over "CSHL Brain Barriers".
+            score += 2 * subject_fit(query, _name_words(conf.name))[0]
+            scored.append((score, conf, matched))
+    if not scored:
+        return []
+    top = max(s for s, _, _ in scored)
+    scored.sort(key=lambda t: (-t[0], _CORE_ORDER.get(t[1].core_rank, len(_CORE_ORDER)), -_SIZE_ORDER.get(t[1].size, 0), t[1].acronym))
+    return [
+        VenueRow(
+            name=f"{conf.name} ({conf.acronym})" if conf.acronym and conf.acronym.lower() not in conf.name.lower() else conf.name,
+            venue_type="conference",
+            score=max(1, round(SUBJECT_FIT_CAP * score / top)),
+            basis="subject",
+            keywords=conf.keywords,
+            link=conf.link,
+            limit=conf.limit,
+            reason="subjects: " + ", ".join(matched),
+            conference=conf,
+        )
+        for score, conf, matched in scored
+    ]
+
+
+def combine_rows(rows: Iterable[VenueRow], extra: Iterable[VenueRow] = (), *, venue_types: tuple[str, ...] = (), archival: str = "archival") -> list[VenueRow]:
+    """``rows`` and ``extra`` together, best first, filtered by venue type and archival status.
+
+    ``archival`` (the default) leaves out conferences known to be non-archival
+    and those found by subject alone whose status is unknown;
+    ``non-archival`` keeps only conferences known to be non-archival
+    (journals and preprint servers are archival); ``all`` keeps both.
+    """
+    if archival not in ARCHIVAL_CHOICES:
+        raise ValueError(f"archival must be one of {', '.join(ARCHIVAL_CHOICES)}")
+    out = []
+    for row in [*rows, *extra]:
+        if venue_types and row.venue_type not in venue_types:
+            continue
+        if archival == "archival" and row.venue_type == "conference":
+            if row.archival == "no" or (row.archival == "" and row.basis == "subject"):
+                continue
+        if archival == "non-archival" and not (row.venue_type == "conference" and row.archival == "no"):
+            continue
+        out.append(row)
+    return sorted(out, key=lambda r: -(r.score or 0))  # stable: ties keep their order
+
+
+def shortlist(selection: Selection, journals: JournalSearch | None = None, catalog=None, *, venue_types: tuple[str, ...] = (), archival: str = "archival", subject_conferences: bool = True) -> list[VenueRow]:
+    """The ``pick-venue`` table: OpenAlex's venues when there are any, else paperpush's ranking.
+
+    With a ``catalog`` and a manuscript, conference-agent's conferences that
+    fit its subjects are added (``subject_conferences``); see
+    :func:`combine_rows` for the venue-type and archival filters.
+    """
+    rows = rows_from_search(journals, catalog) if journals is not None and journals.hits else rows_from_hits(selection.hits, catalog)
+    extra: list[VenueRow] = []
+    if catalog is not None and subject_conferences and selection.manuscript is not None and (not venue_types or "conference" in venue_types):
+        extra = rows_from_conferences(selection.manuscript, catalog, exclude={k for k in (_conference_key(r) for r in rows) if k})
+    return combine_rows(rows, extra, venue_types=venue_types, archival=archival)
