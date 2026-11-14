@@ -781,6 +781,17 @@
           ],
           "description": "Whether 'et al' takes a full stop: yes for 'et al.', no for 'et al' (AMA and RSNA house style). Empty when the guidelines do not say; `validate` then asks for 'et al.'."
         },
+        "serial_comma": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether lists take the serial (Oxford) comma: yes for 'A, B, and C', no for 'A, B and C'. Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent."
+        },
         "initial_submission_any_format": {
           "anyOf": [
             {

@@ -5392,7 +5392,33 @@
         "running_head": "Under review as a conference paper at ICLR 2027",
         "margin_line_numbers": true,
         "tolerance_pt": 3
-      }
+      },
+      "main_text_end_headings": [
+        "Ethics Statement",
+        "Ethical Statement",
+        "Ethics",
+        "Reproducibility Statement",
+        "Reproducibility",
+        "Reproducibility and Ethics Statement",
+        "Ethics and Reproducibility Statement",
+        "Reproducibility and Ethics",
+        "Ethics and Reproducibility",
+        "Acknowledgments",
+        "Acknowledgements",
+        "Acknowledgment",
+        "Acknowledgement",
+        "LLM Usage",
+        "LLM Usage Statement",
+        "LLM Usage Disclosure",
+        "Usage of LLMs",
+        "Use of LLMs",
+        "Usage of Large Language Models",
+        "Use of Large Language Models",
+        "The Use of Large Language Models",
+        "The Use of Large Language Models (LLMs)",
+        "Statement on the Use of LLMs",
+        "AI Use Statement"
+      ]
     },
     "statements": {
       "required": [
@@ -19527,6 +19553,106 @@
     "supplementary": {
       "notes": [
         "The demo video may be published on a platform such as YouTube with a link in the paper, or submitted as supplementary material in MPEG4 format; the video is used for evaluation and is not published unless requested."
+      ]
+    }
+  },
+  "iclr_2026": {
+    "source_urls": [
+      "https://iclr.cc/Conferences/2026/AuthorGuide"
+    ],
+    "retrieved": "2026-11-13",
+    "notes": [
+      "Historical snapshot of the ICLR 2026 author guide, recorded to validate past ICLR 2026 submissions. Double-blind; identity revealed in main text or supplement leads to desk rejection. Undisclosed significant LLM usage can lead to desk rejection."
+    ],
+    "manuscript": {
+      "formats": [
+        ".pdf"
+      ],
+      "max_pages_before_refs": 9,
+      "count_excludes": [
+        "references",
+        "appendices",
+        "ethics_statement",
+        "reproducibility_statement",
+        "ai_use_statement",
+        "acknowledgements"
+      ],
+      "font_size_pt": 10,
+      "page_size": "US Letter",
+      "single_file": false,
+      "figures_placement": "inline",
+      "anonymized": true,
+      "template_required": true,
+      "template_url": "https://github.com/ICLR/Master-Template/raw/master/iclr2026.zip",
+      "latex_class": "iclr2026_conference",
+      "template_layout": {
+        "page_width_pt": 612,
+        "page_height_pt": 792,
+        "text_left_pt": 108,
+        "text_right_pt": 504,
+        "text_top_pt": 701.5,
+        "text_bottom_pt": 60,
+        "body_font_pt": 10,
+        "baseline_skip_pt": 11,
+        "running_head": "Under review as a conference paper at ICLR 2026",
+        "margin_line_numbers": true,
+        "tolerance_pt": 3
+      },
+      "notes": [
+        "\"At the time of submission, the main text should be 9 pages or fewer.\" Strictly enforced; over-limit papers are desk-rejected.",
+        "The page limit increases to 10 pages for the discussion period and camera-ready.",
+        "References, appendices (after the bibliography), the optional ethics statement (at most 1 page), the reproducibility statement and acknowledgements do not count toward the limit."
+      ],
+      "main_text_end_headings": [
+        "Ethics Statement",
+        "Ethical Statement",
+        "Ethics",
+        "Reproducibility Statement",
+        "Reproducibility",
+        "Reproducibility and Ethics Statement",
+        "Ethics and Reproducibility Statement",
+        "Reproducibility and Ethics",
+        "Ethics and Reproducibility",
+        "Acknowledgments",
+        "Acknowledgements",
+        "Acknowledgment",
+        "Acknowledgement",
+        "LLM Usage",
+        "LLM Usage Statement",
+        "LLM Usage Disclosure",
+        "Usage of LLMs",
+        "Use of LLMs",
+        "Usage of Large Language Models",
+        "Use of Large Language Models",
+        "The Use of Large Language Models",
+        "The Use of Large Language Models (LLMs)",
+        "Statement on the Use of LLMs",
+        "AI Use Statement"
+      ]
+    },
+    "statements": {
+      "optional": [
+        "ethics_statement",
+        "reproducibility",
+        "ai_use"
+      ],
+      "ai_use_if_used": true,
+      "notes": [
+        "Authors who used LLMs significantly \"should describe the precise role of the LLM in a separate section on LLM usage\", which can appear in the appendix. Not disclosing significant LLM usage can lead to desk rejection.",
+        "Ethics and reproducibility statements are encouraged, at the end of the main text before references, and do not count toward the page limit."
+      ]
+    },
+    "supplementary": {
+      "formats": [
+        ".pdf",
+        ".zip"
+      ],
+      "combined_single_pdf": false,
+      "notes": [
+        "Authors are encouraged (not required) to submit a single file containing paper + supplementary text; supplementary text should appear after the references and be clearly marked (e.g. as an appendix).",
+        "Source code can be uploaded as supplementary material (e.g. anonymized code in a .zip) or linked via an anonymous repository; encouraged but optional.",
+        "No supplementary file size cap is stated in the guidelines text.",
+        "Supplementary materials are due on the same deadline as the full paper."
       ]
     }
   }
