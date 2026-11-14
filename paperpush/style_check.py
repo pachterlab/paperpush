@@ -438,7 +438,7 @@ _KNOWN = frozenset(
     PET EEG ECG EKG FDA NIH NSF ERC WHO CDC MIT UCLA USC MD PHD PhD MS MSc BS BSc BA MA ET AL FIG EQ VS IE EG CF NB PS AND OR THE OF IN ON
     AT TO FOR BY WITH IS ARE NOT ABSTRACT INTRODUCTION METHODS RESULTS DISCUSSION CONCLUSION CONCLUSIONS REFERENCES ACKNOWLEDGMENTS
     ACKNOWLEDGEMENTS SUPPLEMENTARY APPENDIX BACKGROUND MATERIALS DATA CODE AVAILABILITY FUNDING TABLE FIGURE NY CA MA TX UK LLC INC
-    MATLAB ATP GTP NADH NADPH TEX LATEX BIBTEX""".split()
+    MATLAB ATP GTP NADH NADPH TEX LATEX BIBTEX API APIs HTTP HTTPS SQL IBM NASA""".split()
 )
 _ROMAN = re.compile(r"[IVXLC]+")
 # Words an acronym's letters skip ("Department of Energy (DE)").
@@ -995,7 +995,14 @@ def _body_paragraphs(text, prose_only: bool = False) -> list[str]:
     if text.checks == PDF_CHECKS and doc.page_texts is not None:
         from .manuscript import main_text_end
 
+        from .bibliography_check import _page_furniture
+
+        # Running heads and feet ("Published as a conference paper at ICLR 2026" on every page) are
+        # not prose: their acronyms and words would otherwise count once per page.
+        furniture = _page_furniture(doc)
         pages = [_pdf_without_captions(page) for page in doc.page_texts]
+        if furniture:
+            pages = ["\n".join(line for line in page.split("\n") if line.strip() not in furniture) for page in pages]
         if prose_only:
             pages = ["\n".join(line for line in page.split("\n") if not _pdf_table_or_code_line(line)) for page in pages]
         whole = "\n\n\f".join(pages)

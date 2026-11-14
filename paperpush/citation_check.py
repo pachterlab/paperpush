@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from . import document
@@ -72,7 +72,7 @@ PANEL_TITLE = "Figure and table panels cited in order"
 # An item, with the panels that can follow its letter ("1a-c", "1a, b and d").
 _ITEM = r"(?:S?\d{1,3}[a-zA-Z](?:\s*(?:,|and\b|&|[\u2013-])\s*[a-zA-Z](?![\w]))*|S?\d{1,3})"
 _MENTION = re.compile(
-    r"(?P<prefix>\b(?:Supplementary|Supplemental|Suppl\.?|Supp\.?|Extended\s+Data|Appendix)\s+(?:Information\s+)?)?" r"\b(?P<word>Fig(?:ure)?s?\.?|Tables?)\s*" rf"(?P<list>{_ITEM}(?:\s*(?:,|;|and|&|[\u2013-]|to)\s*{_ITEM}(?![\w]))*)",
+    r"(?P<prefix>\b(?:Supplementary|Supplemental|Suppl\.?|Supp\.?|Extended\s+Data|Appendix)\s+(?:Information\s+)?)?" r"\b(?P<word>Fig(?:ure)?s?\.?|Tables?|Tabs?\.)\s*" rf"(?P<list>{_ITEM}(?:\s*(?:,|;|and|&|[\u2013-]|to)\s*{_ITEM}(?![\w]))*)",
     re.IGNORECASE,
 )
 # A caption: at the start of a line, the item number then '.', ':', '|', two
@@ -93,6 +93,8 @@ class Mention:
     pos: int
     caption: bool
     text: str
+    # After the reference list's heading, in a PDF whose captions sit on both sides of it (an appendix).
+    appendix: bool = False
 
 
 def _series(prefix: str, word: str, item: str) -> str | None:
@@ -101,7 +103,9 @@ def _series(prefix: str, word: str, item: str) -> str | None:
     if "extended" in prefix:
         return "ed_table" if table else "ed_figure"
     if "appendix" in prefix:
-        return None
+        # "Appendix Fig. 8": in a continuously numbered paper, Figure 8 in the appendix. It
+        # counts as citing that item, but not for the order (see order_problems).
+        return "appendix_table" if table else "appendix_figure"
     if prefix or item.upper().startswith("S"):
         return "supp_table" if table else "supp_figure"
     return "table" if table else "figure"
@@ -159,15 +163,23 @@ def mentions(text: str) -> list[Mention]:
             # A blank line also ends a paragraph, however the line above it ends (a long title, say).
             blank_above = text[len(before) : line_start].count("\n") >= 2
             caption = bool(_CAPTION_TAIL.match(text, m.end())) and (not before or blank_above or before[-1] in ".!?:)]\"'" or before[-1].isdigit() or len(previous) < short_line)
+            # "Table 1:Deep-prefill robustness ...": a colon right after the number opens a caption,
+            # whatever the line above is (often text drawn inside the figure).
+            caption = caption or (text[m.end(): m.end() + 1] == ":" and not re.search(r"\b(?:in|see|of|from|to|and)\s*$", before))
         if not caption and _OTHER_AFTER.match(text, m.end()) and not _COUNT_NOT_REFERENCE.match(text, m.end()):
             continue  # another paper's figure: "Fig. 3 of ref. 12"
         for item in _expand(listing):
             series = _series(m.group("prefix") or "", m.group("word"), item)
-            if series is not None:
+            if series is not None and not (caption and series.startswith("appendix_")):
                 out.append(Mention(series, int(re.sub(r"\D", "", item)), m.start(), caption, m.group(0)))
     span = _reference_span(text, out)
     if span:
         out = [x for x in out if x.caption or not span[0] <= x.pos < span[1]]
+        # Figures captioned both before and after the references: the later ones are an appendix.
+        for series in {x.series for x in out}:
+            sides = {x.pos > span[0] for x in out if x.series == series and x.caption}
+            if sides == {True, False}:
+                out = [replace(x, appendix=x.pos > span[0]) if x.series == series else x for x in out]
     return out
 
 
@@ -185,7 +197,7 @@ def _reference_span(text: str, found: list[Mention]) -> tuple[int, int] | None:
 
 # "Fig." / "Figure" / "Table" (with any Supplementary / Extended Data prefix) and a number.
 _PANEL_START = re.compile(
-    r"(?P<prefix>\b(?:Supplementary|Supplemental|Suppl\.?|Supp\.?|Extended\s+Data|Appendix)\s+(?:Information\s+)?)?" r"\b(?P<word>Fig(?:ure)?s?\.?|Tables?)[~\u00a0]?\s*(?=S?\d)",
+    r"(?P<prefix>\b(?:Supplementary|Supplemental|Suppl\.?|Supp\.?|Extended\s+Data|Appendix)\s+(?:Information\s+)?)?" r"\b(?P<word>Fig(?:ure)?s?\.?|Tables?|Tabs?\.)[~\u00a0]?\s*(?=S?\d)",
     re.IGNORECASE,
 )
 _DASH = r"\s*[\u2013\u2014-]\s*"
@@ -239,6 +251,8 @@ def panel_mentions(text: str, series: str | None = None) -> list[PanelCite]:
             item = _PANEL_ITEM.match(text, pos)
             if item:
                 kind = _series(prefix, word, item.group(1) + item.group(2))
+                if kind and kind.startswith("appendix_"):
+                    kind = None  # panel order is checked within the main series only
                 current, lettered = (kind, int(item.group(2))), bool(item.group(3))
                 if kind and item.group(3):
                     found += [PanelCite(kind, current[1], c, item.start()) for c in _letters(item.group(3), item.group(4))]
@@ -340,26 +354,43 @@ def order_problems(found: list[Mention], series: str, defined_extra: set[int] | 
     """Out-of-order, uncited, and undefined items of one series, as sentences."""
     name = _NAMES[series]
     first: dict[int, int] = {}
+    first_in_appendix: dict[int, int] = {}
     defined: set[int] = set(defined_extra or ())
+    appendix: set[int] = set()  # items captioned in an appendix after the references
+    also_cited: set[int] = set()  # "Appendix Fig. 8"
     for m in found:
+        if m.series == "appendix_" + series:
+            also_cited.add(m.number)
+            continue
         if m.series != series:
             continue
         if m.caption:
             defined.add(m.number)
-        elif m.number not in first:
-            first[m.number] = m.pos
+            if m.appendix:
+                appendix.add(m.number)
+        else:
+            first.setdefault(m.number, m.pos)
+            if m.appendix:
+                first_in_appendix.setdefault(m.number, m.pos)
     problems: list[str] = []
     cited_order = sorted(first, key=first.get)
-    seen: set[int] = set()
-    known = defined | set(first)
-    for number in cited_order:
-        earlier = [n for n in known if n < number and n not in seen]
-        if earlier:
-            problems.append(f"{name} {number} is cited before {name} {min(earlier)}; number {name.lower()}s in the order the text first cites them")
+    # The main text may point ahead to an appendix figure ("see Figure 27") without misnumbering
+    # anything: main-text items are ordered by their first citation, appendix items by their first
+    # citation within the appendix.
+    # An item never cited is reported as such, not as also out of order ("Figure 2 is cited before Figure 1").
+    main_known = set(first) - appendix
+    for order, known in (([n for n in cited_order if n not in appendix], main_known), (sorted((n for n in first_in_appendix if n in appendix), key=first_in_appendix.get), appendix & set(first_in_appendix))):
+        seen: set[int] = set()
+        for number in order:
+            earlier = [n for n in known if n < number and n not in seen]
+            if earlier:
+                problems.append(f"{name} {number} is cited before {name} {min(earlier)}; number {name.lower()}s in the order the text first cites them")
+                break
+            seen.add(number)
+        if problems:
             break
-        seen.add(number)
     if defined:
-        uncited = sorted(defined - set(first))
+        uncited = sorted(defined - set(first) - also_cited)
         if uncited:
             problems.append(f"{name} {', '.join(map(str, uncited))} {'is' if len(uncited) == 1 else 'are'} never cited in the text")
         missing = sorted(n for n in first if n not in defined)

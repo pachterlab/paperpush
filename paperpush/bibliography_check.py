@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import logging
 import re
+import datetime
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -135,6 +136,7 @@ def _tex_bibliography(path: Path, source: str) -> Bibliography | None:
 # --- text reference lists ----------------------------------------------------------------
 
 _NUMBER_LABEL = re.compile(r"^\s*(?:\[(\d{1,4})\]|(\d{1,4})[.)])\s")
+_PAREN_GROUP = re.compile(r"\(\s*(\d{1,4}(?:\s*[,;\u2013\u2014-]\s*\d{1,4})*)\s*\)")
 _BRACKET = re.compile(r"\[\s*(\d{1,4}(?:\s*[,;\u2013\u2014-]\s*\d{1,4})*)\s*\]")
 _YEAR = re.compile(r"\b((?:19|20)\d{2})([a-z]?)\b")
 _SURNAME = re.compile(r"[^\W\d_](?:[^\W\d_]|['\u2019-])+")
@@ -255,7 +257,11 @@ _AUTHOR_YEAR_HEAD = re.compile(r"^[^.]{0,250}?(?:\.[^.]{0,60}?){0,8}?[.,]\s*\(?(
 # The end of an entry's author list in the natbib author-year styles (ICLR, NeurIPS, ICML, *ACL):
 # "Jort F. Gemmeke, Daniel P. W. Ellis, and Marvin Ritter. Audioset: ..., 2017." The year
 # closes the entry, so _AUTHOR_YEAR_HEAD misses it. An initial ("F.") is no end; "et al." is.
-_AUTHOR_LIST_END = re.compile(r"(?<![A-Z])\.(?:\s|$)")
+_AUTHOR_LIST_END = re.compile(r"(?<!\b[A-Z])\.(?:\s|$|(?=[A-Z][a-z]))")
+# Two "Given Surname," names opening an entry ("Kevin Black, Noah Brown, ..."): an author list,
+# even when a later name is lower-cased ("brian ichter") or the title follows without a space.
+_NAME_WORD = r"(?:[A-Z][\w'.\u2019-]*|van|von|de|der|den|da|di|du|le|la|del|dos|das)"
+_TWO_NAMES = re.compile(rf"(?:[A-Z][\w'.\u2019-]*(?:\s+{_NAME_WORD}){{1,3}},\s+){{2}}")
 _NAME_TOKEN_LOWER = frozenset({"and", "et", "al", "al.", "&", "van", "von", "de", "der", "den", "da", "di", "du", "le", "la", "del", "dos", "das", "ter", "ten", "bin", "ibn", "y"})
 
 
@@ -265,11 +271,11 @@ def _author_list_head(entry: str) -> bool:
     A run-on line ("Conference on Acoustics, Speech and Signal Processing ...") has
     lowercase words that are not name particles, so it stays with the entry before.
     """
-    end = _AUTHOR_LIST_END.search(entry, 0, 400)
+    end = _AUTHOR_LIST_END.search(entry, 0, 2500)
     if end is None:
         return False
     tokens = re.findall(r"[^\s,]+", entry[: end.start()])
-    if not tokens or len(tokens) > 120:
+    if not tokens or len(tokens) > 400:
         return False
     for token in tokens:
         if token.lower() in _NAME_TOKEN_LOWER:
@@ -283,18 +289,42 @@ def _author_list_head(entry: str) -> bool:
 
 # PDF text often sets an accent as its own glyph beside the letter ("Schl \u00a8uter",
 # "Doll \u00b4ar"), which breaks the surname. The spacing accent goes onto the next letter.
-_SPACING_ACCENTS = {"\u00a8": "\u0308", "\u00b4": "\u0301", "\u02c6": "\u0302", "\u02dc": "\u0303", "\u00b8": "\u0327",
+_SPACING_ACCENTS = {"\u00a8": "\u0308", "\u00b4": "\u0301", "`": "\u0300", "\u02c6": "\u0302", "\u02dc": "\u0303", "\u00b8": "\u0327",
                     "\u02c7": "\u030c", "\u02d8": "\u0306", "\u02d9": "\u0307", "\u02da": "\u030a", "\u02dd": "\u030b"}
-_SPLIT_ACCENT = re.compile(r"(?<=[A-Za-z]) ?([" + "".join(_SPACING_ACCENTS) + r"]) ?([A-Za-z])")
+_SPLIT_ACCENT = re.compile(r"(?<=[A-Za-z]) ?([" + "".join(_SPACING_ACCENTS) + r"]) ?([A-Za-z\u0131])")
 
 
 def join_split_accents(text: str) -> str:
     import unicodedata
 
-    return _SPLIT_ACCENT.sub(lambda m: unicodedata.normalize("NFC", m.group(2) + _SPACING_ACCENTS[m.group(1)]), text)
+    # A dotless i takes the accent as an i ("Pelegr\u00b4\u0131n" -> "Pelegr\u00edn").
+    return _SPLIT_ACCENT.sub(lambda m: unicodedata.normalize("NFC", m.group(2).replace("\u0131", "i") + _SPACING_ACCENTS[m.group(1)]), text)
+
+
+# Kerning can split an initial from its period ("Kathy Y . Wei") or a capital from its word ("Richard A V olz").
+_KERNED_INITIAL = re.compile(r"\b([A-Z]) \.(?=\s)")
+_KERNED_CAPITAL = re.compile(r"\b([VWY]) ([a-z]{2,})\b")
+
+
+def unkern(text: str) -> str:
+    return _KERNED_CAPITAL.sub(r"\1\2", _KERNED_INITIAL.sub(r"\1.", text))
 
 
 _NOT_A_YEAR = re.compile(r"(?:arXiv:?\s*|abs/|\d[-\u2013\u2014]|10\.\d{4,9}/\S*?)$", re.IGNORECASE)
+
+
+_LATEST_YEAR = datetime.date.today().year + 1
+
+
+def _in_url_or_date(entry: str, m: re.Match[str]) -> bool:
+    """A year inside a link ("https://.../2018/...") or an access date ("Accessed: 2025-09-13")."""
+    start = max(entry.rfind(" ", 0, m.start()), 0)
+    end = entry.find(" ", m.end())
+    token = entry[start: end if end != -1 else len(entry)]
+    if "/" in token or re.match(r"-\d{2}-\d{2}\b", entry[m.end():]):
+        return True
+    # Nor an ISSN ("ISSN 2076-3417", "1939-1471") or a number no year can be yet.
+    return bool(re.match(r"-\d{3}[\dXx]\b", entry[m.end():])) or int(m.group(1)) > _LATEST_YEAR
 
 
 def entry_year(entry: str) -> re.Match[str] | None:
@@ -304,7 +334,8 @@ def entry_year(entry: str) -> re.Match[str] | None:
     a DOI can come first. A parenthesized year ("(2015)") is the year; otherwise the last one
     left, where the natbib styles print it.
     """
-    found = [m for m in _YEAR.finditer(entry) if not _NOT_A_YEAR.search(entry[max(0, m.start() - 40): m.start()]) and not re.match(r"\.\d{4,5}", entry[m.end():])]
+    # Nor one inside a DOI split by a line wrap ("doi: 10.1016/j. tibtech.2014.11.010").
+    found = [m for m in _YEAR.finditer(entry) if not _NOT_A_YEAR.search(entry[max(0, m.start() - 40): m.start()]) and not re.match(r"\.\d", entry[m.end():]) and not re.search(r"[A-Za-z]\.$", entry[max(0, m.start() - 2): m.start()]) and not _in_url_or_date(entry, m)]
     if not found:
         return None
     for m in found:
@@ -315,7 +346,10 @@ def entry_year(entry: str) -> re.Match[str] | None:
 
 def _runs_on(entry: str) -> bool:
     """Whether ``entry`` opens like the rest of a venue name ("Conference on Acoustics, ...") rather than an author list."""
-    words = [w.strip(",.;:()[]") for w in entry.split()[:3]]
+    raw = entry.split()[:3]
+    if raw and re.fullmatch(r"[A-Z][\w&-]*\.", raw[0]):
+        return False  # a one-word author ("Anthropic. System card: ...")
+    words = [w.strip(",.;:()[]") for w in raw]
     return any(w.isalpha() and w.islower() and w not in _NAME_TOKEN_LOWER for w in words[1:])
 
 
@@ -379,6 +413,13 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
         refs = [Ref(n, f"[{n}]", entry) for n, entry in _entries(tail, numbered)]
         last = max(int(n) for n, _ in _entries(tail, numbered))
         cited = {str(n) for g in citation_groups(body, last) for n in _numbers(g)}
+        # natbib's numbers style can print citations in parentheses ("(1; 13; 8)", "Refs. (30; 31)").
+        # A parenthesized number may also be an equation or a list item, so they count only when
+        # brackets cite under half the list, and as citations only, never as missing entries.
+        if len(cited) < len(refs) / 2:
+            paren = {str(n) for g in _PAREN_GROUP.findall(body) for n in _numbers(g) if 1 <= n <= last}
+            if len(paren) > len(cited):
+                cited |= paren
         note = ""
         if not cited and doc.is_docx:
             cited = {str(n) for n in docx_superscript_numbers(doc) or ()}
@@ -393,10 +434,15 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
         cited = {k.strip() for g in groups for k in re.split(r"[,;]", g) if k.strip() in known}
         return Bibliography("labels", refs, cited)
 
-    tail = join_split_accents(tail)
+    tail = unkern(join_split_accents(tail))
     furniture = _page_furniture(doc)
     if furniture:
         tail = "".join(line for line in tail.splitlines(keepends=True) if line.strip() not in furniture)
+    # The text cites with the same broken accents and kerning, and a citation can run across a
+    # page break ("Xue et al." / "7" / running head / "(2025)") or a hyphenated name ("Akhound-" / "Sadegh").
+    body = unkern(join_split_accents(body))
+    body = "".join(line for line in body.splitlines(keepends=True) if line.strip() not in furniture and not line.strip().isdigit())
+    body = re.sub(r"(?<=[A-Za-z]-)[ \t]*\n[ \t]*(?=[A-Z])", "", body)
     starts = author_year_starts(tail)
     if not starts:
         return None
@@ -406,7 +452,7 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
         # A real entry opens with its authors and year ("..., Name. 2015.", "Smith, J. (2015).") or,
         # in the natbib styles, with its authors and a year at the end; a line that does neither is
         # the previous entry running on (a venue, "Preprint, arXiv:...").
-        head = not _runs_on(entry) and (bool(_AUTHOR_YEAR_HEAD.search(entry[:300])) or (_author_list_head(entry) and bool(_YEAR.search(entry))))
+        head = not _runs_on(entry) and (bool(_AUTHOR_YEAR_HEAD.search(entry[:300])) or ((_author_list_head(entry) or bool(_TWO_NAMES.match(entry))) and bool(_YEAR.search(entry))))
         if entries and (len(entry) < 25 or not head):
             entries[-1] += " " + entry
         elif entry:
@@ -421,7 +467,11 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
         if not candidates or year is None:
             continue
         suffix = year.group(2) or "[a-z]?"
-        hit = next((c for c in candidates if re.search(rf"(?<![A-Za-z]){re.escape(_fold(c))}(?![a-z])[^;\n]{{0,80}}?\b{year.group(1)}{suffix}(?![\da-z])", folded)), None)
+        # The year can follow others of the same authors ("Wang et al., 2018; 2019", "Tong et al., 2024a;b").
+        chain = rf"\b(?:(?:19|20)\d{{2}}[a-z]?\s*[;,]\s*){{0,5}}{year.group(1)}{suffix}(?![\da-z])"
+        if year.group(2):
+            chain = rf"(?:{chain}|\b{year.group(1)}[a-z](?:\s*[;,]\s*[a-z])*\s*[;,]\s*{year.group(2)}(?![\w]))"
+        hit = next((c for c in candidates if re.search(rf"(?<![A-Za-z]){re.escape(_fold(c))}(?![a-z])[^;\n]{{0,80}}?{chain}", folded)), None)
         if not hit:
             # An appendix after the reference list cites in the same shape: "Boteva et al., 2016", "Holm (2024)".
             hit = next((c for c in candidates if re.search(rf"(?<![A-Za-z]){re.escape(_fold(c))}(?: et al\.?| (?:and|&) [A-Z][\w-]+)?,? \(?{year.group(1)}{suffix}(?![\da-z])", folded_tail)), None)

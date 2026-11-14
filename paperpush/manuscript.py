@@ -1577,9 +1577,16 @@ def _cited_bib_entries(main_tex: Path, source: str) -> list[str] | None:
 _JOURNAL_VOLUME_LINE = re.compile(r"[A-Z][\w.&]*(?:[ \t]+[A-Z][\w.&]*){0,4}[ \t]+\d{1,4}[ \t]*[,:(;]")
 # A wrapped line that opens with the previous entry's link or identifier ("URL https://...",
 # "S0895479803436652."): names hold no digits, so a first word with one is no author.
-_CONTINUATION_LINE = re.compile(r"(?:URL|https?://|doi\b|[A-Za-z]*\d\S*(?:\s|$))", re.IGNORECASE)
+_CONTINUATION_LINE = re.compile(r"(?:URL|https?://|doi\b|[A-Za-z]*\d\S*(?:\s|$)|[^\s/]*/)", re.IGNORECASE)
 _ENTRY_YEAR = re.compile(r"\b(?:19|20)\d{2}[a-z]?\b")
-_ENTRY_CLOSED = re.compile(r"(?:[.)\]]|\d|https?://\S+|doi\S*)\s*$", re.IGNORECASE)
+# A URL broken after '/' or '-' runs on to the next line ("github.com/Farama-Foundation/" + "Gymnasium-Robotics.").
+_ENTRY_CLOSED = re.compile(r"(?:[.)\]]|\d|https?://\S*[^\s/-]|doi\S*[^\s/-])\s*$", re.IGNORECASE)
+# A line ending mid-phrase ("..., New York," / "Workshop on" / "ACM/IEEE Design"): the next line continues it.
+_ENTRY_OPEN_END = re.compile(r"[\w,;:&/-]\s*$")
+# A piece this short with no year ("Online.", a wrapped URL's last part) is the previous entry's tail.
+_STRAY_PIECE = 30
+# A line opening with a name and a comma ("Eric Kolve, Roozbeh Mottaghi, ..."), as an author list does.
+_AUTHOR_LINE = re.compile(r"[A-Z][\w'.’-]*(?:[ \t]+[A-Z][\w'.’-]*){0,3},")
 
 
 def author_year_starts(tail: str) -> list[int]:
@@ -1592,16 +1599,23 @@ def author_year_starts(tail: str) -> list[int]:
     """
     starts: list[int] = []
     offset = 0
-    has_year = closed = False
+    has_year = closed = open_end = False
+    piece = ""  # the text since the last start
     for line in tail.splitlines(keepends=True):
         stripped = line.strip()
         if stripped:
             upper = stripped[0].isupper() and not _JOURNAL_VOLUME_LINE.match(stripped) and not _CONTINUATION_LINE.match(stripped)
-            if upper and (not starts or (has_year and (closed or _AUTHOR_YEAR_REF.match(stripped)))):
+            # After a stray yearless line ("Online."), the next author line still starts an entry;
+            # the stray piece is then folded back below.
+            stray = bool(starts) and not has_year and len(piece) <= _STRAY_PIECE and closed and bool(_AUTHOR_LINE.match(stripped))
+            if upper and (not starts or stray or (has_year and (closed or (not open_end and _AUTHOR_YEAR_REF.match(stripped))))):
                 starts.append(offset + len(line) - len(line.lstrip()))
                 has_year = False
+                piece = ""
             has_year = has_year or bool(_ENTRY_YEAR.search(stripped))
             closed = bool(_ENTRY_CLOSED.search(stripped))
+            open_end = not closed and bool(_ENTRY_OPEN_END.search(stripped))
+            piece += stripped + " "
         offset += len(line)
     bounds = starts + [len(tail)]
     kept = [a for i, (a, b) in enumerate(zip(bounds, bounds[1:])) if i == 0 or _ENTRY_YEAR.search(tail[a:b])]

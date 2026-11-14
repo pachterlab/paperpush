@@ -971,7 +971,9 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
     suggestions = result.suggestions
     if suggestions:
         listed = [f"{lk.ref.label} -> {lk.record['DOI'].lower()}" for lk in suggestions]
-        issues.append(Issue(WARNING, "", f"{len(suggestions)} reference(s) have no DOI but match a registered work; add the DOI so readers (and this check) can follow them: {_listed(listed)}"))
+        # Advice, not a problem: a found work is confirmed, and many styles (natbib's ML ones) print
+        # no DOIs. A venue that requires them is checked by references.doi_required.
+        issues.append(Issue(SUGGESTION, "", f"{len(suggestions)} reference(s) have no DOI but match a registered work; add the DOI so readers (and this check) can follow them: {_listed(listed)}"))
 
     unverified = result.unverified
     unknown = result.by_status(reference_search.UNKNOWN)
