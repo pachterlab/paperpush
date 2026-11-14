@@ -86,7 +86,11 @@ def _reference_order(venue: Venue, values: dict[str, str], alphabetical: bool, c
         raise Unchecked(f"{path.name} uses {bib.mode} references; ordering could not be assessed reliably")
 
     names = [_fold(ref.key.rsplit(" ", 1)[0]) for ref in bib.refs]
-    alpha_ok = names == sorted(names)
+    # Read from a PDF, a few entries come out with the wrong name (a corporate author, a
+    # wrapped venue line), so a list is alphabetical when nearly every neighbour is in order;
+    # a list in citation order has about half of them inverted.
+    inversions = sum(1 for a, b in zip(names, names[1:]) if a > b)
+    alpha_ok = inversions <= max(1, len(names) // 10) if bib.mode == "author-year" and len(names) >= 10 else names == sorted(names)
     positions: list[int] = []
     for ref in bib.refs:
         surname = _fold(ref.key.rsplit(" ", 1)[0])

@@ -59,7 +59,7 @@ open the `SKILL.md` and follow it as written.
 
 | Skill | What it does | Call it when the user... |
 | --- | --- | --- |
-| `paperpush-prepare-submission` | The whole flow: checks the login, finds or creates the `.sub`, runs autofill, runs validate (stopping on errors or more than 5 warnings and offering `paperpush-fix`), then hands off to `paperpush-submit`. | asks to prepare, get ready, or submit a manuscript to a venue, and has not named a single step. **Start here when in doubt.** |
+| `paperpush-prepare-submission` | The whole flow: checks the login, finds or creates the `.sub`, runs autofill, runs validate (stopping on errors or more than 5 warnings, suggestions on style not counted, and offering `paperpush-fix`), then hands off to `paperpush-submit`. | asks to prepare, get ready, or submit a manuscript to a venue, and has not named a single step. **Start here when in doubt.** |
 | `paperpush-pick-venue` | Reads the manuscript, runs `paperpush pick-venue` (journals and conferences that published similar work, from OpenAlex, with conference ranks, deadlines, and archival status, and the supported venues ranked on subject), corrects the subjects, then checks each candidate against the author's constraints (open access, APC budget, venues already tried) and, for supported venues, against `paperpush requirements` (word, display-item, and reference limits, article types). Reports a short list with the reasons, OpenAlex's 2-year mean citedness and h-index (never called an impact factor, and not used to rank), and paperpush's support for each, then hands the chosen venue to `prepare-submission` (or `transfer`). | asks where to submit, which journals fit a manuscript, or wants to prepare a submission without having chosen a venue. |
 | `paperpush-autofill` | Reads the manuscript directory, writes `values.json`, and applies it with `paperpush autofill --engine manual`. Leaves `never` fields for the author. On an already-filled `.sub` it updates instead: takes the venue and file paths from the file, previews with `--keep-existing`, and asks before replacing any value the new draft contradicts. | wants a `.sub` filled from their files, or refreshed after the manuscript changed, and nothing else yet. |
 | `paperpush-validate` | Runs `paperpush validate`, then does the checks that need a reader (lettering in raster figures, panel labels, figure and panel content vs. legends and text, free-text guideline rules, `.sub` vs manuscript) through `--ai-tasks` / `--ai-results`. Optionally saves the report. For a venue paperpush does not support yet, builds a temporary entry with `paperpush-add-venue-validate` (temporary mode) and validates against it. | asks whether a manuscript or `.sub` is ready, meets a venue's guidelines, or passes validation, or wants the AI checks or a saved report. |
@@ -380,7 +380,12 @@ gives a contact e-mail, every reference is cited, and self-citations are not
 excessive; and proofreads the prose mechanically (double spaces, repeated
 words, punctuation spacing, unbalanced brackets and quotes, common
 misspellings, repetitive word choice, numbers of 10 or more in digits,
-abbreviations written one way, acronyms spelled out at first use), queuing
+abbreviations written one way, acronyms spelled out at first use and their
+full terms not written out before or after it, the serial comma used one
+way, hyphens and dashes, P values, units, and spacing around `=` written one
+way, agreement slips such as "these data is", contractions, sentences over
+50 words, and American and British spelling mixed or opposite to the
+corresponding author's country), queuing
 spelling, grammar, and tense as the AI check `ai.prose`. Warnings from this
 pass are heuristics over extracted text and images: relay them to the user as
 things to confirm, not as blockers. `--disable-manuscript` skips the pass.
@@ -405,9 +410,16 @@ with `paperpush-transfer`.
 
 ## The report, and the checks you run yourself
 
-`validate` reports every check as passed, failed, warning, could not run, needs
-AI, not implemented, or not applicable (MCP: `checks` in the `validate_subfile`
-result). `-o` saves the report (PDF by default; `.html`/`.md`/`.txt` by
+`validate` reports every check as passed, failed, warning, suggestion, could
+not run, needs AI, not implemented, or not applicable (MCP: `checks` in the
+`validate_subfile` result). A **suggestion** is a point of style an editor
+could leave as it is (repetitive word choice, a spelled-out number, a form or
+heading style used two ways, double spaces): mention how many there are, but
+never count them as warnings, stop on them, or rewrite the prose for them
+unasked. The terminal only counts them unless `--suggestions` is given; the
+JSON (`suggestions`) and a saved report list them. `--strict-style` (MCP:
+`strict_style=true`) reports them as warnings, for an author or venue that
+wants the house style enforced. `-o` saves the report (PDF by default; `.html`/`.md`/`.txt` by
 extension); `--colorblind` is the color-blind-friendly palette.
 When the venue lets the initial submission be in any format
 (`manuscript.initial_submission_any_format`), the report opens with that rule
@@ -426,7 +438,8 @@ API key:
    `validation_ai_tasks`). Each task has an `id`, `instructions`, and the
    `files` to read.
 2. Read the files and judge each task: `pass`, `fail` (say exactly what and
-   where), `unclear`, or `not_applicable`. Figure tasks give the minimum
+   where), `suggest` (nothing wrong, only points of style; reported as a
+   suggestion), `unclear`, or `not_applicable`. Figure tasks give the minimum
    lettering size as a fraction of the image width; measure against it.
 3. Write `{"results": [{"id", "status", "details", "evidence"}]}` and run
    `paperpush validate <abs .sub> --ai-results <that file>` (MCP:

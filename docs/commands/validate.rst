@@ -9,10 +9,11 @@ check manuscript files without a ``.sub``, with or without a venue (see
 .. code-block:: text
 
    usage: paperpush validate [-h] [-v] [-q] [--disable-CHECK ...] [--enable-CHECK ...] [--anonymous]
-                             [--initial-submission]
+                             [--initial-submission] [--strict-style]
                              [-o [OUT]] [--overwrite] [--cover-letter-max-age DAYS]
                              [--show-errors-only] [--hide-warnings]
-                             [--hide-unchecked] [--colorblind]
+                             [--hide-unchecked] [--suggestions]
+                             [--hide-suggestions] [--colorblind]
                              [--ai] [--provider {anthropic,openai,google}]
                              [--model MODEL] [--ai-only] [--json [FILE]]
                              [--ai-tasks FILE] [--ai-results FILE] [--venue VENUE]
@@ -39,13 +40,16 @@ Synopsis
    paperpush validate --issn 0012-365X --manuscript main.pdf   # a journal paperpush does not list
 
 ``validate`` prints a report of every check, grouped and colored by what
-happened to it: **failed** (red), **warnings** (amber), **needs AI**
-(purple), **not checked** -- because it could not run here, with the reason
+happened to it: **failed** (red), **warnings** (amber), **suggestions**
+on style (blue; only counted in the terminal unless ``--suggestions`` is
+given), **needs AI** (purple), **not checked** -- because it could not run here, with the reason
 on the line below, or because paperpush has no check for the rule yet (gray)
 -- and **passed** (green). Errors must be fixed before the file can be submitted
 (for example, a required field left blank, a referenced file that does not
 exist, or a choice value that isn't one of the venue's allowed options);
-warnings are worth reviewing but don't block submission. See
+warnings are worth reviewing but don't block submission; suggestions are
+points of style (repetitive word choice, spelled-out numbers, ...) an editor
+could leave as they are. See
 :ref:`how findings are reported <vc-report>` and :doc:`../validation-checks`.
 For an example, see this `saved report <../_static/arxiv_validation.pdf>`_:
 an arXiv ``.sub`` for a published CC BY 4.0 paper (`arXiv:2501.09805
@@ -368,6 +372,14 @@ Arguments
    "initial submission (any format)" checkbox next to the Validate buttons
    does the same (it is greyed out for venues without the rule).
 
+``--strict-style``
+   Report the suggestions on style (repetitive word choice, spelled-out
+   numbers, a form or heading style used two ways, double spaces, the style
+   points of ``ai.prose``) as warnings, for an author or venue that wants the
+   house style enforced. The report opens with a note saying how many were
+   promoted. They then count toward ``prepare-submission``'s limit of 5
+   warnings.
+
 ``--cover-letter-max-age DAYS``
    Warn when the date at the top of the cover letter is more than DAYS days
    old (default 7) or lies in the future. See :ref:`vc-cover-letter`.
@@ -395,15 +407,23 @@ Arguments
    Leave out the checks that were not run: the *could not run*, *needs AI*,
    and *not implemented* sections.
 
-   These three display flags filter both the terminal output and the report
+``--suggestions``
+   List the suggestions on style in the terminal. Without it the terminal
+   shows only how many there are (``Not shown: N suggestion(s) on style``);
+   the report saved with ``-o`` and the ``--json`` report always list them.
+
+``--hide-suggestions``
+   Leave the suggestions out of the report saved with ``-o`` as well.
+
+   These display flags filter both the terminal output and the report
    saved with ``-o``. They do not apply with ``--web``. The summary line still
    counts every check, a ``Not shown:`` line says which sections were left
    out, and the exit status is the same.
 
 ``--colorblind``
    Use color-blind-friendly colors (blue for passed, vermillion for failed,
-   dark yellow for warnings, reddish purple for needs AI, gray for could not
-   run / not implemented) in the terminal and the saved report. The web app's
+   dark yellow for warnings, bluish green for suggestions, reddish purple for
+   needs AI, gray for could not run / not implemented) in the terminal and the saved report. The web app's
    *Colorblind-friendly colors* setting uses the same palette, and with
    ``--web`` the page opens with that setting on. ``--alt-color`` is an older
    name for this flag.

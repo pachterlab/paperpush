@@ -1108,3 +1108,40 @@ def test_local_session_resolves_against_the_sub_folder_then_cwd(tmp_path, monkey
     assert local.resolve("both.pdf") == ms / "both.pdf"
     assert local.resolve("cwd_only.pdf").resolve() == (tmp_path / "cwd_only.pdf").resolve()
     assert local.resolve("missing.pdf") == ms / "missing.pdf"
+
+
+# --- recommend a venue ------------------------------------------------------
+
+
+_SCRNA = {
+    "title": "Pseudoalignment of single-cell RNA-seq reads",
+    "abstract": "We quantify transcript abundance in single-cell RNA sequencing data with a fast pseudoalignment method.",
+    "keywords": "bioinformatics, genomics",
+    "venue_type": "journal",
+}
+
+
+def test_pick_venue_ranks_supported_venues_offline(client):
+    # network_checks=False: no OpenAlex, so only the venues paperpush supports are ranked.
+    res = client.post("/api/pick-venue", data=_SCRNA)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["openalex"] is False
+    assert body["venues"], body
+    assert all(v["venue_type"] == "journal" for v in body["venues"])
+    assert all(v["paperpush_slug"] for v in body["venues"])
+    assert body["ai_venues"] is None
+
+
+def test_pick_venue_reads_an_uploaded_workspace_manuscript(client, ws):
+    client.post(f"/api/workspaces/{ws}/files", files=[("files", ("paper.txt", _SCRNA["title"].encode() + b"\n\n" + _SCRNA["abstract"].encode(), "text/plain"))])
+    res = client.post("/api/pick-venue", data={"venue_type": "journal", "keywords": "bioinformatics", "ws_id": ws, "manuscript_name": "paper.txt"})
+    assert res.status_code == 200, res.text
+    assert res.json()["read"] is not None
+
+
+def test_pick_venue_needs_input_and_a_key_for_ai(client):
+    assert client.post("/api/pick-venue", data={"venue_type": "journal"}).status_code == 400
+    assert client.post("/api/pick-venue", data={**_SCRNA, "venue_type": "bogus"}).status_code == 400
+    res = client.post("/api/pick-venue", data={**_SCRNA, "ai": "true"})
+    assert res.status_code == 400 and "API key" in res.json()["detail"]

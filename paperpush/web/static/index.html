@@ -73,8 +73,18 @@
   </nav>
 
   <main>
-    <h1>Prepare a submission</h1>
-    <p class="intro">Pick where you are submitting. The form fills in with everything that venue's submission portal asks for and its author guidelines require. Upload your files, fill in (or autofill) the rest, then validate it before you submit.</p>
+    <div class="page-head">
+      <h1>Prepare a submission</h1>
+      <button type="button" class="btn" id="recommend-btn" title="Find journals and conferences that publish work like yours"><span aria-hidden="true">🧭</span> Recommend a venue</button>
+    </div>
+    <ol class="intro steps">
+      <li>Pick a venue</li>
+      <li>Upload your manuscript files</li>
+      <li>Fill out the manuscript metadata (automatically with AI, or manually otherwise)</li>
+      <li>Check your manuscript (extended with AI)</li>
+      <li>Share this page with your co-authors</li>
+      <li>Fill out the submission portal (automatically for some journals, or manually otherwise)</li>
+    </ol>
 
     <fieldset class="panel">
       <label class="name" for="venue-search">Venue</label>
@@ -165,6 +175,7 @@
             <span class="mark st-passed">✔ passed</span>
             <span class="mark st-failed">✖ failed</span>
             <span class="mark st-warning">▲ warning</span>
+            <span class="mark st-suggestion">✎ suggestion (style)</span>
             <span class="mark st-pending">○ not checked yet</span>
           </p>
         </summary>
@@ -195,6 +206,31 @@
       <h2>Fill out the <span data-venue-name></span> submission portal</h2>
       <div id="portal-body"></div>
       <div class="dialog-actions"><button class="btn" value="close">Close</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="recommend-dialog" class="wide">
+    <form method="dialog" class="dialog-inner" id="recommend-form">
+      <h2>Recommend a venue</h2>
+      <p class="hint">Journals and conferences that recently published work like yours (from OpenAlex), with conference ranks and deadlines. Give the manuscript, or its title, abstract, and keywords; anything you type replaces what is read from the file.</p>
+      <div class="rec-grid">
+        <label class="rec-field rec-wide"><span class="name">Manuscript</span>
+          <span class="rec-file"><span class="btn btn-small">Choose a file…</span><span class="mono small" id="rec-file-name"></span><input type="file" id="rec-file" accept=".pdf,.docx,.doc,.tex,.zip,.md,.txt,.odt,.rtf" hidden><span class="hint small" id="rec-file-note"></span></span></label>
+        <label class="rec-field rec-wide"><span class="name">Title</span><input type="text" id="rec-title" class="input" autocomplete="off"></label>
+        <label class="rec-field rec-wide"><span class="name">Keywords</span><input type="text" id="rec-keywords" class="input" autocomplete="off" placeholder="Comma-separated, e.g. single-cell RNA-seq, clustering"></label>
+        <label class="rec-field rec-wide"><span class="name">Abstract</span><textarea id="rec-abstract" class="input" rows="5"></textarea></label>
+        <label class="rec-field"><span class="name">Venue type</span>
+          <select id="rec-type" class="input"><option value="all">All</option><option value="journal">Journals</option><option value="conference">Conferences</option></select></label>
+        <label class="rec-field"><span class="name">Conferences</span>
+          <select id="rec-archival" class="input" title="Archival proceedings count as publication; non-archival meetings are abstract, poster, or talk only"><option value="archival">Archival</option><option value="non-archival">Non-archival</option><option value="all">All</option></select></label>
+      </div>
+      <div class="dialog-actions rec-actions">
+        <span id="rec-status" class="small muted" role="status"></span>
+        <button type="button" class="btn" value="close" id="rec-close">Close</button>
+        <span class="ai-button-wrap" id="rec-ai-wrap" tabindex="0"><button type="button" class="btn" id="rec-ai-btn" disabled><span aria-hidden="true">✨</span> Recommend, extended with AI</button></span>
+        <button type="button" class="btn primary" id="rec-run">Recommend</button>
+      </div>
+      <div id="rec-results"></div>
     </form>
   </dialog>
 

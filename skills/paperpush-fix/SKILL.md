@@ -112,8 +112,9 @@ paperpush validate <abs .sub> --json <scratch>/round1.json --ai-tasks <scratch>/
 ### Reading the results
 
 In `round1.json`, `checks[]` gives each check's `id`, `status` (`failed`,
-`warning`, `unchecked`, `needs_ai`, `passed`, ...) and `issues[]`, each with
-`level`, `field` (the `.sub` field), and `message`. A limit issue states both
+`warning`, `suggestion`, `unchecked`, `needs_ai`, `passed`, ...) and
+`issues[]`, each with `level` (`error`, `warning`, or `suggestion`), `field`
+(the `.sub` field), and `message`. A limit issue states both
 numbers in its message: "Abstract: 312 words exceeds the 250-word limit",
 "Title: 160 characters exceeds the 150-character limit", "7 keywords given;
 the author guidelines allow at most 6", "14 pages exceeds the 12-page limit".
@@ -167,7 +168,7 @@ correct fix:
 
 | Check ids | Fix |
 | --- | --- |
-| `prose.*` (double spaces, repeated words, spacing around punctuation, unbalanced brackets or quotes, common misspellings, numbers, acronyms not defined at first use) | Edit the source at the spot the message quotes, following the editing rules in step 4. |
+| `prose.*` issues of level `warning` (repeated words, spacing around punctuation, unbalanced brackets or quotes, common misspellings, malformed "i.e."/"et al.", numbers grouped against the venue's rule, acronyms not defined at first use) | Edit the source at the spot the message quotes, following the editing rules in step 4. |
 | `consistency.title`, `consistency.abstract`, `consistency.keywords`, `consistency.authors`, `consistency.statements`, `consistency.display_counts`, `consistency.word_counts` | The manuscript is the source of truth. Change the `.sub` to match it (`paperpush autofill --engine manual --values <values.json>` with just those fields, or edit the field directly). If the manuscript is the one that's wrong (a stated word count that is out of date), fix the manuscript. |
 | `form.options`, `form.schema` (an option spelled slightly off, an unknown field that is a typo of a real one) | Use the exact option from `paperpush options <venue> <field>`, or the field name the error suggests. Only when exactly one option is clearly meant. |
 | `integrity.dois`, `integrity.unmatched_references`, `integrity.reference_versions` (a wrong or missing DOI, a preprint that has since been published) | Fix the `.bib`. Fetch the record from the registry (`https://api.crossref.org/works/<doi>`, or a search with `query.bibliographic=<title author year>`) and change only the fields the issue names. A DOI goes in only if the record's title, first author, and year match the entry. |
@@ -186,6 +187,17 @@ correct fix:
   repeat words in the title), and say which.
 - **`front_matter.abstract_citations`** (a citation in the abstract): remove
   the citation and keep the sentence, if it reads correctly without it.
+
+**Suggestions: leave them alone unless the user asks.** An issue of level
+`suggestion` (repetitive word choice, spelled-out numbers, a form written two
+ways, headings capitalized two ways, double spaces, an AI `suggest` verdict
+on style) is house style an editor could keep as it is. Don't edit for it,
+and don't count it toward the rounds' stopping rule. List the count, and the
+check ids, under "Suggestions on style" in the report. If the user asked to
+fix the style too (or validate ran with `--strict-style`, which makes them
+warnings), treat the mechanical ones (double spaces, numbers, forms written
+two ways, heading case) as tier 1, and repetitive word choice as tier 3 with
+a proposed rewording for each, since rewording is the author's voice.
 
 **Tier 3: report it, don't fix it.** The author has to decide or supply
 these:
@@ -302,7 +314,11 @@ leave the issue in tier 3.
   of cited works; proper names.
 - **Acronyms:** define at first use in the main text as `full term
   (ACRONYM)`, and separately in the abstract if the abstract uses it. Don't
-  define terms everyone knows (DNA, RNA, MRI, GPU, PCR).
+  define terms everyone knows (DNA, RNA, MRI, GPU, PCR). When the full term
+  is written out before the definition, move the `(ACRONYM)` to that first
+  use. When it is written out again after the definition, use the acronym
+  instead (a suggestion: leave a deliberate repeat, such as one opening a
+  section, as it is).
 - **Numbers:** follow the convention the prose check names; don't start a
   sentence with a digit (rephrase instead: "A total of 15 patients ...").
 - **LaTeX:** edit the `.tex`/`.bib` text directly. Leave comments, macros,
@@ -438,7 +454,9 @@ In this order:
    words) is the longest section." Include any statement you drafted.
 4. **Can't fix here**: missing files, figures to export again, things that
    couldn't be checked, each with the reason.
-5. Where the backup is (`<sub dir>/.paperpush-backup/<timestamp>/`), and
+5. **Suggestions on style** (left as they are): how many, by check id, and
+   that you can apply them if the author wants.
+6. Where the backup is (`<sub dir>/.paperpush-backup/<timestamp>/`), and
    where the saved report is.
 
 ## Rules

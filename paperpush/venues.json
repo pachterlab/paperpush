@@ -1146,5 +1146,18 @@
       "natural language processing",
       "machine learning"
     ]
+  },
+  "iclr_2026": {
+    "name": "ICLR 2026",
+    "full_name": "The Fourteenth International Conference on Learning Representations",
+    "venue_type": "conference",
+    "anonymous": true,
+    "deprecated": true,
+    "site_url": "https://iclr.cc/Conferences/2026",
+    "submission_guide": "https://iclr.cc/Conferences/2026/AuthorGuide",
+    "description": "Conference on representation learning, deep learning, and their applications, covering machine learning theory, methods, and practice.",
+    "keywords": [
+      "machine learning"
+    ]
   }
 }

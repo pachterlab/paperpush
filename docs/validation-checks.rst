@@ -8,7 +8,7 @@ sensitive-data scan (see :ref:`submit-validation`).
 
 .. BEGIN VALIDATION CHECK COUNT
 
-PaperPush currently has **155 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
+PaperPush currently has **160 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
 
 .. END VALIDATION CHECK COUNT
 
@@ -209,23 +209,28 @@ Venue rules marked *not implemented* are excluded.
 139. ``prose.acronyms`` — Acronyms spelled out at first use
 140. ``prose.brackets`` — Brackets and quotes pair up
 141. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
-142. ``prose.double_spaces`` — No double spaces between words
-143. ``prose.heading_case`` — Headings of the same level capitalized one way
-144. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
-145. ``prose.punctuation_spacing`` — Spacing around punctuation
-146. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
-147. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
-148. ``prose.spelling`` — Common misspellings (codespell)
+142. ``prose.dashes`` — Hyphens, en dashes, em dashes, and quotes used as expected
+143. ``prose.double_spaces`` — No double spaces between words
+144. ``prose.heading_case`` — Headings of the same level capitalized one way
+145. ``prose.number_format`` — Statistics, units, and percent signs written one way
+146. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
+147. ``prose.punctuation_spacing`` — Spacing around punctuation
+148. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
+149. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
+150. ``prose.serial_comma`` — Lists use the serial (Oxford) comma one way
+151. ``prose.spelling`` — Common misspellings (codespell)
+152. ``prose.spelling_variant`` — Spelling uses one English variant (US or UK)
+153. ``prose.usage`` — Agreement, contractions, and very long sentences
 
 **Rigor and reproducibility**
 
-149. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
-150. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
-151. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
-152. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
-153. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
-154. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
-155. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
+154. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
+155. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
+156. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
+157. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
+158. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
+159. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
+160. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
 
 .. END VALIDATION CHECK LIST
 
@@ -391,6 +396,20 @@ to it:
   cover heuristics over extracted text and images, such as a heading that was
   not found, a figure that looks low-resolution, or a name that might identify
   an author. Read each one and decide whether it applies.
+- **Suggestions (style)** -- the check found only points of **style** an
+  editor could leave as they are: repetitive word choice, a number of 10 or
+  more spelled out, a form written two ways ("vs" and "vs."), headings
+  capitalized two ways, double spaces, or style points from the AI check
+  ``ai.prose``. They are not counted with the warnings and never block
+  anything (``prepare-submission``'s limit of 5 warnings ignores them). The
+  terminal shows only how many there are, unless ``--suggestions`` is given;
+  the report saved with ``-o``, the JSON, and the web page list them.
+  ``--strict-style`` reports them as warnings instead, for an author or venue
+  that wants the house style enforced. A rule the venue's guidelines state
+  (``manuscript.thousands_separator``, ``manuscript.group_four_digit_numbers``)
+  is reported as a warning whatever the flag. The rule of thumb: a finding is
+  a suggestion when fixing it would not change whether the paper meets the
+  venue's rules or is correct.
 - **Not checked: could not run** -- the check applies but did not run here:
   it was switched off with ``--disable-...`` (see :ref:`vc-disable`), a tool or optional package is missing
   (``latexmk``, ``pdfminer.six``), or a file could not be read. The reason is
@@ -405,13 +424,15 @@ to it:
   nothing for the check to look at. Listed at the end, one check per line.
 
 In the terminal the sections are colored: green for passed, red for failed,
-amber for warnings, purple for needs AI, and gray for checks that could not
-run (each says why) or are not implemented. The web app uses the same colors.
-``--colorblind`` switches to a color-blind-friendly palette (blue,
-vermillion, dark yellow, reddish purple, gray) -- the same one as the web
-app's *Colorblind-friendly colors* setting -- and every line also
-carries a marker (``✔``, ``✖``, ``▲``, ``?``, ``–``), so the status never
-depends on color alone. ``-o`` saves the same report as a PDF (colors kept),
+amber for warnings, blue for suggestions, purple for needs AI, and gray for
+checks that could not run (each says why) or are not implemented. The web app
+uses the same colors. ``--colorblind`` switches to a color-blind-friendly
+palette (blue, vermillion, dark yellow, bluish green, reddish purple, gray;
+blue means passed there, so suggestions are bluish green) -- the same one as
+the web app's *Colorblind-friendly colors* setting -- and every line also
+carries a marker (``✔``, ``✖``, ``▲``, ``✎``, ``?``, ``–``; ``[HINT]`` for a
+suggestion in a PDF or text report), so the status never depends on color
+alone. ``-o`` saves the same report as a PDF (colors kept),
 or as HTML, Markdown, or plain text when the path ends in ``.html``, ``.md``,
 or ``.txt``.
 
@@ -1233,11 +1254,18 @@ because LaTeX does not print them. Text extracted from a PDF has spacing
 artifacts of its own (justified lines, rejoined line breaks), so a PDF gets
 only the repeated-word, spelling, and repetitive-word-choice checks. The
 reference list is skipped.
-Every finding is a warning, quoting the first five examples in context with
-the problem marked (``␣␣`` for a double space, ``»,«`` around a mark).
+Each finding quotes the first five examples in context with the problem
+marked (``␣␣`` for a double space, ``»,«`` around a mark). Repeated words,
+punctuation spacing, unbalanced brackets, and misspellings are warnings;
+double spaces and repetitive word choice are suggestions (see
+:ref:`vc-report`).
 
 Copy-editing conventions are checked in the same pass, in every format (a
-PDF's text included):
+PDF's text included). A mistake (a malformed "i.e." or "et al.", an acronym
+never spelled out, a number grouped against the venue's rule) is a warning;
+house style and consistency (a spelled-out number, a sentence opening with
+digits, a form or heading style used two ways, thousands grouped two ways
+when the venue sets no rule) are suggestions:
 
 - **Numbers** (``prose.numbers``): a number of 10 or more spelled out
   ("twenty-five patients" for "25 patients"), and a sentence that opens with
@@ -1293,6 +1321,40 @@ PDF's text included):
   One-word headings, acronyms, and words the text capitalizes as names show no
   style and are not counted.
 
+- **Serial comma** (``prose.serial_comma``). Lists of three or more short
+  items written both with the serial (Oxford) comma ("A, B, and C") and
+  without it ("A, B and C"); the less-used form is quoted. An introductory
+  phrase ("In 2020, cells and media ...") and an aside between commas
+  ("our model, trained on ImageNet, and the baseline") are not lists. When the
+  venue's ``manuscript.serial_comma`` says which form it uses, lists written
+  the other way are warnings instead.
+- **Dashes and quotes** (``prose.dashes``). A hyphen in a number range
+  ("10-20" for "10–20"; not dates, IDs, or coordinates), a spaced or double
+  hyphen used as a dash ("the cells - which" for an em dash), and dashes set
+  both spaced and closed up ("a—b" and "a — b"). In LaTeX source, ``--`` and
+  ``---`` count as en and em dashes, and a straight double quote opening a
+  quotation (``"word"``) is a warning: LaTeX prints it as a closing quote.
+- **Number formats** (``prose.number_format``). ``=``, ``<``, and ``>``
+  spaced two ways ("n = 12" and "n=12") or on one side only ("n =12"); P
+  values with and without a leading zero ("P < 0.05" and "P < .05"), or with
+  both "P" and "p"; and units (mg, µL, nm, kDa, bp, °C, ...) and percent signs
+  set both with and without a space. Spacing is not compared in a PDF, whose
+  extracted text loses thin spaces.
+- **Usage** (``prose.usage``). Agreement slips a pattern can see, as
+  warnings: "these data is", "a criteria", "phenomena was", "these
+  analysis.", "the results shows", "there is several", "each sample were",
+  "its'". A plural noun governed by "of" ("the number of criteria is") is not
+  reported. As suggestions: "data" treated as both singular and plural,
+  contractions ("don't", "it's"), and sentences of more than 50 words (not in
+  a PDF).
+- **Spelling variant** (``prose.spelling_variant``), when the guidelines name
+  no English variant (``layout.language`` checks it when they do). American and
+  British spellings mixed ("color" and "colour"), or a manuscript written in
+  the variant opposite to the corresponding author's affiliation (read from
+  the ``.sub`` author list: British spelling from a US address, or American
+  spelling from the UK, Ireland, Australia, New Zealand, or South Africa).
+  Both are warnings to confirm, not errors.
+
 What a pattern cannot judge is left to the AI check ``ai.prose`` (see
 :ref:`vc-ai`): misspellings beyond codespell's list and real words in the
 wrong place ("form" for "from"), grammar (agreement, missing words, articles,
@@ -1300,7 +1362,10 @@ run-ons, comma splices, dangling modifiers), tense (past for what the study
 did and found, present for established facts, what a figure shows, and
 conclusions; a section that keeps another convention consistently is fine),
 and spelling that strays from the guidelines' English variant or mixes
-American and British forms.
+American and British forms. Errors make it fail (a warning). When there are
+none, it may answer ``suggest`` with up to 10 points of style (an awkward or
+very long sentence, wordiness, tense that drifts but could be defended),
+reported as a suggestion.
 
 .. _vc-placeholders:
 

@@ -100,6 +100,7 @@
     // version, base}. `base` is the text as last saved to (or read from) the
     // server; the page's edits are state.text minus that.
     shared: null,
+    carry: null, // title, abstract, keywords, manuscript carried into a venue picked in "Recommend a venue"
   };
 
   // ------------------------------------------------------------------ utils
@@ -332,7 +333,6 @@
           { role: "option", id: `venue-opt-${index}`, "data-slug": v.slug, "data-index": index, class: index === comboActive ? "active" : null },
           el("span", { class: "vname", text: v.name }),
           el("span", { class: "vfull", text: v.full_name && v.full_name !== v.name ? v.full_name : v.description || "" }),
-          v.supports_submit || v.venue_type === "general" ? null : el("span", { class: "chip plain", title: "paperpush checks the manuscript but cannot fill this venue's portal yet", text: "validate only" }),
         );
         li.addEventListener("mousedown", (e) => { e.preventDefault(); chooseVenue(v.slug); });
         list.append(li);
@@ -437,6 +437,7 @@
     renderInitialSubmission();
     refreshPlan();
     applyPendingMatches();
+    if (state.carry) await applyCarry();
   }
 
   function renderVenueHead() {
@@ -1729,7 +1730,7 @@
     const server = {};
     if (state.results && !state.resultsStale) {
       for (const c of state.results.checks) {
-        if (c.group === "live" || !["failed", "warning"].includes(c.status)) continue;
+        if (c.group === "live" || !["failed", "warning", "suggestion"].includes(c.status)) continue;
         for (const i of c.issues) if (i.field) (server[i.field] ||= []).push(i);
       }
     }
@@ -1737,7 +1738,7 @@
       const live = (state.live.byField[fid] || []).filter((i) => i.check !== "form.required" || state.showRequired || touchedFields.has(fid));
       const all = [...live, ...(server[fid] || [])];
       const list = $(".field-issues", w.card);
-      list.replaceChildren(...all.map((i) => el("li", { class: i.level === "error" ? "error" : "warning", text: i.message })));
+      list.replaceChildren(...all.map((i) => el("li", { class: i.level === "error" ? "error" : i.level === "suggestion" ? "suggestion" : "warning", text: i.message })));
       w.card.querySelectorAll(".input").forEach((n) => n.classList.toggle("invalid", live.some((i) => i.level === "error")));
       w.issues = all;
     }
@@ -1746,11 +1747,12 @@
 
   // One status per field, shown as the card's coloured edge and the menu
   // dot: red for an error, orange for a warning, yellow for a value autofill
-  // wants read over, green for filled, hollow grey for empty.
+  // wants read over, green for filled, hollow grey for empty. A suggestion on
+  // style leaves the field green: it is listed, but nothing needs fixing.
   const STATUS_CLASSES = ["st-ok", "st-warn", "st-issue", "st-review", "st-empty", "st-pending"];
   function fieldStatus(value, issues, review) {
     if (issues.some((i) => i.level === "error")) return "st-issue";
-    if (issues.length) return "st-warn";
+    if (issues.some((i) => i.level !== "suggestion")) return "st-warn";
     if (!String(value || "").trim()) return "st-empty";
     return review ? "st-review" : "st-ok";
   }
@@ -1817,8 +1819,8 @@
     }
     // Once a file is removed or replaced, the last validation's tally no
     // longer describes the files: show none until Validate runs again.
-    const c = state.filesChanged ? { passed: 0, failed: 0, warning: 0, needs_ai: 0 } : r.counts;
-    const ran = c.passed + c.failed + c.warning;
+    const c = state.filesChanged ? { passed: 0, failed: 0, warning: 0, suggestion: 0, needs_ai: 0 } : r.counts;
+    const ran = c.passed + c.failed + c.warning + (c.suggestion || 0);
     $("#stat-checks").textContent = `${c.passed}/${ran}`;
     $("#stat-checks-label").textContent = state.resultsStale ? "checks passed (out of date)" : "checks passed";
     const cls = state.resultsStale ? "stale" : c.failed ? "bad" : c.warning ? "partial" : "good";
@@ -1828,6 +1830,7 @@
       ["good", c.passed, "passed"],
       [c.failed ? "bad" : "", c.failed, "failed"],
       [c.warning ? "partial" : "", c.warning, "warnings"],
+      [c.suggestion ? "suggest" : "", c.suggestion || 0, "suggestions"],
       [c.needs_ai ? "ai" : "", c.needs_ai || 0, "need AI"],
     ];
     statsRow.replaceChildren(...tiles.map(([k, n, label]) => el("div", { class: `stat ${k}` }, el("b", { text: String(n) }), el("span", { text: label }))));
@@ -1841,8 +1844,8 @@
     ["ai", "Checked only with AI", "Judgements that need someone to read the files: lettering in raster figures, free-text guideline rules, whether every field says what the manuscript says. Run them with “Validate, extended with AI”."],
     ["manual", "Not checked by paperpush", "Rules in the guidelines paperpush has no check for yet. Check these yourself."],
   ];
-  const MARKS = { passed: "✔", failed: "✖", warning: "▲", unchecked: "?", needs_ai: "?", not_implemented: "–", not_applicable: "·", pending: "○" };
-  const STATUS_WORDS = { unchecked: "could not run", needs_ai: "needs AI", not_implemented: "check by hand" };
+  const MARKS = { passed: "✔", failed: "✖", warning: "▲", suggestion: "✎", unchecked: "?", needs_ai: "?", not_implemented: "–", not_applicable: "·", pending: "○" };
+  const STATUS_WORDS = { suggestion: "style", unchecked: "could not run", needs_ai: "needs AI", not_implemented: "check by hand" };
 
   // The checks of one block, each with the status to show (grey "pending"
   // until there is a result for it).
@@ -1870,7 +1873,7 @@
 
   function checkItem(c) {
     const status = c.status;
-    const cls = { passed: "st-passed", failed: "st-failed", warning: "st-warning", unchecked: "st-unchecked", needs_ai: "st-needs-ai", not_applicable: "st-na" }[status] || "";
+    const cls = { passed: "st-passed", failed: "st-failed", warning: "st-warning", suggestion: "st-suggestion", unchecked: "st-unchecked", needs_ai: "st-needs-ai", not_applicable: "st-na" }[status] || "";
     const tag = c.source === "ai" ? el("span", { class: "tag", text: "AI" }) : null;
     const word = STATUS_WORDS[status] ? el("span", { class: "cat", text: STATUS_WORDS[status] }) : null;
     const head = [el("span", { class: "mk", "aria-hidden": "true", text: MARKS[status] || "○" }), el("span", { class: "ttl", text: c.title }), tag, word, el("span", { class: "cat", text: c.category })];
@@ -1881,7 +1884,7 @@
     const body = el("div", { class: "body" },
       detail ? el("p", { class: "detail", text: detail }) : null,
       issues.length ? el("ul", {}, issues.map((i) => el("li", {},
-        i.unchecked ? "Not checked: " : "",
+        i.unchecked ? "Not checked: " : i.level === "suggestion" && status !== "suggestion" ? "Suggestion: " : "",
         i.field && state.fields.has(i.field) ? el("button", { type: "button", class: "link", onclick: () => focusField(i.field), text: state.fields.get(i.field).label }) : null,
         i.field && state.fields.has(i.field) ? ": " : "",
         i.message))) : null,
@@ -1918,8 +1921,9 @@
       }
       const shown = checks.filter((c) => c.status !== "not_applicable");
       const na = checks.filter((c) => c.status === "not_applicable");
-      const done = shown.filter((c) => ["passed", "failed", "warning"].includes(c.status));
-      const counts = done.length ? `${done.filter((c) => c.status === "passed").length} of ${shown.length} passed` : plural(shown.length, "check");
+      const done = shown.filter((c) => ["passed", "failed", "warning", "suggestion"].includes(c.status));
+      // A suggestion counts as passed: nothing in it needs fixing.
+      const counts = done.length ? `${done.filter((c) => c.status === "passed" || c.status === "suggestion").length} of ${shown.length} passed` : plural(shown.length, "check");
       const worst = shown.some((c) => c.status === "failed") ? "st-failed"
         : shown.some((c) => c.status === "warning") ? "st-warning"
           : shown.length && done.length === shown.length ? "st-passed" : "st-pending";
@@ -1940,6 +1944,7 @@
     btn.disabled = !ai || state.busy;
     btn.title = ai ? `Also runs the AI checks (${ai})` : reason;
     setAiTooltip($("#validate-ai-wrap"), reason);
+    renderRecommendAi();
   }
 
   let planSeq = 0;
@@ -1993,7 +1998,7 @@
       const notes = [];
       if (!res.network_checks) notes.push("link and DOI checks are switched off on this server");
       if (res.ai_error) notes.push(`AI checks failed: ${res.ai_error}`);
-      status.textContent = `${c.passed} passed, ${c.failed} failed, ${c.warning} with warnings${c.needs_ai ? `, ${c.needs_ai} need AI` : ""}.${notes.length ? ` (${notes.join("; ")})` : ""}`;
+      status.textContent = `${c.passed} passed, ${c.failed} failed, ${c.warning} with warnings${c.suggestion ? `, ${c.suggestion} with suggestions on style` : ""}${c.needs_ai ? `, ${c.needs_ai} need AI` : ""}.${notes.length ? ` (${notes.join("; ")})` : ""}`;
       if (res.ai_error) status.className = "small err";
     } catch (err) {
       status.className = "small err";
@@ -2501,8 +2506,213 @@
     location.hash = `#/v/${encodeURIComponent(venue)}`;
   }
 
+  // ------------------------------------------------------ recommend a venue
+  // `paperpush pick-venue` on the page: the dialog starts from what the form
+  // already holds (title, abstract, keywords, the uploaded manuscript), and
+  // "Use this venue" opens a supported venue with those carried over.
+
+  const META_IDS = { title: ["title"], abstract: ["abstract"], keywords: ["keywords", "portal_keywords"] };
+
+  function formMeta() {
+    if (!state.venue) return { title: "", abstract: "", keywords: "", manuscript: "" };
+    const vals = values();
+    const pick = (ids) => ids.map((id) => (vals[id] || "").trim()).find(Boolean) || "";
+    const mf = state.venue.manuscript_field;
+    const raw = mf ? (vals[mf] || "").trim().split("\n")[0].split("|")[0].trim() : "";
+    const keywords = pick(META_IDS.keywords).split("\n").map((k) => k.trim()).filter(Boolean).join(", ");
+    return { title: pick(META_IDS.title), abstract: pick(META_IDS.abstract), keywords, manuscript: raw };
+  }
+
+  function renderRecommendAi() {
+    const btn = $("#rec-ai-btn");
+    if (!btn) return;
+    const { label: ai, reason } = aiAvailability();
+    btn.disabled = !ai || state.busy;
+    btn.title = ai ? `An LLM (${ai}) also ranks the venues paperpush supports, with a reason for each` : reason;
+    setAiTooltip($("#rec-ai-wrap"), reason);
+  }
+
+  function openRecommend() {
+    const meta = formMeta();
+    // Fill only the boxes that are empty, so what the author typed here stays.
+    for (const k of ["title", "abstract", "keywords"]) {
+      const box = $(`#rec-${k}`);
+      if (!box.value.trim() && meta[k]) box.value = meta[k];
+    }
+    const note = $("#rec-file-note");
+    if (!$("#rec-file").files.length) {
+      if (meta.manuscript) {
+        note.textContent = `Or leave it empty to use your uploaded ${meta.manuscript.split("/").pop()}.`;
+        note.dataset.manuscript = meta.manuscript;
+      } else {
+        note.textContent = "";
+        delete note.dataset.manuscript;
+      }
+    }
+    renderRecommendAi();
+    $("#recommend-dialog").showModal();
+  }
+
+  function recRow(r, { ai = false } = {}) {
+    const typeLabel = { journal: "Journal", conference: "Conference", preprint: "Preprint server" }[r.venue_type] || r.venue_type || "";
+    const meta = [typeLabel, r.publisher];
+    if (r.core_rank) meta.push(`CORE ${r.core_rank}`);
+    if (r.ccf_rank) meta.push(`CCF ${r.ccf_rank}`);
+    if (r.deadlines) meta.push(r.deadlines);
+    if (r.venue_type === "conference" && r.archival === false) meta.push("non-archival");
+    if (r.similar_works) meta.push(`${r.similar_works} similar works`);
+    if (r.mean_citedness_2yr != null) meta.push(`2-yr mean citedness ${Number(r.mean_citedness_2yr).toFixed(1)}`);
+    if (r.h_index != null) meta.push(`h-index ${r.h_index}`);
+    if (r.is_oa) meta.push("open access");
+    if (r.apc_usd) meta.push(`APC $${Number(r.apc_usd).toLocaleString()}`);
+    if (r.limit) meta.push(r.limit);
+    const slug = r.paperpush_slug;
+    const known = slug ? state.venues.find((v) => v.slug === slug) : null;
+    const action = known
+      ? el("button", { type: "button", class: "btn btn-small primary", onclick: () => useRecommended(slug), text: "Use this venue" })
+      : el("button", { type: "button", class: "btn btn-small", title: "paperpush has no entry for this venue yet: open the general checks (or add the venue from the top bar)", onclick: () => useRecommended("general"), text: "General checks" });
+    const chip = known
+      ? el("span", { class: "chip plain rec-chip", title: known.supports_submit ? "paperpush checks the manuscript and fills the portal" : "paperpush checks the manuscript against this venue's guidelines", text: "in paperpush" })
+      : null;
+    return el("li", { class: "rec-item" },
+      el("span", { class: "rec-score", title: ai ? "" : `score 0-100 (${r.basis || "fit"})`, text: ai || r.score == null ? "" : String(r.score) }),
+      el("div", {},
+        el("div", { class: "rec-name" }, r.link ? el("a", { href: r.link, target: "_blank", rel: "noopener", text: r.name }) : r.name, chip),
+        el("div", { class: "rec-meta", text: meta.filter(Boolean).join(" · ") }),
+        r.reason ? el("div", { class: "rec-reason", text: r.reason }) : null),
+      action);
+  }
+
+  function renderRecommendations(res) {
+    const parts = [];
+    if (res.notes && res.notes.length) parts.push(el("p", { class: "hint rec-notes", text: res.notes.join(" ") }));
+    if (res.ai_venues) {
+      parts.push(el("h3", { text: `Best fits among the venues paperpush supports (${(res.ai && res.ai.model) || "AI"})` }));
+      if (res.ai && res.ai.subjects && res.ai.subjects.length) parts.push(el("p", { class: "hint", text: `Subjects: ${res.ai.subjects.join(", ")}` }));
+      parts.push(res.ai_venues.length ? el("ol", { class: "rec-list" }, res.ai_venues.map((r) => recRow(r, { ai: true }))) : el("p", { class: "hint", text: "The model picked no venue." }));
+    }
+    parts.push(el("h3", { text: res.openalex ? "Venues publishing similar work" : "Venues matched on subject" }));
+    if (!res.openalex && res.subjects && res.subjects.length) parts.push(el("p", { class: "hint", text: `Subjects: ${res.subjects.join(", ")}` }));
+    parts.push(res.venues.length
+      ? el("ol", { class: "rec-list" }, res.venues.map((r) => recRow(r)))
+      : el("p", { class: "hint", text: "No venue matched. Add keywords or the abstract, or try another venue type." }));
+    if (res.total_venues > res.venues.length) parts.push(el("p", { class: "hint small", text: `${res.total_venues - res.venues.length} more not shown.` }));
+    parts.push(el("p", { class: "hint small", text: "Ranked on fit alone. Citedness is OpenAlex's 2-year mean citations per work, not the Clarivate impact factor. Check each venue's scope, open-access policy, and fees before you choose." }));
+    $("#rec-results").replaceChildren(...parts);
+  }
+
+  async function runRecommend(withAi) {
+    const status = $("#rec-status");
+    const file = $("#rec-file").files[0] || null;
+    const uploaded = file ? "" : $("#rec-file-note").dataset.manuscript || "";
+    const typed = { title: $("#rec-title").value.trim(), abstract: $("#rec-abstract").value.trim(), keywords: $("#rec-keywords").value.trim() };
+    if (!file && !uploaded && !typed.title && !typed.abstract && !typed.keywords) {
+      status.textContent = "Give the manuscript, or its title, abstract, or keywords.";
+      return;
+    }
+    const body = new FormData();
+    for (const [k, v] of Object.entries(typed)) body.append(k, v);
+    body.append("venue_type", $("#rec-type").value);
+    body.append("archival", $("#rec-archival").value);
+    body.append("ai", withAi ? "true" : "false");
+    if (file) body.append("manuscript", file, file.name);
+    else if (uploaded && state.ws) {
+      body.append("ws_id", state.ws);
+      body.append("manuscript_name", uploaded);
+    }
+    $("#rec-run").disabled = true;
+    $("#rec-ai-btn").disabled = true;
+    status.textContent = withAi ? "Searching OpenAlex and asking the AI… (up to a minute)" : "Searching OpenAlex… (up to half a minute)";
+    try {
+      const res = await (await api("/api/pick-venue", { method: "POST", headers: withAi ? llmHeaders() : {}, body })).json();
+      status.textContent = "";
+      if (res.read) {
+        // Show what was read from the file in the empty boxes: it is what the venues were matched on.
+        if (!$("#rec-title").value.trim() && res.read.title) $("#rec-title").value = res.read.title;
+        if (!$("#rec-abstract").value.trim() && res.read.abstract) $("#rec-abstract").value = res.read.abstract;
+        if (!$("#rec-keywords").value.trim() && res.read.keywords && res.read.keywords.length) $("#rec-keywords").value = res.read.keywords.join(", ");
+      }
+      renderRecommendations(res);
+      $("#rec-results").scrollIntoView({ block: "start", behavior: "smooth" });
+    } catch (err) {
+      status.textContent = err.message;
+    } finally {
+      $("#rec-run").disabled = false;
+      renderRecommendAi();
+    }
+  }
+
+  // Opening a recommended venue carries the title, abstract, keywords, and
+  // manuscript over into its empty fields.
+  async function useRecommended(slug) {
+    const file = $("#rec-file").files[0] || null;
+    state.carry = {
+      title: $("#rec-title").value.trim(),
+      abstract: $("#rec-abstract").value.trim(),
+      keywords: $("#rec-keywords").value.trim(),
+      file,
+      manuscript: file ? "" : formMeta().manuscript,
+    };
+    $("#recommend-dialog").close();
+    if (state.venue && state.venue.slug === slug) await applyCarry();
+    else chooseVenue(slug);
+  }
+
+  async function applyCarry() {
+    const carry = state.carry;
+    state.carry = null;
+    if (!carry || !state.venue) return;
+    const vals = values();
+    let text = state.text;
+    const setIfEmpty = (ids, value, asList = false) => {
+      if (!value) return;
+      const field = ids.map((id) => state.fields.get(id)).find(Boolean);
+      if (!field || (vals[field.id] || "").trim()) return;
+      const multi = Boolean(Subfile.MULTILINE_TYPES && Subfile.MULTILINE_TYPES.has(field.type));
+      text = Subfile.setField(text, field, asList && multi ? value.split(/\s*[,;]\s*/).filter(Boolean).join("\n") : value);
+    };
+    setIfEmpty(META_IDS.title, carry.title);
+    setIfEmpty(META_IDS.abstract, carry.abstract);
+    setIfEmpty(META_IDS.keywords, carry.keywords, true);
+    const mf = state.venue.manuscript_field ? state.fields.get(state.venue.manuscript_field) : null;
+    if (mf && !(vals[mf.id] || "").trim()) {
+      let name = carry.manuscript;
+      if (carry.file) name = (await uploadFiles([carry.file]))[0] || "";
+      if (name) text = Subfile.setField(text, mf, name);
+    }
+    if (text === state.text) return;
+    setText(text);
+    syncWidgets();
+    refreshFileWidgets();
+    renderManuscript();
+    refreshPlan();
+    toast("Carried your title, abstract, keywords, and manuscript over. Check them below.");
+  }
+
+  function wireRecommend() {
+    $("#recommend-btn").addEventListener("click", openRecommend);
+    $("#rec-close").addEventListener("click", () => $("#recommend-dialog").close());
+    $("#rec-run").addEventListener("click", () => runRecommend(false));
+    $("#rec-ai-btn").addEventListener("click", () => runRecommend(true));
+    const wrap = $("#rec-ai-wrap");
+    wrap.addEventListener("click", () => { if (wrap.dataset.tooltip) wrap.focus(); });
+    $("#rec-file").addEventListener("change", () => {
+      const note = $("#rec-file-note");
+      const file = $("#rec-file").files[0];
+      $("#rec-file-name").textContent = file ? file.name : "";
+      if (file) { note.textContent = ""; delete note.dataset.manuscript; }
+    });
+    // Archival only sorts conferences: nothing to choose when only journals are wanted.
+    const syncArchival = () => { $("#rec-archival").disabled = $("#rec-type").value === "journal"; };
+    $("#rec-type").addEventListener("change", syncArchival);
+    syncArchival();
+    // Enter in a one-line box runs the plain recommendation instead of closing the dialog.
+    $("#recommend-form").addEventListener("submit", (e) => { e.preventDefault(); runRecommend(false); });
+  }
+
   function wire() {
     wireSettings();
+    wireRecommend();
     wireCombo();
     wireManuscript();
     wireImport();

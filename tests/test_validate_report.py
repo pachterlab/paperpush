@@ -177,7 +177,7 @@ def _sample_report() -> report.ValidationReport:
 def test_text_and_markdown_list_every_section():
     rep = _sample_report()
     text = report.to_text(rep)
-    for marker in ("[PASS] [Cat] Passes", "[FAIL] [Cat] Breaks", "[WARN]", "[AI] [Cat] Judgement", "[TODO] [Cat] Rule", "[SKIP] [Cat] Off", "error: [title] title is required"):
+    for marker in ("[PASS] [Cat] Passes", "[FAIL] [Cat] Breaks", "[WARN]", "[AI] [Cat] Judgement", "[NOT IMPLEMENTED] [Cat] Rule", "[SKIP] [Cat] Off", "error: [title] title is required"):
         assert marker in text
     # Not-applicable checks get a line each, without their reasons.
     assert "  [NA] [Cat] Irrelevant\n  [NA] [Other] Also irrelevant\n" in text and "no such rule" not in text
@@ -193,7 +193,7 @@ def test_errors_only_shows_just_the_failed_section():
     assert "[WARN] 1 with warnings" in text and "Not shown: Warnings (1); " in text
     body = text.split("Not shown:", 1)[1]
     assert "[FAIL] [Cat] Breaks" in body and "error: [title] title is required" in body
-    for gone in ("PASSED (", "WARNINGS (", "[AI] [", "[TODO] [", "[SKIP] [", "[NA] ["):
+    for gone in ("PASSED (", "WARNINGS (", "[AI] [", "[NOT IMPLEMENTED] [", "[SKIP] [", "[NA] ["):
         assert gone not in body
 
 
@@ -203,7 +203,7 @@ def test_hide_warnings_and_hide_unchecked_drop_their_sections():
     assert "WARNINGS (" not in no_warn and "looks single-spaced" not in no_warn
     assert "[FAIL] [" in no_warn and "[SKIP] [" in no_warn and "[PASS] [" in no_warn
     no_unchecked = report.to_text(rep, hide=report.hidden_statuses(hide_unchecked=True))
-    for gone in ("[AI] [", "[TODO] [", "[SKIP] ["):
+    for gone in ("[AI] [", "[NOT IMPLEMENTED] [", "[SKIP] ["):
         assert gone not in no_unchecked
     assert "[WARN] [Cat] Advisory" in no_unchecked and "[PASS] [" in no_unchecked
     assert "Not shown: Not checked: could not run (1); Not checked: needs AI (1); Not checked: not implemented (1)." in no_unchecked
@@ -1355,3 +1355,14 @@ def test_combined_file_placement_shapes_the_default_figure_field(monkeypatch):
     monkeypatch.setattr(r, "get_requirements", lambda slug: reqs)
     field = next(f for f in database.default_form("anyvenue")["fields"] if f["id"] == "figure_files")
     assert "combining all the figures" in field["help"] and field["accept"] == [".docx", ".pdf"]
+
+
+def test_summary_line_leaves_out_zero_counts_except_the_core_three():
+    rep = report.ValidationReport(venue="testj", subfile="paper.sub", results=[
+        report.CheckResult("a", "Passes", "Cat", report.PASSED),
+        report.CheckResult("e", "Rule", "Cat", report.NOT_IMPLEMENTED),
+    ])
+    assert [t for _, t in report._summary_line(rep)] == ["1 passed", "0 failed", "0 with warnings", "1 not implemented"]
+    summary = report.to_text(rep).splitlines()
+    assert any("[FAIL] 0 failed" in line for line in summary)
+    assert not any("need AI" in line or "could not run" in line or "with suggestions" in line for line in summary)

@@ -189,6 +189,8 @@ _LINE_MARK = re.compile(r"(?m)^[ \t]*(\d{1,4})[.)][ \t]+(?=\S)")
 _ALPHA_MARK = re.compile(r"(?:^|(?<=\s))\[([A-Z][A-Za-z]{0,6}\+?\d{2}[a-z]?)\]\s+(?=\S)")
 # Gap allowed between consecutive entry numbers before a marker is taken for something else (a year, a page).
 _MAX_NUMBER_GAP = 3
+# How far into the reference list (characters, after page furniture) its first number may sit.
+NUMBERED_START_WITHIN = 600
 
 
 def _sequential(marks: list[re.Match[str]]) -> list[re.Match[str]]:
@@ -250,6 +252,84 @@ def _first_surname(entry: str) -> str:
 
 
 _AUTHOR_YEAR_HEAD = re.compile(r"^[^.]{0,250}?(?:\.[^.]{0,60}?){0,8}?[.,]\s*\(?(?:19|20)\d{2}[a-z]?\)?[.,:]")
+# The end of an entry's author list in the natbib author-year styles (ICLR, NeurIPS, ICML, *ACL):
+# "Jort F. Gemmeke, Daniel P. W. Ellis, and Marvin Ritter. Audioset: ..., 2017." The year
+# closes the entry, so _AUTHOR_YEAR_HEAD misses it. An initial ("F.") is no end; "et al." is.
+_AUTHOR_LIST_END = re.compile(r"(?<![A-Z])\.(?:\s|$)")
+_NAME_TOKEN_LOWER = frozenset({"and", "et", "al", "al.", "&", "van", "von", "de", "der", "den", "da", "di", "du", "le", "la", "del", "dos", "das", "ter", "ten", "bin", "ibn", "y"})
+
+
+def _author_list_head(entry: str) -> bool:
+    """Whether ``entry`` opens with a bare list of author names ended by a period, as natbib's author-year styles print it.
+
+    A run-on line ("Conference on Acoustics, Speech and Signal Processing ...") has
+    lowercase words that are not name particles, so it stays with the entry before.
+    """
+    end = _AUTHOR_LIST_END.search(entry, 0, 400)
+    if end is None:
+        return False
+    tokens = re.findall(r"[^\s,]+", entry[: end.start()])
+    if not tokens or len(tokens) > 120:
+        return False
+    for token in tokens:
+        if token.lower() in _NAME_TOKEN_LOWER:
+            continue
+        letter = next((c for c in token if c.isalpha()), "")
+        # An accent split off by extraction ("Doll ´ar") leaves a token opening with the mark.
+        if not letter or (not letter.isupper() and not re.match(r"[\u00b4`\u00a8~^\u02c6\u02dc\u00b8'-]", token)):
+            return False
+    return tokens[0][:1].isupper()
+
+
+# PDF text often sets an accent as its own glyph beside the letter ("Schl \u00a8uter",
+# "Doll \u00b4ar"), which breaks the surname. The spacing accent goes onto the next letter.
+_SPACING_ACCENTS = {"\u00a8": "\u0308", "\u00b4": "\u0301", "\u02c6": "\u0302", "\u02dc": "\u0303", "\u00b8": "\u0327",
+                    "\u02c7": "\u030c", "\u02d8": "\u0306", "\u02d9": "\u0307", "\u02da": "\u030a", "\u02dd": "\u030b"}
+_SPLIT_ACCENT = re.compile(r"(?<=[A-Za-z]) ?([" + "".join(_SPACING_ACCENTS) + r"]) ?([A-Za-z])")
+
+
+def join_split_accents(text: str) -> str:
+    import unicodedata
+
+    return _SPLIT_ACCENT.sub(lambda m: unicodedata.normalize("NFC", m.group(2) + _SPACING_ACCENTS[m.group(1)]), text)
+
+
+_NOT_A_YEAR = re.compile(r"(?:arXiv:?\s*|abs/|\d[-\u2013\u2014]|10\.\d{4,9}/\S*?)$", re.IGNORECASE)
+
+
+def entry_year(entry: str) -> re.Match[str] | None:
+    """The publication year of a reference-list entry.
+
+    Not the first year-like number: an arXiv id ("2010.11929"), a page range ("1877-1901"), or
+    a DOI can come first. A parenthesized year ("(2015)") is the year; otherwise the last one
+    left, where the natbib styles print it.
+    """
+    found = [m for m in _YEAR.finditer(entry) if not _NOT_A_YEAR.search(entry[max(0, m.start() - 40): m.start()]) and not re.match(r"\.\d{4,5}", entry[m.end():])]
+    if not found:
+        return None
+    for m in found:
+        if entry[m.start() - 1: m.start()] == "(" and entry[m.end(): m.end() + 1] == ")":
+            return m
+    return found[-1]
+
+
+def _runs_on(entry: str) -> bool:
+    """Whether ``entry`` opens like the rest of a venue name ("Conference on Acoustics, ...") rather than an author list."""
+    words = [w.strip(",.;:()[]") for w in entry.split()[:3]]
+    return any(w.isalpha() and w.islower() and w not in _NAME_TOKEN_LOWER for w in words[1:])
+
+
+def _page_furniture(doc: document.Document) -> set[str]:
+    """Running heads and feet: a first or last line that recurs on three or more pages."""
+    from collections import Counter
+
+    seen: Counter[str] = Counter()
+    for page in doc.page_texts or ():
+        lines = [line.strip() for line in page.splitlines() if line.strip()]
+        for line in {*(lines[:1]), *(lines[-1:])}:
+            if len(line) > 12 and not line.isdigit():
+                seen[line] += 1
+    return {line for line, n in seen.items() if n >= 3}
 
 
 def _surname_candidates(entry: str) -> list[str]:
@@ -263,7 +343,12 @@ def _surname_candidates(entry: str) -> list[str]:
     first = _first_surname(entry)
     if first:
         out.append(first)
-    head = re.split(r",| and |\.\s+(?=\(?(?:19|20)\d{2})", _NUMBER_LABEL.sub("", entry, count=1), maxsplit=1)[0]
+    names = _NUMBER_LABEL.sub("", entry, count=1)
+    # A single author with no comma ("Abraham H Maslow. A theory of ...") ends at the list's period.
+    cut = _AUTHOR_LIST_END.search(names, 0, 400)
+    if cut and not _YEAR.match(names[cut.end():].lstrip("( ")):
+        names = names[: cut.start()]
+    head = re.split(r",| and |\.\s+(?=\(?(?:19|20)\d{2})|\s+et\s+al\b", names, maxsplit=1)[0]
     words = [w.strip(",.;:()[]") for w in head.split()]
     words = [w for w in words if w and not re.fullmatch(r"[A-Z]\.?(?:-[A-Z]\.?)?", w)]
     if 1 < len(words) <= 5:
@@ -286,6 +371,10 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
     body, tail = parts
 
     numbered = max((_sequential(list(p.finditer(tail))) for p in (_BRACKET_MARK, _LINE_MARK)), key=len)
+    # A numbered list starts right under its heading. Two "1." / "2." lines deep in the tail
+    # are an enumerated list in an appendix the tail ran into, not the references.
+    if numbered and numbered[0].start() > NUMBERED_START_WITHIN and len(numbered) < len(author_year_starts(tail)) // 2:
+        numbered = []
     if len(numbered) >= 2:
         refs = [Ref(n, f"[{n}]", entry) for n, entry in _entries(tail, numbered)]
         last = max(int(n) for n, _ in _entries(tail, numbered))
@@ -304,15 +393,21 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
         cited = {k.strip() for g in groups for k in re.split(r"[,;]", g) if k.strip() in known}
         return Bibliography("labels", refs, cited)
 
+    tail = join_split_accents(tail)
+    furniture = _page_furniture(doc)
+    if furniture:
+        tail = "".join(line for line in tail.splitlines(keepends=True) if line.strip() not in furniture)
     starts = author_year_starts(tail)
     if not starts:
         return None
     entries: list[str] = []
     for a, b in zip(starts, starts[1:] + [len(tail)]):
         entry = re.sub(r"\s+", " ", tail[a:b]).strip()
-        # A real entry opens with its authors and year ("..., Name. 2015.", "Smith, J. (2015)."); a
-        # line that does not is the previous entry running on (a venue, "Preprint, arXiv:...").
-        if entries and (len(entry) < 25 or not _AUTHOR_YEAR_HEAD.search(entry[:300])):
+        # A real entry opens with its authors and year ("..., Name. 2015.", "Smith, J. (2015).") or,
+        # in the natbib styles, with its authors and a year at the end; a line that does neither is
+        # the previous entry running on (a venue, "Preprint, arXiv:...").
+        head = not _runs_on(entry) and (bool(_AUTHOR_YEAR_HEAD.search(entry[:300])) or (_author_list_head(entry) and bool(_YEAR.search(entry))))
+        if entries and (len(entry) < 25 or not head):
             entries[-1] += " " + entry
         elif entry:
             entries.append(entry)
@@ -321,7 +416,7 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
     refs: list[Ref] = []
     cited: set[str] = set()
     for entry in entries:
-        year = _YEAR.search(entry)
+        year = entry_year(entry)
         candidates = _surname_candidates(entry)
         if not candidates or year is None:
             continue
@@ -330,7 +425,10 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
         if not hit:
             # An appendix after the reference list cites in the same shape: "Boteva et al., 2016", "Holm (2024)".
             hit = next((c for c in candidates if re.search(rf"(?<![A-Za-z]){re.escape(_fold(c))}(?: et al\.?| (?:and|&) [A-Z][\w-]+)?,? \(?{year.group(1)}{suffix}(?![\da-z])", folded_tail)), None)
-        surname = hit or candidates[0]
+        # Uncited, the label falls back to a guess: the last name for "Jacob Devlin, ..." (given
+        # name first, the natbib styles) and the first word for "Devlin, J., ...".
+        given_first = len(candidates) > 1 and not re.match(r"\s*[^\s,]+,", _NUMBER_LABEL.sub("", entry, count=1))
+        surname = hit or (candidates[1] if given_first else candidates[0])
         key = f"{surname} {year.group(0)}"
         refs.append(Ref(key, f"{surname} ({year.group(0)})", entry, year.group(0)))
         if hit:

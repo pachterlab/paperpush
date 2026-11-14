@@ -227,7 +227,11 @@ class AutofillResult:
 
     @property
     def warnings(self) -> list[Issue]:
-        return [i for i in self.issues if not i.is_error]
+        return [i for i in self.issues if not i.is_error and not i.is_suggestion]
+
+    @property
+    def suggestions(self) -> list[Issue]:
+        return [i for i in self.issues if i.is_suggestion]
 
 
 def parse_extraction(data: dict) -> Extraction:

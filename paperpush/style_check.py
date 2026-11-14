@@ -1,7 +1,11 @@
 """Copy-editing conventions in the manuscript's prose: numbers, abbreviations, acronyms.
 
 Like :mod:`paperpush.prose_check`, each check looks for slips a pattern can
-find with few false alarms, and every finding is a WARNING. The prose is read
+find with few false alarms. A finding that is a mistake (a malformed "i.e.",
+an acronym never spelled out, a number grouped against the venue's rule) is a
+WARNING; one that is only house style or consistency (a spelled-out number,
+"vs." written two ways, headings capitalized two ways) is a SUGGESTION, which
+``--strict-style`` reports as a warning. The prose is read
 by :func:`paperpush.prose_check.read`, so math, code, citations, URLs, and the
 reference list are already left out.
 
@@ -50,7 +54,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .database import Venue
-from .validate import WARNING, Issue, NotApplicable, Outcome, Unchecked
+from .validate import SUGGESTION, WARNING, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -317,10 +321,16 @@ _HYPHENATED = re.compile(r"(?<![\w-])([a-z]{2,})-([a-z]{2,})(?![\w-])")
 
 @dataclass
 class Conventions:
-    """What :func:`conventions` found, one sentence per problem."""
+    """What :func:`conventions` found, one sentence per problem.
+
+    ``style`` holds the problems in ``problems`` that are only a matter of
+    consistency (a form written two ways) rather than a mistake; they are
+    reported as suggestions.
+    """
 
     problems: list[str] = field(default_factory=list)
     checked: list[str] = field(default_factory=list)
+    style: list[str] = field(default_factory=list)
 
 
 def _minority(forms: Counter, examples: dict[str, list[str]], what: str) -> str | None:
@@ -392,16 +402,19 @@ def conventions(paragraphs: list[str], *, hyphens: bool = True, et_al_period: Op
     ie = _minority(ie_forms, ie_examples, "'i.e.'/'e.g.'")
     if ie:
         out.problems.append(ie)
+        out.style.append(ie)
     if et_al_bad:
         out.problems.append(f"{len(et_al_bad)} malformed '{'et al' if et_al_period is False else 'et al.'}': " + "; ".join(et_al_bad[:MAX_EXAMPLES]))
     for problem in (_minority(vs_forms, vs_examples, "'vs.'"), _minority(fig_forms, fig_examples, "Figure citations mid-sentence")):
         if problem:
             out.problems.append(problem)
+            out.style.append(problem)
     both = [(form, snippet, closed[key]) for key, (form, snippet) in hyphenated.items() if closed[key]]
     if both:
         shown = "; ".join(f"'{form}' (e.g. {snippet}) and '{form.replace('-', '')}' {n}x" for form, snippet, n in both[:MAX_EXAMPLES])
         more = f" (and {len(both) - MAX_EXAMPLES} more)" if len(both) > MAX_EXAMPLES else ""
         out.problems.append(f"{len(both)} word(s) both hyphenated and closed up: {shown}{more}; pick one form")
+        out.style.append(out.problems[-1])
     out.checked = ["i.e./e.g.", "et al" if et_al_period is False else "et al.", "vs."] + (["Fig./Figure"] if fig_forms else []) + (["hyphenation"] if hyphens else [])
     return out
 
@@ -459,28 +472,53 @@ class _Acro:
     legend_defined: bool = False  # spelled out in a legend
     snippet: str = ""
     expansions: list[str] = field(default_factory=list)
+    phrases: list[str] = field(default_factory=list)  # the full term as written, in order of definition
+
+
+def _expansion_start(before: str, acronym: str) -> int | None:
+    """Where in ``before`` the words spelling ``acronym`` start ("Department of Energy" before "(DE)"), or None."""
+    words = list(re.finditer(r"[A-Za-z0-9']+", before))
+    letters = acronym.replace("&", "")
+    if not letters.isupper():
+        letters = letters[0] + "".join(c for c in letters[1:] if c.isupper())
+    i = len(words) - 1
+    for letter in reversed(letters.lower()):
+        while i >= 0 and words[i].group().lower() in _ACRONYM_LINK_WORDS and words[i].group()[0].lower() != letter:
+            i -= 1
+        if i < 0 or words[i].group()[0].lower() != letter:
+            return None
+        i -= 1
+    return words[i + 1].start()
 
 
 def _expansion(before: str, acronym: str) -> str | None:
     """The words before "(ACR)" whose initials spell it, lower-cased; None if they do not ("electroencephalogram (EEG)").
 
     A mixed-case acronym is spelled by its capitals: "t-Distributed Neural Networks (TDistNN)".
+    Link words the letters skip are left out: "Department of Energy (DE)" is "department energy".
     """
-    words = re.findall(r"[A-Za-z0-9']+", before)
+    start = _expansion_start(before, acronym)
+    if start is None:
+        return None
     letters = acronym.replace("&", "")
     if not letters.isupper():
         letters = letters[0] + "".join(c for c in letters[1:] if c.isupper())
+    words = re.findall(r"[A-Za-z0-9']+", before[start:])
     picked: list[str] = []
     i = len(words) - 1
     for letter in reversed(letters.lower()):
-        while i >= 0 and words[i].lower() in _ACRONYM_LINK_WORDS and words[i][0].lower() != letter:
+        while words[i].lower() in _ACRONYM_LINK_WORDS and words[i][0].lower() != letter:
             i -= 1
-        if i < 0 or words[i][0].lower() != letter:
-            return None
         picked.append(words[i].lower())
         i -= 1
     picked[0] = picked[0][:-1] if len(picked[0]) > 3 and picked[0].endswith("s") else picked[0]  # the last word: singular
     return " ".join(reversed(picked))
+
+
+def _phrase(before: str, acronym: str) -> str | None:
+    """The full term exactly as written before "(ACR)" ("Department of Energy"), or None when its words do not spell it."""
+    start = _expansion_start(before, acronym)
+    return None if start is None else before[start:].rstrip(" \t\n,;:-")
 
 
 def _skipped(acr: str) -> bool:
@@ -539,6 +577,9 @@ def _scan_acronyms(paragraphs: list[str], mixed: set[str] | frozenset[str] = fro
             expansion = _expansion(p[: p.rfind("(", 0, pos)], acr)
             if expansion and expansion not in entry.expansions:
                 entry.expansions.append(expansion)
+            phrase = _phrase(p[: p.rfind("(", 0, pos)], acr)
+            if phrase:
+                entry.phrases.append(phrase)
         for m in _acronym_matches(p, _ACRONYM, mixed_use):
             acr = m.group(1)
             if (acr, m.start(1)) in defined_here or _skipped(acr):
@@ -576,6 +617,8 @@ class Acronyms:
     abstract_only: list[str] = field(default_factory=list)
     abstract_undefined: list[str] = field(default_factory=list)
     legend_only: list[str] = field(default_factory=list)
+    expanded_before_definition: list[str] = field(default_factory=list)
+    expanded_after_definition: list[str] = field(default_factory=list)
     defined: int = 0
 
 
@@ -583,6 +626,57 @@ def _meaning_key(expansion: str) -> str:
     """An expansion with case, hyphens, and plural endings set aside: "regions of interest" is "Region of Interest"."""
     words = re.findall(r"[a-z0-9]+", expansion.lower())
     return " ".join(w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w for w in words)
+
+
+# A full term shorter than this ("time (T)") is too likely to be ordinary prose to look for elsewhere.
+_PHRASE_MIN_CHARS = 10
+
+
+def _phrase_pattern(phrase: str) -> re.Pattern:
+    """``phrase`` in any case, its words singular or plural ("regions of interest"), split by spaces, hyphens, or a line break."""
+    words = [w[:-1] if len(w) > 3 and w.lower().endswith("s") and not w.lower().endswith("ss") else w for w in re.findall(r"[A-Za-z0-9']+", phrase)]
+    word = lambda w: r"(?:-\s+)?".join(re.escape(c) for c in w) + r"(?:e?s)?"
+    joined = r"[\s\-\u2010\u2011]+".join(word(w) for w in words)
+    return re.compile(rf"(?<![A-Za-z0-9'\-]){joined}(?![A-Za-z0-9'])", re.IGNORECASE)
+
+
+def _expanded_uses(body: list[str], found: dict[str, _Acro]) -> tuple[dict[str, list[tuple[str, re.Match]]], dict[str, list[tuple[str, re.Match]]]]:
+    """Where the main text writes out a defined acronym's full term: ``(before its definition, after it)``.
+
+    The definition itself ("random forest (RF)") is not a use, nor is a term
+    inside a longer one found at the same place ("neural network" within
+    "convolutional neural network"). A section's first paragraph may spell a
+    term out again, so uses there are left out of "after" (unless the
+    acronym is defined in that same paragraph). An acronym defined with two
+    meanings is left to the "conflicting" report.
+    """
+    patterns: dict[str, re.Pattern] = {}
+    for acr, a in found.items():
+        if not a.definitions or not a.phrases or len({_meaning_key(m) for m in a.expansions}) > 1:
+            continue
+        if len(a.phrases[0]) >= _PHRASE_MIN_CHARS:
+            patterns[acr] = _phrase_pattern(a.phrases[0])
+    before: dict[str, list[tuple[str, re.Match]]] = {}
+    after: dict[str, list[tuple[str, re.Match]]] = {}
+    section_start = True
+    for i, p in enumerate(body):
+        if not _counts(p):
+            if _is_heading(p) and not _CAPTION_START.match(p):
+                section_start = True
+            continue
+        opening, section_start = section_start, False
+        spans = [(acr, m) for acr, pattern in patterns.items() for m in pattern.finditer(p)]
+        for acr, m in spans:
+            if re.match(rf"\s*\(\s*{re.escape(acr)}s?\s*[);,]", p[m.end() :]):
+                continue  # spelled out to define it (again: that is "redefined")
+            if any(o.start() <= m.start() and m.end() <= o.end() and o.end() - o.start() > m.end() - m.start() for _, o in spans):
+                continue
+            first = found[acr].definitions[0]
+            if (i, m.start()) < first:
+                before.setdefault(acr, []).append((p, m))
+            elif not opening or i == first[0]:
+                after.setdefault(acr, []).append((p, m))
+    return before, after
 
 
 def acronyms(body: list[str], abstract: list[str] | None = None, floats: list[str] | None = None, tables: list[str] | None = None) -> Acronyms:
@@ -627,18 +721,32 @@ def acronyms(body: list[str], abstract: list[str] | None = None, floats: list[st
     for acr, a in abs_found.items():
         if a.uses and not a.definitions and acr in main and main[acr].definitions:
             out.abstract_undefined.append(f"'{acr}'")
+    from .prose_check import _mark, _snippet
+
+    rarely = {h.split("'")[1] for h in out.rarely_used}
+    expanded_before, expanded_after = _expanded_uses(body, main)
+    for acr, hits in expanded_before.items():
+        p, m = hits[0]
+        out.expanded_before_definition.append(f"'{acr}' ('{main[acr].phrases[0]}' {len(hits)}x, first in {_snippet(p, m.start(), m.end(), _mark)})")
+    for acr, hits in expanded_after.items():
+        if acr in rarely:
+            continue  # already told to drop the acronym
+        p, m = hits[0]
+        out.expanded_after_definition.append(f"'{acr}' ('{main[acr].phrases[0]}' {len(hits)}x, first in {_snippet(p, m.start(), m.end(), _mark)})")
     return out
 
 
 _ACRONYM_KINDS = (
-    ("before_definition", "acronym(s) used before they are spelled out", "define each at its first use in the main text"),
-    ("abstract_only", "acronym(s) spelled out only in the abstract", "the main text should define them again at first use"),
-    ("abstract_undefined", "acronym(s) the abstract uses without spelling out (the main text does)", "an abstract is read on its own, so define them there too"),
-    ("legend_only", "acronym(s) spelled out only in a figure or table legend", "a legend is read on its own, so define them at first use in the main text too"),
-    ("redefined", "acronym(s) spelled out more than once in the main text", "define once, then use the acronym"),
-    ("undefined", "acronym(s) used but never spelled out", "define them at first use, unless every reader knows them (a gene, a unit, a name)"),
-    ("rarely_used", "acronym(s) spelled out but never used again", "write the full term and drop the acronym"),
-    ("conflicting", "acronym(s) spelled out with different meanings", "give each acronym one meaning"),
+    ("before_definition", "acronym(s) used before they are spelled out", "define each at its first use in the main text", WARNING),
+    ("expanded_before_definition", "acronym(s) whose full term is written out before the acronym is defined", "define the acronym at the first use of the term", WARNING),
+    ("abstract_only", "acronym(s) spelled out only in the abstract", "the main text should define them again at first use", WARNING),
+    ("abstract_undefined", "acronym(s) the abstract uses without spelling out (the main text does)", "an abstract is read on its own, so define them there too", WARNING),
+    ("legend_only", "acronym(s) spelled out only in a figure or table legend", "a legend is read on its own, so define them at first use in the main text too", WARNING),
+    ("redefined", "acronym(s) spelled out more than once in the main text", "define once, then use the acronym", WARNING),
+    ("expanded_after_definition", "acronym(s) whose full term is written out again after the acronym is defined (outside a section's first paragraph)", "use the acronym once it is defined", SUGGESTION),
+    ("undefined", "acronym(s) used but never spelled out", "define them at first use, unless every reader knows them (a gene, a unit, a name)", WARNING),
+    ("rarely_used", "acronym(s) spelled out but never used again", "write the full term and drop the acronym", WARNING),
+    ("conflicting", "acronym(s) spelled out with different meanings", "give each acronym one meaning", WARNING),
 )
 
 
@@ -778,15 +886,15 @@ def _pdf_main_captions(doc) -> list[str]:
 # --- the checks -------------------------------------------------------------------------------
 
 
-def _report(hits: list[str], noun: str, field_id: str, name: str, advice: str = "", named: bool = False) -> Issue:
-    """One warning listing ``hits``; past the first few, only their names when ``named`` (each hit opens with its quoted name)."""
+def _report(hits: list[str], noun: str, field_id: str, name: str, advice: str = "", named: bool = False, level: str = WARNING) -> Issue:
+    """One warning (or ``level``) listing ``hits``; past the first few, only their names when ``named`` (each hit opens with its quoted name)."""
     shown = "; ".join(hits[:MAX_EXAMPLES])
     rest = hits[MAX_EXAMPLES:]
     if rest and named:
         more = f" (and {len(rest)} more: " + ", ".join(h.split(" ", 1)[0] for h in rest) + ")"
     else:
         more = f" (and {len(rest)} more)" if rest else ""
-    return Issue(WARNING, field_id, f"{name}: {len(hits)} {noun}: {shown}{more}" + (f"; {advice}" if advice else ""))
+    return Issue(level, field_id, f"{name}: {len(hits)} {noun}: {shown}{more}" + (f"; {advice}" if advice else ""))
 
 
 def _number_rules(venue: Venue, values: dict[str, str]) -> tuple[Optional[str], Optional[bool]]:
@@ -821,13 +929,14 @@ def _numbers_check(venue: Venue, values: dict[str, str]) -> Outcome:
         paragraphs = [p for p in _main_paragraphs(text.paragraphs) if not _is_heading(p)]
         spelled = [hit for p in paragraphs for hit in spelled_numbers(p)]
         opening = [hit for p in paragraphs for hit in digit_sentence_starts(p)]
+        # House style, not a mistake: suggestions, unless the venue's own rules say how to write them.
         if spelled:
-            issues.append(_report(spelled, "number(s) of 10 or more spelled out", fld.id, text.path.name, "write numbers of 10 and over in digits"))
+            issues.append(_report(spelled, "number(s) of 10 or more spelled out", fld.id, text.path.name, "write numbers of 10 and over in digits", level=SUGGESTION))
         if opening:
-            issues.append(_report(opening, "sentence(s) opening with digits", fld.id, text.path.name))
+            issues.append(_report(opening, "sentence(s) opening with digits", fld.id, text.path.name, level=SUGGESTION))
         grouping = thousands_grouping(paragraphs, separator, group_four)
         for desc, hits in grouping:
-            issues.append(_report(hits, desc, fld.id, text.path.name))
+            issues.append(_report(hits, desc, fld.id, text.path.name, level=WARNING if "venue's guidelines" in desc else SUGGESTION))
         if not spelled and not opening and not grouping:
             details.append(f"none in {text.path.name}")
     return Outcome(issues, "; ".join(details))
@@ -846,7 +955,7 @@ def _conventions_check(venue: Venue, values: dict[str, str]) -> Outcome:
         # Legends are left out: a venue may write "Fig." in legends and "Figure" in the text.
         body = [p for p in _body_paragraphs(text) if not _CAPTION_START.match(p)]
         found = conventions(body, hyphens=text.checks != PDF_CHECKS, et_al_period=_et_al_period(venue, values))
-        issues += [Issue(WARNING, fld.id, f"{text.path.name}: {p}") for p in found.problems]
+        issues += [Issue(SUGGESTION if p in found.style else WARNING, fld.id, f"{text.path.name}: {p}") for p in found.problems]
         if not found.problems:
             details.append(f"{text.path.name}: consistent ({', '.join(found.checked)})")
     return Outcome(issues, "; ".join(details))
@@ -927,11 +1036,11 @@ def _acronym_check(venue: Venue, values: dict[str, str]) -> Outcome:
         elif text.checks == PDF_CHECKS and doc.page_texts is not None:
             floats = _pdf_main_captions(doc)  # a PDF's tables are in its page text
         found = acronyms(body, abstract, floats, tables)
-        for kind, noun, advice in _ACRONYM_KINDS:
+        for kind, noun, advice, level in _ACRONYM_KINDS:
             hits = getattr(found, kind)
             if hits:
-                issues.append(_report(hits, noun, fld.id, text.path.name, advice, named=True))
-        if not any(getattr(found, k) for k, _, _ in _ACRONYM_KINDS):
+                issues.append(_report(hits, noun, fld.id, text.path.name, advice, named=True, level=level))
+        if not any(getattr(found, k) for k, *_ in _ACRONYM_KINDS):
             details.append(f"{text.path.name}: {found.defined} acronym(s) defined at first use" + ("" if abstract else " (abstract not found, so it was read as main text)"))
     return Outcome(issues, "; ".join(details))
 
@@ -1088,7 +1197,7 @@ def _heading_case_check(venue: Venue, values: dict[str, str]) -> Outcome:
         keep = [i for i, h in enumerate(headings) if _norm(h[1]) != title]
         hits, styled = inconsistent_heading_case([headings[i] for i in keep], _proper_words(text.paragraphs), [parts[i] for i in keep] if parts else None)
         if hits:
-            issues.append(Issue(WARNING, fld.id, f"{text.path.name}: {len(hits)} heading(s) capitalized differently from the others at their level: {'; '.join(hits)}; use one style for headings of the same level"))
+            issues.append(Issue(SUGGESTION, fld.id, f"{text.path.name}: {len(hits)} heading(s) capitalized differently from the others at their level: {'; '.join(hits)}; use one style for headings of the same level"))
         elif styled:
             details.append(f"{text.path.name}: {styled} heading(s) capitalized consistently")
     if not issues and not details:
@@ -1108,8 +1217,9 @@ _AI_PROSE = (
     "3. Tense: past tense for what this study did and found (Methods, Results, and the abstract's findings); present tense for established facts, "
     "for what a figure or table shows ('Figure 2 shows'), and for interpretation and conclusions (Introduction, Discussion). Flag tense that drifts within a paragraph, "
     "and a section that breaks these conventions inconsistently. A section that follows another convention consistently (for example Methods in the present tense, common in computer science) is not a problem.\n"
-    "Do not report style preferences, word choice that is correct, or anything the author could defensibly keep. "
-    "Report 'fail' listing each problem (up to 25, the clearest first) as: the section or page, a short quote, and the correction; else 'pass'."
+    "These are errors. Report 'fail' listing each one (up to 25, the clearest first) as: the section or page, a short quote, and the correction.\n"
+    "If there are no errors but there are points of style worth raising (an awkward, ambiguous, or very long sentence; wordiness; tense that drifts but could be defended), "
+    "report 'suggest' listing up to 10 of them the same way. Do not raise word choice that is correct, or a preference of your own. Else report 'pass'."
 )
 
 

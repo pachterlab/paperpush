@@ -43,6 +43,10 @@ logger = logging.getLogger(__name__)
 
 ERROR = "error"
 WARNING = "warning"
+# A stylistic finding a reasonable editor could leave as it is (repetitive
+# word choice, a spelled-out number): reported, but it never makes a check a
+# warning, and it is not counted with the warnings (see paperpush.report).
+SUGGESTION = "suggestion"
 
 # Below this DPI, raster figures tend to look soft in print.
 MIN_FIGURE_DPI = 300
@@ -59,7 +63,7 @@ _FALSE = {"no", "n", "false", "0", "off"}
 
 @dataclass(frozen=True)
 class Issue:
-    level: str  # ERROR or WARNING
+    level: str  # ERROR, WARNING, or SUGGESTION
     field: str  # field id the issue concerns ("" for file-level)
     message: str
     # Id of the check that raised it (see paperpush.report); stamped by the
@@ -72,6 +76,14 @@ class Issue:
     @property
     def is_error(self) -> bool:
         return self.level == ERROR
+
+    @property
+    def is_suggestion(self) -> bool:
+        return self.level == SUGGESTION
+
+    @property
+    def is_warning(self) -> bool:
+        return self.level == WARNING
 
 
 def unchecked(field: str, message: str) -> Issue:
@@ -1266,8 +1278,10 @@ def _status_for(issues: list[Issue]) -> str:
 
     if any(i.is_error for i in issues):
         return report.FAILED
-    if any(not i.unchecked for i in issues):
+    if any(i.is_warning and not i.unchecked for i in issues):
         return report.WARNING
+    if any(i.is_suggestion for i in issues):
+        return report.SUGGESTION
     if issues:
         return report.UNCHECKED
     return report.PASSED
@@ -1512,7 +1526,7 @@ def _run_manuscript_stages(bar: _Progress, checks: Checks, venue: Venue, values:
         bar.run(label, module.run_checks, checks, venue, values)
 
 
-def _ai_only_report(checks: Checks, subfile: SubFile, venue: Venue, *, ai, subfile_path: str, initial_submission: bool, progress=None):
+def _ai_only_report(checks: Checks, subfile: SubFile, venue: Venue, *, ai, subfile_path: str, initial_submission: bool, strict_style: bool = False, progress=None):
     """The :func:`validate_report` for ``ai_only``: just the checks that need AI."""
     from . import ai_validate, report
     from .requirements import any_format_initial_rule
@@ -1528,6 +1542,9 @@ def _ai_only_report(checks: Checks, subfile: SubFile, venue: Venue, *, ai, subfi
     result = report.ValidationReport(venue=venue.slug, subfile=subfile_path, results=checks.results, ai_tasks=tasks, ai_only=True)
     _record_inputs(result, venue, values, subfile_path)
     result.initial_submission_rule = any_format_initial_rule(venue.slug, values)
+    if strict_style:
+        result.strict_style = True
+        result.promoted = promote_suggestions(result.results)
     if initial_submission:
         result.initial_submission = True
         result.downgraded = downgrade_errors(result.results)
@@ -1558,6 +1575,7 @@ def validate(
     check_hidden_text: bool = True,
     check_openreview: bool = True,
     initial_submission: bool = False,
+    strict_style: bool = False,
     cover_letter_max_age_days: int = 7,
     references_alphabetical: bool = False,
     references_citation_order: bool = False,
@@ -1588,6 +1606,7 @@ def validate(
         check_hidden_text=check_hidden_text,
         check_openreview=check_openreview,
         initial_submission=initial_submission,
+        strict_style=strict_style,
         cover_letter_max_age_days=cover_letter_max_age_days,
         references_alphabetical=references_alphabetical,
         references_citation_order=references_citation_order,
@@ -1612,6 +1631,7 @@ def validate_report(
     check_hidden_text: bool = True,
     check_openreview: bool = True,
     initial_submission: bool = False,
+    strict_style: bool = False,
     cover_letter_max_age_days: int = 7,
     references_alphabetical: bool = False,
     references_citation_order: bool = False,
@@ -1626,8 +1646,8 @@ def validate_report(
 ):
     """Run every check on ``subfile`` and return a :class:`~paperpush.report.ValidationReport`.
 
-    The report holds one entry per check -- passed, failed, warning, could not
-    run, needs AI, not implemented, or not applicable -- so the author sees what
+    The report holds one entry per check -- passed, failed, warning,
+    suggestion, could not run, needs AI, not implemented, or not applicable -- so the author sees what
     was verified as well as what is wrong.
 
     When ``check_sensitive`` is set (the default), the referenced upload files
@@ -1689,6 +1709,10 @@ def validate_report(
     for venues whose guidelines let the initial submission be in any format
     (``manuscript.initial_submission_any_format``); that rule is put on the
     report (``initial_submission_rule``) whether or not the flag is set.
+
+    ``strict_style`` reports every suggestion (a stylistic finding, such as
+    repetitive word choice or a spelled-out number) as a warning instead, for
+    an author or venue that wants the house style enforced.
 
     ``cover_letter_max_age_days`` is how old the cover letter's date may be
     before it is reported (see :mod:`paperpush.cover_letter_check`, which also
@@ -1762,7 +1786,7 @@ def validate_report(
     if ai_only:
         if not check_manuscript:
             raise ValueError("ai_only needs check_manuscript: the manuscript checks decide which AI checks apply")
-        result = _ai_only_report(checks, subfile, venue, ai=ai, subfile_path=subfile_path, initial_submission=initial_submission, progress=progress)
+        result = _ai_only_report(checks, subfile, venue, ai=ai, subfile_path=subfile_path, initial_submission=initial_submission, strict_style=strict_style, progress=progress)
         _set_scope(result, venue, values, files_only, notes)
         return result
 
@@ -1864,6 +1888,9 @@ def validate_report(
     _set_scope(result, venue, values, files_only, notes)
     _record_inputs(result, venue, values, subfile_path)
     result.initial_submission_rule = any_format_initial_rule(venue.slug, values)
+    if strict_style:
+        result.strict_style = True
+        result.promoted = promote_suggestions(result.results)
     if initial_submission:
         result.initial_submission = True
         result.downgraded = downgrade_errors(result.results)
@@ -1872,11 +1899,12 @@ def validate_report(
         result.ai_error = ai.error
     errors = len(result.errors)
     logger.info(
-        "Validated %s subfile: %d issue(s) (%d error(s), %d warning(s))",
+        "Validated %s subfile: %d issue(s) (%d error(s), %d warning(s), %d suggestion(s))",
         venue.slug,
         len(result.issues()),
         errors,
-        len(result.issues()) - errors,
+        len(result.warnings),
+        len(result.suggestions),
     )
     return result
 
@@ -1938,6 +1966,25 @@ def downgrade_errors(results: list) -> int:
             count += sum(1 for i in result.issues if i.is_error)
             result.issues = [replace(i, level=WARNING) if i.is_error else i for i in result.issues]
         if result.status == report.FAILED:
+            result.status = report.WARNING
+    return count
+
+
+def promote_suggestions(results: list) -> int:
+    """Turn every suggestion in ``results`` into a warning, in place; return how many.
+
+    A suggestion check becomes a warning check. Used by ``--strict-style``.
+    """
+    from dataclasses import replace
+
+    from . import report
+
+    count = 0
+    for result in results:
+        if any(i.is_suggestion for i in result.issues):
+            count += sum(1 for i in result.issues if i.is_suggestion)
+            result.issues = [replace(i, level=WARNING) if i.is_suggestion else i for i in result.issues]
+        if result.status == report.SUGGESTION:
             result.status = report.WARNING
     return count
 

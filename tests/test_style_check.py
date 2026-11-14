@@ -221,10 +221,10 @@ def test_checks_run_on_a_docx(tmp_path):
     )
     results, checks = _run(doc)
     status, message, _ = results["prose.numbers"]
-    assert status == report.WARNING and "twenty" in message and "twenty-five" not in message  # the reference list is skipped
+    assert status == report.SUGGESTION and "twenty" in message and "twenty-five" not in message  # the reference list is skipped
     assert "separator" not in message
     status, message, _ = results["prose.conventions"]
-    assert status == report.WARNING and "with a comma" in message and "Fig." in message and "et al." not in message
+    assert status == report.SUGGESTION and "with a comma" in message and "Fig." in message and "et al." not in message
     status, message, _ = results["prose.acronyms"]
     assert status == report.WARNING and "'CNN'" in message and "spelled out only in the abstract" in message
     task = next(t for t in checks.ai_tasks if t.id == sc.AI_PROSE_ID)
@@ -354,7 +354,7 @@ def test_heading_case_in_latex(tmp_path):
         "\\section{Data \\emph{Availability}}\nText here.\n\\subsection{Cell Culture}\nText here.\n\\end{document}\n"
     )
     status, message, _ = _heading_result(tex)
-    assert status == report.WARNING and "'Data Availability' is Title Case" in message and "Cell Culture" not in message
+    assert status == report.SUGGESTION and "'Data Availability' is Title Case" in message and "Cell Culture" not in message
 
 
 def test_heading_case_in_markdown_skips_the_title_and_names(tmp_path):
@@ -376,14 +376,14 @@ def test_heading_case_in_word_uses_heading_styles(tmp_path):
     with ZipFile(path, "w") as archive:
         archive.writestr("word/document.xml", f"<w:document><w:body>{body}</w:body></w:document>")
     status, message, _ = _heading_result(path)
-    assert status == report.WARNING and "'Data Availability'" in message and "Some Short" not in message
+    assert status == report.SUGGESTION and "'Data Availability'" in message and "Some Short" not in message
 
 
 def test_heading_case_unmarked_file_reads_only_standard_names(tmp_path):
     doc = tmp_path / "ms.txt"
     doc.write_text("Some Odd Short Line\n\nMaterials and methods\n\nWe did the work.\n\nData Availability\n\nOn request.\n\nAuthor contributions\n\nAll.\n")
     status, message, _ = _heading_result(doc)
-    assert status == report.WARNING and "'Data Availability'" in message and "Odd" not in message
+    assert status == report.SUGGESTION and "'Data Availability'" in message and "Odd" not in message
 
 
 def test_heading_case_not_applicable_without_styled_headings(tmp_path):
@@ -397,3 +397,43 @@ def test_acronyms_read_as_main_text_when_there_is_no_introduction(tmp_path):
     doc.write_text("# A title\n\n## Abstract\n\nWe trained a model on mice.\n\n## Materials and methods\n\nWe used a hidden Markov model (HMM) on the mice here.\n")
     status, message, _ = _run(doc)[0]["prose.acronyms"]
     assert status == report.WARNING and "'HMM'" in message
+
+
+def test_full_term_written_out_before_the_acronym_is_defined():
+    body = [
+        "Introduction",
+        "We study regions of interest in the cortex with a model.",
+        "We segmented each region of interest (ROI) by hand. The ROI was big and the ROI held.",
+    ]
+    found = sc.acronyms(body)
+    assert [s.split("'")[1] for s in found.expanded_before_definition] == ["ROI"]
+    assert "»regions of interest«" in found.expanded_before_definition[0]
+    assert found.expanded_after_definition == []
+
+
+def test_full_term_written_out_again_after_the_acronym_is_defined():
+    body = [
+        "Introduction",
+        "A convolutional neural network (CNN) and a neural network (NN) ran. The CNN and the NN won.",
+        "The convolutional neural network was then retrained. The CNN and NN held.",
+        "Methods",
+        # A section's first paragraph may spell a term out again.
+        "Each convolutional neural network was trained twice. The CNN and the NN were saved.",
+    ]
+    found = sc.acronyms(body)
+    # "neural network" inside "convolutional neural network" is not a use of NN's term.
+    assert [s.split("'")[1] for s in found.expanded_after_definition] == ["CNN"]
+    assert "1x, first in The »convolutional neural network« was then retrained" in found.expanded_after_definition[0]
+    assert found.expanded_before_definition == [] and found.redefined == []
+
+
+def test_full_term_check_skips_short_terms_redefinitions_and_unused_acronyms():
+    body = [
+        "We set a time (T) and the T held. Time passed, and the T rose.",  # too short to search for
+        "We fit a random forest (RF) once. The RF was fast.",
+        "A random forest (RF) again.",  # a redefinition is reported as one, not as the term written out
+        "A hidden Markov model (HMM) was fit. Then the hidden Markov model was fit again.",  # never used: drop the acronym instead
+    ]
+    found = sc.acronyms(body)
+    assert found.expanded_before_definition == [] and found.expanded_after_definition == []
+    assert found.redefined == ["'RF' (2 times)"] and found.rarely_used == ["'HMM'"]

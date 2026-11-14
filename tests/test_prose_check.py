@@ -15,7 +15,8 @@ from tests.conftest import _build_docx, _build_pdf
 MANUSCRIPT = Field(id="manuscript_file", label="Manuscript", type="file")
 VENUE = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT])
 IDS = [f"prose.{name}" for name in pc._CHECKS]
-ALL_IDS = set(IDS) | {f"prose.{pc.REPETITION}", "prose.numbers", "prose.conventions", "prose.acronyms", "prose.heading_case"}
+ALL_IDS = set(IDS) | {f"prose.{pc.REPETITION}", "prose.numbers", "prose.conventions", "prose.acronyms", "prose.heading_case",
+           "prose.serial_comma", "prose.dashes", "prose.number_format", "prose.usage", "prose.spelling_variant"}
 
 needs_codespell = pytest.mark.skipif(
     pc.misspellings() is None, reason="codespell is not installed"
@@ -130,7 +131,8 @@ def test_docx_runs_every_check(tmp_path):
     assert set(results) == ALL_IDS
     for cid in IDS:
         status, message, _ = results[cid]
-        assert status == report.WARNING, (cid, results[cid])
+        # Double spaces are style (a suggestion); the rest are slips (warnings).
+        assert status == (report.SUGGESTION if cid == "prose.double_spaces" else report.WARNING), (cid, results[cid])
         assert "teh" not in message  # the reference list is skipped
     assert "recieved" in results["prose.spelling"][1]
 
@@ -250,7 +252,7 @@ def test_repetition_check_reports_and_lists_top_words(tmp_path):
     doc = tmp_path / "ms.docx"
     _build_docx(doc, ["Title", "We ran it. We saw it. We liked it. We stopped.", "References", "We a. We b. We c. We d."])
     status, message, detail = _run(doc)["prose.repetition"]
-    assert status == report.WARNING
+    assert status == report.SUGGESTION
     assert "1 run(s) of sentences opening with the same word" in message
     assert "words" in detail
 

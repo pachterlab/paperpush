@@ -99,9 +99,15 @@ def _extra_heading_pattern(headings: tuple[str, ...]) -> re.Pattern[str] | None:
     phrases = [h.strip() for h in headings if h and h.strip()]
     if not phrases:
         return None
-    alternatives = "|".join(re.escape(phrase) for phrase in phrases)
+    # Small capitals come out of some PDFs split after each capital ("E THICS S TATEMENT",
+    # "LLM S") or with the space between words lost ("REPRODUCIBILITYSTATEMENT"), so a
+    # space may fall between any two letters of a word, and may be missing between words. Anchored to a whole
+    # line, that admits nothing but the heading itself. A run-in heading ("Ethics Statement:
+    # Our study ...", "Reproducibility. We ...", a bold paragraph lead) also counts when it opens
+    # its line and a colon or period and a capitalized sentence follow.
+    alternatives = "|".join(r"\s*".join(" ?".join(re.escape(ch) for ch in word) for word in phrase.split()) for phrase in phrases)
     return re.compile(
-        r"^\s*" + _MD_HEADING_OPEN + r"(?:\d+\.?\s+|[A-Za-z]\.?\s+|[ivxlcIVXLC]+\.?\s+)?" rf"(?:{alternatives})" r"(?:\s+[A-Za-z0-9]{1,3})?" r"\s*:?" + _MD_HEADING_CLOSE + r"\s*$",
+        r"^\s*" + _MD_HEADING_OPEN + r"(?:\d+\.?\s+|[A-Za-z]\.?\s+|[ivxlcIVXLC]+\.?\s+)?" rf"(?:{alternatives})" r"(?:(?:\s+[A-Za-z0-9]{1,3})?" r"\s*:?" + _MD_HEADING_CLOSE + r"\s*$" r"|" + _MD_HEADING_CLOSE + r"\s*[:.][ \t]*[A-Z])",
         re.IGNORECASE | re.MULTILINE,
     )
 
@@ -1569,6 +1575,9 @@ def _cited_bib_entries(main_tex: Path, source: str) -> list[str] | None:
 
 # A wrapped line opening with a journal and its volume ("Nature 12, 1-9"), not an entry.
 _JOURNAL_VOLUME_LINE = re.compile(r"[A-Z][\w.&]*(?:[ \t]+[A-Z][\w.&]*){0,4}[ \t]+\d{1,4}[ \t]*[,:(;]")
+# A wrapped line that opens with the previous entry's link or identifier ("URL https://...",
+# "S0895479803436652."): names hold no digits, so a first word with one is no author.
+_CONTINUATION_LINE = re.compile(r"(?:URL|https?://|doi\b|[A-Za-z]*\d\S*(?:\s|$))", re.IGNORECASE)
 _ENTRY_YEAR = re.compile(r"\b(?:19|20)\d{2}[a-z]?\b")
 _ENTRY_CLOSED = re.compile(r"(?:[.)\]]|\d|https?://\S+|doi\S*)\s*$", re.IGNORECASE)
 
@@ -1587,7 +1596,7 @@ def author_year_starts(tail: str) -> list[int]:
     for line in tail.splitlines(keepends=True):
         stripped = line.strip()
         if stripped:
-            upper = stripped[0].isupper() and not _JOURNAL_VOLUME_LINE.match(stripped)
+            upper = stripped[0].isupper() and not _JOURNAL_VOLUME_LINE.match(stripped) and not _CONTINUATION_LINE.match(stripped)
             if upper and (not starts or (has_year and (closed or _AUTHOR_YEAR_REF.match(stripped)))):
                 starts.append(offset + len(line) - len(line.lstrip()))
                 has_year = False
@@ -1648,9 +1657,11 @@ def reference_count(path: Path) -> int | None:
     return len(author_year_starts(tail)) or None
 
 
-# Where a reference list ends in extracted text: a figure/table caption or a
-# heading that commonly follows it.
-_AFTER_REFERENCES = re.compile(r"^\s*" + _MD_HEADING_OPEN + r"(?:(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?\.?|Table)\s+S?\d+\s*[.:|]|Figure\s+legends?\b|Tables?\s*$|Supplementary\s+(?:information|materials?)\b|Appendix\b|(?:Online\s+|Materials\s+and\s+)?Methods\s*$|(?:(?:Data|Code|Software|Materials?)(?:(?:\s*,\s*|\s+and\s+)\w+)*\s+availability|Acknowledge?ments?|Author\s+contributions?|Funding|Competing\s+interests?|Conflicts?\s+of\s+interest|(?:Clinical\s+)?Trial\s+registration)\b\s*(?:\*\*|__)?\s*(?:[:.](?:\s|$)|$)|(?:Ethics(?:\s+statement)?|Declarations?|Additional\s+information)\s*$)", re.IGNORECASE | re.MULTILINE)
+# Where a reference list ends in extracted text: a figure/table caption, a heading that
+# commonly follows it, or a lettered appendix heading in capitals ("A EXPERIMENTAL SETUP",
+# the ICLR/NeurIPS appendix after the bibliography). The space after the letter is required:
+# without it "REFERENCES" itself reads as one.
+_AFTER_REFERENCES = re.compile(r"^\s*" + _MD_HEADING_OPEN + r"(?:(?-i:[A-Z](?:\.\d+)?\.?[ \t]+[A-Z][A-Z0-9 \t&:,()-]{3,60}$(?<=[A-Z]))|(?-i:[A-Z]\.\d+[ \t]+[A-Z][^\n]{2,80}$)|(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?\.?|Table)\s+S?\d+\s*[.:|]|Figure\s+legends?\b|Tables?\s*$|Supplementary\s+(?:information|materials?)\b|Appendix\b|(?:Online\s+|Materials\s+and\s+)?Methods\s*$|(?:(?:Data|Code|Software|Materials?)(?:(?:\s*,\s*|\s+and\s+)\w+)*\s+availability|Acknowledge?ments?|Author\s+contributions?|Funding|Competing\s+interests?|Conflicts?\s+of\s+interest|(?:Clinical\s+)?Trial\s+registration)\b\s*(?:\*\*|__)?\s*(?:[:.](?:\s|$)|$)|(?:Ethics(?:\s+statement)?|Declarations?|Additional\s+information)\s*$)", re.IGNORECASE | re.MULTILINE)
 _BIB_ITEM = re.compile(r"\\bibitem\s*(?:\[[^\]]*\])?\s*\{[^}]*\}(.*?)(?=\\bibitem|\\end\s*\{\s*thebibliography|$)", re.DOTALL)
 
 

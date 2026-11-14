@@ -85,6 +85,18 @@ MAX_SEARCHES = 60
 RETRIES = 1
 RETRY_DELAY = 1.0
 _RETRY_STATUS = {429, 500, 502, 503, 504}
+# A 429 (Crossref's and OpenAlex's rate limits) is waited out this many times, for the
+# server's Retry-After or a growing delay, capped at RATE_LIMIT_MAX_WAIT seconds.
+RATE_LIMIT_RETRIES = 3
+RATE_LIMIT_MAX_WAIT = 30.0
+
+
+def _rate_limit_wait(exc: urllib.error.HTTPError, n: int) -> float:
+    try:
+        asked = float((exc.headers or {}).get("Retry-After", ""))
+    except (TypeError, ValueError):
+        asked = 2.0 * n
+    return max(0.5, min(asked, RATE_LIMIT_MAX_WAIT))
 # A service is given up on after this many consecutive failed requests.
 MAX_CONSECUTIVE_FAILURES = 3
 # Below TITLE_MATCH_RATIO but at least this similar is a near miss: maybe the
@@ -180,6 +192,8 @@ class Lookup:
     source: str = ""
     problems: list[str] = field(default_factory=list)
     candidates: list[dict] = field(default_factory=list)
+    # A prose entry neither Crossref nor OpenAlex could match by its full text or its title.
+    confident_miss: bool = False
 
 
 @dataclass
@@ -234,7 +248,8 @@ class _Service:
                 time.sleep(wait)
         req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": USER_AGENT})
         body = None
-        for attempt in range(1 + RETRIES):
+        attempt = throttled = 0
+        while True:
             try:
                 with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:  # https literal URLs below  # nosec B310
                     body = resp.read(MAX_TEXT_BYTES)
@@ -243,10 +258,17 @@ class _Service:
                 error: Exception = exc
                 if exc.code not in _RETRY_STATUS:
                     break
+                if exc.code == 429 and throttled < RATE_LIMIT_RETRIES:
+                    # Rate limited, not down: wait as long as asked rather than spend a retry.
+                    throttled += 1
+                    time.sleep(_rate_limit_wait(exc, throttled))
+                    continue
             except Exception as exc:  # noqa: BLE001 -- inconclusive, never an accusation
                 error = exc
-            if attempt < RETRIES:
-                time.sleep(RETRY_DELAY)
+            if attempt >= RETRIES:
+                break
+            attempt += 1
+            time.sleep(RETRY_DELAY)
         if body is None:
             exc = error
             self._last = time.monotonic()
@@ -575,30 +597,193 @@ def match_entry(ref: Reference, candidates: list[dict]) -> Lookup:
     return Lookup(ref, MATCHED, record=best, problems=problems)
 
 
+# Problems a prose entry's own text shows against the work its title matches. One that
+# starts with WRONG_AUTHORS is reported outright (see search_references); the rest are near
+# misses for a reader, since a prose match may be a namesake.
+WRONG_AUTHORS = "the entry's authors are not the work's"
+# A prose entry holding this share of the title's significant words names that work.
+PROSE_STRONG_TITLE = 0.9
+# Below this share of the registered authors' family names in the entry, the list is wrong.
+PROSE_AUTHOR_SHARE = 0.5
+
+
+def _registered_families(record: dict) -> list[str]:
+    out = []
+    for a in record.get("author") or []:
+        if isinstance(a, dict):
+            fam = _family(a.get("family") or a.get("name") or "")
+            if fam and len(fam) > 1:
+                out.append(fam)
+    return out
+
+
+_PROSE_AUTHORS_END = re.compile(r"(?<![A-Z])\.\s+(?=\S)")
+
+
+def _prose_title(text: str) -> str:
+    """The title of a reference-list entry: the sentence after its author list (and year, if it comes first)."""
+    text = re.sub(r"^\s*(?:\[\d+\]|\d+[.)])\s*", "", text)
+    end = _PROSE_AUTHORS_END.search(text, 0, 500)
+    if end is None:
+        return ""
+    rest = re.sub(r"^\(?(?:19|20)\d{2}[a-z]?\)?[.,:]?\s*", "", text[end.end():])
+    # A title may hold a question ("Do LLMs Overcome Shortcut Learning? An Evaluation ..."),
+    # so only a period or the venue's "In" ends it.
+    stop = re.search(r"\.(?:\s|$)|\s+In\s+(?=[A-Z])", rest)
+    return rest[: stop.start()] if stop else rest[:200]
+
+
+def _entry_families(text: str) -> list[str]:
+    """Family names of the authors a natbib-style entry lists ("Jake Snell, Kevin Swersky, and
+    Richard Zemel." or "... Kyunghyun Cho, et al."), normalized; [] when the list cannot be read."""
+    text = re.sub(r"^\s*(?:\[\d+\]|\d+[.)])\s*", "", text)
+    end = _PROSE_AUTHORS_END.search(text, 0, 700)
+    if end is None:
+        return []
+    names = re.split(r",\s*(?:and\s+)?|\s+and\s+", re.sub(r",?\s*et\s+al\.?$", "", text[: end.start() + 1].rstrip(".")))
+    out = []
+    for name in names:
+        words = [w for w in name.split() if not re.fullmatch(r"[A-Z]\.?(?:-[A-Z]\.?)?", w)]
+        if not words or len(words) > 4 or not words[-1][:1].isupper():
+            return []  # not a plain name list ("Smith, J." order, or prose)
+        out.append(_family(words[-1]))
+    return out if len(out) >= 2 else []
+
+
+def _entry_lead_author(text: str) -> str:
+    """The first author's family name in a reference-list entry, in either name order."""
+    text = re.sub(r"^\s*(?:\[\d+\]|\d+[.)])\s*", "", text)
+    first = re.split(r",|\s+and\s+|\s+et\s+al\b|\.\s", text, maxsplit=1)[0]
+    words = [w for w in first.split() if not re.fullmatch(r"[A-Z]\.?(?:-[A-Z]\.?)?", w)]
+    if not words:
+        return ""
+    # "Smith, J." puts the family name first; "John Smith," last.
+    return words[0] if re.match(r"\s*[^\s,]+,\s*[A-Z]\.?(?:\s|,|$)", text) else words[-1]
+
+
+_INDEXED_VENUE = re.compile(r"\bIn\s*(?:Proc|Advances|International|Annual|The\s+\w+\s+(?:Conference|Workshop)|Conference|Findings|Workshop|Forty|Thirty|Twenty)|Proceedings|Conference|Transactions|Journal|\barXiv\b|Letters|\bNature\b|\bScience\b", re.IGNORECASE)
+_UNINDEXED_KIND = re.compile(r"\b(?:thesis|dissertation|technical\s+report|tech\.\s*rep|white\s*paper|blog|github|gitlab|hugging\s*face|huggingface|kaggle|accessed|retrieved|website|web\s+page|model\s+card|system\s+card|press|book|chapter|manual|documentation|patent|standard|lecture|slides|tutorial|preprint\s+server|ssrn)\b", re.IGNORECASE)
+
+
+def claims_indexed_venue(text: str) -> bool:
+    """Whether a reference-list entry says it is a journal, conference, or arXiv paper, the kinds
+    of work Crossref or OpenAlex index; books, reports, software, and web pages often are not."""
+    return bool(text) and bool(_INDEXED_VENUE.search(text)) and not _UNINDEXED_KIND.search(text)
+
+
+def _same_title(a: str, b: str) -> bool:
+    """Whether two titles name one work. Character similarity rates titles one key word apart
+    ("On the Weaknesses of ..." / "A Study of ...") as the same; shared significant words do not."""
+    if not a or not b:
+        return False
+    return word_overlap(a, b) >= 0.9 or title_similarity(a, b) >= 0.95
+
+
+def _credible_title(own: str, registered: str) -> bool:
+    """Whether the span read as an entry's title plausibly is one (styles differ: Vancouver
+    "Pachter L. Title." can leave the journal there), judged by its overlap with the work's."""
+    return len(own.split()) >= MIN_TITLE_WORDS and word_overlap(own, registered) >= 0.5
+
+
+def _title_conflict(own: str, registered: str) -> bool:
+    """The entry's own title is readable and is a different one from the registered work's."""
+    return _credible_title(own, registered) and not _same_title(own, registered)
+
+
+def _prose_problems(text: str, words: set[str], record: dict, title_score: float) -> list[str]:
+    """Author and year disagreements between a reference-list entry and the work it matched.
+
+    An entry that lists its authors in full should name most of the registered ones; one
+    cut short with "et al." is held only to its first author. A year counts when any year in
+    the entry is within YEAR_TOLERANCE (a preprint and its proceedings differ by one).
+    """
+    problems: list[str] = []
+    families = _registered_families(record)[:10]
+    truncated = bool(re.search(r"\bet\s+al\b|\bothers\b", text, re.IGNORECASE))
+    # The entry's own title must be the work's: a short registered title can be a subset of a
+    # longer one ("On the Difficulty of Membership Inference Attacks").
+    own = _prose_title(text)
+    same_title = _credible_title(own, _title_of(record)) and _same_title(own, _title_of(record))
+    if families and not truncated and len(families) >= 2 and title_score >= PROSE_STRONG_TITLE and same_title:
+        present = [f for f in families if f in words]
+        lead = _family(_entry_lead_author(text))
+        if len(present) < PROSE_AUTHOR_SHARE * len(families):
+            listed = f"of its registered authors ({', '.join(families[:4])}{', ...' if len(families) > 4 else ''}) the entry names {len(present)} of {len(families)}"
+            # A wrong first author is reported outright; the right first author with other
+            # co-authors may be another version of the work (a solo working paper later
+            # co-authored) or a review registered under its reviewer, so a reader decides.
+            if lead and lead not in _registered_families(record):
+                problems.append(f"{WRONG_AUTHORS}: {listed}")
+            else:
+                problems.append(f"the entry's co-authors differ from the work's: {listed}")
+    listed = _entry_families(text)
+    all_registered = set(_registered_families(record))
+    if same_title and not problems and len(listed) >= 3 and all_registered and sum(f in all_registered for f in listed) < PROSE_AUTHOR_SHARE * len(listed):
+        # The names the entry does list, even cut short by "et al.", should be the work's.
+        lead = listed[0]
+        named = f"of the {len(listed)} authors the entry lists ({', '.join(listed[:4])}{', ...' if len(listed) > 4 else ''}) {sum(f in all_registered for f in listed)} are among the work's"
+        problems.append(f"{WRONG_AUTHORS}: {named}" if lead not in all_registered else f"the entry's co-authors differ from the work's: {named}")
+    elif families and families[0] not in words and same_title:
+        problems.append(f"the entry does not name the registered first author ({families[0]})")
+    found_year = _year_value(_year_of(record))
+    years = [int(y) for y in re.findall(r"\b(?:19|20)\d{2}\b", text)]
+    if same_title and found_year and years and all(abs(y - found_year) > YEAR_TOLERANCE for y in years):
+        problems.append(f"the entry's year ({years[-1]}) is not the work's ({found_year})")
+    return problems
+
+
 def match_text(ref: Reference, candidates: list[dict]) -> Lookup:
     """Compare a reference-list entry (prose) with Crossref's candidates."""
     # A title of a word or two ("New products") turns up in almost any entry.
-    candidates = [c for c in candidates if _is_candidate(c) and len(_significant_words(_work_title(_title_of(c)))) >= MIN_TITLE_WORDS]
+    # ... unless the entry's own title, read cleanly, is that short title ("Attention Is All You Need").
+    own_title = _prose_title(ref.text)
+    candidates = [c for c in candidates if _is_candidate(c) and (len(_significant_words(_work_title(_title_of(c)))) >= MIN_TITLE_WORDS or _same_title(own_title, _title_of(c)))]
     words = set(_normalize_text(ref.text).split())
     scored = sorted(((_prose_overlap(ref.text, c), c) for c in candidates), key=lambda t: -t[0])
     for score, c in scored:
         if score < PROSE_TITLE_OVERLAP:
             break
+        # Most of a registered title's words can sit in a different title on the same topic
+        # ("A Study of RL for NMT" in "On the Weaknesses of RL for NMT"): when the entry's own
+        # title can be read, it has to be that title.
+        if _title_conflict(own_title, _title_of(c)):
+            continue
         family = _family(_first_author_of(c))
         if not family or family in words:
-            return Lookup(ref, MATCHED, record=c)
+            return Lookup(ref, MATCHED, record=c, problems=_prose_problems(ref.text, words, c, score))
+    # A title that matches outright, under a first author the registered work does not have:
+    # the entry names the wrong people (a fabricated author list on a real title).
+    if scored and scored[0][0] >= PROSE_STRONG_TITLE and len(_registered_families(scored[0][1])) >= 2:
+        c = scored[0][1]
+        problems = _prose_problems(ref.text, words, c, scored[0][0])
+        if problems:
+            return Lookup(ref, MATCHED, record=c, problems=problems)
     if scored and scored[0][0] >= PROSE_NEAR_OVERLAP:
         return Lookup(ref, NEAR, record=scored[0][1], candidates=[c for _, c in scored[:2]])
     return Lookup(ref, NOT_FOUND, candidates=[c for _, c in scored[:2]])
+
+
+def _same_authors(ref: Reference, record: dict) -> bool:
+    """Whether a reference names the record's people: its first author, and most of the first few."""
+    families = _registered_families(record)[:6]
+    if not families:
+        return False
+    if ref.text:
+        words = set(_normalize_text(ref.text[:600]).split())
+        return families[0] in words and sum(f in words for f in families) >= max(1, len(families) // 2)
+    return bool(ref.author) and _family(ref.author) == families[0]
 
 
 def match_arxiv(ref: Reference, record: dict | None) -> Lookup:
     """Compare a reference citing an arXiv id with what arXiv has under that id."""
     if record is None:
         return Lookup(ref, MATCHED, problems=[f"it cites arXiv:{ref.arxiv_id}, which arXiv has no record of"], source="arXiv")
-    if ref.title and title_similarity(ref.title, record["title"]) < NEAR_TITLE_RATIO:
+    # arXiv papers are often retitled between versions ("EraseBench: ..." became "Erasing More
+    # Than Intended? ..."), so a title that disagrees counts only when the authors do too.
+    same_people = _same_authors(ref, record)
+    if ref.title and title_similarity(ref.title, record["title"]) < NEAR_TITLE_RATIO and not same_people:
         return Lookup(ref, MATCHED, record=record, source="arXiv", problems=[f'it cites arXiv:{ref.arxiv_id}, but that identifier is "{record["title"]}"'])
-    if ref.text and not ref.title and _prose_overlap(ref.text, record) < PROSE_NEAR_OVERLAP:
+    if ref.text and not ref.title and _prose_overlap(ref.text, record) < PROSE_NEAR_OVERLAP and not same_people:
         return Lookup(ref, MATCHED, record=record, source="arXiv", problems=[f'it cites arXiv:{ref.arxiv_id}, but that identifier is "{record["title"]}"'])
     return Lookup(ref, MATCHED, record=record, source="arXiv")
 
@@ -637,11 +822,25 @@ def _search_one(ref: Reference, svc: _Services) -> Lookup:
             lookup.status = UNKNOWN
         return lookup or Lookup(ref, UNKNOWN)
     items = crossref_search(ref.text, svc.crossref) if svc.crossref.available else None
-    if items is None:
-        return Lookup(ref, UNKNOWN)
-    lookup = match_text(ref, items)
-    lookup.source = "Crossref"
-    return lookup
+    lookup = match_text(ref, items) if items is not None else None
+    if lookup is not None:
+        lookup.source = "Crossref"
+    # Crossref lacks much of computer science (ICLR, many NeurIPS and arXiv papers), so an entry
+    # it cannot match is also searched in OpenAlex by its own title. A miss in both, for a
+    # cleanly read title, is a confident miss.
+    own = _prose_title(ref.text)
+    if (lookup is None or lookup.status != MATCHED) and len(own.split()) >= MIN_TITLE_WORDS and svc.openalex.available:
+        works = openalex_search(own, svc.openalex)
+        if works is not None:
+            second = match_text(ref, works)
+            second.source = "OpenAlex" if lookup is None else "Crossref and OpenAlex"
+            if lookup is None or second.status == MATCHED or (second.status == NEAR and lookup.status == NOT_FOUND):
+                lookup = second
+            else:
+                lookup.source = "Crossref and OpenAlex"
+                lookup.candidates += second.candidates[:1]
+            lookup.confident_miss = lookup.status == NOT_FOUND and items is not None
+    return lookup or Lookup(ref, UNKNOWN)
 
 
 def search_references(refs: list[Reference], *, services: _Services | None = None) -> SearchResult:
@@ -673,7 +872,7 @@ def search_references(refs: list[Reference], *, services: _Services | None = Non
         result.lookups.append(_search_one(ref, svc))
 
     for lk in result.lookups:
-        if lk.status == MATCHED and lk.problems and lk.source != "arXiv" and not lk.ref.indexed:
+        if lk.status == MATCHED and lk.problems and lk.source != "arXiv" and not lk.ref.indexed and not any(p.startswith(WRONG_AUTHORS) for p in lk.problems):
             # A book, a web page, a prose entry: the "match" may be a review or
             # a namesake, so a disagreement is for a reader to settle.
             lk.status = NEAR
@@ -682,14 +881,14 @@ def search_references(refs: list[Reference], *, services: _Services | None = Non
         if lk.status == MATCHED and lk.problems:
             what = f"the closest registered work is {_describe(lk.record)}" if lk.record else ""
             result.findings.append(Finding(lk.ref.where, "reference does not match a registered work", f"{lk.ref.label} looks wrong: {'; '.join(lk.problems)}" + (f"; {what}" if what and lk.source != "arXiv" else "") + ". Check it against the published work"))
-        elif lk.status == NOT_FOUND and lk.ref.indexed:
+        elif lk.status == NOT_FOUND and (lk.ref.indexed or (lk.confident_miss and claims_indexed_venue(lk.ref.text))):
             searched = lk.source or "Crossref"
             near = f" (the closest title found was {_describe(lk.candidates[0])})" if lk.candidates else ""
             result.findings.append(
                 Finding(
                     lk.ref.where,
                     "no registered work",
-                    f'{lk.ref.label} ("{lk.ref.title[:120]}", {lk.ref.author or "no author"}, {lk.ref.year or "no year"}) matches no work in {searched}{near}. Check that it exists and its title is right; a reference that cannot be found may be fabricated',
+                    f'{lk.ref.label} ("{(lk.ref.title or _prose_title(lk.ref.text))[:120]}", {lk.ref.author or _entry_lead_author(lk.ref.text) or "no author"}, {lk.ref.year or "no year"}) matches no work in {searched}{near}. Check that it exists and its title is right; a reference that cannot be found may be fabricated',
                 )
             )
         elif lk.status == MATCHED and lk.source != "arXiv" and lk.record and lk.record.get("DOI"):

@@ -95,7 +95,7 @@ Run the pre-submission checks against a loaded ``.sub`` file and its venue. See
 :func:`paperpush.validate_report` runs the same checks and returns a
 :class:`~paperpush.report.ValidationReport` with one
 :class:`~paperpush.report.CheckResult` per check -- passed, failed, warning,
-unchecked, needs AI, not implemented, or not applicable -- which
+suggestion, unchecked, needs AI, not implemented, or not applicable -- which
 :func:`paperpush.report.save` writes as PDF, HTML, Markdown, or text.
 
 .. autofunction:: paperpush.validate_report

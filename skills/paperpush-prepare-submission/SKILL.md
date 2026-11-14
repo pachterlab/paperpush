@@ -120,7 +120,7 @@ fly. See step 1.
    verdicts into the report.
 
    Then decide whether to go on, from the counts in the merged report (failed
-   AI checks count as warnings):
+   AI checks count as warnings; suggestions on style do not count at all):
 
    - **Errors, or more than 5 warnings: stop here.** Summarize them in three
      groups: must fix (errors), worth checking (warnings, deterministic first,
@@ -138,6 +138,12 @@ fly. See step 1.
    - **No errors and 5 warnings or fewer:** list the warnings as things for
      the user to confirm, and ask whether to continue to the portal anyway
      before step 4. With no warnings at all, go straight on.
+   - **Suggestions** (status `suggestion`: repetitive word choice,
+     spelled-out numbers, forms or headings written two ways, double spaces)
+     never stop the flow. Mention how many there are in one line, and that
+     `paperpush validate --suggestions` lists them, or `paperpush-fix` can
+     apply them if the user asks. If the user wants the house style enforced,
+     validate with `--strict-style`, which makes them warnings.
 
    **If the user asked to skip validation** ("skip validation", "submit
    anyway"), do not run this step. Go straight to step 4 and pass the request

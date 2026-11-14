@@ -20,9 +20,11 @@ resolves them in one of three ways, chosen by :class:`AiOptions`:
 * **Neither**: each task is reported as *needs AI*, so the report says plainly
   what was not checked.
 
-A verdict is ``pass``, ``fail``, ``unclear``, or ``not_applicable``. A failed
-AI check is reported as a warning: it is a reader's judgement, not a
-measurement, so it never blocks a submission on its own.
+A verdict is ``pass``, ``fail``, ``suggest``, ``unclear``, or
+``not_applicable``. A failed AI check is reported as a warning: it is a
+reader's judgement, not a measurement, so it never blocks a submission on its
+own. ``suggest`` is for a check that found nothing wrong, only points of style
+an editor could leave as they are; it is reported as a suggestion.
 """
 
 from __future__ import annotations
@@ -37,9 +39,9 @@ from .database import Venue
 
 logger = logging.getLogger(__name__)
 
-VERDICTS = ("pass", "fail", "unclear", "not_applicable")
+VERDICTS = ("pass", "fail", "suggest", "unclear", "not_applicable")
 
-_SYSTEM = "You are a meticulous pre-submission checker for academic manuscripts. You are given " "the files of one submission and a list of checks. For each check, read the files it " "names and decide: 'pass' if the submission meets it, 'fail' if it does not, " "'not_applicable' if the check does not apply to this submission, or 'unclear' if the " "files do not let you decide. Judge only from the files; do not assume. For 'fail', " "'details' must say exactly what is wrong and where (file, page, figure, panel) so the " "author can fix it; for 'pass', say briefly what you verified. Quote short evidence."
+_SYSTEM = "You are a meticulous pre-submission checker for academic manuscripts. You are given " "the files of one submission and a list of checks. For each check, read the files it " "names and decide: 'pass' if the submission meets it, 'fail' if it does not, " "'suggest' if nothing is wrong but you have points of style the author could defensibly leave as they are, " "'not_applicable' if the check does not apply to this submission, or 'unclear' if the " "files do not let you decide. Judge only from the files; do not assume. For 'fail', " "'details' must say exactly what is wrong and where (file, page, figure, panel) so the " "author can fix it; for 'pass', say briefly what you verified. Quote short evidence."
 
 
 @dataclass(frozen=True)
@@ -110,7 +112,7 @@ def parse_results(data: Any) -> dict[str, dict]:
         raise ValueError("expected a JSON object with a 'results' list")
     for task_id, item in out.items():
         status = str(item.get("status", "")).strip().lower().replace(" ", "_").replace("-", "_")
-        status = {"passed": "pass", "ok": "pass", "failed": "fail", "warning": "fail", "na": "not_applicable", "n/a": "not_applicable"}.get(status, status)
+        status = {"passed": "pass", "ok": "pass", "failed": "fail", "warning": "fail", "suggestion": "suggest", "suggested": "suggest", "na": "not_applicable", "n/a": "not_applicable"}.get(status, status)
         if status not in VERDICTS:
             raise ValueError(f"result {task_id!r} has status {item.get('status')!r}; use one of {', '.join(VERDICTS)}")
         item["status"] = status
@@ -301,6 +303,13 @@ def resolve(checks, venue: Venue, values: dict[str, str], ai: Optional[AiOptions
             from .validate import WARNING, Issue
 
             checks.record(task.id, task.title, task.category, report.WARNING, issues=[Issue(WARNING, "", message or "the AI check failed (no details given)")], source="ai")
+        elif status == "suggest":
+            from .validate import SUGGESTION, Issue
+
+            if message:
+                checks.record(task.id, task.title, task.category, report.SUGGESTION, issues=[Issue(SUGGESTION, "", message)], source="ai")
+            else:
+                checks.record(task.id, task.title, task.category, report.PASSED, detail="no problems; the AI suggested changes of style but gave none", source="ai")
         elif status == "not_applicable":
             checks.record(task.id, task.title, task.category, report.NOT_APPLICABLE, detail=message, source="ai")
         else:
@@ -413,7 +422,7 @@ def tasks_payload(tasks: list[AiTask], venue: Venue, subfile: str = "", command:
     return {
         "venue": venue.slug,
         "subfile": subfile,
-        "instructions": ("For each task, read the files it lists and judge it as the task says. " 'Write {"results": [{"id": <task id>, "status": "pass" | "fail" | "unclear" | "not_applicable", ' '"details": <what you found>, "evidence": <a short quote or location>}]} to a JSON file, then run ' f"`{command} --ai-results <that file>` to merge the verdicts into the report."),
+        "instructions": ("For each task, read the files it lists and judge it as the task says. " 'Write {"results": [{"id": <task id>, "status": "pass" | "fail" | "suggest" | "unclear" | "not_applicable", ' '"details": <what you found>, "evidence": <a short quote or location>}]} to a JSON file, then run ' f"`{command} --ai-results <that file>` to merge the verdicts into the report."),
         "system": _SYSTEM,
         "tasks": [t.to_dict() for t in tasks],
     }

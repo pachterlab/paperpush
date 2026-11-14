@@ -148,8 +148,11 @@ guess failed.
      fraction of the image width ("a capital letter must be at least 0.9% of
      the image width tall") — measure against it rather than eyeballing
      "small".
-   - Decide `pass`, `fail`, `unclear` (the files do not let you decide), or
-     `not_applicable` (e.g. a portal or fee rule, or no tables to check).
+   - Decide `pass`, `fail`, `suggest` (nothing is wrong, but there are
+     points of style the author could defensibly keep, listed in `details`;
+     the task says when it wants them, e.g. `ai.prose`), `unclear` (the files
+     do not let you decide), or `not_applicable` (e.g. a portal or fee rule,
+     or no tables to check). Never use `suggest` to soften a real `fail`.
    - For `fail`, `details` must say exactly what is wrong and where (file,
      page, figure, panel, rule number) so the author can fix it; add a short
      quote or location as `evidence`.
@@ -225,7 +228,7 @@ guess failed.
 
    (MCP alternative: `validate_subfile(subfile, ai_results=[...], output=...)`.)
    Your verdicts appear marked "(AI)". A failed AI check is a warning, never a
-   blocking error.
+   blocking error; a `suggest` verdict is a suggestion.
 
    If the user asks for the AI checks only, add `--ai-only` to both commands
    (MCP: `ai_only=true`): the report then lists just the AI checks and gives
@@ -234,7 +237,10 @@ guess failed.
 
 4. **Summarize for the user**, in this order: blocking errors (must fix),
    warnings (deterministic first, then AI), what could not be checked and why
-   (could not run / not implemented), and where the saved report is. Relay
+   (could not run / not implemented), suggestions on style (one line with the
+   count and the check ids, unless the user asks for them; the JSON and a
+   saved report list them, and so does the terminal with `--suggestions`),
+   and where the saved report is. Never count suggestions as warnings. Relay
    heuristics as things to confirm, not as certainties. List every AI task
    with its verdict (one line each), so it is visible that none was skipped.
    If the user asked for the findings in a file or another format, include

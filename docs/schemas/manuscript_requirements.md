@@ -95,6 +95,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `thousands_separator` | `comma` \| `space` or null | How numbers of 10,000 and over group their thousands: comma (10,000) or space (10 000, often a thin space). Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent. |
 | `group_four_digit_numbers` | boolean or null | Whether four-digit numbers take the thousands separator too: yes for 1,000, no for 1000 (SI and some house styles). Empty when the guidelines do not say. |
 | `et_al_period` | boolean or null | Whether 'et al' takes a full stop: yes for 'et al.', no for 'et al' (AMA and RSNA house style). Empty when the guidelines do not say; `validate` then asks for 'et al.'. |
+| `serial_comma` | boolean or null | Whether lists take the serial (Oxford) comma: yes for 'A, B, and C', no for 'A, B and C'. Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent. |
 | `initial_submission_any_format` | string or null | Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings. |
 | `notes` | list of string or null | Rules with no structured key, one per string. |
 

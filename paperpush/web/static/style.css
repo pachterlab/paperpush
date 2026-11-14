@@ -25,6 +25,8 @@
   --st-failed-bg: #fdecee;
   --st-warning: #b35900;
   --st-warning-bg: #fff4e5;
+  --st-suggestion: #0969da;
+  --st-suggestion-bg: #ebf3fd;
   --st-ai: #8250df;
   --st-ai-bg: #f5f0ff;
   --st-unchecked: #57606a;
@@ -63,6 +65,8 @@ html[data-theme="dark"] {
   --st-failed-bg: #3a1c1c;
   --st-warning: #f0a35e;
   --st-warning-bg: #35250f;
+  --st-suggestion: #58a6ff;
+  --st-suggestion-bg: #13233a;
   --st-ai: #a371f7;
   --st-ai-bg: #241b38;
   --st-unchecked: #9aa3ad;
@@ -83,9 +87,10 @@ html[data-theme="dark"] {
   --backdrop: rgba(0, 0, 0, 0.6);
   color-scheme: dark;
 }
-/* Okabe-Ito blue / vermillion / dark yellow / reddish purple (report.py's
-   ALT_PALETTE, also `paperpush validate --colorblind`): distinguishable under
-   the common forms of colour-blindness. Every status also has a mark. */
+/* Okabe-Ito blue / vermillion / dark yellow / bluish green / reddish purple
+   (report.py's ALT_PALETTE, also `paperpush validate --colorblind`):
+   distinguishable under the common forms of colour-blindness. Blue is passed
+   here, so suggestions are bluish green. Every status also has a mark. */
 html[data-palette="alt"] {
   --st-passed: #0072b2;
   --st-passed-bg: #e6f1f8;
@@ -93,6 +98,8 @@ html[data-palette="alt"] {
   --st-failed-bg: #fbeee5;
   --st-warning: #8a6d00;
   --st-warning-bg: #f7f1dc;
+  --st-suggestion: #007a5c;
+  --st-suggestion-bg: #e3f4ee;
   --st-ai: #aa3377;
   --st-ai-bg: #f8ebf2;
   --st-unchecked: #555555;
@@ -104,6 +111,8 @@ html[data-theme="dark"][data-palette="alt"] {
   --st-failed-bg: #3a2414;
   --st-warning: #e6c84a;
   --st-warning-bg: #2f2a12;
+  --st-suggestion: #3ccf9e;
+  --st-suggestion-bg: #12302a;
   --st-ai: #cc79a7;
   --st-ai-bg: #33202c;
   --st-unchecked: #a8a8a8;
@@ -171,6 +180,7 @@ html { scroll-padding-top: calc(var(--topbar-h) + 64px); }
 .stat.partial b { color: var(--st-warning); }
 .stat.bad b { color: var(--st-failed); }
 .stat.ai b { color: var(--st-ai); }
+.stat.suggest b { color: var(--st-suggestion); }
 .stat.stale, .stats.stale .stat { opacity: 0.6; }
 
 /* ---- filter and search bar */
@@ -193,6 +203,10 @@ h1 { font-size: 30px; font-weight: 600; line-height: 1.15; margin: 10px 0 8px; l
 h2 { font-size: 21px; font-weight: 600; margin: 0; }
 h3 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
 .intro { color: var(--muted); font-size: 15px; margin: 0 0 22px; line-height: 1.55; max-width: 68ch; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 10px 0 8px; }
+.page-head h1 { margin: 0; }
+ol.intro.steps { max-width: none; padding-left: 1.4em; }
+ol.intro.steps li { margin: 1px 0; padding-left: 2px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
@@ -401,6 +415,8 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .field-issues li.warning { color: var(--st-warning); background: var(--st-warning-bg); }
 .field-issues li::before { content: "✖ "; }
 .field-issues li.warning::before { content: "▲ "; }
+.field-issues li.suggestion { color: var(--st-suggestion); background: var(--st-suggestion-bg); }
+.field-issues li.suggestion::before { content: "✎ "; }
 .card.review .input { background: var(--review-input-bg); }
 .yesno { display: flex; gap: 14px; align-items: center; }
 .yesno label, .confirm { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
@@ -463,6 +479,7 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .mark.st-warning { color: var(--st-warning); }
 .mark.st-pending { color: var(--st-pending); }
 .mark.st-needs-ai { color: var(--st-ai); }
+.mark.st-suggestion { color: var(--st-suggestion); }
 .check-group { margin: 0 0 18px; padding: 14px 18px; background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--st-pending); border-radius: var(--radius); }
 .check-group.st-passed { border-left-color: var(--st-passed); }
 .check-group.st-failed { border-left-color: var(--st-failed); }
@@ -495,6 +512,8 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .check.st-warning .mk { color: var(--st-warning); }
 .check.st-unchecked { border-left-color: var(--st-unchecked); color: var(--text); }
 .check.st-unchecked .mk { color: var(--st-unchecked); }
+.check.st-suggestion { border-left-color: var(--st-suggestion); background: color-mix(in srgb, var(--st-suggestion-bg) 60%, transparent); color: var(--text); }
+.check.st-suggestion .mk { color: var(--st-suggestion); }
 .check.st-needs-ai { border-left-color: var(--st-ai); background: var(--st-ai-bg); color: var(--text); }
 .check.st-needs-ai .mk { color: var(--st-ai); }
 .check.st-na { opacity: 0.75; }
@@ -551,6 +570,35 @@ dialog { background: var(--panel); }
 #portal-body .portal-download { margin-bottom: 4px; }
 #portal-body .portal-download p { margin: 0 0 4px; }
 .dialog-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+/* ---- recommend a venue */
+dialog.wide { max-width: 860px; }
+.rec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin: 12px 0 4px; }
+.rec-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rec-field .name { font-weight: 600; font-size: 14px; }
+.rec-wide { grid-column: 1 / -1; }
+.rec-field textarea { resize: vertical; font: inherit; }
+.rec-file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rec-actions { align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 4px; }
+.rec-actions #rec-status { margin-right: auto; }
+#rec-results:empty { display: none; }
+#rec-results { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
+#rec-results h3 { margin: 14px 0 6px; }
+#rec-results h3:first-child { margin-top: 0; }
+.rec-notes { margin: 0 0 8px; }
+.rec-list { list-style: none; padding: 0; margin: 0; }
+.rec-item { display: grid; grid-template-columns: 2.4em minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 9px 0; border-bottom: 1px solid var(--rule); margin: 0 !important; }
+.rec-score { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); text-align: right; }
+.rec-name { font-weight: 600; }
+.rec-name a { color: inherit; }
+.rec-chip { margin-left: 6px; font-weight: 400; vertical-align: 1px; }
+.rec-meta { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.rec-reason { font-size: 13px; line-height: 1.45; margin-top: 2px; }
+.rec-item .btn { white-space: nowrap; }
+@media (max-width: 560px) {
+  .rec-grid { grid-template-columns: 1fr; }
+  .rec-item { grid-template-columns: 2.2em minmax(0, 1fr); }
+  .rec-item .btn { grid-column: 2; justify-self: start; }
+}
 .toast {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 50; max-width: calc(100% - 32px);
   padding: 9px 14px; border-radius: 2px; background: var(--tooltip-bg); color: var(--tooltip-fg); font-size: 14px;
@@ -575,7 +623,7 @@ dialog { background: var(--panel); }
   .group-head, .check-group > h3 { break-after: avoid; }
   /* What only matters while editing: the intro, the venue picker, an empty
      upload box, and the add / upload / filter / clear controls. */
-  main > h1, main > .intro, fieldset.panel:has(#venue-search), #sub-text-panel,
+  main > h1, main > .intro, main > .page-head, fieldset.panel:has(#venue-search), #sub-text-panel,
   .card .btn, .card .icon-btn, .card .link, .card input[type=search], .card input[placeholder^="Add your own"] { display: none !important; }
   /* A long checklist prints only what was chosen. */
   .multi .checklist { max-height: none; overflow: visible; }

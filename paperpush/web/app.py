@@ -56,7 +56,7 @@ import zipfile
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -904,6 +904,8 @@ class ValidateRequest(BaseModel):
     anonymous: Optional[bool] = None
     # Report every error as a warning (paperpush validate --initial-submission).
     initial_submission: bool = False
+    # Report every suggestion on style as a warning (paperpush validate --strict-style).
+    strict_style: bool = False
     # Answer with NDJSON: {"progress": {...}} lines as each stage starts, then
     # one {"result": {...}} (or {"error": "..."}) line. The page's progress bar.
     stream: bool = False
@@ -1036,6 +1038,123 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         """Which of the venue's upload fields each file belongs in, by its name and folder (no AI)."""
         venue = _venue_or_404(slug)
         return match_files(venue, req.paths[:_MAX_ZIP_MEMBERS]).to_dict(venue)
+
+    @app.post("/api/pick-venue")
+    def pick_venue(
+        title: str = Form(""),
+        abstract: str = Form(""),
+        keywords: str = Form(""),
+        venue_type: str = Form("all"),
+        archival: str = Form("archival"),
+        ai: bool = Form(False),
+        limit: int = Form(15),
+        ws_id: str = Form(""),
+        manuscript_name: str = Form(""),
+        manuscript: Optional[UploadFile] = File(None),
+        x_llm_provider: Optional[str] = Header(None),
+        x_llm_key: Optional[str] = Header(None),
+        x_paperpush_token: Optional[str] = Header(None),
+    ) -> dict[str, Any]:
+        """Recommend venues for a manuscript, like ``paperpush pick-venue``.
+
+        The manuscript is a file sent with the request, or one already uploaded
+        to workspace ``ws_id`` (``manuscript_name``); the title, abstract, and
+        keywords typed on the page replace (or, for keywords, add to) what is
+        read from it. Venues come from OpenAlex (journals and conferences that
+        published similar work) plus conferences matched on subject; with
+        ``ai`` an LLM also ranks the venues paperpush supports, with reasons.
+        """
+        from ..openalex import OpenAlexError
+        from ..venue_select import VENUE_TYPE_CHOICES, archival_venue_types, find_journals, pick_venues, rank_via_api, rows_from_hits, select, shortlist
+
+        if venue_type not in VENUE_TYPE_CHOICES:
+            raise HTTPException(400, f"venue_type must be one of {', '.join(VENUE_TYPE_CHOICES)}")
+        if archival not in ("archival", "non-archival", "all"):
+            raise HTTPException(400, "archival must be archival, non-archival, or all")
+        try:
+            types = archival_venue_types(archival, VENUE_TYPE_CHOICES[venue_type])
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from None
+        provider = api_key = None
+        files, local = workspace(ws_id, x_paperpush_token) if ws_id else (None, None)
+        if ai:
+            provider, api_key = visitor_llm(settings, x_llm_provider, x_llm_key, "the AI recommendation", local=local is not None)
+        words = [k.strip() for k in re.split(r"[,;\n]", keywords) if k.strip()]
+        limit = max(1, min(limit, 50))
+        with tempfile.TemporaryDirectory(prefix="paperpush-pick-") as tmp:
+            path: Optional[Path] = None
+            if manuscript is not None and manuscript.filename:
+                path = Path(tmp) / safe_name(manuscript.filename)
+                written = 0
+                with path.open("wb") as out:
+                    while chunk := manuscript.file.read(_CHUNK):
+                        written += len(chunk)
+                        if written > settings.max_workspace_mb * _CHUNK:
+                            raise HTTPException(413, f"the manuscript is larger than {settings.max_workspace_mb:g} MB")
+                        out.write(chunk)
+            elif files is not None and manuscript_name:
+                path = local.resolve(manuscript_name) if local is not None else files / safe_name(Path(manuscript_name).name)
+                if not Path(path).is_file():
+                    path = None
+            if not (words or title.strip() or abstract.strip() or path):
+                raise HTTPException(400, "give a title, abstract, keywords, or a manuscript")
+            try:
+                selection = select(keywords=words, title=title, abstract=abstract, manuscript=str(path) if path else None, venue_types=types)
+            except ValueError as exc:
+                raise HTTPException(400, str(exc)) from None
+            mq = selection.manuscript
+            if mq is not None and mq.is_empty():
+                raise HTTPException(400, "found no title, abstract, or text to go on in the manuscript")
+            read = {"title": mq.title, "abstract": mq.abstract, "keywords": list(mq.keywords)} if mq is not None else None
+
+            notes: list[str] = []
+            journals = None
+            beyond_supported = mq is not None and settings.network_checks
+            if beyond_supported:
+                try:
+                    journals = find_journals(mq, venue_types=types)
+                except (OpenAlexError, ValueError) as exc:
+                    notes.append(f"OpenAlex could not be searched ({exc}); only the venues paperpush supports were ranked.")
+                if journals is not None and not journals.hits:
+                    notes.append("OpenAlex found no venues publishing similar work; only the venues paperpush supports were ranked.")
+            catalog = None
+            if (not types or "conference" in types) and (beyond_supported or any(h.venue.venue_type == "conference" for h in selection.hits)):
+                from ..conferences import load_catalog
+
+                catalog = load_catalog()
+                for feed, error in catalog.errors.items():
+                    notes.append(f"Conference data from {feed} is unavailable ({error}).")
+            rows = shortlist(selection, journals, catalog, venue_types=types, archival=archival, subject_conferences=beyond_supported)
+
+            ai_rows = None
+            ai_info = None
+            if ai and mq is not None:
+                from ..autofill import AutofillApiError
+
+                candidates = [h.venue for h in pick_venues("", venue_types=types)]
+                try:
+                    ranking = rank_via_api(mq, candidates, limit=limit, provider=provider, api_key=api_key)
+                except AutofillApiError as exc:
+                    raise HTTPException(502, _scrub(str(exc), Path(tmp), api_key)) from None
+                by_slug = {h.venue.slug: h for h in pick_venues("", venues=candidates)}
+                ai_rows = rows_from_hits([by_slug[p.slug] for p in ranking.picks if p.slug in by_slug], catalog, reasons={p.slug: f"{p.fit}: {p.reason}" for p in ranking.picks}, basis="ai")
+                ai_info = {"model": ranking.model, "subjects": ranking.subjects}
+
+        def scrubbed(row) -> dict[str, Any]:
+            data = row.to_dict()
+            data.pop("conference", None)
+            return data
+
+        return {
+            "read": read,
+            "subjects": list(selection.subjects),
+            "venues": [scrubbed(r) for r in rows[:limit]],
+            "total_venues": len(rows),
+            "openalex": bool(journals is not None and journals.hits),
+            "ai": ai_info,
+            "ai_venues": [scrubbed(r) for r in ai_rows] if ai_rows is not None else None,
+            "notes": notes,
+        }
 
     @app.post("/api/workspaces")
     def create_workspace() -> dict[str, Any]:
@@ -1200,6 +1319,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                 # when paperpush runs on their machine.
                 check_openreview=local is not None,
                 initial_submission=req.initial_submission,
+                strict_style=req.strict_style,
                 ai=ai,
                 progress=progress,
             )
@@ -1220,6 +1340,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             "initial_submission_rule": report.initial_submission_rule,
             "initial_submission": report.initial_submission,
             "downgraded": report.downgraded,
+            "strict_style": report.strict_style,
             "checks": _report_payload(report, files),
             # The same report `paperpush validate -o report.txt` writes, for the Download button.
             "report_text": _scrub(report_mod.to_text(report), files, ai.api_key if ai else None),

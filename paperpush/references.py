@@ -621,7 +621,9 @@ def _reference_list_end(text: str, refs_at: int | None) -> int:
     close = _END_THEBIBLIOGRAPHY.search(text, refs_at)
     if close:
         return close.end()
-    after = manuscript._AFTER_REFERENCES.search(text, refs_at)
+    # From the end of the heading's line: the heading is no closing heading of its own list.
+    line_end = text.find("\n", refs_at)
+    after = manuscript._AFTER_REFERENCES.search(text, refs_at if line_end < 0 else line_end)
     return after.start() if after else len(text)
 
 

@@ -728,6 +728,7 @@ def validate_subfile(
     output: Optional[str] = None,
     colorblind: bool = False,
     initial_submission: bool = False,
+    strict_style: bool = False,
     ai_only: bool = False,
     cover_letter_max_age_days: int = 7,
     publisher: Optional[str] = None,
@@ -804,7 +805,7 @@ def validate_subfile(
     manuscript says). They come back with status `needs_ai` and are listed in
     `ai_tasks`: do each task yourself by reading the files it names, then call
     this tool again with `ai_results` = `[{"id", "status": "pass"|"fail"|
-    "unclear"|"not_applicable", "details", "evidence"}]` to merge your verdicts
+    "suggest"|"unclear"|"not_applicable", "details", "evidence"}]` to merge your verdicts
     (or get the same list from `validation_ai_tasks`). `ai_only` reports just
     those checks and skips the deterministic ones (the manuscript is still read
     to find which apply; it cannot be combined with `check_manuscript=false`).
@@ -837,10 +838,17 @@ def validate_subfile(
     lets the initial submission be in any format; that rule, when the venue
     has one, is returned as `initial_submission_rule` either way.
 
+    `strict_style` reports every suggestion on style as a warning instead
+    (only when the author or the venue wants the house style enforced).
+
     `checks` lists every check with its status: passed, failed, warning,
-    unchecked (could not run here), needs_ai, not_implemented, or
-    not_applicable. `errors` block submission; `warnings` are advisory. `ok` is
-    true when there are no errors. `output`, an absolute path ending in .pdf,
+    suggestion, unchecked (could not run here), needs_ai, not_implemented, or
+    not_applicable. `errors` block submission; `warnings` are advisory;
+    `suggestions` are points of style (repetitive word choice, spelled-out
+    numbers, abbreviations or headings written more than one way, double
+    spaces) an editor could leave as they are: mention them to the author,
+    but do not count them as warnings or rewrite the prose for them unasked.
+    `ok` is true when there are no errors. `output`, an absolute path ending in .pdf,
     .html, .md, or .txt, also saves the colour-coded report there
     (`colorblind` for a colour-blind-friendly palette, the same as
     `paperpush validate --colorblind`).
@@ -851,7 +859,7 @@ def validate_subfile(
     files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
     path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files, publisher, issn, journal)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
-    result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, reproduce_figures=reproduce_figures, reproduce_minutes=reproduce_minutes, reproduce_download_gb=reproduce_download_gb, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, disable=disable or (), enable=enable or (), initial_submission=initial_submission, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
+    result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, reproduce_figures=reproduce_figures, reproduce_minutes=reproduce_minutes, reproduce_download_gb=reproduce_download_gb, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, disable=disable or (), enable=enable or (), initial_submission=initial_submission, strict_style=strict_style, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
     out: dict[str, Any] = {
         "path": str(path or ""),
         # When it ran and a fingerprint of each input, to tell later whether the result is stale.
@@ -868,6 +876,8 @@ def validate_subfile(
         "ai_only": result.ai_only,
         "errors": _issue_dicts(result.errors),
         "warnings": _issue_dicts(result.warnings),
+        "suggestions": _issue_dicts(result.suggestions),
+        "strict_style": result.strict_style,
         "counts": result.counts(),
         "checks": [r.to_dict() for r in result.results],
         "ai_tasks": tasks_payload([t for t in result.ai_tasks if t.id in {r.id for r in result.by_status(report_mod.NEEDS_AI)}], venue_def, str(path or ""))["tasks"],
@@ -907,7 +917,7 @@ def validation_ai_tasks(
     the manuscript, and so on -- and returns them as tasks: an id, the
     instructions, and the files to read. Do each one, then pass your verdicts
     to `validate_subfile` as `ai_results` (`[{"id", "status": "pass"|"fail"|
-    "unclear"|"not_applicable", "details", "evidence"}]`). No API key is
+    "suggest"|"unclear"|"not_applicable", "details", "evidence"}]`). No API key is
     needed: you are the reader.
     Set `reference_check_extended=true` to add per-source claim-support,
     original-source, and journal-indexing tasks; these may require reading external papers and
@@ -1042,6 +1052,7 @@ def autofill_subfile(
         # validate_subfile once a human has filled those in.
         "errors": _issue_dicts(result.errors),
         "warnings": _issue_dicts(result.warnings),
+        "suggestions": _issue_dicts(result.suggestions),
     }
 
 

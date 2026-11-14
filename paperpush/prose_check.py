@@ -1,7 +1,10 @@
 """Mechanical proofreading of the manuscript's prose.
 
 Not a grammar checker: each check here looks for one kind of slip that a
-pattern can find with few false alarms, and every finding is a WARNING.
+pattern can find with few false alarms. A slip (a repeated word, a misspelling,
+an unbalanced bracket) is a WARNING; a point of style an editor could leave as
+it is (double spaces, repetitive word choice) is a SUGGESTION, which
+``--strict-style`` reports as a warning.
 
 * ``prose.double_spaces`` -- two or more spaces between words. Two spaces
   after a sentence (after ``.``, ``?``, ``!`` or ``:``) are allowed.
@@ -26,7 +29,9 @@ pattern can find with few false alarms, and every finding is a WARNING.
 
 Numbers, abbreviation conventions, and acronyms are checked by
 :mod:`paperpush.style_check` and reported here too (``prose.numbers``,
-``prose.conventions``, ``prose.acronyms``), and the AI task ``ai.prose``
+``prose.conventions``, ``prose.acronyms``); the serial comma, dashes, number
+formats, agreement, and the spelling variant by :mod:`paperpush.usage_check`;
+and the AI task ``ai.prose``
 (spelling and typos beyond codespell's list, grammar, and tense) is queued.
 
 What can be checked depends on the file. A Word file, Markdown, or plain text
@@ -50,7 +55,7 @@ from pathlib import Path
 
 from . import document
 from .database import Field, Venue
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .validate import SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -520,6 +525,10 @@ def _manuscripts(venue: Venue, values: dict[str, str]) -> list[tuple[Field, _Tex
     return [(f, read(p)) for f, p in files]
 
 
+# Checks whose findings are style, not slips: reported as suggestions.
+_LEVELS = {DOUBLE_SPACES: SUGGESTION}
+
+
 def _check(name: str, venue: Venue, values: dict[str, str]) -> Outcome:
     title, noun, fn = _CHECKS[name]
     if name == SPELLING:
@@ -554,7 +563,7 @@ def _check(name: str, venue: Venue, values: dict[str, str]) -> Outcome:
             )
             issues.append(
                 Issue(
-                    WARNING,
+                    _LEVELS.get(name, WARNING),
                     fld.id,
                     f"{text.path.name}: {len(found)} {noun}: {shown}{more}",
                 )
@@ -868,7 +877,7 @@ def _repetition_check(venue: Venue, values: dict[str, str]) -> Outcome:
             if hits:
                 shown = "; ".join(hits[:MAX_EXAMPLES])
                 more = f" (and {len(hits) - MAX_EXAMPLES} more)" if len(hits) > MAX_EXAMPLES else ""
-                issues.append(Issue(WARNING, fld.id, f"{text.path.name}: {len(hits)} {noun}: {shown}{more}; vary the wording"))
+                issues.append(Issue(SUGGESTION, fld.id, f"{text.path.name}: {len(hits)} {noun}: {shown}{more}; vary the wording"))
         top = ", ".join(f"{w} ({n})" for w, n in found.top)
         prefix = f"{text.path.name}: " if len(files) > 1 else ""
         details.append(f"{prefix}{found.words:,} words; most frequent adjectives and adverbs: {top}" if top else f"{prefix}{found.words:,} words; no adjective or adverb used {found.top_min} or more times" if found.words else f"{prefix}no words read")
@@ -886,6 +895,9 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("prose.conventions", "Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)", PROSE, style_check._conventions_check, venue, values)
     checks.run("prose.acronyms", "Acronyms spelled out at first use", PROSE, style_check._acronym_check, venue, values)
     checks.run("prose.heading_case", "Headings of the same level capitalized one way", PROSE, style_check._heading_case_check, venue, values)
+    from . import usage_check
+
+    usage_check.run_checks(checks, venue, values)
     task = style_check.ai_prose_task(venue, values)
     if task is not None:
         checks.needs_ai(task)

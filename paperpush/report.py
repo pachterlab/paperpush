@@ -8,6 +8,11 @@ ends in one of these states:
 * ``passed`` -- the check ran and found nothing wrong.
 * ``failed`` -- it found at least one error (blocks submission).
 * ``warning`` -- it found only advisory problems.
+* ``suggestion`` -- it found only stylistic points a reasonable editor could
+  leave as they are (repetitive word choice, a spelled-out number). They are
+  not counted with the warnings, and the terminal report shows only how many
+  there are unless ``--suggestions`` is given; ``--strict-style`` reports them
+  as warnings instead.
 * ``unchecked`` -- it applies, but could not run here: switched off by a flag,
   a tool or optional package is missing, or the file could not be read.
 * ``needs_ai`` -- it can only be judged by reading the files the way a person
@@ -20,13 +25,14 @@ ends in one of these states:
 
 The rest of this module renders a report for the terminal (with :mod:`rich`)
 and saves it as PDF, HTML, Markdown, or plain text (see :func:`save`). Colours
-follow the status: green for passed, red for failed, amber for warnings,
-purple for checks that need AI, and grey for checks that could not run or are
-not implemented (a check that could not run says why on the line below it).
-``alt_color`` (``paperpush validate --colorblind``) swaps in a colour-blind-safe
-palette (blue / vermillion / dark yellow / reddish purple / grey, after Okabe
-and Ito), and every line also carries a text marker so the status never
-depends on colour alone.
+follow the status: green for passed, red for failed, amber for warnings, blue
+for suggestions, purple for checks that need AI, and grey for checks that could
+not run or are not implemented (a check that could not run says why on the line
+below it). ``alt_color`` (``paperpush validate --colorblind``) swaps in a
+colour-blind-safe palette (blue / vermillion / dark yellow / bluish green /
+reddish purple / grey, after Okabe and Ito; blue is taken by passed there, so
+suggestions are bluish green), and every line also carries a text marker so
+the status never depends on colour alone.
 """
 
 from __future__ import annotations
@@ -45,17 +51,19 @@ logger = logging.getLogger(__name__)
 PASSED = "passed"
 FAILED = "failed"
 WARNING = "warning"
+SUGGESTION = "suggestion"
 UNCHECKED = "unchecked"
 NEEDS_AI = "needs_ai"
 NOT_IMPLEMENTED = "not_implemented"
 NOT_APPLICABLE = "not_applicable"
 
-STATUSES = (FAILED, WARNING, UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED, PASSED, NOT_APPLICABLE)
+STATUSES = (FAILED, WARNING, SUGGESTION, UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED, PASSED, NOT_APPLICABLE)
 
 # Section headings, in the order the report shows them.
 _HEADINGS = {
     FAILED: "Failed",
     WARNING: "Warnings",
+    SUGGESTION: "Suggestions (style)",
     UNCHECKED: "Not checked: could not run",
     NEEDS_AI: "Not checked: needs AI",
     NOT_IMPLEMENTED: "Not checked: not implemented",
@@ -64,8 +72,8 @@ _HEADINGS = {
 }
 # Markers for the terminal, HTML, and Markdown, and the ASCII ones the PDF's
 # standard fonts can draw.
-_MARKS = {FAILED: "✖", WARNING: "▲", UNCHECKED: "?", NEEDS_AI: "?", NOT_IMPLEMENTED: "–", PASSED: "✔", NOT_APPLICABLE: "·"}
-_ASCII_MARKS = {FAILED: "[FAIL]", WARNING: "[WARN]", UNCHECKED: "[SKIP]", NEEDS_AI: "[AI]", NOT_IMPLEMENTED: "[TODO]", PASSED: "[PASS]", NOT_APPLICABLE: "[NA]"}
+_MARKS = {FAILED: "✖", WARNING: "▲", SUGGESTION: "✎", UNCHECKED: "?", NEEDS_AI: "?", NOT_IMPLEMENTED: "–", PASSED: "✔", NOT_APPLICABLE: "·"}
+_ASCII_MARKS = {FAILED: "[FAIL]", WARNING: "[WARN]", SUGGESTION: "[HINT]", UNCHECKED: "[SKIP]", NEEDS_AI: "[AI]", NOT_IMPLEMENTED: "[NOT IMPLEMENTED]", PASSED: "[PASS]", NOT_APPLICABLE: "[NA]"}
 
 
 @dataclass(frozen=True)
@@ -79,12 +87,14 @@ class Palette:
     needs_ai: str
     not_implemented: str
     muted: str
+    suggestion: str
 
     def for_status(self, status: str) -> str:
         return {
             PASSED: self.passed,
             FAILED: self.failed,
             WARNING: self.warning,
+            SUGGESTION: self.suggestion,
             UNCHECKED: self.unchecked,
             NEEDS_AI: self.needs_ai,
             NOT_IMPLEMENTED: self.not_implemented,
@@ -92,15 +102,16 @@ class Palette:
         }[status]
 
 
-# Green / red / amber / purple / grey, dark enough to read on white paper. The
+# Green / red / amber / blue / purple / grey, dark enough to read on white paper. The
 # two "not checked" greys differ only in weight: a check that could not run is
 # a shade darker than one paperpush has not implemented, and both are darker
 # than a not-applicable one. (The same colours as the web page's.)
-DEFAULT_PALETTE = Palette(passed="#1a7f37", failed="#cf222e", warning="#b35900", unchecked="#57606a", needs_ai="#8250df", not_implemented="#6e7781", muted="#8c959f")
-# Okabe-Ito blue and vermillion, dark yellow for warnings, reddish purple for
-# needs AI, and grey for the rest: distinguishable under the common forms of
-# colour-blindness. (Same hues as the web page's colour-blind theme.)
-ALT_PALETTE = Palette(passed="#0072b2", failed="#d55e00", warning="#8a6d00", unchecked="#555555", needs_ai="#aa3377", not_implemented="#666666", muted="#999999")
+DEFAULT_PALETTE = Palette(passed="#1a7f37", failed="#cf222e", warning="#b35900", unchecked="#57606a", needs_ai="#8250df", not_implemented="#6e7781", muted="#8c959f", suggestion="#0969da")
+# Okabe-Ito blue and vermillion, dark yellow for warnings, bluish green for
+# suggestions (blue is passed here), reddish purple for needs AI, and grey for
+# the rest: distinguishable under the common forms of colour-blindness. (Same
+# hues as the web page's colour-blind theme.)
+ALT_PALETTE = Palette(passed="#0072b2", failed="#d55e00", warning="#8a6d00", unchecked="#555555", needs_ai="#aa3377", not_implemented="#666666", muted="#999999", suggestion="#007a5c")
 
 
 def palette(alt_color: bool = False) -> Palette:
@@ -164,6 +175,10 @@ class ValidationReport:
     # warning (``downgraded`` of them).
     initial_submission: bool = False
     downgraded: int = 0
+    # Validated with --strict-style: every suggestion was turned into a
+    # warning (``promoted`` of them).
+    strict_style: bool = False
+    promoted: int = 0
     # Validated with --ai-only: only the checks that need AI were reported.
     ai_only: bool = False
     # What was validated: "" (a .sub), "files" (files named for a venue, no
@@ -199,7 +214,12 @@ class ValidationReport:
 
     @property
     def warnings(self) -> list["Issue"]:
-        return [i for i in self.issues() if not i.is_error]
+        """Every issue that is neither an error nor a suggestion (including the "not checked" messages)."""
+        return [i for i in self.issues() if not i.is_error and not getattr(i, "is_suggestion", False)]
+
+    @property
+    def suggestions(self) -> list["Issue"]:
+        return [i for i in self.issues() if getattr(i, "is_suggestion", False)]
 
     @property
     def ok(self) -> bool:
@@ -221,6 +241,8 @@ class ValidationReport:
             "initial_submission_rule": self.initial_submission_rule,
             "initial_submission": self.initial_submission,
             "downgraded": self.downgraded,
+            "strict_style": self.strict_style,
+            "promoted": self.promoted,
             "ai_only": self.ai_only,
             "scope": self.scope,
             "files": self.files,
@@ -245,10 +267,15 @@ class _Line:
 
 
 def _summary_line(report: ValidationReport) -> list[tuple[str, str]]:
-    """``(status, "N passed")`` pairs for the summary line under the verdict."""
+    """``(status, "N passed")`` pairs for the summary line under the verdict.
+
+    Passed, failed, and warnings are always shown ("0 failed" is the line a
+    reader looks for); the other counts are left out when they are 0.
+    """
     counts = report.counts()
-    labels = [(PASSED, "passed"), (FAILED, "failed"), (WARNING, "with warnings"), (UNCHECKED, "could not run"), (NEEDS_AI, "need AI"), (NOT_IMPLEMENTED, "not implemented")]
-    return [(status, f"{counts[status]} {label}") for status, label in labels]
+    labels = [(PASSED, "passed"), (FAILED, "failed"), (WARNING, "with warnings"), (SUGGESTION, "with suggestions"), (UNCHECKED, "could not run"), (NEEDS_AI, "need AI"), (NOT_IMPLEMENTED, "not implemented")]
+    always = (PASSED, FAILED, WARNING)
+    return [(status, f"{counts[status]} {label}") for status, label in labels if counts[status] or status in always]
 
 
 def _ai_hint(report: ValidationReport) -> str:
@@ -297,18 +324,22 @@ def initial_submission_notes(report: ValidationReport) -> list[str]:
 NOT_CHECKED = frozenset({UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED})
 
 
-def hidden_statuses(*, errors_only: bool = False, hide_warnings: bool = False, hide_unchecked: bool = False) -> frozenset[str]:
+def hidden_statuses(*, errors_only: bool = False, hide_warnings: bool = False, hide_unchecked: bool = False, hide_suggestions: bool = False) -> frozenset[str]:
     """The statuses to leave out of the report, from validate's display flags.
 
     ``errors_only`` keeps only the failed checks; ``hide_warnings`` drops the
     warnings; ``hide_unchecked`` drops every "Not checked" section (could not
-    run, needs AI, not implemented).
+    run, needs AI, not implemented); ``hide_suggestions`` drops the
+    suggestions (the terminal does unless ``--suggestions`` is given), and the
+    suggestions listed under other checks.
     """
     if errors_only:
         return frozenset(s for s in STATUSES if s != FAILED)
     hide: set[str] = set()
     if hide_warnings:
         hide.add(WARNING)
+    if hide_suggestions:
+        hide.add(SUGGESTION)
     if hide_unchecked:
         hide |= NOT_CHECKED
     return frozenset(hide)
@@ -318,7 +349,11 @@ def _hidden_note(report: ValidationReport, hide: frozenset[str]) -> str:
     """Say which sections the display flags left out, and how many checks each held."""
     parts = []
     for status in STATUSES:
-        if status in hide:
+        if status == SUGGESTION and status in hide:
+            n = len(report.suggestions)
+            if n:
+                parts.append(f"{n} suggestion(s) on style (show them with --suggestions)")
+        elif status in hide:
             n = len(report.by_status(status))
             if n:
                 parts.append(f"{_HEADINGS[status]} ({n})")
@@ -336,7 +371,8 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
     lines += [_Line("meta", f"Checked: {path}") for path in report.files]
     lines.append(_Line("meta", f"Venue: {'none (general checks only)' if report.scope == 'general' else report.venue}"))
     lines.append(_Line("meta", _ai_hint(report)))
-    lines += [_Line("notice", text, status=WARNING) for text in scope_notes(report) + report.notes + initial_submission_notes(report)]
+    style = [f"Validated with --strict-style: {report.promoted} suggestion(s) on style shown as warnings."] if report.strict_style else []
+    lines += [_Line("notice", text, status=WARNING) for text in scope_notes(report) + report.notes + initial_submission_notes(report) + style]
     verdict = "Ready to submit: no blocking errors." if report.ok else f"Not ready: {len(report.errors)} error(s) must be fixed before submitting."
     if report.scope:
         verdict = "No errors in the files checked." if report.ok else f"{len(report.errors)} error(s) in the files checked."
@@ -370,8 +406,9 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
                 continue
             for issue in result.issues:
                 where = f"[{issue.field}] " if issue.field else ""
-                level = "error" if issue.is_error else ("not checked" if getattr(issue, "unchecked", False) else "warning")
-                item_status = FAILED if issue.is_error else (UNCHECKED if getattr(issue, "unchecked", False) else WARNING)
+                suggestion = getattr(issue, "is_suggestion", False)
+                level = "error" if issue.is_error else ("not checked" if getattr(issue, "unchecked", False) else "suggestion" if suggestion else "warning")
+                item_status = FAILED if issue.is_error else (UNCHECKED if getattr(issue, "unchecked", False) else SUGGESTION if suggestion else WARNING)
                 if status in (UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED):
                     item_status = status
                 if item_status in hide:

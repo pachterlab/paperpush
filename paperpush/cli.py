@@ -1494,10 +1494,13 @@ def _report_validation(subfile, venue_def, subfile_path: str, *, network: bool =
     skipped = "the sensitive-data scan" if network else "the link, reference, and OpenReview lookups and the sensitive-data scan"
     print(f"note: submit skipped {skipped}; 'paperpush validate' runs them" + ("." if network else ", or add --enable-network-checks for the lookups."), file=sys.stderr)
     errors = [i for i in issues if i.is_error]
-    warnings = [i for i in issues if not i.is_error]
+    warnings = [i for i in issues if not i.is_error and not i.is_suggestion]
+    suggestions = [i for i in issues if i.is_suggestion]
     for issue in warnings:
         where = f"[{issue.field}] " if issue.field else ""
         print(f"warning: {where}{issue.message}", file=sys.stderr)
+    if suggestions:
+        print(f"note: {len(suggestions)} suggestion(s) on style; 'paperpush validate --suggestions' lists them.", file=sys.stderr)
     if errors:
         logger.warning("validation failed for %s: %d error(s)", venue_def.slug, len(errors))
         print(f"\nerror: {len(errors)} problem(s) in {subfile_path} must be " "fixed before submitting:", file=sys.stderr)
@@ -1839,7 +1842,11 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         errors_only=getattr(args, "errors_only", False),
         hide_warnings=getattr(args, "hide_warnings", False),
         hide_unchecked=getattr(args, "hide_unchecked", False),
+        hide_suggestions=getattr(args, "hide_suggestions", False),
     )
+    # The terminal shows only how many suggestions there are, unless asked;
+    # the report saved with -o lists them.
+    terminal_hide = hide if getattr(args, "suggestions", False) else hide | {report_mod.SUGGESTION}
     json_out = getattr(args, "json_out", None)
     # With the JSON on stdout, the notes below go to stderr so stdout stays parseable.
     note_stream = sys.stderr if json_out == "-" else sys.stdout
@@ -1847,7 +1854,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         # Machine-readable report on stdout instead of the coloured one.
         print(json.dumps(result.to_dict(), indent=2))
     else:
-        report_mod.print_report(result, alt_color=alt, hide=hide)
+        report_mod.print_report(result, alt_color=alt, hide=terminal_hide)
     if json_out and json_out != "-":
         json_path = Path(json_out).expanduser()
         try:
@@ -2237,7 +2244,7 @@ def _cmd_prepare_submission(args: argparse.Namespace) -> int:
         result = validate_report_for(subfile, venue, str(sub_path), ai=ai, progress=progress, **check_flags)
     result.command = shlex.join(["paperpush", *getattr(args, "raw_argv", sys.argv[1:])])
     result.cwd = os.getcwd()
-    report_mod.print_report(result)
+    report_mod.print_report(result, hide=frozenset({report_mod.SUGGESTION}))
     fix_hint = f"Fix them (the paperpush-fix skill can do much of it), then run 'paperpush validate {shlex.quote(str(sub_path))}', or this command again."
     if result.errors:
         print(f"\n{len(result.errors)} error(s) block the submission. {fix_hint}", file=sys.stderr)
@@ -3296,6 +3303,12 @@ def _add_check_options(parser: argparse.ArgumentParser, *, documented: bool = Tr
         help="validate this as an initial submission: every error is reported as a warning, so nothing blocks it. Meant for venues whose guidelines let the initial submission be in any format (the report names the rule at the top when the venue has one; see 'paperpush requirements VENUE').",
     )
     add(
+        "--strict-style",
+        dest="strict_style",
+        action="store_true",
+        help="report the suggestions on style (repetitive word choice, spelled-out numbers, abbreviations or headings written more than one way, double spaces) as warnings, for an author or venue that wants the house style enforced. Without it they are suggestions: listed, but not counted with the warnings.",
+    )
+    add(
         "--cover-letter-max-age",
         dest="cover_letter_max_age",
         type=int,
@@ -3315,6 +3328,7 @@ def _check_flags(args: argparse.Namespace) -> dict:
         "enable": enable,
         "check_anonymous": getattr(args, "check_anonymous", None),
         "initial_submission": getattr(args, "initial_submission", False),
+        "strict_style": getattr(args, "strict_style", False),
         "cover_letter_max_age_days": getattr(args, "cover_letter_max_age", 7),
         "references_alphabetical": getattr(args, "references_alphabetical", False),
         "references_citation_order": getattr(args, "references_citation_order", False),
@@ -3465,7 +3479,9 @@ def build_parser() -> argparse.ArgumentParser:
     display_group.add_argument("--show-errors-only", dest="errors_only", action="store_true", help="show only the failed checks and their errors; overrides --hide-warnings and --hide-unchecked")
     display_group.add_argument("--hide-warnings", dest="hide_warnings", action="store_true", help="leave out the warnings section, and the warnings listed under failed checks")
     display_group.add_argument("--hide-unchecked", dest="hide_unchecked", action="store_true", help="leave out the checks that were not run: could not run, needs AI, and not implemented")
-    p_validate.add_argument("--colorblind", "--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours in the terminal and saved report: blue for passed, vermillion for failed, dark yellow for warnings, reddish purple for needs AI, grey for could not run / not implemented (the same palette as the web app's \"Colorblind-friendly colors\" setting). --alt-color is an older name for it")
+    display_group.add_argument("--suggestions", dest="suggestions", action="store_true", help="list the suggestions on style (repetitive word choice, spelled-out numbers, ...) in the terminal too; by default the terminal shows only how many there are, and the report saved with -o lists them")
+    display_group.add_argument("--hide-suggestions", dest="hide_suggestions", action="store_true", help="leave the suggestions on style out of the report saved with -o as well")
+    p_validate.add_argument("--colorblind", "--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours in the terminal and saved report: blue for passed, vermillion for failed, dark yellow for warnings, bluish green for suggestions, reddish purple for needs AI, grey for could not run / not implemented (the same palette as the web app's \"Colorblind-friendly colors\" setting). --alt-color is an older name for it")
     p_validate.add_argument(
         "--ai",
         action="store_true",
