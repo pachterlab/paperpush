@@ -159,6 +159,20 @@ SECTION_TITLES: dict[str, str] = {
     "attestations": "Attestations",
 }
 
+# Headings that differ for a data repository's .sub, which describes a data
+# deposit rather than a manuscript.
+DATA_REPOSITORY_SECTION_TITLES: dict[str, str] = {
+    "type": "Deposit type",
+    "metadata": "Deposit details",
+}
+
+
+def section_title(section: str, venue_type: str = "") -> str:
+    """The .sub heading for ``section`` in a venue of ``venue_type``."""
+    if venue_type == "data_repository" and section in DATA_REPOSITORY_SECTION_TITLES:
+        return DATA_REPOSITORY_SECTION_TITLES[section]
+    return SECTION_TITLES[section]
+
 
 @dataclass(frozen=True)
 class ConditionalLimit:
@@ -492,8 +506,8 @@ class VenueInfo:
     name: Annotated[str, PField(description="Display name. Defaults to the slug when omitted.")] = ""
     full_name: Annotated[str, PField(description="Full, unabbreviated venue name.")] = ""
     venue_type: Annotated[
-        Literal["preprint", "journal", "conference"],
-        PField(description="Kind of venue: a preprint server, a journal, or a conference."),
+        Literal["preprint", "journal", "conference", "data_repository"],
+        PField(description="Kind of venue: a preprint server, a journal, a conference, or a data repository (a database that takes data deposits, such as Zenodo or GEO)."),
     ] = "journal"
     # Double-blind review: reviewers must not learn who the authors are. When
     # set, ``paperpush validate`` scans the attachments (and any linked

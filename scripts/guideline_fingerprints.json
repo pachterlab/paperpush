@@ -4,6 +4,16 @@
     "recorded": "2026-11-11",
     "sha256": "d9710646dff4ebf0e5e3972649b8f08294b429ddc6ba49f365eb91e47cb888c6"
   },
+  "https://about.zenodo.org/policies/": {
+    "chars": 5219,
+    "recorded": "2026-11-14",
+    "sha256": "83b69a16fadbf2241bf7350f849ef2d146d3f8aba357fc93bb4b92cf093173cc"
+  },
+  "https://about.zenodo.org/terms/": {
+    "chars": 3260,
+    "recorded": "2026-11-14",
+    "sha256": "1a270fcd4bdf02a6df805dccdab4af61229f26d04b6c6584fc9295282f2265ec"
+  },
   "https://aclrollingreview.org/authorchecklist": {
     "chars": 10657,
     "recorded": "2026-10-23",
@@ -59,6 +69,16 @@
     "recorded": "2026-11-01",
     "sha256": "af22fc8fdd3103591700a3b07a9a6f673e7acfff81db61b5cf732102cf0a1d0c"
   },
+  "https://data.caltech.edu/terms": {
+    "chars": 8592,
+    "recorded": "2026-11-14",
+    "sha256": "b0b2a7a4e6d5aecfc4a106b22900f9b093e9d6f6751762026f1c14996ac30b1c"
+  },
+  "https://developers.zenodo.org/": {
+    "chars": 57101,
+    "recorded": "2026-11-14",
+    "sha256": "e7c5d6e3bb64413c8f2142701ba0478e89119f823e6e2e3c503b2a43a6bbb93b"
+  },
   "https://elife-rp.msubmit.net/html/elife-rp_author_instructions.html": {
     "chars": 3578,
     "recorded": "2026-10-23",
@@ -98,6 +118,96 @@
     "chars": 3736,
     "recorded": "2026-11-01",
     "sha256": "93ab2889cd504019db11e40eb5aaa1923ab939b5d89b34621f2ca41aab53d311"
+  },
+  "https://help.zenodo.org/docs/deposit/about-records/": {
+    "chars": 3771,
+    "recorded": "2026-11-14",
+    "sha256": "cdbfe864eb51620bb212a81188d24afe1f3bf6d19ece8af9fa0abaccb6e788b9"
+  },
+  "https://help.zenodo.org/docs/deposit/create-new-upload/": {
+    "chars": 4776,
+    "recorded": "2026-11-14",
+    "sha256": "28fc934dd4e0075056d723878e3c9fa7fd74ec024fbb233d66722fb67b373d53"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/": {
+    "chars": 1282,
+    "recorded": "2026-11-14",
+    "sha256": "e7879ad1a05c01c8a1224498890bbb3662e5adaa706e908477050a0b82242d11"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/contributors/": {
+    "chars": 1288,
+    "recorded": "2026-11-14",
+    "sha256": "ed7c8eff4a12f1b2825e18284e3548aad66e63c50a2fc476274c03dc09b5747c"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/creators/": {
+    "chars": 2410,
+    "recorded": "2026-11-14",
+    "sha256": "4b628195309be8d0356cf35844a9c5a8b0d15f684687ed32ad1fc6bb913d0b1b"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/descriptions/": {
+    "chars": 1118,
+    "recorded": "2026-11-14",
+    "sha256": "ed66bf68d4e97ca494d93866633f6edce80429fdb2b43c738fc7f43a3973f239"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/funding/": {
+    "chars": 1821,
+    "recorded": "2026-11-14",
+    "sha256": "c76f5c525c9da57aff151b57dfcdca6c6b92b2d64a33bc558efbf48c0fe09448"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/keywords-and-subjects/": {
+    "chars": 1381,
+    "recorded": "2026-11-14",
+    "sha256": "6636a31150183222199ef2b6b99bf965d4a86118a3d8b9192f027cc175078ae1"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/licenses/": {
+    "chars": 1730,
+    "recorded": "2026-11-14",
+    "sha256": "b86e2d02169372e6f341adba7a914891ddbc9424fb58daf3ac485dd57deeb96f"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/publication-date/": {
+    "chars": 1349,
+    "recorded": "2026-11-14",
+    "sha256": "7a1d2b147af0aa5b670d417a23e1fef5bd621565b10f5ae92bf83dbb71f3c413"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/publisher/": {
+    "chars": 630,
+    "recorded": "2026-11-14",
+    "sha256": "0393cee44c5fd9491f7835a4865c6fcbef525f210f46ef43c19f55ff821747ad"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/reserve-doi/": {
+    "chars": 2372,
+    "recorded": "2026-11-14",
+    "sha256": "70c73eff66f7c35dd951d7f93d52ef332474bdccc79fc5374b71a5db31aa3417"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/resource-type/": {
+    "chars": 1694,
+    "recorded": "2026-11-14",
+    "sha256": "57e3ee22a99472417318936a2f76c3d8bd942210ccb33c6c627031d769a1f022"
+  },
+  "https://help.zenodo.org/docs/deposit/describe-records/titles/": {
+    "chars": 974,
+    "recorded": "2026-11-14",
+    "sha256": "a74d1dba5b827b26488c888e327c72b11ad904e4394a0a79befdc53fbda254d4"
+  },
+  "https://help.zenodo.org/docs/deposit/manage-files/": {
+    "chars": 3600,
+    "recorded": "2026-11-14",
+    "sha256": "d339617a7c15ebefcc129efb2f10c9e481022000292a4b68afdcb9d4f2e81207"
+  },
+  "https://help.zenodo.org/docs/deposit/manage-quota/": {
+    "chars": 2086,
+    "recorded": "2026-11-14",
+    "sha256": "60ae48a776c51fd188720fd6d1cb6b9f8cc2b5ea0994769905720df79ed15868"
+  },
+  "https://help.zenodo.org/docs/deposit/manage-records/": {
+    "chars": 2406,
+    "recorded": "2026-11-14",
+    "sha256": "cbf704c5caead45141d63cf0af4b9bf519623017ad0fda6cf1fd77685543fe67"
+  },
+  "https://help.zenodo.org/docs/deposit/manage-versions/": {
+    "chars": 2036,
+    "recorded": "2026-11-14",
+    "sha256": "709782abdbb8d58d3a6d31bc9351a473ca229aec47d6a2bb435705f4a6f37185"
   },
   "https://iclr.cc/Conferences/2027/AuthorGuidelines": {
     "chars": 25463,
@@ -353,6 +463,81 @@
     "chars": 8898,
     "recorded": "2026-11-04",
     "sha256": "faa5657ed7c0284b186edafa71bf3bfb4f882d3ec1040ad5ad16a1697f9d58fb"
+  },
+  "https://libanswers.caltech.edu/faq/146996": {
+    "chars": 1247,
+    "recorded": "2026-11-14",
+    "sha256": "5d51579eb09892f5ad7fc3e83a270934ab09141a7b4dada5db095da07a3b5a67"
+  },
+  "https://libanswers.caltech.edu/faq/163208": {
+    "chars": 851,
+    "recorded": "2026-11-14",
+    "sha256": "b543ec821e3cc07b0d34920f44a623c90ba7ac8355ab661d59e9705f174a148c"
+  },
+  "https://libanswers.caltech.edu/faq/163209": {
+    "chars": 648,
+    "recorded": "2026-11-14",
+    "sha256": "d30854a0f51b47b2419b9892150aa8e02f08c19ff06836c566336eb0db2424b3"
+  },
+  "https://libanswers.caltech.edu/faq/163211": {
+    "chars": 835,
+    "recorded": "2026-11-14",
+    "sha256": "609844ca4c103f96ffc09720496dc140e8404059d5311387234c767ed338bc3e"
+  },
+  "https://libanswers.caltech.edu/faq/163212": {
+    "chars": 1012,
+    "recorded": "2026-11-14",
+    "sha256": "16bc04cabe50cd683a68e8b15839467d70029d39f0aab263971af934d869ed0d"
+  },
+  "https://libanswers.caltech.edu/faq/163214": {
+    "chars": 791,
+    "recorded": "2026-11-14",
+    "sha256": "1ac7d0c4b3803246adc12a40ef83296517d05ecaa29188bbbf02b5491dcd2462"
+  },
+  "https://libanswers.caltech.edu/faq/163215": {
+    "chars": 713,
+    "recorded": "2026-11-14",
+    "sha256": "210a96f985d18a51c9d58a25a64fb6ea06ae32ef9124d24764ba565f4e3f93e2"
+  },
+  "https://libanswers.caltech.edu/faq/163217": {
+    "chars": 749,
+    "recorded": "2026-11-14",
+    "sha256": "e175937877f78bf1ba374026dba2118aa9b4496eab52a0e83a7848a26350a69e"
+  },
+  "https://libanswers.caltech.edu/faq/192438": {
+    "chars": 864,
+    "recorded": "2026-11-14",
+    "sha256": "41607d48e98e07c7ef92c615ca198e4638bea01ff34db4919d443b8a3d24f347"
+  },
+  "https://libanswers.caltech.edu/faq/240347": {
+    "chars": 825,
+    "recorded": "2026-11-14",
+    "sha256": "164e68b8f01bb415207193a60032cb731d727d79706120aff032810b0ab01122"
+  },
+  "https://libanswers.caltech.edu/faq/262131": {
+    "chars": 1048,
+    "recorded": "2026-11-14",
+    "sha256": "d2cdf515154ac1c8bffcadbb05b7cd7a3aaccbcd5043c6c422c84f1ee6d3f419"
+  },
+  "https://libanswers.caltech.edu/faq/271978": {
+    "chars": 1950,
+    "recorded": "2026-11-14",
+    "sha256": "e9b34c728ad65df5921d146fdc7fac9ce23c9f3be1ccd4628e10b9693bb3e5f1"
+  },
+  "https://library.caltech.edu/c.php?g=1237965&p=9059086": {
+    "chars": 3970,
+    "recorded": "2026-11-14",
+    "sha256": "1bb4f34c25741d7f0c37642a86a04dee250d69fe009dff35367632d86389621c"
+  },
+  "https://library.caltech.edu/publish/data": {
+    "chars": 5351,
+    "recorded": "2026-11-14",
+    "sha256": "97f2564b48fce940cbabe4a9828099229d5c43c683ea8212d9072d313cdecc19"
+  },
+  "https://library.caltech.edu/search/caltechdata": {
+    "chars": 8592,
+    "recorded": "2026-11-14",
+    "sha256": "b0b2a7a4e6d5aecfc4a106b22900f9b093e9d6f6751762026f1c14996ac30b1c"
   },
   "https://link.springer.com/journal/10278/submission-guidelines": {
     "chars": 59863,
@@ -1223,6 +1408,81 @@
     "chars": 21751,
     "recorded": "2026-11-04",
     "sha256": "6c0db58ba7f36e7a11d53ef775a36c8f965335be6e1b87743930af8972fa1d93"
+  },
+  "https://www.ncbi.nlm.nih.gov/bioproject/docs/faq/": {
+    "chars": 11127,
+    "recorded": "2026-11-14",
+    "sha256": "bedd5d3aa3c8590923d5d857fba9eb3544853d7abcb9c7c023bab54d095db361"
+  },
+  "https://www.ncbi.nlm.nih.gov/biosample/docs/packages/": {
+    "chars": 13254,
+    "recorded": "2026-11-14",
+    "sha256": "1d54f54cf736f74084c9ffa7cee48c04172bd93bcc38f333baa5396abea8de14"
+  },
+  "https://www.ncbi.nlm.nih.gov/biosample/docs/submission/faq/": {
+    "chars": 6673,
+    "recorded": "2026-11-14",
+    "sha256": "d467b3e1bb6d65d3b12cf4276d590f4b4fd9acf0c2386052dd480e5bac05a0bc"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/sra-data-submission-standards/": {
+    "chars": 6702,
+    "recorded": "2026-11-14",
+    "sha256": "36aabb2f1d18fcfbf7a687a2155504d86f61cf698cf1c1e216f074da40730017"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submit/": {
+    "chars": 3916,
+    "recorded": "2026-11-14",
+    "sha256": "5ac651ad66094a12e890c2d2460691ab6a79484d70efdeaa4ffc3814ec0faddd"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submitbio/": {
+    "chars": 6846,
+    "recorded": "2026-11-14",
+    "sha256": "b4ac030e51b0bce400972e4a1078e6461191b6341fe1c804b183723d0d9ce73d"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submitdbgap/": {
+    "chars": 13260,
+    "recorded": "2026-11-14",
+    "sha256": "b98bd132f7c04f2ef510f8f8dba250686d98262e65d3bceb0c4adc7ce053d706"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submitfiles/": {
+    "chars": 7096,
+    "recorded": "2026-11-14",
+    "sha256": "cf9a117f31a3b7c7f822f795aaf44128435f7ea425c8a9c40d74e6277bb6af3f"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submitformats/": {
+    "chars": 17979,
+    "recorded": "2026-11-14",
+    "sha256": "8b27cd1b3a7ea2e6cf27bbb7666bc6398095f2eec75162306931d428e5f99992"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submitmeta/": {
+    "chars": 4386,
+    "recorded": "2026-11-14",
+    "sha256": "343ef10143c8da9df11a790783dfa86075415e104c2fb51e236a0945beeab383"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submitportal/": {
+    "chars": 11476,
+    "recorded": "2026-11-14",
+    "sha256": "a612466466dbe1c4bc5fc1a95f1c4d7b6364d29511ecfb6660e80247f3cfb694"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submitquestions/": {
+    "chars": 8629,
+    "recorded": "2026-11-14",
+    "sha256": "ee3e84275ec63c920688446b25860dd7853918252350a592e71501a5d442ac0e"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submitspfiles/": {
+    "chars": 11883,
+    "recorded": "2026-11-14",
+    "sha256": "1b1702eb7594769e45aca9463ff1751d4f8eabb6443e2269c746245bfb7cad9d"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submitsra/": {
+    "chars": 2627,
+    "recorded": "2026-11-14",
+    "sha256": "ae1f94ad5e6822a6b70e30dfe28b534b13026ab09d250b0b062affbad16b5ab2"
+  },
+  "https://www.ncbi.nlm.nih.gov/sra/docs/submitupdate/": {
+    "chars": 5175,
+    "recorded": "2026-11-14",
+    "sha256": "1b66b4b1b2fa6c5a6ea3b10df18e0a98a357b0909b6969be15d909ebb7255bf8"
   },
   "https://www.nejm.org/author-center/article-types": {
     "chars": 1527,

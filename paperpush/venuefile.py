@@ -635,7 +635,7 @@ def _rule(title: str, subtitle: str) -> list[str]:
 _HEADER = """\
 paperpush venue file  -*- mode: yaml -*-
 
-Describes one venue (journal, preprint server, or conference) for paperpush.
+Describes one venue (journal, preprint server, conference, or data repository) for paperpush.
 Fill it in, then add it with:   paperpush add-venue {filename}
 
   [venue]                       -> venues.json: the list of venues

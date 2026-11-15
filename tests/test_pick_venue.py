@@ -532,3 +532,9 @@ def test_mcp_pick_venue_needs_input():
 
     with pytest.raises(ValueError):
         pick_venue()
+
+
+def test_data_repositories_only_when_asked_for():
+    corpus = [_venue("genbio", keywords=["genetics"]), _venue("geo", venue_type="data_repository", keywords=["genetics"])]
+    assert [h.venue.slug for h in pick_venues(subjects=["genetics"], venues=corpus)] == ["genbio"]
+    assert [h.venue.slug for h in pick_venues(subjects=["genetics"], venue_types=("data_repository",), venues=corpus)] == ["geo"]

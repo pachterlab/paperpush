@@ -260,6 +260,15 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 | [ACL Rolling Review](https://aclrollingreview.org) | `acl_arr` | ✅ |  |
 | [CVPR 2027](https://cvpr.thecvf.com/Conferences/2027) | `cvpr_2027` | ✅ |  |
 | [NAACL 2027 Demo Track](https://2027.naacl.org) | `naacl_2027_demo` | ✅ | ✅ |
+
+**Data repositories**
+
+| Venue | Slug | Validate + basic .sub | Submit + full .sub |
+| --- | --- | :---: | :---: |
+| [CaltechDATA](https://data.caltech.edu) | `caltechdata` | ✅ |  |
+| [GEO](https://www.ncbi.nlm.nih.gov/geo/) | `geo` | ✅ |  |
+| [SRA](https://www.ncbi.nlm.nih.gov/sra) | `sra` | ✅ |  |
+| [Zenodo](https://zenodo.org) | `zenodo` | ✅ |  |
 <!-- END SUPPORTED VENUES -->
 
 View the list on the command line with `paperpush venues`. See more information on major conferences at [conference-agent](https://conferenceagent.vercel.app).

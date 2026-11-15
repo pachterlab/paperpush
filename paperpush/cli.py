@@ -84,6 +84,7 @@ _VENUE_GROUPS = [
     ("preprint", "Preprint servers"),
     ("journal", "Journals"),
     ("conference", "Conferences"),
+    ("data_repository", "Data repositories"),
 ]
 
 _VENUES_URL = "https://github.com/pachterlab/paperpush/blob/main/venues.md"
@@ -127,7 +128,7 @@ def _validate_only_message(venue: Venue) -> str:
     return _GENERAL_NO_SUBMIT if venue.is_general else f"{venue.slug} is validate-only: {_VALIDATE_ONLY}"
 
 
-_TYPE_LABELS = {venue_type: heading.removesuffix("s").removesuffix(" server") for venue_type, heading in _VENUE_GROUPS}
+_TYPE_LABELS = {"preprint": "Preprint", "journal": "Journal", "conference": "Conference", "data_repository": "Data repository"}
 _CHECK = "\u2713"
 
 
@@ -2738,8 +2739,11 @@ def _print_autofill_summary(result, extraction, venue, out_path, dry_run: bool) 
         print(f"\nFinish the items above in {out_path}, then run")
     else:
         print(f"\nNext: review {out_path}, then run")
-    print(f"  paperpush login {venue.slug}")
-    print(f"  paperpush submit {out_path}")
+    if venue.supports_submit:
+        print(f"  paperpush login {venue.slug}")
+        print(f"  paperpush submit {out_path}")
+    else:
+        print(f"  paperpush validate {out_path}")
 
 
 def _find_document(candidates: list[Path], search_dirs: list[Path], explicit: str | None, stems: tuple[str, ...]) -> Path | None:
@@ -3368,7 +3372,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_venues.add_argument("--validate", action="store_true", help="only venues paperpush can validate a manuscript against")
     p_venues.add_argument("--submit", action="store_true", help="only venues paperpush can submit to")
     p_venues.add_argument("-k", "--keywords", metavar="KW[,KW...]", help="only venues tagged with any of these comma-separated subject keywords (e.g. 'medicine,biology,bioinformatics')")
-    p_venues.add_argument("-t", "--type", dest="types", action="append", choices=[t for t, _ in _VENUE_GROUPS], metavar="TYPE", help="only venues of this kind: preprint, journal, or conference (repeatable)")
+    p_venues.add_argument("-t", "--type", dest="types", action="append", choices=[t for t, _ in _VENUE_GROUPS], metavar="TYPE", help="only venues of this kind: preprint, journal, conference, or data_repository (repeatable)")
     p_venues.add_argument("--columns", metavar="COL[,COL...]", help=f"show only these comma-separated columns, in this order (from: {', '.join(_VENUE_COLUMNS)}; rank and deadline are shown only when named here)")
     p_venues.add_argument("--hide-columns", dest="hide_columns", metavar="COL[,COL...]", help="hide these comma-separated columns")
     p_venues.set_defaults(func=_cmd_venues)

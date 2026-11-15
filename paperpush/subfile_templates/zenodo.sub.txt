@@ -1,0 +1,122 @@
+# paperpush submission file for zenodo  -*- mode: yaml -*-
+# Zenodo
+#
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate zenodo.sub.txt`
+# Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web zenodo.sub.txt   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
+#
+# To fill this out with AI from your manuscript files:
+#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill zenodo.sub.txt
+#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR zenodo.sub.txt
+
+@venue: zenodo
+# submission guide: https://help.zenodo.org/docs/deposit/create-new-upload/
+
+# ----------------------------------------------------------------------
+# Deposit type
+# ----------------------------------------------------------------------
+
+# Resource type (choice, REQUIRED)
+#   The type of the files being shared (Zenodo's list is based on DataCite's ResourceType vocabulary). For mixed uploads, choose the type that best reflects the upload. 'Other' also exists under the Image and Publication groups.
+#   options: Annotation collection | Book | Book chapter | Computational notebook | Conference paper | Conference proceeding | Data paper | Dataset | Diagram | Drawing | Event | Figure | Image | Journal | Journal article | Lesson | Model | Other | Output management plan | Patent | Peer review | Photo | Physical object | Plot | Poster | Preprint | Presentation | Project deliverable | Project milestone | Proposal | Publication | Report | Software | Software documentation | Standard | Taxonomic treatment | Technical note | Thesis | Video/Audio | Workflow | Working paper
+resource_type: 
+
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
+
+# Files (filelist, optional)
+#   Optional. One file per line as 'path | label' (label optional). Up to 100 files and 50GB in total per record (more storage can be allocated, see the requirements notes). Zenodo recommends packaging 20 or more files in a ZIP archive.
+#   provide 0-100 item(s), one per line
+data_files: |
+  
+
+# ----------------------------------------------------------------------
+# Deposit details
+# ----------------------------------------------------------------------
+
+# Title (text, REQUIRED)
+#   A clear and informative title for the upload.
+title: 
+
+# Description (textarea, optional)
+#   Recommended. Usually an abstract of the record (basic formatting allowed).
+abstract: |
+  
+
+# Keywords and subjects (text, optional)
+#   Optional. Comma-separated keywords. Terms from EuroSciVoc, MeSH or GEMET can be chosen as controlled subjects; anything else is a custom keyword.
+keywords: 
+
+# Digital Object Identifier (DOI) (text, optional)
+#   Optional. Only if the upload already has a DOI for the same object; leave blank and Zenodo registers one on publication. Do NOT enter the DOI of a journal article that this upload supports (put that in related_identifiers instead).
+doi: 
+
+# Publication date (text, REQUIRED)
+#   When the upload was first made available to the public (YYYY-MM-DD; EDTF imprecise dates and ranges such as 2023-09 or 2023-01-01/2023-09-23 are accepted). Zenodo defaults it to the date the draft was created. If the content was previously published elsewhere, use the date of first publication.
+publication_date: 
+
+# Related works (textarea, optional)
+#   Optional. Persistent identifiers of related publications and datasets, one per line as 'identifier | relation' (e.g. '10.1234/foo | Is supplement to' for the paper this deposit supports). Identifiers: DOI, Handle, ARK, PURL, ISSN, ISBN, PubMed ID, PubMed Central ID, ADS Bibliographic Code, arXiv, LSID, EAN-13, ISTC, URN or URL. Relations: Cites, Compiles, Continues, Describes, Documents, Has metadata, Has part, Has version, Is cited by, Is compiled by, Is continued by, Is derived from, Is described by, Is documented by, Is identical to, Is metadata for, Is new version of, Is obsoleted by, Is original form of, Is part of, Is previous version of, Is published in, Is referenced by, Is required by, Is reviewed by, Is source of, Is supplement to, Is supplemented by, Is variant form of, Is version of, Obsoletes, References, Requires, Reviews.
+related_identifiers: |
+  
+
+# Version (text, optional)
+#   Optional. Version of the resource; any string, semantic versioning (e.g. 2.1.5) suggested.
+version: 
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
+
+# Creators (authorlist, REQUIRED)
+#   One creator (person or organisation) per line, in citation order. Format: Name | affiliation | ORCID | role. Write a person's name as 'Family name, Given names'. Affiliation, identifier (ORCID, ISNI, GND or ROR) and role (e.g. Editor) are optional; separate several affiliations with ';'.
+authors: |
+  
+
+# Contributors (textarea, optional)
+#   Recommended. People or organisations who contributed but are not in the citation (supervisors, contact persons, sponsors), one per line as 'Name | role | affiliation | ORCID'. A role from DataCite's contributor vocabulary is required.
+contributors: |
+  
+
+# ----------------------------------------------------------------------
+# Declarations
+# ----------------------------------------------------------------------
+
+# Funding (textarea, optional)
+#   Recommended. Awards or grants that funded the work, one per line as 'Funder | award number | award title'. Funders outside Zenodo's standard list must be registered in ROR.
+funding: |
+  
+
+# ----------------------------------------------------------------------
+# Additional information
+# ----------------------------------------------------------------------
+
+# License (choice, REQUIRED)
+#   The license of the files. Zenodo defaults to Creative Commons Attribution 4.0 International and offers the SPDX license list; a custom license can be added, and several licenses can be declared for mixed uploads.
+#   options: Creative Commons Attribution 4.0 International
+license: 
+
+# Publisher (text, REQUIRED)
+#   Needed for the citation. Zenodo sets it to 'Zenodo'; if the content was previously published elsewhere, use the original publisher's name.
+publisher: 
+
+# Visibility of the files (choice, optional)
+#   Visibility of the files once published (metadata is always public). Restricted files can be shared with specific people after publishing.
+#   options: Public | Restricted
+access_right: 
+
+# Embargo until (text, optional)
+#   Optional, only with Restricted visibility and 'Apply an embargo' (YYYY-MM-DD). The files become public automatically at midnight UTC on this date.
+embargo_date: 
+
+# Communities (textarea, optional)
+#   Optional. Community identifiers to submit the record to, one per line. The community's owner is notified and can accept or reject the record.
+communities: |
+  
+
+# vim: set filetype=yaml :

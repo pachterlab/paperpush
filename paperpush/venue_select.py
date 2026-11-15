@@ -500,6 +500,10 @@ def pick_venues(
         portal = portal_of(venue.slug)
         if venue_types and venue.venue_type not in venue_types:
             continue
+        # A data repository takes data deposits, not manuscripts, so it is
+        # suggested only when asked for by type.
+        if venue.venue_type == "data_repository" and "data_repository" not in venue_types:
+            continue
         if portals and portal not in portals:
             continue
         score, reasons = _score_name(venue, name)

@@ -70,7 +70,11 @@ VENUE_GROUPS = [
     ("preprint", "Preprint servers"),
     ("journal", "Journals"),
     ("conference", "Conferences"),
+    ("data_repository", "Data repositories"),
 ]
+
+# Singular label for each venue_type, for the Type column.
+TYPE_LABELS = {"preprint": "Preprint", "journal": "Journal", "conference": "Conference", "data_repository": "Data repository"}
 
 # Submission platform (the manuscript-submission system the runner drives) each
 # venue uses, keyed by slug. This is README presentation kept out of
@@ -240,7 +244,7 @@ def build_table(*, live: bool = True) -> str:
             if not live_row.get(column) and j.venue_type == "conference":
                 live_row[column] = existing.get(j.slug, {}).get(column, "")
         lines.append(
-            f"| `{j.slug}` | {_linked_name(j)} | {_cell(', '.join(j.keywords))} | {_cell(j.venue_type.capitalize())} | "
+            f"| `{j.slug}` | {_linked_name(j)} | {_cell(', '.join(j.keywords))} | {_cell(TYPE_LABELS.get(j.venue_type, j.venue_type.capitalize()))} | "
             f"{live_row.get('Rank', '')} | {live_row.get('Next deadline', '')} | {validate} | {submit} | {_cell(platform)} | {_cell(j.description)} | "
             f"{walkthrough_cell(j.slug, j.supports_submit)} |"
         )
@@ -304,7 +308,7 @@ def build_venue_groups_rst() -> str:
     Keywords, Type, Link, Validate, Submit), in the database's display order,
     so the docs list matches the CLI without being edited by hand.
     """
-    labels = {venue_type: heading.removesuffix("s").removesuffix(" server") for venue_type, heading in VENUE_GROUPS}
+    labels = TYPE_LABELS
     order = {venue_type: i for i, (venue_type, _) in enumerate(VENUE_GROUPS)}
     venues = sorted(list_venues(), key=lambda v: order.get(v.venue_type, len(order)))
     lines = [

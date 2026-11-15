@@ -1,0 +1,87 @@
+# paperpush submission file for geo  -*- mode: yaml -*-
+# Gene Expression Omnibus
+#
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate geo.sub.txt`
+# Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web geo.sub.txt   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
+#
+# To fill this out with AI from your manuscript files:
+#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill geo.sub.txt
+#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR geo.sub.txt
+
+@venue: geo
+# submission guide: https://www.ncbi.nlm.nih.gov/geo/info/submission.html
+
+# ----------------------------------------------------------------------
+# Deposit type
+# ----------------------------------------------------------------------
+
+# Data type (choice, REQUIRED)
+#   The kind of data being submitted; each type has its own instructions and metadata spreadsheet. A study with several data types (RNA-seq, ChIP-seq, ...) is submitted as one submission per data type.
+#   options: High-throughput sequencing (HTS) | Microarray and other non-HTS data types
+submission_type: 
+
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
+
+# Metadata spreadsheet (file, REQUIRED)
+#   The completed GEO metadata spreadsheet for this data type (one per data type, at most 1,000 samples). Uploaded on the Submit to GEO page after the FTP transfer is complete, not by FTP.
+metadata_file: 
+
+# Processed data files (filelist, REQUIRED)
+#   One processed data file per line (a matrix table or one file per sample), with a quantitative component such as counts. Read alignments (BAM, SAM, BED) do not count as processed data. Uploaded by FTP.
+data_files: |
+  
+
+# Raw data files (filelist, REQUIRED)
+#   One raw data file per line. HTS: FASTQ (gzip or bzip2 compressed), BAM, or CRAM, each under 100 GiB. Affymetrix microarrays: CEL files; other arrays: the scan software's quantification files (e.g. GPR). Uploaded by FTP.
+#   each file at most 102400 MB
+raw_data_files: |
+  
+
+# ----------------------------------------------------------------------
+# Deposit details
+# ----------------------------------------------------------------------
+
+# Title (text, optional)
+#   The study (Series) title, as entered in the STUDY section of the GEO metadata spreadsheet.
+title: 
+
+# Summary (textarea, optional)
+#   The study (Series) summary, as entered in the STUDY section of the GEO metadata spreadsheet.
+abstract: |
+  
+
+# Overall design (textarea, optional)
+#   The experimental design text of the STUDY (Series) section of the metadata spreadsheet: the samples, their relationships, and the experimental factors.
+overall_design: |
+  
+
+# Related identifiers (textarea, optional)
+#   Optional. One per line: the PubMed ID (PMID) of the publication citing the data, or, when the raw data are already in SRA, the PRJNA/SAMN/SRX/SRR accessions.
+related_identifiers: |
+  
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
+
+# Contributors (authorlist, optional)
+#   One contributor per line, in order, as they should appear on the GEO records.
+authors: |
+  
+
+# ----------------------------------------------------------------------
+# Additional information
+# ----------------------------------------------------------------------
+
+# Release date (text, optional)
+#   The date (YYYY-MM-DD) the records become public, at most four years ahead. Records must be released once a manuscript or preprint citing the accession is public.
+release_date: 
+
+# vim: set filetype=yaml :

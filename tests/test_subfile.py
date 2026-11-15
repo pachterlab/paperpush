@@ -34,7 +34,7 @@ from sample_subfiles import REPO_ROOT, scenarios
 
 from paperpush import subfile, venues
 from paperpush.cli import main
-from paperpush.database import SECTION_TITLES, Field, get_venue, list_venues
+from paperpush.database import DATA_REPOSITORY_SECTION_TITLES, SECTION_TITLES, Field, get_venue, list_venues, section_title
 
 VENUES = list_venues()
 SLUGS = [j.slug for j in VENUES]
@@ -162,14 +162,14 @@ def test_template_groups_fields_by_section_in_canonical_order(venue):
     text = subfile.render_template(venue)
     assert _ids_in_text(text) == [f.id for _, f in ordered]
     for section in runs:
-        assert text.count(f"# {SECTION_TITLES[section]}\n") == 1
+        assert text.count(f"# {section_title(section, venue.venue_type)}\n") == 1
 
 
 @pytest.mark.parametrize("venue", VENUES, ids=SLUGS)
 def test_venue_order_keeps_the_portal_order(venue):
     text = subfile.render_template(venue, venue_order=True)
     assert _ids_in_text(text) == [f.id for f in venue.fields]
-    for title in SECTION_TITLES.values():
+    for title in [*SECTION_TITLES.values(), *DATA_REPOSITORY_SECTION_TITLES.values()]:
         assert f"# {title}\n" not in text
 
 
@@ -563,3 +563,8 @@ def test_autofill_fills_the_existing_twin_instead_of_creating_a_new_file(tmp_pat
     values.write_text(json.dumps({"fields": {}}), encoding="utf-8")
     main(["autofill", "biorxiv.sub", "-p", str(ms), "--engine", "manual", "--values", str(values)])
     assert not (tmp_path / "biorxiv.sub").exists()
+
+
+def test_data_repository_sub_headings_describe_a_deposit():
+    text = subfile.render_template(get_venue("zenodo"))
+    assert "# Deposit details" in text and "# Manuscript details" not in text

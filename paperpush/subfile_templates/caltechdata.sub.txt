@@ -1,0 +1,107 @@
+# paperpush submission file for caltechdata  -*- mode: yaml -*-
+# Caltech Research Data Repository (CaltechDATA)
+#
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate caltechdata.sub.txt`
+# Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web caltechdata.sub.txt   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
+#
+# To fill this out with AI from your manuscript files:
+#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill caltechdata.sub.txt
+#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR caltechdata.sub.txt
+
+@venue: caltechdata
+# submission guide: https://library.caltech.edu/search/caltechdata
+
+# ----------------------------------------------------------------------
+# Deposit type
+# ----------------------------------------------------------------------
+
+# Resource type (choice, optional)
+#   The kind of resource deposited. Dataset and Software are the most common; if a record mixes images, movies, or sound with other files, use Dataset or Workflow.
+#   options: Annotation collection | Book | Book section | Collection | Conference paper | Data management plan | Dataset | Diagram | Drawing | Figure | Image | Interactive Resource | Journal article | Lesson | Map | Model | Other | Patent | Photo | Plot | Poster | Preprint | Presentation | Project deliverable | Project milestone | Proposal | Report | Software | Software documentation | Taxonomic treatment | Technical note | Text | Thesis | Video/Audio | Workflow | Working paper
+resource_type: 
+
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
+
+# Files (filelist, optional)
+#   The files to deposit, one per line as 'path | label' (label optional). Any file type is accepted. A record can hold at most 550 files; zip them first if there are more.
+#   provide 0-550 item(s), one per line
+data_files: |
+  
+
+# ----------------------------------------------------------------------
+# Deposit details
+# ----------------------------------------------------------------------
+
+# Title (text, optional)
+#   The title of the dataset or software record.
+title: 
+
+# Description (textarea, REQUIRED)
+#   What the record contains and how another researcher could use it. Deposits with inadequate description may be removed.
+abstract: |
+  
+
+# Keywords (text, optional)
+#   Optional. Comma-separated keywords or subjects.
+keywords: 
+
+# Version (text, optional)
+#   Optional. The version of the data or software (e.g. v1.0).
+version: 
+
+# Related works (textarea, optional)
+#   Optional. One related work per line as 'identifier | relation', e.g. the DOI of the paper that uses the data with the relation 'Is cited by', or a CaltechTHESIS record URL.
+related_identifiers: |
+  
+
+# Caltech groups (text, optional)
+#   Optional. The Caltech group or groups associated with the record, comma-separated.
+caltech_groups: 
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
+
+# Creators (authorlist, REQUIRED)
+#   One creator per line, in order, as 'Name | affiliation | ORCID' (affiliation and ORCID optional). Creators are the main researchers involved in producing the data; they need not match the authors of a related publication.
+authors: |
+  
+
+# Contributor email (text, optional)
+#   Optional. Entering an email address here signs it up for email alerts about the CaltechDATA record.
+contributor_email: 
+
+# ----------------------------------------------------------------------
+# Declarations
+# ----------------------------------------------------------------------
+
+# Funding (textarea, optional)
+#   Optional. One award per line as 'Funder | award number' (award number optional).
+funding: |
+  
+
+# ----------------------------------------------------------------------
+# Additional information
+# ----------------------------------------------------------------------
+
+# License (choice, optional)
+#   The license for the deposited content. The form defaults to CC0.
+#   options: Apache License 2.0 | BSD 3-Clause "New" or "Revised" License | Creative Commons Attribution 4.0 International | Creative Commons Attribution Non Commercial 4.0 International | Creative Commons Zero v1.0 Universal | GNU General Public License v3.0 or later | GNU Lesser General Public License v3.0 or later | MIT License
+license: 
+
+# Publication date (text, optional)
+#   Publication date of the record (YYYY-MM-DD). The form fills in today's date.
+publication_date: 
+
+# Embargo end date (text, optional)
+#   Optional. Date (YYYY-MM-DD) the embargo ends; files stay restricted until then and then become public automatically. Records cannot be kept private indefinitely.
+embargo_date: 
+
+# vim: set filetype=yaml :

@@ -309,7 +309,7 @@
   // ---------------------------------------------------------- venue picker
 
   // "general" is the no-venue option (general checks only): listed first, under no heading.
-  const TYPE_LABELS = { general: "", preprint: "Preprint servers", journal: "Journals", conference: "Conferences" };
+  const TYPE_LABELS = { general: "", preprint: "Preprint servers", journal: "Journals", conference: "Conferences", data_repository: "Data repositories" };
   let comboActive = -1;
 
   function venueMatches(q) {

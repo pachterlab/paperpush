@@ -33,7 +33,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from .database import GENERAL_SLUG, SECTION_TITLES, Field, Venue, options_command
+from .database import GENERAL_SLUG, SECTION_TITLES, Field, Venue, options_command, section_title
 
 logger = logging.getLogger(__name__)
 
@@ -287,7 +287,7 @@ def render_template(
         if section is not None and section != current_section:
             current_section = section
             rule = "# " + "-" * 70
-            lines += [rule, f"# {SECTION_TITLES[section]}", rule, ""]
+            lines += [rule, f"# {section_title(section, venue.venue_type)}", rule, ""]
         flag = "REQUIRED" if field.required else "optional"
         if is_attestation(field):
             flag += "; must be yes to submit"
