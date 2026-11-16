@@ -64,7 +64,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator
 
-from .sensitive import ARCHIVE_EXTS, LEVEL_LIKELY, MAX_ARCHIVE_MEMBERS, MAX_TEXT_BYTES, Finding, _decode, _dedup_paths, _iter_archive_members, _iter_text_blobs
+from .sensitive import ARCHIVE_EXTS, LEVEL_LIKELY, MAX_ARCHIVE_MEMBERS, MAX_TEXT_BYTES, UNREAD, Finding, _decode, _read_capped, _dedup_paths, _iter_archive_members, _iter_text_blobs
 
 logger = logging.getLogger(__name__)
 
@@ -529,8 +529,8 @@ def _iter_bib_blobs(paths: Iterable[Path]) -> Iterator[tuple[str, str]]:
                     if text is not None:
                         yield f"{path.name}:{name}", text
             elif suffix in BIB_EXTS:
-                data = path.read_bytes()
-                if len(data) <= MAX_TEXT_BYTES:
+                data = _read_capped(path)
+                if data is not UNREAD:
                     text = _decode(data)
                     if text is not None:
                         yield path.name, text

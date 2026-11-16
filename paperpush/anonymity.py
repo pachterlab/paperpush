@@ -71,6 +71,7 @@ from .sensitive import (
     IMAGE_EXTS,
     LATEX_EXTS,
     MAX_ARCHIVE_MEMBERS,
+    MAX_BLOB_BYTES,
     MAX_TEXT_BYTES,
     OFFICE_EXTS,
     OPAQUE_EXTS,
@@ -87,6 +88,7 @@ from .sensitive import (
     _not_scanned,
     _office_parts,
     _pdf_metadata_text,
+    _read_capped,
     _read_pdf,
     _unread_summary,
 )
@@ -750,7 +752,12 @@ def scan_file(path: Path, terms: list[tuple[str, str]]) -> list[Finding]:
         elif suffix == ".pdf":
             findings.extend(_scan_pdf(name, path, terms))
         else:
-            findings.extend(_scan_blob(name, name, path.read_bytes(), terms))
+            limit = MAX_BLOB_BYTES if suffix in IMAGE_EXTS or suffix in OFFICE_EXTS else MAX_TEXT_BYTES
+            data = _read_capped(path, limit)
+            if data is UNREAD:
+                findings.append(_not_scanned(name, f"larger than {limit // (1024 * 1024)} MB", _ANON_PREFIX))
+            else:
+                findings.extend(_scan_blob(name, name, data, terms))
     except Exception as exc:
         logger.debug("could not scan %s for identifying information", path, exc_info=True)
         findings.append(_not_scanned(name, type(exc).__name__, _ANON_PREFIX))

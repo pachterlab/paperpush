@@ -203,7 +203,8 @@ class ValidationReport:
     cwd: str = ""
     generated: str = ""
     # The .sub and every upload it names at the time of the run: dicts of
-    # path, size, modified, sha256 (see paperpush.validate.file_fingerprint).
+    # path, size, modified, sha256 (see paperpush.validate.file_fingerprint;
+    # sha256 is None for a file too large to hash).
     # Compare them with the files now to tell whether the report is stale.
     inputs: list[dict] = field(default_factory=list)
 

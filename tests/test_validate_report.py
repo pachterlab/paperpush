@@ -1368,3 +1368,13 @@ def test_summary_line_leaves_out_zero_counts_except_the_core_three():
     summary = report.to_text(rep).splitlines()
     assert any("[FAIL] 0 failed" in line for line in summary)
     assert not any("need AI" in line or "could not run" in line or "with suggestions" in line for line in summary)
+
+
+def test_file_fingerprint_skips_hashing_very_large_files(tmp_path, monkeypatch):
+    big = tmp_path / "atlas.h5ad"
+    with big.open("wb") as fh:
+        fh.truncate(validate_mod.FINGERPRINT_HASH_MAX_BYTES + 1)  # sparse
+    entry = validate_mod.file_fingerprint(big)
+    assert entry["sha256"] is None and entry["size"] == big.stat().st_size and entry["modified"]
+    monkeypatch.setattr(validate_mod, "FINGERPRINT_HASH_MAX_BYTES", big.stat().st_size)
+    assert validate_mod.file_fingerprint(big)["sha256"]

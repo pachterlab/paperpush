@@ -1985,18 +1985,31 @@ def validate_report(
     return result
 
 
+# Files larger than this (a data repository's multi-GB uploads) are fingerprinted
+# by size and modification time only: hashing tens of GB on every validate run
+# would take minutes.
+FINGERPRINT_HASH_MAX_BYTES = 256 * 1024 * 1024
+
+
 def file_fingerprint(path: Path) -> dict:
-    """``{path, size, modified, sha256}`` for ``path``, to tell later whether it changed."""
+    """``{path, size, modified, sha256}`` for ``path``, to tell later whether it changed.
+
+    ``sha256`` is ``None`` for a file over :data:`FINGERPRINT_HASH_MAX_BYTES`;
+    its size and modification time still identify the version.
+    """
     import datetime
 
     path = Path(path).expanduser().resolve()
-    digest = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            digest.update(chunk)
     stat = path.stat()
+    sha256 = None
+    if stat.st_size <= FINGERPRINT_HASH_MAX_BYTES:
+        digest = hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                digest.update(chunk)
+        sha256 = digest.hexdigest()
     modified = datetime.datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds")
-    return {"path": str(path), "size": stat.st_size, "modified": modified, "sha256": digest.hexdigest()}
+    return {"path": str(path), "size": stat.st_size, "modified": modified, "sha256": sha256}
 
 
 def _record_inputs(result, venue: Venue, values: dict[str, str], subfile_path: str) -> None:

@@ -54,7 +54,10 @@ named the venue, use it; otherwise infer or ask per the inputs below.
    "`manuscript.pdf` is the paper, `title_page.pdf` has the authors and
    affiliations, figures are in `figures/`, `supplement.pdf` is supplementary
    material." If they just give a folder, list it and propose a mapping from the
-   filenames, then confirm before extracting. Author names, emails, affiliations,
+   filenames, then confirm before extracting. List it with sizes (`ls -lhA`, or
+   `find <dir> -maxdepth 2 -type f -exec ls -lh {} +` for a deep tree) and
+   don't walk into large subtrees file by file; see
+   [Large data files](#large-data-files). Author names, emails, affiliations,
    and ORCIDs come out far more reliably from a title page or LaTeX/Word source
    than from a flattened PDF, so prefer those when present.
 
@@ -128,6 +131,10 @@ named the venue, use it; otherwise infer or ask per the inputs below.
      bioRxiv supplements `path | type | linktext` where `type` is from
      `type_options`). Only the leading path segment is resolved, so keep it
      absolute; the other columns are preserved as written.
+
+   Only open the documents: the manuscript, title page, cover letter,
+   supplements, figures, and small text files such as a README. Leave data
+   files closed; see [Large data files](#large-data-files).
 
    Set `confidence` honestly per value:
    - `high`   — copied verbatim from the source, or an unambiguous file match.
@@ -212,6 +219,33 @@ named the venue, use it; otherwise infer or ask per the inputs below.
    Remind them these open the portal and stop before the final click, so they
    can review everything in the submission system before submitting.
 
+## Large data files
+
+Manuscript directories, and above all the uploads for a data repository
+(CaltechDATA, Zenodo, Dryad, ...), can hold gigabytes of data: `.h5ad`, `.h5`,
+`.loom`, `.zarr`, `.mtx`, `.fastq(.gz)`, `.bam`, `.parquet`, `.npy`, large
+`.csv`/`.tsv`/`.json`, model checkpoints, archives. Opening one can exhaust the
+machine's memory. So:
+
+- **Map data files by name, never by contents.** A `filemap` field needs only
+  the path. Never Read, `cat`, `strings`, hexdump, or load one in Python
+  (`anndata`, `h5py`, `pandas`, `scanpy`, `numpy`), not even to "check what is
+  in it" or count its cells or samples.
+- **Get the facts about the data from the documentation.** The README,
+  metadata, sample sheet, or manuscript says what the data are. A text file
+  over about 1 MB (a big `metadata.json` or `samples.tsv`) gets
+  `head -c 20000` or `head -n 50`, not a full read.
+- **Hand data files to the command by path.** Put their absolute paths in
+  `values.json` and pass `-p` the directory. Don't copy, decompress, or hash
+  them, and don't run `md5`/`sha256sum` over them; a checksum file already in
+  the directory can be cited by name.
+- **Keep listings short.** For a directory with hundreds of files, summarize
+  by pattern (`ls <dir> | sed 's/_.*//' | sort | uniq -c`, or
+  `ls <dir>/*.h5ad | wc -l`) rather than printing every name into the
+  conversation more than once. A `filelist` field still takes one line per
+  file in `values.json`: write it with a short script (a `glob` over the
+  directory) instead of typing every path.
+
 ## Updating an existing .sub
 
 Use this when the `.sub` is already filled and the manuscript files have
@@ -294,6 +328,9 @@ already tells you and **without** losing anything the author typed in by hand.
   or licenses not present in the source.
 - Prefer source documents (title page, `.tex`, `.docx`) over a flattened PDF for
   author metadata.
+- Never open a data file (`.h5ad`, `.h5`, `.bam`, `.fastq`, `.parquet`, a
+  multi-MB `.csv`, ...): map it by its path and learn about it from the README
+  or manuscript. See [Large data files](#large-data-files).
 - When unsure, lower the confidence rather than guessing high — low-confidence
   values are flagged for the user, not silently trusted.
 - Keep `values.json` strictly in the schema above; the command validates ids

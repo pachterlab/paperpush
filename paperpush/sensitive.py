@@ -51,6 +51,9 @@ logger = logging.getLogger(__name__)
 # Don't try to read text out of a member larger than this; a giant data file is
 # almost never where a pasted credential hides, and decoding it is wasteful.
 MAX_TEXT_BYTES = 5 * 1024 * 1024
+# Images and Office files are parsed (EXIF, zipped XML), not decoded as text, so
+# they get a larger cap; past it the file is reported unread rather than loaded.
+MAX_BLOB_BYTES = 200 * 1024 * 1024
 # Cap how many archive members we inspect, so a pathological bundle can't hang
 # the check. Reported when hit so the truncation is never silent.
 MAX_ARCHIVE_MEMBERS = 2000
@@ -635,6 +638,21 @@ def _junk_member_finding(where: str, name: str) -> Iterator[Finding]:
         yield Finding(where, "unnecessary file", f"build/auxiliary file in bundle: {name}")
 
 
+def _read_capped(path: Path, limit: int = MAX_TEXT_BYTES) -> bytes:
+    """``path``'s bytes, or :data:`UNREAD` when it is larger than ``limit``.
+
+    Checks the size before reading, so a multi-gigabyte data file attached to a
+    submission (an ``.h5ad``, a count matrix) is never loaded into memory.
+    """
+    if path.stat().st_size > limit:
+        return UNREAD
+    return path.read_bytes()
+
+
+def _too_large(name: str, limit: int) -> Finding:
+    return _not_scanned(name, f"larger than {limit // (1024 * 1024)} MB")
+
+
 class _Unread(bytes):
     """Empty contents of an archive member that was too large or could not be read."""
 
@@ -791,14 +809,21 @@ def scan_file(path: Path) -> list[Finding]:
             findings.extend(_scan_archive(name, path))
         elif suffix == ".pdf":
             findings.extend(_scan_pdf(name, path))
-        elif suffix in IMAGE_EXTS:
-            findings.extend(_scan_image_blob(name, path.read_bytes()))
-        elif suffix in OFFICE_EXTS:
-            findings.extend(_scan_office(name, path.read_bytes()))
+        elif suffix in IMAGE_EXTS or suffix in OFFICE_EXTS:
+            data = _read_capped(path, MAX_BLOB_BYTES)
+            if data is UNREAD:
+                findings.append(_too_large(name, MAX_BLOB_BYTES))
+            elif suffix in IMAGE_EXTS:
+                findings.extend(_scan_image_blob(name, data))
+            else:
+                findings.extend(_scan_office(name, data))
         elif suffix in OPAQUE_EXTS:
             findings.append(_not_scanned(name, f"{suffix} files cannot be read"))
         else:
-            data = path.read_bytes()
+            data = _read_capped(path)
+            if data is UNREAD:
+                findings.append(_too_large(name, MAX_TEXT_BYTES))
+                return findings
             findings.extend(_scan_text_blob(name, data, is_latex=suffix in LATEX_EXTS))
             if suffix == ".py":
                 findings.extend(_scan_python_with_bandit(name, path))
@@ -1157,12 +1182,13 @@ def _iter_text_blobs(path: Path) -> Iterator[tuple[str, str]]:
             if text:
                 yield name, text
         elif suffix in OFFICE_EXTS:
-            text = _office_blob_text(path.read_bytes())
+            data = _read_capped(path, MAX_BLOB_BYTES)
+            text = None if data is UNREAD else _office_blob_text(data)
             if text is not None:
                 yield name, text
         elif suffix not in IMAGE_EXTS and suffix not in LINK_SCAN_SKIP_EXTS:
-            data = path.read_bytes()
-            if len(data) <= MAX_TEXT_BYTES:
+            data = _read_capped(path)
+            if data is not UNREAD:
                 text = _decode(data)
                 if text is not None:
                     yield name, text

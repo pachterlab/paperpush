@@ -19,7 +19,7 @@ needs_cleaner = pytest.mark.skipif(not latex_cleaner.available(), reason="needs 
 
 TEX = "\\documentclass{article}\n% TODO tidy before arxiv\n\\begin{document}\nHi\n\\end{document}\n"
 CLEAN_TEX = "\\documentclass{article}\n\\begin{document}\nHi\n\\end{document}\n"
-FLAGS = ["--disable-integrity.links", "--disable-references"]
+FLAGS = ["--disable-integrity.links", "--disable-references", "--no-report"]
 
 
 def _venue(*fields: Field, slug: str = "testj") -> Venue:

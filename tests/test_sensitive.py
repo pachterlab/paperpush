@@ -387,3 +387,22 @@ def test_pdf_text_urls_mangled_by_line_numbers_defer_to_link_annotations():
     assert _covered_by_annotation("https://aaai.org/conference/aaai", annotated)
     assert not _covered_by_annotation("https://github.com/pachterlab/paperpush/missing-page", annotated)
     assert list(_find_urls("see https://477 and https://example.org/x.")) == ["https://example.org/x"]
+
+
+def test_large_data_file_is_not_read_into_memory(tmp_path, monkeypatch):
+    """A multi-GB data file (an .h5ad, say) is reported unread without being loaded."""
+    big = tmp_path / "atlas.h5ad"
+    with big.open("wb") as fh:
+        fh.truncate(sensitive.MAX_TEXT_BYTES + 1)  # sparse: no real disk use
+
+    def no_full_reads(self):
+        raise AssertionError(f"read the whole of {self.name}")
+
+    monkeypatch.setattr(Path, "read_bytes", no_full_reads)
+    findings = scan_file(big)
+    assert [f.category for f in findings] == [sensitive.NOT_SCANNED]
+    assert list(sensitive._iter_text_blobs(big)) == []
+
+    from paperpush import anonymity
+
+    assert [f.category for f in anonymity.scan_file(big, [])] == [sensitive.NOT_SCANNED]
