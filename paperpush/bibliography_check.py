@@ -63,6 +63,10 @@ MAX_SELF_CITATIONS = 15
 # ... as is a larger share than this of a list of at least MIN_REFERENCES_FOR_SHARE.
 MAX_SELF_CITATION_SHARE = 0.8
 MIN_REFERENCES_FOR_SHARE = 5
+# An author-year list of at least this many entries with more than this share unmatched is read as
+# a parsing failure, and bibliography.uncited reports nothing for it.
+UNHEALTHY_MIN_ENTRIES = 10
+UNHEALTHY_UNCITED_SHARE = 0.5
 
 
 @dataclass
@@ -176,6 +180,13 @@ def _unwrap(text: str) -> str:
     return re.sub(r"[ \t]*\n[ \t]*(?=\S)", " ", text)
 
 
+# An appendix heading that ends in a number, which _AFTER_REFERENCES (all capitals, ending in a
+# letter) misses: "A P ROOF OF THEOREM 1" (small capitals split by extraction, ICLR gDxJK8yvZU)
+# was read as a reference entry, and the appendix's own citations as part of the list. One or two
+# digits only, so an all-capitals author line ending in a year ("J. SMITH 2001") is no heading.
+_NUMBERED_APPENDIX_HEADING = re.compile(r"(?m)^[ \t]*[A-Z](?:\.\d+)*\.?[ \t]+(?=[A-Z ]*[A-Z]{3})[A-Z][A-Z \t&:,()-]{3,60}?[ \t]+\d{1,2}(?:\.\d+)*[ \t]*$")
+
+
 def _split(text: str) -> tuple[str, str] | None:
     """``(body, reference list)`` of ``text``: the reference list, and everything else (legends after it are kept)."""
     from .manuscript import _AFTER_REFERENCES, _REFERENCE_HEADING
@@ -185,6 +196,9 @@ def _split(text: str) -> tuple[str, str] | None:
         return None
     tail = text[heading.end() :]
     end = _AFTER_REFERENCES.search(tail)
+    appendix = _NUMBERED_APPENDIX_HEADING.search(tail)
+    if appendix is not None and (end is None or appendix.start() < end.start()):
+        end = appendix
     if end is None:
         return text[: heading.start()], tail
     return text[: heading.start()] + "\n" + tail[end.start() :], tail[: end.start()]
@@ -267,7 +281,8 @@ def _sort_surname(entry: str) -> str:
     """
     names = _NUMBER_LABEL.sub("", entry, count=1).strip()
     head = re.split(r",| and |\.\s+(?=[A-Z][a-z]+\b[^,]*$)", names, maxsplit=1)[0].split()
-    words = [w for w in head if not re.fullmatch(r"(?:[A-Z]\.)+|[A-Z]|Jr\.?|Sr\.?|I{2,3}|IV", w)]
+    # Initials, with or without full stops ("J.", "PM" in Vancouver's "Berry PM"), and suffixes.
+    words = [w for w in head if not re.fullmatch(r"(?:[A-Z]\.-?)+|[A-Z]{1,3}|Jr\.?|Sr\.?|I{2,3}|IV", w)]
     if len(head) >= 2 and len(words) >= 1 and not names.split()[0].endswith(","):
         last = words[-1].strip(".;:()[]")
         if _SURNAME.match(last) and last[0].isupper():
@@ -476,47 +491,185 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
     body = unkern(join_split_accents(body))
     body = "".join(line for line in body.splitlines(keepends=True) if line.strip() not in furniture and not line.strip().isdigit())
     body = re.sub(r"(?<=[A-Za-z]-)[ \t]*\n[ \t]*(?=[A-Z])", "", body)
+    # A page break leaves a run of blank lines where its number and running head were, which kept
+    # "Ren et al." / ... / "(2025)" (ICLR 3KqASrNJGK) apart; one blank line, a paragraph break, stays.
+    body = re.sub(r"\n(?:[ \t]*\n){2,}", "\n", body)
     starts = author_year_starts(tail)
     if not starts:
         return None
+    starts = sorted(set(starts) | set(_entries_after_a_closed_entry(tail, starts)))
     entries: list[str] = []
     for a, b in zip(starts, starts[1:] + [len(tail)]):
         entry = re.sub(r"\s+", " ", tail[a:b]).strip()
         # A real entry opens with its authors and year ("..., Name. 2015.", "Smith, J. (2015).") or,
         # in the natbib styles, with its authors and a year at the end; a line that does neither is
         # the previous entry running on (a venue, "Preprint, arXiv:...").
-        head = not _runs_on(entry) and (bool(_AUTHOR_YEAR_HEAD.search(entry[:300])) or ((_author_list_head(entry) or bool(_TWO_NAMES.match(entry))) and bool(_YEAR.search(entry))))
+        names = (_author_list_head(entry) or bool(_TWO_NAMES.match(entry))) and bool(_YEAR.search(entry))
+        # A volume and pages this early is a venue line, even one in capitals that reads like names
+        # ("IEEE Trans. Mob. Comput., 24(5):4053-4071, 2025.", ICLR BtpXep9qxC).
+        head = not _runs_on(entry) and not _heading_like(entry) and not _VENUE_OPENING.search(entry[:80]) and not _VOLUME_PAGES.search(entry[:40]) and not _PUBLISHER_LINE.match(entry) and (names or (bool(_AUTHOR_YEAR_HEAD.search(entry[:300])) and not _venue_line(entry)))
         if entries and (len(entry) < 25 or not head):
             entries[-1] += " " + entry
-        elif entry:
+        elif entry and not _heading_like(entry):
             entries.append(entry)
     folded = _unwrap(_fold(body))
     folded_tail = _unwrap(_fold(tail))
+    parsed = [(entry, entry_years(entry), _surname_candidates(entry)) for entry in entries]
+    parsed = [(e, ys, cs) for e, ys, cs in parsed if ys and cs]
+    # How many entries each surname leads, to accept a yearless "LoRA (Hu et al.)" (ICLR OswqOlTYR2)
+    # only when it can point to one entry.
+    from collections import Counter
+
+    leads = Counter(_fold(_likely_surname(e, cs)) for e, _, cs in parsed)
     refs: list[Ref] = []
     cited: set[str] = set()
-    for entry in entries:
-        year = entry_year(entry)
-        candidates = _surname_candidates(entry)
-        if not candidates or year is None:
-            continue
-        suffix = year.group(2) or "[a-z]?"
-        # The year can follow others of the same authors ("Wang et al., 2018; 2019", "Tong et al., 2024a;b").
-        chain = rf"\b(?:(?:19|20)\d{{2}}[a-z]?\s*[;,]\s*){{0,5}}{year.group(1)}{suffix}(?![\da-z])"
-        if year.group(2):
-            chain = rf"(?:{chain}|\b{year.group(1)}[a-z](?:\s*[;,]\s*[a-z])*\s*[;,]\s*{year.group(2)}(?![\w]))"
-        hit = next((c for c in candidates if re.search(rf"(?<![A-Za-z]){re.escape(_fold(c))}(?![a-z])[^;\n]{{0,80}}?{chain}", folded)), None)
+    for entry, years, candidates in parsed:
+        year = years[0]
+        hit = next((c for c in candidates if _cited_with_year(_fold(c), year, folded, folded_tail)), None)
         if not hit:
-            # An appendix after the reference list cites in the same shape: "Boteva et al., 2016", "Holm (2024)".
-            hit = next((c for c in candidates if re.search(rf"(?<![A-Za-z]){re.escape(_fold(c))}(?: et al\.?| (?:and|&) [A-Z][\w-]+)?,? \(?{year.group(1)}{suffix}(?![\da-z])", folded_tail)), None)
-        # Uncited, the label falls back to a guess: the last name for "Jacob Devlin, ..." (given
-        # name first, the natbib styles) and the first word for "Devlin, J., ...".
-        given_first = len(candidates) > 1 and not re.match(r"\s*[^\s,]+,", _NUMBER_LABEL.sub("", entry, count=1))
-        surname = hit or (candidates[1] if given_first else candidates[0])
+            # Two entries merged by extraction hold two years, and the one read can be the other
+            # entry's ("Kang ... 2024. Diederik P Kingma ... 2014", ICLR wjaTz8nYjD; "Grimmett ...
+            # 2001. Ju He ... 2025", 7DeARTwvwL). A citation to any of them counts.
+            hit = next((c for y in years[1:] for c in candidates if _cited_with_year(_fold(c), y, folded, folded_tail)), None)
+        if not hit:
+            # A given name glued to the surname by extraction ("FıratÖncel", ICLR wjaTz8nYjD, cited as
+            # "Öncel et al., 2024"): the part after the glue is the surname. Tried last, and never used
+            # as the label, so "DeepMind" or "McCloskey" is not renamed.
+            glued = [m.group(1) for c in candidates if (m := re.search(r"[a-z\u0131]([A-Z\u00c0-\u00de][a-z]{2,})$", c))]
+            hit = next((g for g in glued for y in years if _cited_with_year(_fold(g), y, folded, folded_tail)), None)
+        if not hit:
+            likely = _likely_surname(entry, candidates)
+            hit = likely if leads[_fold(likely)] == 1 and _cited_without_year(_fold(likely), folded) else None
+        surname = hit or _likely_surname(entry, candidates)
         key = f"{surname} {year.group(0)}"
         refs.append(Ref(key, f"{surname} ({year.group(0)})", entry, year.group(0)))
         if hit:
             cited.add(key)
     return Bibliography("author-year", refs, cited) if refs else None
+
+
+def _likely_surname(entry: str, candidates: list[str]) -> str:
+    """The first author's surname as best guessed: the last name for "Jacob Devlin, ..." (given name
+    first, the natbib styles) and the first word for "Devlin, J., ..."."""
+    lead = _NUMBER_LABEL.sub("", entry, count=1)
+    # "Erickson AG, ..." (Vancouver: surname, then initials with no comma) is surname-first too. The
+    # initials need a comma or a year after them, or two letters before a full stop: "Edward J. Hu"
+    # and "George A Miller" (given name, middle initial, ICLR OswqOlTYR2 / 2OcklgJiU0) are given-first.
+    given_first = len(candidates) > 1 and not re.match(r"\s*[^\s,]+,", lead) and not re.match(r"\s*\S+\s+(?:[A-Z]{1,3}(?:[,;]|\s+\(?(?:19|20)\d{2})|[A-Z]{2,3}\.\s)", lead)
+    return candidates[1] if given_first else candidates[0]
+
+
+# Before a surname: no letter, or a lowercase letter that extraction glued to it ("Chain of
+# ThoughtWei et al. (2022)", ICLR kHhMs642rR; "Maximal InequalityRinaldo (2018)", KfjpyOcPQj).
+_SURNAME_START = r"(?:(?<![A-Za-z])|(?<=[a-z])(?=[A-Z]))"
+# ... or, for a surname of four letters or more, a capital: a model name glued to its citation
+# ("Llama-3-8BDubey et al. (2024)", "Mistral-7BJiang et al. (2023a)", ICLR 9U51rOnGko). A short
+# surname ("Li", "Wu") could sit inside an acronym.
+_LONG_SURNAME_START = r"(?:(?<![A-Za-z])|(?<=[A-Za-z])(?=[A-Z]))"
+
+
+def _start(surname: str) -> str:
+    return _LONG_SURNAME_START if len(surname) >= 4 else _SURNAME_START
+# One year of a chain of the same authors' years, with its suffixes: "2018; ", "2023d;a; ", "2024c;d, ".
+_CHAIN_YEAR = r"(?:19|20)\d{2}[a-z]?(?:\s*[;,]\s*[a-z](?![\w]))*\s*[;,]\s*"
+
+
+def _cited_with_year(surname: str, year: re.Match[str], folded: str, folded_tail: str) -> bool:
+    """Whether the text cites ``surname`` with ``year``, alone or in a chain of the same authors' years."""
+    suffix = year.group(2) or "[a-z]?"
+    # The year can follow others of the same authors ("Wang et al., 2018; 2019", "Qin et al. (2024c;d;
+    # 2025e; 2023b; 2025a;c)"), and a suffix can stand for its year ("Liu et al. (2023b; 2022b;a)" is
+    # 2022a, ICLR KAGR7Mqu4h).
+    target = rf"{year.group(1)}{suffix}(?![\da-z])"
+    if year.group(2):
+        target = rf"(?:{target}|{year.group(1)}[a-z](?:\s*[;,]\s*[a-z])*\s*[;,]\s*{year.group(2)}(?![\w]))"
+    chain = rf"\b(?:{_CHAIN_YEAR}){{0,12}}{target}"
+    if re.search(rf"{_start(surname)}{re.escape(surname)}(?![a-z])[^;\n]{{0,80}}?{chain}", folded):
+        return True
+    # An appendix after the reference list cites in the same shape: "Boteva et al., 2016", "Holm (2024)".
+    return bool(re.search(rf"{_start(surname)}{re.escape(surname)}(?: et al\.?| (?:and|&) [A-Z][\w-]+)?,? \(?{year.group(1)}{suffix}(?![\da-z])", folded_tail))
+
+
+def _cited_without_year(surname: str, folded: str) -> bool:
+    """A citation that names the authors with no year: "LoRA (Hu et al.)", "(Smith & Lee)", "(Chen)".
+
+    "et al." or a second author is required, so a word that happens to be a surname ("Hu", "Wang") does not count.
+    """
+    # A single author in parentheses, "architectures from (Chen)" (ICLR CVqYCYpq75), counts too.
+    return bool(re.search(rf"{_start(surname)}{re.escape(surname)}(?: et al\b| (?:and|&) [A-Z][\w'-]+\s*\))|\({re.escape(surname)}\)", folded))
+
+
+def entry_years(entry: str) -> list[re.Match[str]]:
+    """Every year an entry may be cited with: :func:`entry_year` first, then the others it holds (when two entries merged)."""
+    first = entry_year(entry)
+    if first is None:
+        return []
+    others = [m for m in _YEAR.finditer(entry) if m.group(1) != first.group(1) and not _NOT_A_YEAR.search(entry[max(0, m.start() - 40): m.start()]) and not re.match(r"\.\d", entry[m.end():]) and not re.search(r"[A-Za-z]\.$", entry[max(0, m.start() - 2): m.start()]) and not _in_url_or_date(entry, m)]
+    return [first] + others
+
+
+# A line that closes an entry with its year ("... llms. 2024."): extraction can then miss that the
+# next line starts another entry (author_year_starts reads ". 2024." as the year after the authors,
+# with the title to follow), and two entries merge.
+_CLOSED_BY_YEAR = re.compile(r"(?:19|20)\d{2}[a-z]?\.\s*$")
+# ... or with an ISBN or ISSN ("Curran Associates Inc. ISBN 9781510860964.", ICLR ta8BKRa1bl), which never follows the authors.
+_CLOSED_BY_ISBN = re.compile(r"\bIS[BS]N:?\s*[\dXx-]{8,17}\.\s*$")
+
+
+def _entries_after_a_closed_entry(tail: str, starts: list[int]) -> list[int]:
+    """Extra entry starts: a line after one that closes an entry (title, then year) that opens with an author list and has a year.
+
+    "Feiyang Kang, ... Ruoxi Jia. AutoScale: ... llms. 2024." / "Diederik P Kingma and Jimmy Ba. Adam: ..., 2014."
+    (ICLR wjaTz8nYjD) and "Frederick Eberhardt, ... 2005." / "Paul Erdos and Alfred Renyi. ..." (ta8BKRa1bl).
+    The line before must hold a title as well as the authors (two sentence ends before its year), so the
+    title line of "Ashish Vaswani and Noam Shazeer. 2017." (ACL style, year after the authors) is not taken for authors.
+    """
+    out: list[int] = []
+    bounds = starts + [len(tail)]
+    for a, b in zip(bounds, bounds[1:]):
+        offset = a
+        lines = tail[a:b].splitlines(keepends=True)
+        for i, line in enumerate(lines):
+            offset += len(line)
+            if i + 1 >= len(lines) or not (_CLOSED_BY_YEAR.search(line) or _CLOSED_BY_ISBN.search(line)):
+                continue
+            before = re.sub(r"\s+", " ", tail[a:offset]).strip()
+            before = _CLOSED_BY_YEAR.sub("", before)
+            if not _CLOSED_BY_ISBN.search(line) and len(_AUTHOR_LIST_END.findall(before)) < 2:
+                continue
+            rest = re.sub(r"\s+", " ", tail[offset:b]).strip()
+            if not rest or _runs_on(rest) or not (_author_list_head(rest) or _TWO_NAMES.match(rest)) or entry_year(rest) is None:
+                continue
+            start = offset + len(tail[offset:b]) - len(tail[offset:b].lstrip())
+            out.append(start)
+            a = start
+    return out
+
+
+# What extraction can set on a line of its own that is no entry: an appendix heading ("A P ROOF OF
+# THEOREM 1", ICLR gDxJK8yvZU; all capitals, or small capitals split into "P ROOF") or the opening
+# of a proof or theorem ("Proof. It has been shown ...").
+_HEADING_LIKE = re.compile(r"^(?:[A-Z](?:\.\d+)*\.?\s+)?(?:[A-Z]+\s+){0,2}[A-Z]{2,}(?:\s+[A-Z]{2,}|\s+[A-Z]\s?[A-Z]{2,})+\b(?![a-z.,])|^(?:Proof|Theorem|Lemma|Corollary|Proposition|Definition|Remark|Assumption)\b(?:\s+\d+(?:\.\d+)*)?\s*[.:]")
+# A venue and volume line that ran on from the entry before: "Bio Systems, 37(1-2):147-166, 1996."
+# (ICLR Etu7q4KcZ7), "Science, 211(4481):453-458, 1981.", "ISSN 2835-8856. URL ...", "Curran Associates Inc. ISBN ...",
+# "OpenReview.net, 2025. URL ..." (90tCp2KszA), "Graph.36, 6, Article 176 (Nov. 2017)" (5llEo7Hx1k).
+_VOLUME_PAGES = re.compile(r"\d+\s*\(\s*\d[^)]{0,12}\)|\d+\s*:\s*\d+|\b\d{1,5}\s*[-–—]\s*\d{1,5}\b|\bpp?\.\s*\d")
+_VENUE_OPENING = re.compile(r"^(?:ISSN|ISBN|URL|doi|DOI|https?:|In\b|Proceedings\b|Conference\b|Journal\b|Transactions\b|[A-Za-z]+\.(?:net|org|com)\b|[A-Za-z]+\.\d)|\b(?:ISSN|ISBN)\b")
+
+
+# A publisher and year alone: "American Mathematical Soc., 2004." (ICLR P8RzsaEN2s).
+_PUBLISHER_LINE = re.compile(r"^[^.]{0,60}?\b(?:Soc\.|Society|Press|Inc\.|Ltd\.?|Publishers?|Publishing|Verlag|Springer|Elsevier|Wiley|Associates)\s*,?\s*(?:19|20)\d{2}[a-z]?\.?\s*$")
+
+
+def _venue_line(entry: str) -> bool:
+    """Whether ``entry`` opens like a venue, volume, or publisher line rather than authors (it then joins the entry before)."""
+    year = entry_year(entry)
+    before = entry[: year.start()] if year is not None else entry[:120]
+    return bool(_VENUE_OPENING.search(before[:80]) or _VOLUME_PAGES.search(before))
+
+
+def _heading_like(entry: str) -> bool:
+    return bool(_HEADING_LIKE.match(entry))
 
 
 def read_bibliography(path: Path) -> Bibliography | None:
@@ -635,6 +788,11 @@ def _uncited_check(venue: Venue, values: dict[str, str]) -> Outcome:
     uncited = [_named(r, bib.mode) for r in bib.refs if r.key not in bib.cited]
     if bib.printed_only_cited:
         uncited = []
+    # Over half of a long author-year list "uncited" means the list or its citations were misread
+    # (the audit of accepted ICLR papers found almost every such flag a parsing error), or the text
+    # cites in another style, which bibliography.citation_style reports. A list of names would be noise.
+    if bib.mode == "author-year" and len(bib.refs) >= UNHEALTHY_MIN_ENTRIES and len(uncited) > len(bib.refs) * UNHEALTHY_UNCITED_SHARE:
+        raise Unchecked(f"could not match the citations in {path.name} to its reference list ({len(uncited)} of {len(bib.refs)} author-year entries unmatched, so the list or its citations were probably misread)")
     if bib.nocite_only:
         n = len(bib.nocite_only)
         issues.append(Issue(WARNING, field.id, f"{n} {'entry is' if n == 1 else 'entries are'} put in the reference list of {path.name} by \\nocite but never cited in the text: {_list(bib.nocite_only)}"))

@@ -276,6 +276,16 @@ def _abstract_cut_short(abstract: str, doc: document.Document, path: Path) -> li
         return []
     whole = document.tokens(_tex_to_text(_join_subscripts(passage)) if is_latex else passage)
     short = document.tokens(abstract)
+    # No "Introduction" heading (Nature style): the passage runs on into the introduction. A .sub
+    # abstract that ends where one of the passage's paragraphs ends is the whole abstract.
+    # A PDF wraps lines, so there only a blank line ends a paragraph; in a Word file each line is one.
+    if not is_latex:
+        paragraphs = [x for x in re.split(r"\n" if doc.is_docx else r"\n\s*\n", passage) if x.strip()]
+        ends = 0
+        for paragraph, following in zip(paragraphs, paragraphs[1:]):
+            ends += len(document.tokens(paragraph))
+            if following.lstrip()[:1].isupper() and abs(ends - len(short)) <= max(2, 0.03 * len(short)):
+                return []
     if len(whole) - len(short) > max(5, 0.1 * len(whole)) and _is_cut_short(short, whole):
         return [Issue(WARNING, "abstract", f"the abstract in the .sub is {len(short)} words, but the one in {path.name} is {len(whole)}: the .sub has only part of it")]
     return []
@@ -424,6 +434,22 @@ def _form_statements(venue: Venue, values: dict[str, str]) -> tuple[set[str], se
     return ids(rules.not_in_manuscript), ids(rules.in_submission_form)
 
 
+# A statement that there is nothing to declare, however it is worded.
+_NONE_DECLARED = re.compile(r"(?i)\b(?:no|not\s+any|nothing)\b[^.]{0,60}\b(?:compet\w*|conflicts?|financial|interests?|disclose)|\bnone\s+(?:declared|to\s+declare)|\bnothing\s+to\s+(?:declare|disclose)|^\s*none\.?\s*$")
+
+
+# What a manuscript's statement of each kind mentions, by .sub field id.
+_STATEMENT_TOPICS = [
+    (r"competing_interest|conflict_of_interest|declaration_of_interest", re.compile(r"(?i)compet\w*\s+(?:financial\s+)?interests?|conflicts?\s+of\s+interests?|declarations?\s+of\s+interests?|disclosures?")),
+    (r"data_availability", re.compile(r"(?i)data\s+(?:and\s+\w+\s+)?availab|availability\s+of\s+data|data\s+(?:are|is)\s+(?:publicly\s+)?available|deposited")),
+    (r"code_availability", re.compile(r"(?i)code\s+availab|software\s+availab|github|zenodo|code\s+(?:is|are)\s+available")),
+    (r"author_contribution", re.compile(r"(?i)author\s+contributions?|contributions?\s*:|CRediT")),
+    (r"acknowledg", re.compile(r"(?i)acknowledg")),
+    (r"funding_statement", re.compile(r"(?i)funding|funded|grant|financial\s+support")),
+    (r"ethics_statement", re.compile(r"(?i)ethic|institutional\s+review|IACUC|approved\s+by")),
+]
+
+
 def _statements_check(venue: Venue, values: dict[str, str]) -> Outcome:
     kept_out, in_form = _form_statements(venue, values)
     fields = [f for f in venue.fields if f.type in ("text", "textarea") and not f.fields and _STATEMENT_FIELDS.search(f.id) and f.id not in kept_out and len(values.get(f.id, "").split()) >= MIN_STATEMENT_WORDS]
@@ -440,6 +466,18 @@ def _statements_check(venue: Venue, values: dict[str, str]) -> Outcome:
     issues: list[Issue] = []
     matched = []
     for f in fields:
+        topic = next((pattern for key, pattern in _STATEMENT_TOPICS if re.search(key, f.id)), None)
+        if topic is not None and not topic.search(text):
+            # The manuscript has no such statement at all: nothing to compare (whether it must
+            # have one is the requirements check's business, not a mismatch).
+            continue
+        if topic is not None and _NONE_DECLARED.search(values[f.id]) and re.search(r"competing|conflict|declaration_of", f.id):
+            # "The authors have declared no competing interest." (the portal's default) against
+            # "The authors declare no competing interests.": the same statement in other words.
+            at = topic.search(text)
+            if _NONE_DECLARED.search(text[at.start(): at.end() + 300]):
+                matched.append(f.label)
+                continue
         if f.id in in_form:
             # The submission system collects it; the manuscript need not repeat it.
             ratio, start, _ = locate(document.tokens(values[f.id]), hay)

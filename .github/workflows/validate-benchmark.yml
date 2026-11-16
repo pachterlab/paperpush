@@ -2,7 +2,8 @@ name: Validate benchmark
 
 # Scores `paperpush validate` against real papers whose findings were reviewed by
 # hand (tests/validate_benchmark/*.json): fails when a change brings back a false
-# alarm fixed earlier or loses a real finding. It downloads the papers from arXiv,
+# alarm fixed earlier or loses a real finding. It downloads the papers (arXiv PDFs, and
+# bioRxiv preprints' Europe PMC full text),
 # so it runs monthly and on demand, not on every push (see scripts/validate_benchmark.py).
 
 on:
@@ -25,6 +26,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+
+      # The bioRxiv papers are validated as Word files made from their Europe PMC full text
+      # (scripts/jats_to_docx.py), which needs pandoc.
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
 
       # The papers are pinned to a version, so a cached PDF never goes stale.
       - uses: actions/cache@v4

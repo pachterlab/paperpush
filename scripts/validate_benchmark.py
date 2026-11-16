@@ -83,15 +83,43 @@ def _pdf(paper: dict, cache: Path) -> Path:
     return _download(f"https://arxiv.org/pdf/{arxiv_id}", cache / f"{arxiv_id.replace('/', '_')}.pdf")
 
 
-def _validate(pdf: Path, venue: str, timeout: int) -> dict:
+def _europepmc_docx(paper: dict, cache: Path) -> Path:
+    """A preprint's Europe PMC full text (JATS) as a Word file: bioRxiv refuses scripted PDF downloads."""
+    ppr = paper["europepmc"]
+    out = cache / f"{ppr}.docx"
+    if out.exists() and out.stat().st_size > 0:
+        return out
+    xml = cache / f"{ppr}.xml"
+    if not xml.exists():
+        cache.mkdir(parents=True, exist_ok=True)
+        request = urllib.request.Request(f"https://www.ebi.ac.uk/europepmc/webservices/rest/{ppr}/fullTextXML", headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(request, timeout=60) as response:  # nosec B310 -- fixed https URL
+            data = response.read()
+        if b"<article" not in data[:2000]:
+            raise RuntimeError(f"Europe PMC returned no full text for {ppr}")
+        xml.write_bytes(data)
+        time.sleep(1)
+    subprocess.run([sys.executable, "-I", str(ROOT / "scripts" / "jats_to_docx.py"), str(xml), str(out)], check=True, timeout=300)
+    return out
+
+
+def _manuscript(paper: dict, cache: Path) -> Path:
+    return _europepmc_docx(paper, cache) if "europepmc" in paper else _pdf(paper, cache)
+
+
+def _id(paper: dict) -> str:
+    return paper.get("arxiv") or paper["europepmc"]
+
+
+def _validate(manuscript: Path, venue: str, timeout: int) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "report.json"
-        cmd = [sys.executable, "-m", "paperpush.cli", "validate", "--venue", venue, "--manuscript", str(pdf), "--no-report", "--json", str(out), "--hide-suggestions"]
+        cmd = [sys.executable, "-m", "paperpush.cli", "validate", "--venue", venue, "--manuscript", str(manuscript), "--no-report", "--json", str(out), "--hide-suggestions"]
         cmd += [f"--disable-{check}" for check in NETWORK_CHECKS]
         env = dict(os.environ, PAPERPUSH_VENUE_DATA=os.environ.get("PAPERPUSH_VENUE_DATA", "bundled"))
         subprocess.run(cmd, cwd=tmp, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=timeout, check=False)
         if not out.exists():
-            raise RuntimeError(f"validate wrote no report for {pdf.name}")
+            raise RuntimeError(f"validate wrote no report for {manuscript.name}")
         return json.loads(out.read_text("utf-8"))
 
 
@@ -119,7 +147,7 @@ def score(paper: dict, report: dict) -> dict:
     unmatched = [(c, m) for c, m in reported if not any(_matches(r, c, m) for r in expected)]
     false_alarms = [f"{c}: {m}" for c, m in unmatched if not any(_matches(r, c, m) for r in tolerated)]
     misses = [f"{r['check']}: {r.get('contains', '')}" for r in expected if not any(_matches(r, c, m) for c, m in reported)]
-    return {"paper": paper["arxiv"], "reported": len(reported), "tolerated": len(unmatched) - len(false_alarms), "false_alarms": false_alarms, "misses": misses}
+    return {"paper": _id(paper), "reported": len(reported), "tolerated": len(unmatched) - len(false_alarms), "false_alarms": false_alarms, "misses": misses}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -139,14 +167,14 @@ def main(argv: list[str] | None = None) -> int:
         bench = json.loads(path.read_text("utf-8"))
         for paper in bench["papers"]:
             try:
-                report = _validate(_pdf(paper, args.cache), bench.get("venue", "arxiv"), args.timeout)
+                report = _validate(_manuscript(paper, args.cache), bench.get("venue", "arxiv"), args.timeout)
             except Exception as exc:  # noqa: BLE001 -- one unreachable paper should not hide the others' scores
-                print(f"{paper['arxiv']}: could not be scored ({exc})", file=sys.stderr)
-                results.append({"paper": paper["arxiv"], "error": str(exc)})
+                print(f"{_id(paper)}: could not be scored ({exc})", file=sys.stderr)
+                results.append({"paper": _id(paper), "error": str(exc)})
                 continue
             result = score(paper, report)
             results.append(result)
-            print(f"{paper['arxiv']}: {result['reported']} reported, {len(result['false_alarms'])} false alarm(s), {len(result['misses'])} miss(es)")
+            print(f"{_id(paper)}: {result['reported']} reported, {len(result['false_alarms'])} false alarm(s), {len(result['misses'])} miss(es)")
             if args.verbose:
                 for line in result["false_alarms"]:
                     print(f"  FALSE ALARM {line[:300]}")

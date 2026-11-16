@@ -662,6 +662,84 @@ _SUPPLEMENT_REFERENCE = re.compile(
     r"|\b(?:see|in)\s+(?:the\s+)?(?:online\s+)?supplement\b(?:\s+\d+\b)?",
     re.IGNORECASE,
 )
+# Nouns that name a separate file: "Supplementary Data 1", "supplementary videos".
+_SUPPLEMENT_FILE_NOUN = re.compile(r"\b(?:data|files?|videos?|movies?|datasets?|protocols?)\b", re.IGNORECASE)
+# Nouns that ordinary prose uses adjectivally: "Videos provide supplementary information
+# about characters" (ICLR d3ABURcHk3), "we further provide supplementary results" (OswqOlTYR2).
+_SUPPLEMENT_VAGUE_NOUN = re.compile(r"\b(?:information|results|methods?|text|notes?)\s*$", re.IGNORECASE)
+_SUPPLEMENT_POINTER = re.compile(r"\b(?:see|in|into|within|from)\s+(?:(?:the|our|an?)\s+)?(?:online\s+)?$", re.IGNORECASE)
+# A separate attachment named in the mention's own sentence: "As supplementary material, we
+# provide a zip folder" (ICLR ta8BKRa1bl), "supplementary material containing all source code".
+_SUPPLEMENT_ATTACHMENT_CUE = re.compile(r"\b(?:zip|tar|archive|code|codebase|source|scripts?|notebooks?|videos?|movies?|animations?|checkpoints?|repository)\b", re.IGNORECASE)
+_APPENDIX_CUE = re.compile(r"(?i:\bappendi(?:x|ces)\b)|\b(?:Section|Sec\.|§)\s*[A-Z](?:\.\d+)*\b")
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+(?=[A-Z(\[])|\n\s*\n")
+_APPENDIX_HEADING = re.compile(r"(?im)^[ \t]*(?:appendi(?:x|ces)|supplementary\s+(?:materials?|information)|technical\s+appendi(?:x|ces))\b[^\n.]{0,80}$")
+_LETTERED_HEADING = re.compile(r"(?m)^[ \t]*([AB])(?:\.1)?[ \t]+[A-Z][^\n.]{2,70}$")
+
+
+def _has_own_appendix(text: str) -> bool:
+    """Whether the document carries its own appendix or supplementary section.
+
+    Read after the reference list when there is one, where an ICLR-style PDF
+    puts lettered appendices ("A Related Work", "B Notations"; avgMb57IP5).
+    """
+    from .manuscript import reference_list_span
+
+    span = reference_list_span(text)
+    back = text if span is None else text[span[1]:]
+    if _APPENDIX_HEADING.search(back):
+        return True
+    return span is not None and {m.group(1) for m in _LETTERED_HEADING.finditer(back)} == {"A", "B"}
+
+
+def _is_heading_line(text: str, start: int, end: int) -> bool:
+    """The match sits on a heading such as "Technical Appendices and Supplementary Material" (ICLR Pa6ak2B9jJ)."""
+    lo = text.rfind("\n", 0, start) + 1
+    hi = text.find("\n", end)
+    line = text[lo: len(text) if hi < 0 else hi].strip()
+    words = [w for w in re.findall(r"[A-Za-z]+", line) if len(w) > 3]
+    return len(line.split()) <= 10 and not line.endswith((".", ",", ";", ":")) and all(w[0].isupper() for w in words)
+
+
+def _sentence_and_neighbors(text: str, start: int) -> tuple[str, str]:
+    """The sentence holding ``start``, and the sentences just before and after it."""
+    lo, hi = max(0, start - 1500), min(len(text), start + 1500)
+    cuts = [lo] + [m.end() for m in _SENTENCE_BREAK.finditer(text, lo, hi)] + [hi]
+    i = max(k for k in range(len(cuts) - 1) if cuts[k] <= start)
+    own = text[cuts[i]: cuts[i + 1]]
+    neighbors = text[cuts[max(i - 1, 0)]: cuts[i]] + " " + text[cuts[i + 1]: cuts[min(i + 2, len(cuts) - 1)]]
+    return own, neighbors
+
+
+def _vague_supplement_reference(text: str, match: re.Match[str], own_appendix: bool) -> bool:
+    """Whether a "supplementary ..." phrase most likely means the document's own appendix or plain prose.
+
+    Numbered items (Supplementary Data 1, Supplement 2, S1 Fig) and file nouns
+    (supplementary videos) are never vague: on a journal or bioRxiv submission
+    they name an upload that must be there.
+    """
+    phrase = match.group()
+    if _is_heading_line(text, match.start(), match.end()):
+        return True
+    own, neighbors = _sentence_and_neighbors(text, match.start())
+    own = own.replace(phrase, " ")  # "Supplementary Appendix" is itself the reference, not a pointer to an appendix
+    if _APPENDIX_CUE.search(own):  # "supplementary information ... in Appendix B" (UQZ0Y0dbP9)
+        return False if re.search(r"\d\s*$", phrase) else True
+    if re.search(r"\d\s*$", phrase) or _SUPPLEMENT_FILE_NOUN.search(phrase):
+        return False
+    # Checked before the attachment cues: in "Videos provide supplementary information
+    # about characters" (d3ABURcHk3) the video is the subject, not an attachment.
+    vague = _SUPPLEMENT_VAGUE_NOUN.search(phrase)
+    titled = all(w[0].isupper() for w in phrase.split())  # "Supplementary Information", a journal section name
+    if vague and not titled and not _SUPPLEMENT_POINTER.search(text[max(0, match.start() - 40): match.start()]):
+        return True
+    if _SUPPLEMENT_ATTACHMENT_CUE.search(own):
+        return False
+    if _APPENDIX_CUE.search(neighbors):  # "training curves are shown in Appendix K and L. ... in the supplementary materials" (OWkkFaq1IZ)
+        return True
+    # A generic "supplementary material(s)" in a document with its own appendix
+    # is that appendix (avgMb57IP5).
+    return own_appendix
 
 
 def _supplementary_attachment_check(venue: Venue, values: dict[str, str]) -> Outcome:
@@ -684,13 +762,16 @@ def _supplementary_attachment_check(venue: Venue, values: dict[str, str]) -> Out
         text = document.get(path).text
         if text is None:
             raise Unchecked(f"could not read {path.name} as text")
+        own_appendix = _has_own_appendix(text)
         text = without_reference_list(text)
         found = mentions(text)
         # Supplementary items captioned in the manuscript itself: the supplement is in this file.
         if any(m.caption and m.series.startswith(("supp_", "ed_")) for m in found):
             continue
         references = [m.text for m in found if not m.caption and m.series.startswith(("supp_", "ed_"))]
-        references += [m.group() for m in _SUPPLEMENT_REFERENCE.finditer(text)]
+        # Unnumbered phrases that point at the document's own appendix, or are plain
+        # prose, made most ICLR camera-ready flags false alarms; leave them out.
+        references += [m.group() for m in _SUPPLEMENT_REFERENCE.finditer(text) if not _vague_supplement_reference(text, m, own_appendix)]
         examples = list(dict.fromkeys(" ".join(ref.split()) for ref in references))[:5]
         if examples:
             quoted = ", ".join(f"“{ref}”" for ref in examples)

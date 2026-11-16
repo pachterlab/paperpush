@@ -27,12 +27,15 @@ CHECK_IDS = set(json.loads((ROOT / "paperpush" / "validation_check_ids.json").re
 @pytest.mark.parametrize("path", BENCHMARKS, ids=lambda p: p.stem)
 def test_benchmark_files_are_well_formed(path):
     bench = json.loads(path.read_text("utf-8"))
-    ids = [p["arxiv"] for p in bench["papers"]]
-    assert ids and len(ids) == len(set(ids))
+    ids = [p.get("arxiv") or p.get("europepmc") for p in bench["papers"]]
+    assert ids and all(ids) and len(ids) == len(set(ids))
     for paper in bench["papers"]:
-        # A pinned version, so the PDF cannot change under the expected findings.
-        assert re.search(r"v\d+$", paper["arxiv"]), paper["arxiv"]
-        for rule in paper["expected"]:
+        if "arxiv" in paper:
+            # A pinned version, so the PDF cannot change under the expected findings.
+            assert re.search(r"v\d+$", paper["arxiv"]), paper["arxiv"]
+        else:
+            assert re.fullmatch(r"PPR\d+", paper["europepmc"]), paper["europepmc"]
+        for rule in paper["expected"] + paper.get("tolerated", []):
             assert rule["check"] in CHECK_IDS, rule["check"]
             assert rule["check"] not in V.NETWORK_CHECKS, f"{rule['check']} is turned off in the benchmark"
             assert rule.get("contains") and rule.get("why"), rule

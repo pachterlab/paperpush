@@ -378,6 +378,9 @@ def _table_cells(paragraph: str, m: re.Match[str]) -> bool:
     # A row of yes/no cells ("Position controls no no yes no yes").
     if m.group(1).lower() in ("no", "yes") and re.match(r"\s+(?:yes|no)\b", paragraph[m.end():], re.IGNORECASE):
         return True
+    # A legend's label in parentheses, "MoRA (both both)", "DCP (image image)" (ICLR 2026 audit).
+    if paragraph[m.start() - 1: m.start()] == "(" and paragraph[m.end(): m.end() + 1] == ")":
+        return True
     if m.group(1).lower() in _STOP_WORDS:
         return False
     # A legend's keys: "Boundary lb lb = 1 lb = 8".
@@ -391,12 +394,21 @@ def _table_cells(paragraph: str, m: re.Match[str]) -> bool:
     return bool(re.match(r"\s+[\d.,]+(?:\s|$)", paragraph[m.end() :]) or re.search(r"(?:^|\s)[\d.,]+\s+$", paragraph[: m.start()]))
 
 
+# Glued to a symbol that prose does not put against a word: table headers such as "en⇒zh zh⇒th",
+# where each "zh" belongs to a different language pair (ICLR 2026 audit).
+_SYMBOL_NEIGHBOUR = re.compile(r"[^\w\s.,;:!?'\"()\[\]\u2018\u2019\u201c\u201d-]")
+
+
 def repeated_words(paragraph: str, *, pdf: bool = False) -> list[str]:
     """The same word twice in a row, ignoring case. Across a line break only when the second is lower case."""
     found = []
     for m in _REPEAT.finditer(paragraph):
         word = m.group(1).lower()
         if word in _DOUBLING_OK or (len(word) == 1 and word != "a"):
+            continue
+        if word == "end":
+            continue  # nested blocks closing in an algorithm listing; "end end" is not a slip prose makes
+        if _SYMBOL_NEIGHBOUR.match(paragraph[m.start() - 1: m.start()] or " ") or _SYMBOL_NEIGHBOUR.match(paragraph[m.end(): m.end() + 1] or " "):
             continue
         if "\n" in m.group(2) and not m.group(3)[0].islower():
             continue  # a heading followed by a sentence that starts with the same word
@@ -425,6 +437,8 @@ def punctuation_spacing(paragraph: str) -> list[str]:
     for m in _SPACE_BEFORE.finditer(masked):
         if m.group(2) == ":" and masked[m.start() - 1].isdigit() and re.match(r"\s*\d", masked[m.end() :]):
             continue  # a ratio set with spaces ("1 : 100")
+        if m.group(2) == ":" and re.search(r"(?:^|\s)\w$", masked[: m.start()]) and re.match(r"\s*\S{1,3}\s*(?:\u2192|->|\\to|\u21a6|\u00d7)", masked[m.end():]):
+            continue  # a mapping in mathematical notation ("f : X \u2192 Y")
         found.append((m.start(), _snippet(paragraph, m.start(1), m.end(2), _mark)))
     for m in _NO_SPACE_AFTER.finditer(masked):
         if m.group(4) in _CODE_MODULES:
@@ -449,7 +463,8 @@ def unbalanced(paragraph: str) -> list[str]:
         text = _ENUMERATOR.sub(
             lambda m: (
                 m.group(0)[:-1] + " "
-                if "(" not in text[max(0, m.start() - 1) : m.start() + 1]
+                # Not the closer of a parenthesis still open before it: "(Fig. 2)".
+                if "(" not in text[max(0, m.start() - 1) : m.start() + 1] and text.count("(", 0, m.start()) <= text.count(")", 0, m.start())
                 else m.group(0)
             ),
             text,

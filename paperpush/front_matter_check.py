@@ -99,13 +99,46 @@ def citations_in(text: str, *, tex: bool = False) -> list[str]:
 # --- the manuscript's abstract -------------------------------------------------------
 
 _TEX_ABSTRACT = re.compile(r"\\begin\s*\{\s*abstract\s*\}(.*?)\\end\s*\{\s*abstract\s*\}|\\abstract\s*\{((?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*)\}", re.DOTALL)
-_ABSTRACT_HEADING = re.compile(r"^[ \t]*(?:\d+\.?\s+)?(?:abstract|summary(?![ \t]+(?:statement|points?|box)\b))[ \t]*[:.\u2014-]?[ \t]*(?:\n|(?=(?-i:[A-Z])))", re.IGNORECASE | re.MULTILINE)
+
+
+def _small_caps(words: str) -> str:
+    """``words`` as a pattern that also matches small-caps headings split after their first letter.
+
+    pdftotext renders a small-caps heading's large initial apart from the rest,
+    so ICLR's "1 Introduction" comes out as "1 I NTRODUCTION" and "Abstract" as
+    "A BSTRACT"; without this the abstract ran on into the Introduction.
+    """
+    return r"\s+".join(w[0] + r" ?" + w[1:] if len(w) > 1 and w[0].isalpha() else w for w in words.split())
+
+
+_ABSTRACT_HEADING = re.compile(
+    rf"^[ \t]*(?:\d+\.?\s+)?(?:{_small_caps('abstract')}|summary(?![ \t]+(?:statement|points?|box)\b))[ \t]*[:.\u2014-]?[ \t]*(?:\n|(?=(?-i:[A-Z])))", re.IGNORECASE | re.MULTILINE
+)
 # What ends the abstract in extracted text: the next part of the front matter or the main text.
+_END_WORDS = (
+    "introduction", "key words", "keywords", "index terms", "main", "main text", "significance", "significance statement", "author summary",
+    "graphical abstract", "highlights", "background and summary", "one-sentence summary", "one sentence summary", "teaser",
+    # ACM and IEEE front matter after the abstract.
+    "ccs concepts", "acm reference format", "general terms", "additional key words and phrases",
+)  # fmt: skip
 _ABSTRACT_END = re.compile(
-    r"^[ \t]*(?:\d+\.?[ \t]+|[IVX]+\.[ \t]+)?(?:introduction|key\s*words|keywords|index\s+terms|main(?:\s+text)?|significance(?:\s+statement)?|author\s+summary|"
-    r"graphical\s+abstract|highlights|background\s+and\s+summary|one[- ]sentence\s+summary|teaser)\b[ \t]*[:.\u2014-]?[ \t]*$",
+    r"^[ \t]*(?:\d+\.?[ \t]+|[IVX]+\.[ \t]+)?(?:" + "|".join(_small_caps(w) for w in sorted(_END_WORDS, key=len, reverse=True)) + r")\b[ \t]*[:.\u2014-]?[ \t]*$",
     re.IGNORECASE | re.MULTILINE,
 )
+# The first numbered section of the paper, whatever it is called: "1 Background", "1. Problem Setup",
+# "1 M OTIVATION" (split small caps), "I. RELATED WORK". A line of its own, of capitalised words, with no
+# full stop, so a wrapped abstract line that happens to start with "1" ("1 million cells were ...") is not one.
+# A split small-caps word ("I NTRODUCTION") reads as two capitalised words.
+_CAP_WORD = r"(?:[A-Z][A-Za-z0-9'\u2019-]*|of|and|for|the|in|on|to|with|a|an|via|vs\.?|&)"
+_FIRST_SECTION = re.compile(rf"^[ \t]*(?:1\.?|I\.)[ \t]+(?=[A-Z]){_CAP_WORD}(?:[ \t]+{_CAP_WORD}){{0,7}}[ \t]*$", re.MULTILINE)
+# A heading after a paragraph break: a blank line, then a short line of capitalised words with no full stop,
+# then more text ("\n\nRelated Work\nPrior methods ..."). Structured-abstract labels are left to _end_at_label.
+_HEADING_AFTER_BREAK = re.compile(rf"\n[ \t]*\n[ \t]*((?=[A-Z]){_CAP_WORD}(?:[ \t]+{_CAP_WORD}){{0,7}})[ \t]*\n(?=[ \t]*\S)")
+# A figure or table caption at the start of a line: no abstract contains one.
+_CAPTION = re.compile(r"^[ \t]*(?:Figure|Fig\.|Table)[ \t]*\d+[ \t]*[:.|]", re.MULTILINE)
+# Words inside a figure, as pdftotext gives them: eight or more lines in a row of three words or fewer.
+# Fewer is not enough: inline math in an abstract also breaks into a handful of short lines.
+_FIGURE_DEBRIS = re.compile(r"^(?:[ \t]*(?:\S+[ \t]+){0,2}\S+[ \t]*\n){8,}", re.MULTILINE)
 # A line of its own naming a part of a structured abstract or of the paper: the two share "Methods" and "Results".
 _ABSTRACT_LABEL = re.compile(
     r"^[ \t]*(?:\d+\.?[ \t]+|[IVX]+\.[ \t]+)?(materials\s+and\s+methods|methods\s+and\s+materials|results\s+and\s+discussion|methods?|results?|discussions?|conclusions?(?:\s+and\s+relevance)?|"
@@ -179,6 +212,28 @@ def _end_without_introduction(rest: str, doc: document.Document, sub_abstract: s
     return min((end for end in ends if end is not None), default=len(rest))
 
 
+def _end_at_heading(rest: str, *, pdf: bool = False) -> int | None:
+    """Where the first heading after the abstract starts in ``rest``, or None.
+
+    The Introduction, keywords, and similar named parts; the paper's first
+    numbered section under any name; or a heading after a paragraph break.
+    Structured-abstract labels ("Methods", "Results") are not headings here.
+    In a PDF, a figure's caption or the text inside it (a run of very short
+    lines) also ends it, since pdftotext can put a figure that sits above the
+    Introduction (ICLR's teaser figures) between it and the abstract.
+    """
+    ends = [m.start() for m in (_ABSTRACT_END.search(rest), _FIRST_SECTION.search(rest), _CAPTION.search(rest)) if m]
+    if pdf:
+        debris = _FIGURE_DEBRIS.search(rest)
+        if debris:
+            ends.append(debris.start())
+    for m in _HEADING_AFTER_BREAK.finditer(rest):
+        if not _ABSTRACT_LABEL.fullmatch(m.group(1)) and re.search(r"[A-Za-z]{3}", m.group(1)):
+            ends.append(m.start(1))
+            break
+    return min(ends, default=None)
+
+
 def manuscript_abstract(doc: document.Document, sub_abstract: str = "") -> tuple[str, bool] | None:
     """The manuscript's abstract and whether it is LaTeX source, or None if it cannot be found.
 
@@ -198,8 +253,8 @@ def manuscript_abstract(doc: document.Document, sub_abstract: str = "") -> tuple
     heading = _ABSTRACT_HEADING.search(text)
     if heading is not None:
         rest = text[heading.end() : heading.end() + _ABSTRACT_MAX_CHARS]
-        end = _ABSTRACT_END.search(rest)
-        return rest[: end.start() if end else _end_without_introduction(rest, doc, sub_abstract)], False
+        end = _end_at_heading(rest, pdf=doc.is_pdf)
+        return rest[: end if end is not None else _end_without_introduction(rest, doc, sub_abstract)], False
     words = re.findall(r"[A-Za-z0-9]+", sub_abstract)
     if len(words) >= 8:
         start = re.search(r"\W+".join(re.escape(w) for w in words[:6]), text, re.IGNORECASE)
@@ -208,6 +263,24 @@ def manuscript_abstract(doc: document.Document, sub_abstract: str = "") -> tuple
             if end is not None:
                 return text[start.start() : start.start() + end.end()], False
     return None
+
+
+# An "abstract" longer than this means its end was not found (the ICLR audit's runaways read 530-660
+# words, Introduction included); real abstracts run 150-300 words, rarely past 400.
+_ABSTRACT_MAX_WORDS = 450
+
+
+def _checkable_abstract(text: str) -> str | None:
+    """``text`` if it is plausibly the whole abstract and nothing more, else its first paragraph, else None.
+
+    Reporting citations from past the abstract's end is worse than missing
+    one in it, so an over-long stretch is cut to its first paragraph and, with
+    no paragraph break to cut at, not checked at all.
+    """
+    if len(text.split()) <= _ABSTRACT_MAX_WORDS:
+        return text
+    first = re.split(r"\n[ \t]*\n", text.strip(), maxsplit=1)[0]
+    return first if len(first.split()) <= _ABSTRACT_MAX_WORDS else None
 
 
 def _manuscript(venue: Venue, values: dict[str, str]) -> tuple[Field, Path, document.Document] | None:
@@ -422,14 +495,24 @@ def _abstract_citations_check(venue: Venue, values: dict[str, str]) -> Outcome:
     reqs = _rules(venue, values)
     rule = " (the author guidelines do not allow them)" if reqs is not None and reqs.abstract.no_references else ""
     issues: list[Issue] = []
+    read: list[str] = []
     for field_id, where, text, tex in abstracts:
+        if field_id != "abstract" and not tex:
+            # Found heuristically in extracted text: check it only when its end is believable.
+            checkable = _checkable_abstract(text)
+            if checkable is None:
+                notes.append(unchecked(field_id, f"could not tell where {where} ends, so it was not read for citations"))
+                continue
+            text = checkable
+        read.append(where)
         found = citations_in(text, tex=tex)
         if found:
             shown = ", ".join(f"'{c}'" for c in found[:MAX_EXAMPLES])
             more = f" and {len(found) - MAX_EXAMPLES} more" if len(found) > MAX_EXAMPLES else ""
             issues.append(Issue(WARNING, field_id, f"{where} cites references ({shown}{more}){rule}; an abstract is read apart from the reference list, so state the point without the citation"))
-    read = " and ".join(w for _, w, _, _ in abstracts)
-    return Outcome(issues, "" if issues else f"no citations in {read}" + "".join(f" ({n.message})" for n in notes))
+    if not read:
+        raise Unchecked(notes[0].message)
+    return Outcome(issues, "" if issues else f"no citations in {' and '.join(read)}" + "".join(f" ({n.message})" for n in notes))
 
 
 def _structured_check(venue: Venue, values: dict[str, str]) -> Outcome:

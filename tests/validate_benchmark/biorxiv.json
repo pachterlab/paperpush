@@ -1,0 +1,424 @@
+{
+  "description": "bioRxiv preprints (June-July 2026, CC BY) across ten subjects, validated as Word files made from their Europe PMC full text (bioRxiv refuses scripted PDF downloads; see scripts/jats_to_docx.py). Expected findings reviewed by hand against the Europe PMC XML.",
+  "venue": "biorxiv",
+  "papers": [
+    {
+      "europepmc": "PPR1277218",
+      "doi": "10.64898/2026.07.07.736929",
+      "title": "An internal PDZ-binding motif in Densin-180 promotes activity-dependen (neuroscience)",
+      "expected": [
+        {
+          "check": "citations.supplementary_attachments",
+          "contains": "manuscript references supplementary material",
+          "why": "the manuscript cites supplementary items and none are attached (validated without a .sub)"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 3d is first cited before Fig. 3b; panels are usually",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 6c is first cited before Fig. 6a; panels are usually",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "1 acronym(s) spelled out only in the abstract: 'PSD' (first",
+          "why": "acronym defined late, only in the abstract, or with two meanings ('sum intensity projection'/'project')"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "1 acronym(s) spelled out with different meanings: 'SIP'",
+          "why": "acronym defined late, only in the abstract, or with two meanings ('sum intensity projection'/'project')"
+        },
+        {
+          "check": "prose.usage",
+          "contains": "1 agreement slip(s): ...or LifeAct for »each spine were«",
+          "why": "'each X were' in the text"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.acronyms",
+          "contains": "14 acronym(s) used but never spelled out: 'SHANK' (55x,",
+          "why": "real undefined acronyms mixed with gene and protein symbols (SHANK, UBTF, HOX) that need no definition"
+        }
+      ]
+    },
+    {
+      "europepmc": "PPR1276294",
+      "doi": "10.64898/2026.07.07.736950",
+      "title": "Rectangle: robust and scalable multiscale deconvolution informed by si (bioinformatics)",
+      "expected": [
+        {
+          "check": "citations.supplementary_attachments",
+          "contains": "manuscript references supplementary material (“Suppl. Table",
+          "why": "the manuscript cites supplementary items and none are attached (validated without a .sub)"
+        },
+        {
+          "check": "prose.conventions",
+          "contains": "1 malformed 'i.e.'/'e.g.': ...reconstruction error »eg,«",
+          "why": "malformed abbreviation in the text"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "2 acronym(s) used before they are spelled out: 'RMSE' first",
+          "why": "acronym defined late, only in the abstract, or with two meanings ('sum intensity projection'/'project')"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.punctuation_spacing",
+          "contains": "5 spacing problem(s) around punctuation: \"...subject to x ≥",
+          "why": "the converter drops inline math ('subject to x >= 0 and [formula].'); 'local,docker' is a command-line argument"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "1 acronym(s) used but never spelled out: 'CAF' (2x, first",
+          "why": "real undefined acronyms mixed with gene and protein symbols (SHANK, UBTF, HOX) that need no definition"
+        }
+      ]
+    },
+    {
+      "europepmc": "PPR1264076",
+      "doi": "10.64898/2026.06.25.733584",
+      "title": "Spike-in–normalised single-cell RNA-seq reveals cell-type-specific tra (genomics)",
+      "expected": [
+        {
+          "check": "citations.supplementary_attachments",
+          "contains": "manuscript references supplementary material",
+          "why": "the manuscript cites supplementary items and none are attached (validated without a .sub)"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 3 has panel d in its legend that the text never cites",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "1 acronym(s) used before they are spelled out: 'DEG' first",
+          "why": "acronym defined late, only in the abstract, or with two meanings ('sum intensity projection'/'project')"
+        },
+        {
+          "check": "rigor.code_availability",
+          "contains": "the manuscript describes computational work (5 mentions of",
+          "why": "no code repository is linked in the text (PPR1261907 only promises 'will be available on Github')"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.acronyms",
+          "contains": "5 acronym(s) used but never spelled out: 'ERCC' (18x, first",
+          "why": "real undefined acronyms mixed with gene and protein symbols (SHANK, UBTF, HOX) that need no definition"
+        }
+      ]
+    },
+    {
+      "europepmc": "PPR1264072",
+      "doi": "10.64898/2026.06.30.735472",
+      "title": "Statistical learning of bacterial growth in combinatorially constructe (microbiology)",
+      "expected": [
+        {
+          "check": "citations.supplementary_attachments",
+          "contains": "manuscript references supplementary material",
+          "why": "the manuscript cites supplementary items and none are attached (validated without a .sub)"
+        },
+        {
+          "check": "citations.missing_captions",
+          "contains": "Table 1: no caption found; a caption is a line of its own",
+          "why": "Table 1 is cited but the Europe PMC version has no Table 1"
+        },
+        {
+          "check": "prose.brackets",
+          "contains": "1 unbalanced bracket(s) or quote(s): \"...environment b",
+          "why": "an unclosed or mismatched bracket/quote in the Europe PMC text"
+        }
+      ]
+    },
+    {
+      "europepmc": "PPR1261745",
+      "doi": "10.64898/2026.06.29.735028",
+      "title": "NucleiSky enables cross-scale multimodal registration of microscopy da (cell biology)",
+      "expected": [
+        {
+          "check": "citations.supplementary_attachments",
+          "contains": "manuscript references supplementary material (“Fig. S1A”,",
+          "why": "the manuscript cites supplementary items and none are attached (validated without a .sub)"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 2 has panels a, b, c, d in its legend that the text",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "prose.brackets",
+          "contains": "1 unbalanced bracket(s) or quote(s): \"...Kamprads",
+          "why": "an unclosed or mismatched bracket/quote in the Europe PMC text"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "1 acronym(s) used before they are spelled out: 'SSIM' first",
+          "why": "acronym defined late, only in the abstract, or with two meanings ('sum intensity projection'/'project')"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.acronyms",
+          "contains": "14 acronym(s) used but never spelled out: 'DCIS' (6x, first",
+          "why": "real undefined acronyms mixed with gene and protein symbols (SHANK, UBTF, HOX) that need no definition"
+        }
+      ]
+    },
+    {
+      "europepmc": "PPR1260639",
+      "doi": "10.64898/2026.06.26.734721",
+      "title": "Quinone-transporting filaments extend the respiratory chain of Gram-po (biochemistry)",
+      "expected": [
+        {
+          "check": "citations.supplementary_attachments",
+          "contains": "manuscript references supplementary material (“Figure S1a”,",
+          "why": "the manuscript cites supplementary items and none are attached (validated without a .sub)"
+        },
+        {
+          "check": "citations.supp_figure",
+          "contains": "Supplementary Figure 11 is cited before Supplementary",
+          "why": "order of first citation in the text"
+        },
+        {
+          "check": "citations.supp_table",
+          "contains": "Supplementary Table 3 is cited before Supplementary Table",
+          "why": "order of first citation in the text"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 1j is first cited before Fig. 1g; panels are usually",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 4c is first cited before Fig. 4b; panels are usually",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Supplementary Fig. 9f is first cited before Supplementary",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "prose.punctuation_spacing",
+          "contains": "1 spacing problem(s) around punctuation: \"...respiratory",
+          "why": "a space before a full stop after superscript citations ('quinone28,29 .')"
+        },
+        {
+          "check": "prose.brackets",
+          "contains": "2 unbalanced bracket(s) or quote(s): \"...equation »(«v =",
+          "why": "an unclosed or mismatched bracket/quote in the Europe PMC text"
+        },
+        {
+          "check": "prose.conventions",
+          "contains": "1 malformed 'i.e.'/'e.g.': ...in a single polarity, »ie.«",
+          "why": "malformed abbreviation in the text"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "3 acronym(s) used before they are spelled out: 'CTF' first",
+          "why": "acronym defined late, only in the abstract, or with two meanings ('sum intensity projection'/'project')"
+        },
+        {
+          "check": "rigor.code_availability",
+          "contains": "the manuscript describes computational work (25 mentions of",
+          "why": "no code repository is linked in the text (PPR1261907 only promises 'will be available on Github')"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.spelling",
+          "contains": "'homogenous'",
+          "why": "a common variant spelling that codespell lists"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "15 acronym(s) used but never spelled out: 'KM' (2x, first",
+          "why": "real undefined acronyms mixed with gene and protein symbols (SHANK, UBTF, HOX) that need no definition"
+        }
+      ]
+    },
+    {
+      "europepmc": "PPR1260721",
+      "doi": "10.64898/2026.06.26.734713",
+      "title": "Evolutionary genomics of a natural Wolbachia superinfection in the den (evolutionary biology)",
+      "expected": [
+        {
+          "check": "citations.supplementary_attachments",
+          "contains": "manuscript references supplementary material (“Table S1”,",
+          "why": "the manuscript cites supplementary items and none are attached (validated without a .sub)"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 3 has panels b, c in its legend that the text never",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "prose.usage",
+          "contains": "2 agreement slip(s): Equimolar quantities of »each library",
+          "why": "'each X were' in the text"
+        },
+        {
+          "check": "rigor.code_availability",
+          "contains": "the manuscript describes computational work (5 mentions of",
+          "why": "no code repository is linked in the text (PPR1261907 only promises 'will be available on Github')"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.brackets",
+          "contains": "2 unbalanced bracket(s) or quote(s): \"...was 127—224×",
+          "why": "the bracket closes inside MathML the converter drops"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "6 acronym(s) used but never spelled out: 'SNP' (10x, first",
+          "why": "real undefined acronyms mixed with gene and protein symbols (SHANK, UBTF, HOX) that need no definition"
+        }
+      ]
+    },
+    {
+      "europepmc": "PPR1259842",
+      "doi": "10.64898/2026.06.24.734247",
+      "title": "Neural Processes with Normalizing Flows for Wheat Height Estimation (plant biology)",
+      "expected": [
+        {
+          "check": "rigor.code_availability",
+          "contains": "the manuscript describes computational work (6 mentions of",
+          "why": "no code repository is linked in the text (PPR1261907 only promises 'will be available on Github')"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.punctuation_spacing",
+          "contains": "9 spacing problem(s) around punctuation: \"...there is a set",
+          "why": "the converter drops inline math ('defined as [formula], where')"
+        }
+      ]
+    },
+    {
+      "europepmc": "PPR1279116",
+      "doi": "10.64898/2026.07.13.738216",
+      "title": "Temporally distinct CDX programmes preconfigure vagal and trunk neural (developmental biology)",
+      "expected": [
+        {
+          "check": "citations.supplementary_attachments",
+          "contains": "manuscript references supplementary material (“Figure",
+          "why": "the manuscript cites supplementary items and none are attached (validated without a .sub)"
+        },
+        {
+          "check": "citations.supp_table",
+          "contains": "Supplementary Table 7 is cited before Supplementary Table",
+          "why": "order of first citation in the text"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 2d is first cited before Fig. 2c; panels are usually",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 4g is first cited before Fig. 4f; panels are usually",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Supplementary Fig. 3f is first cited before Supplementary",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Supplementary Table 1f is first cited before Supplementary",
+          "why": "panel citation order/coverage read from the text (spot-checked: PPR1261745 cites only Fig. 2E)"
+        },
+        {
+          "check": "front_matter.contact_email",
+          "contains": "PPR1279116.docx gives no e-mail address; add the",
+          "why": "no e-mail address anywhere in the Europe PMC record"
+        },
+        {
+          "check": "prose.spelling",
+          "contains": "1 common misspelling(s): 'mutliple' (did you mean",
+          "why": "a typo in the text"
+        },
+        {
+          "check": "prose.conventions",
+          "contains": "1 malformed 'et al.': ...et al., 2002; Young »et al«, 2009;",
+          "why": "malformed abbreviation in the text"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "2 acronym(s) used before they are spelled out: 'AEpiL'",
+          "why": "acronym defined late, only in the abstract, or with two meanings ('sum intensity projection'/'project')"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "1 acronym(s) the abstract uses without spelling out (the",
+          "why": "acronym defined late, only in the abstract, or with two meanings ('sum intensity projection'/'project')"
+        },
+        {
+          "check": "prose.usage",
+          "contains": "2 agreement slip(s): ...expression values for »each gene",
+          "why": "'each X were' in the text"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "bibliography.uncited",
+          "contains": "1 of 61 entries in the reference list of PPR1279116.docx is",
+          "why": "the Europe PMC record of Bronner & Simoes-Costa has no year"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "14 acronym(s) used but never spelled out: 'HOX' (2x, first",
+          "why": "real undefined acronyms mixed with gene and protein symbols (SHANK, UBTF, HOX) that need no definition"
+        }
+      ]
+    },
+    {
+      "europepmc": "PPR1261907",
+      "doi": "10.64898/2026.06.28.735040",
+      "title": "Color polymorphism in the saddleback clownfish,  <i>Amphiprion polymnu (ecology)",
+      "expected": [
+        {
+          "check": "citations.supplementary_attachments",
+          "contains": "manuscript references supplementary material (“Figure S1”),",
+          "why": "the manuscript cites supplementary items and none are attached (validated without a .sub)"
+        },
+        {
+          "check": "prose.brackets",
+          "contains": "3 unbalanced bracket(s) or quote(s): \"Recent taxonomic...",
+          "why": "an unclosed or mismatched bracket/quote in the Europe PMC text"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "1 acronym(s) used before they are spelled out: 'FST' first",
+          "why": "acronym defined late, only in the abstract, or with two meanings ('sum intensity projection'/'project')"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "1 acronym(s) the abstract uses without spelling out (the",
+          "why": "acronym defined late, only in the abstract, or with two meanings ('sum intensity projection'/'project')"
+        },
+        {
+          "check": "rigor.code_availability",
+          "contains": "the manuscript describes computational work (4 mentions of",
+          "why": "no code repository is linked in the text (PPR1261907 only promises 'will be available on Github')"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.acronyms",
+          "contains": "5 acronym(s) used but never spelled out: 'GATK' (2x, first",
+          "why": "real undefined acronyms mixed with gene and protein symbols (SHANK, UBTF, HOX) that need no definition"
+        }
+      ]
+    }
+  ]
+}

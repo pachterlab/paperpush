@@ -15,11 +15,6 @@
           "check": "citations.panels",
           "contains": "Fig. 2 has panels a, c",
           "why": "the text cites only Figure 2b"
-        },
-        {
-          "check": "prose.acronyms",
-          "contains": "'LLM'",
-          "why": "LLM is never spelled out"
         }
       ]
     },
@@ -50,11 +45,6 @@
           "check": "prose.acronyms",
           "contains": "used before they are spelled out",
           "why": "AUROC and NLI are used before their definitions"
-        },
-        {
-          "check": "prose.acronyms",
-          "contains": "the abstract uses without spelling out",
-          "why": "AUROC in the abstract"
         },
         {
           "check": "prose.acronyms",
@@ -94,8 +84,15 @@
         },
         {
           "check": "prose.acronyms",
-          "contains": "'IID'",
-          "why": "IID/OOD/FLAN only in legends and tables, never spelled out"
+          "contains": "'LoRA'",
+          "why": "the abstract uses LoRA without spelling it out"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.acronyms",
+          "contains": "'FLAN'",
+          "why": "FLAN is a dataset name"
         }
       ]
     },
@@ -192,14 +189,16 @@
           "why": "no address in the paper"
         },
         {
-          "check": "prose.acronyms",
-          "contains": "'LLM'",
-          "why": "LLM is never spelled out (UBS and P&L in the same message are names)"
-        },
-        {
           "check": "rigor.code_availability",
           "contains": "links no code repository",
           "why": "no repository is linked"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.acronyms",
+          "contains": "'TARGET'",
+          "why": "an all-caps word in a quoted agent prompt"
         }
       ]
     },
@@ -211,11 +210,13 @@
           "check": "citations.panels",
           "contains": "Fig. 1 has panel b",
           "why": "the text cites only Fig. 1(a)"
-        },
+        }
+      ],
+      "tolerated": [
         {
           "check": "prose.acronyms",
-          "contains": "'KL'",
-          "why": "KL and CE are never spelled out ('AB' in the same message is Alberta in an affiliation: a known imprecision)"
+          "contains": "'AB'",
+          "why": "SGDR and PGD are undefined, but 'AB' is Alberta in an affiliation and SVHN a dataset name"
         }
       ]
     },
@@ -232,6 +233,11 @@
           "check": "rigor.code_availability",
           "contains": "links no code repository",
           "why": "no repository is linked"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "spelled out only in the abstract: 'ML'",
+          "why": "ML is defined in the abstract only"
         }
       ]
     },
@@ -285,11 +291,6 @@
           "why": "'is belows tol.'"
         },
         {
-          "check": "prose.acronyms",
-          "contains": "'LLM'",
-          "why": "LLM, CIF, ... never spelled out"
-        },
-        {
           "check": "prose.usage",
           "contains": "each system were",
           "why": "agreement slip in the text"
@@ -300,6 +301,11 @@
           "check": "prose.spelling",
           "contains": "'unparseable'",
           "why": "reported in the same message as 'belows'; 'unparseable' is a common variant spelling that codespell lists"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "'JARVIS'",
+          "why": "tool and database names (JARVIS, GEPA, DICVOL) mixed with real undefined acronyms"
         }
       ]
     }

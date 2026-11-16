@@ -438,8 +438,15 @@ _KNOWN = frozenset(
     PET EEG ECG EKG FDA NIH NSF ERC WHO CDC MIT UCLA USC MD PHD PhD MS MSc BS BSc BA MA ET AL FIG EQ VS IE EG CF NB PS AND OR THE OF IN ON
     AT TO FOR BY WITH IS ARE NOT ABSTRACT INTRODUCTION METHODS RESULTS DISCUSSION CONCLUSION CONCLUSIONS REFERENCES ACKNOWLEDGMENTS
     ACKNOWLEDGEMENTS SUPPLEMENTARY APPENDIX BACKGROUND MATERIALS DATA CODE AVAILABILITY FUNDING TABLE FIGURE NY CA MA TX UK LLC INC
-    MATLAB ATP GTP NADH NADPH TEX LATEX BIBTEX API APIs HTTP HTTPS SQL IBM NASA NVIDIA AMD AWS""".split()
+    MATLAB ATP GTP NADH NADPH TEX LATEX BIBTEX API APIs HTTP HTTPS SQL IBM NASA NVIDIA AMD AWS
+    LLM FLOP FLOPS MDP PPO MLP SGD RL KL NLP SOTA AUC AUROC ROC MSE BLEU ROUGE IID OOD PCA SVD QA VQA
+    BERT GPT CLIP TPU KV ODE PDE CIFAR MNIST
+    DAPI EDTA EGTA PBS BSA DMSO SDS FBS DMEM RPMI HEPES DTT GFP EGFP RFP YFP CFP FLAG NAD FAD ADP GDP""".split()
 )
+# The last line: lab reagents, buffers, and tags no biology paper spells out (bioRxiv audit: DAPI, EDTA,
+# PBS, FLAG reported as "never spelled out").
+# The second line: terms every machine-learning reader knows, and model and dataset names that are never
+# expanded (ICLR 2026 audit: FLOPs, MDP, PPO, LLM, GPT, CLIP, CIFAR reported as "never spelled out").
 _ROMAN = re.compile(r"[IVXLC]+")
 # Words an acronym's letters skip ("Department of Energy (DE)").
 _ACRONYM_LINK_WORDS = frozenset("a an and the of for in on to with by".split())
@@ -460,7 +467,16 @@ def _counts(paragraph: str) -> bool:
     if _is_heading(paragraph) or _CAPTION_START.match(paragraph):
         return False
     letters = [c for c in paragraph if c.isalpha()]
-    return not letters or sum(c.isupper() for c in letters) < 0.5 * len(letters)
+    if letters and sum(c.isupper() for c in letters) >= 0.5 * len(letters):
+        return False
+    # A figure's or table's text in a PDF's page text: axis ticks and cells, mostly numbers
+    # ("2.2 2.4 2.6 Loss TREC predicts best data place LR drops ..."), where no acronym is introduced
+    # (ICLR 2026 audit: a teaser figure's labels read as uses before the introduction's definitions).
+    words = paragraph.split()
+    return len(words) < 20 or sum(bool(_NUMBER_TOKEN.fullmatch(w)) for w in words) < 0.3 * len(words)
+
+
+_NUMBER_TOKEN = re.compile(r"[(\[]?[-+\u2212]?[\d.,]+[%\u00d7]?[)\],;]?|[\u00b1\u00d7]")
 
 
 @dataclass
@@ -511,8 +527,17 @@ def _expansion(before: str, acronym: str) -> str | None:
             i -= 1
         picked.append(words[i].lower())
         i -= 1
-    picked[0] = picked[0][:-1] if len(picked[0]) > 3 and picked[0].endswith("s") else picked[0]  # the last word: singular
+    picked[0] = _singular(picked[0])  # the last word
     return " ".join(reversed(picked))
+
+
+def _singular(word: str) -> str:
+    """``word`` without a plural ending: "networks" is "network", "processes" is "process" (not "processe"), "loss" stays."""
+    if word.endswith("sses"):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
 
 
 def _phrase(before: str, acronym: str) -> str | None:
@@ -535,13 +560,91 @@ def mixed_case_acronyms(paragraphs: list[str]) -> set[str]:
     return found
 
 
+# Characters of an equation. A PDF's text flattens a formula into capitals that look like acronyms:
+# "EP,π[PH j=h ...]" (an expectation and a sum), "PK k=1", "E[A GAE t ]" (ICLR 2026 audit).
+_MATH_CHARS = frozenset("=<>≤≥≠≈∼∝∈∉⊂⊆∑∏∫∂∇∥|^_+×÷·←→↦⇒⇔∞∅∗†‖⟨⟩") | frozenset(chr(c) for c in range(0x3B1, 0x3CA)) - {"ς"}
+_MATH_WINDOW = 20
+# What may stand right before a use: a word written on its own, not glued to a formula ("(ELBO)LELBO", "=:LSV").
+_USE_OPENERS = frozenset(" \t\n([{\"'“‘")
+# A name split at a hyphen with spaces around it ("AUTO - RT"), or a capital standing alone before the token.
+_SPACED_HYPHEN_AFTER = re.compile(r"\s+[-‐‑–]\s*[A-Z]|[-‐‑–]\s+[A-Z]")
+_SPACED_HYPHEN_BEFORE = re.compile(r"[A-Z]\s*[-‐‑–]\s+$|[A-Z]\s+[-‐‑–]$")
+_CAPS_BEFORE = re.compile(r"(?<![\w-])([A-Z]+)[ ]$")
+_CAPS_AFTER = re.compile(r"^[ ]([A-Z]+)(?![\w-])")
+# An author-year citation right after the token ("GQA (Hudson & Manning, 2019)", "EBD (Park & Shen, 2024)"):
+# the token is a model, dataset, or method's name, which a reader looks up rather than expands.
+_CITED_AFTER = re.compile(r"\s*[(\[]\s*(?:e\.g\.,?\s*)?[A-Z][^()\[\]]{0,80}?(?:19|20)\d\d[a-z]?\s*[;,)\]]")
+# Introduced in words rather than in parentheses: "..., abbreviated as DA." (ICLR 2026 audit).
+_NAMED_BEFORE = re.compile(r"\b(?:abbreviated|denoted|referred\s+to|known)\s+as\s+(?:the\s+)?$|\bcalled\s+$", re.IGNORECASE)
+_NAMED_AFTER = re.compile(r"\s+(?:dataset|data\s+set|benchmark|corpus|suite|library|toolkit|package|codebase|checkpoint)s?\b", re.IGNORECASE)
+
+
+def _math_near(p: str, start: int, end: int) -> bool:
+    """Whether the token at ``p[start:end]`` sits in a formula: two or more equation characters near it."""
+    window = p[max(0, start - _MATH_WINDOW): start] + p[end: end + _MATH_WINDOW]
+    return sum(c in _MATH_CHARS for c in window) >= 2
+
+
+def _not_a_use(p: str, m: re.Match, tokens: set[str]) -> bool:
+    """Whether the acronym-like match ``m`` in ``p`` is extraction debris rather than a use of an acronym.
+
+    ``tokens`` is every capitalized token of the manuscript, to put a name split across a space back
+    together ("SV AE" for SVAE, which the paper defines; ICLR 2026 audit).
+    """
+    start, end = m.start(1), m.end()
+    if start > 0 and p[start - 1] not in _USE_OPENERS:
+        return True  # glued to what comes before: a subscript or a formula
+    if p[end: end + 1] == "(":
+        return True  # "KL(p||q)", "VQ(z;E)": a function in a formula
+    if _math_near(p, start, end):
+        return True
+    # A sub- or superscript around it: "A GAE t" is A^GAE_t, "PK k=1" a sum.
+    if re.match(r"\s[b-z](?:\s|[\]),;=]|$)", p[end:]) or re.search(r"(?:^|\s)[B-HJ-Z]\s$", p[:start]):
+        return True
+    if _SPACED_HYPHEN_AFTER.match(p, end) or _SPACED_HYPHEN_BEFORE.search(p[:start]):
+        return True
+    before, after = _CAPS_BEFORE.search(p[:start]), _CAPS_AFTER.match(p[end:])
+    return bool((before and before.group(1) + m.group(1) in tokens) or (after and m.group(1) + after.group(1) in tokens))
+
+
+_REVERSE_DEFINITION = re.compile(r"(?<![\w\-/.\\@])([A-Z][A-Z&]*[A-Z])s?\s*\(\s*([A-Za-z][^()]{2,80}?)\s*\)")
+
+
+def _reverse_definitions(p: str) -> list[tuple[str, int, str]]:
+    """``(acronym, offset, full term)`` for each "ACR (full term)" in ``p``: the term's words spell it, from its start.
+
+    ICLR 2026 audit: "ESG (Environmental, Social, and Governance)" was reported as never spelled out.
+    """
+    out = []
+    for m in _REVERSE_DEFINITION.finditer(p):
+        inner = m.group(2).rstrip(" ,;")
+        start = _expansion_start(inner + " ", m.group(1))
+        if start is not None and not inner[:start].strip():
+            out.append((m.group(1), m.start(1), inner))
+    return out
+
+
+def _names(paragraphs: list[str]) -> set[str]:
+    """Acronym-like tokens used as a name somewhere (followed by a citation, or by "dataset", "benchmark", ...) or introduced in words ("abbreviated as DA")."""
+    out: set[str] = set()
+    for p in paragraphs:
+        for m in _ACRONYM.finditer(p):
+            if _CITED_AFTER.match(p, m.end()) or _NAMED_AFTER.match(p, m.end()) or _NAMED_BEFORE.search(p[max(0, m.start(1) - 40): m.start(1)]):
+                out.add(m.group(1))
+    return out
+
+
+def _caps_tokens(paragraphs: list[str]) -> set[str]:
+    return {t for p in paragraphs for t in re.findall(r"(?<![\w-])[A-Z][A-Za-z]*(?:-[A-Z][A-Za-z]*)*(?![\w])", p)}
+
+
 def _acronym_matches(p: str, pattern: re.Pattern, mixed: re.Pattern | None):
     yield from pattern.finditer(p)
     if mixed is not None:
         yield from mixed.finditer(p)
 
 
-def _scan_acronyms(paragraphs: list[str], mixed: set[str] | frozenset[str] = frozenset()) -> dict[str, _Acro]:
+def _scan_acronyms(paragraphs: list[str], mixed: set[str] | frozenset[str] = frozenset(), tokens: set[str] | frozenset[str] = frozenset()) -> dict[str, _Acro]:
     """Each acronym's definitions and uses in the body text of ``paragraphs``.
 
     Uses in a legend or a table (a paragraph :func:`_counts` leaves out, other
@@ -561,7 +664,7 @@ def _scan_acronyms(paragraphs: list[str], mixed: set[str] | frozenset[str] = fro
                 if _CAPTION_START.match(p):
                     defs |= {(m.group(1), m.start(1)) for m in _LEGEND_DEFINITION.finditer(p)}
                 for m in _acronym_matches(p, _ACRONYM, mixed_use):
-                    if not _skipped(m.group(1)):
+                    if not _skipped(m.group(1)) and ((m.group(1), m.start(1)) in defs or not _not_a_use(p, m, tokens)):
                         entry = found.setdefault(m.group(1), _Acro())
                         if (m.group(1), m.start(1)) in defs:
                             entry.legend_defined = True
@@ -569,20 +672,23 @@ def _scan_acronyms(paragraphs: list[str], mixed: set[str] | frozenset[str] = fro
                             entry.other_uses += 1
             continue
         defined_here = {(m.group(1), m.start(1)) for m in _acronym_matches(p, _DEFINITION, mixed_def)}
+        reverse = {(acr, pos): term for acr, pos, term in _reverse_definitions(p)}
+        defined_here |= set(reverse)
         for acr, pos in sorted(defined_here, key=lambda x: x[1]):
             if _skipped(acr):
                 continue  # its uses are not counted either: "(USA)", "(III)"
             entry = found.setdefault(acr, _Acro())
             entry.definitions.append((i, pos))
-            expansion = _expansion(p[: p.rfind("(", 0, pos)], acr)
+            before = reverse[(acr, pos)] + " " if (acr, pos) in reverse else p[: p.rfind("(", 0, pos)]
+            expansion = _expansion(before, acr)
             if expansion and expansion not in entry.expansions:
                 entry.expansions.append(expansion)
-            phrase = _phrase(p[: p.rfind("(", 0, pos)], acr)
+            phrase = _phrase(before, acr)
             if phrase:
                 entry.phrases.append(phrase)
         for m in _acronym_matches(p, _ACRONYM, mixed_use):
             acr = m.group(1)
-            if (acr, m.start(1)) in defined_here or _skipped(acr):
+            if (acr, m.start(1)) in defined_here or _skipped(acr) or _not_a_use(p, m, tokens):
                 continue
             a = found.setdefault(acr, _Acro())
             a.uses += 1
@@ -592,7 +698,7 @@ def _scan_acronyms(paragraphs: list[str], mixed: set[str] | frozenset[str] = fro
     return found
 
 
-def _float_acronyms(paragraphs: list[str], mixed: set[str] | frozenset[str]) -> tuple[Counter, set[str]]:
+def _float_acronyms(paragraphs: list[str], mixed: set[str] | frozenset[str], tokens: set[str] | frozenset[str] = frozenset()) -> tuple[Counter, set[str]]:
     """Acronym uses in legend and table text, and the acronyms it spells out ("... (ACR)")."""
     names = "|".join(re.escape(m) for m in sorted(mixed, key=len, reverse=True))
     mixed_use = re.compile(rf"(?<![\w\-/.\\@])({names})(s?)(?![\w/@])(?!-(?![a-z]))") if names else None
@@ -603,7 +709,7 @@ def _float_acronyms(paragraphs: list[str], mixed: set[str] | frozenset[str]) -> 
         defs = {(m.group(1), m.start(1)) for m in _acronym_matches(p, _DEFINITION, mixed_def)}
         defs |= {(m.group(1), m.start(1)) for m in _LEGEND_DEFINITION.finditer(p)}
         defined |= {acr for acr, _ in defs}
-        uses.update(m.group(1) for m in _acronym_matches(p, _ACRONYM, mixed_use) if (m.group(1), m.start(1)) not in defs and not _skipped(m.group(1)))
+        uses.update(m.group(1) for m in _acronym_matches(p, _ACRONYM, mixed_use) if (m.group(1), m.start(1)) not in defs and not _skipped(m.group(1)) and not _not_a_use(p, m, tokens))
     return uses, defined
 
 
@@ -630,7 +736,7 @@ def _meaning_key(expansion: str) -> str:
     """
     words = re.findall(r"[a-z0-9]+", expansion.lower())
     words = [_LINK_GLUED.sub("", w) for w in words if w not in _ACRONYM_LINK_WORDS]
-    return " ".join(w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w for w in words)
+    return " ".join(_singular(w) for w in words)
 
 
 # A linking word glued to the end of the word before it by a lost line-break hyphen.
@@ -688,7 +794,7 @@ def _expanded_uses(body: list[str], found: dict[str, _Acro]) -> tuple[dict[str, 
     return before, after
 
 
-def acronyms(body: list[str], abstract: list[str] | None = None, floats: list[str] | None = None, tables: list[str] | None = None) -> Acronyms:
+def acronyms(body: list[str], abstract: list[str] | None = None, floats: list[str] | None = None, tables: list[str] | None = None, legends_reliable: bool = True) -> Acronyms:
     """Acronyms in ``body`` (the main text) and ``abstract`` not introduced at first use.
 
     ``floats`` is the legend text of the main text's figures and tables that
@@ -696,20 +802,36 @@ def acronyms(body: list[str], abstract: list[str] | None = None, floats: list[st
     spelled out there counts as spelled out. ``tables`` is table-cell text: it
     only shows that an acronym is used (a column of method names is not where
     acronyms are introduced, so cells alone do not make one "undefined").
+
+    ``legends_reliable`` is False when ``floats`` was cut from a PDF's page
+    text, where a legend's end is a guess and the main text after it can land
+    in ``floats``: then "spelled out only in a legend" is not reported (ICLR
+    2026 audit: 3 of 3 such reports were main-text definitions), nor an
+    acronym "used but never spelled out" that is seen only outside the prose.
+
+    A token used as a name (cited like a paper, "GQA (Hudson & Manning,
+    2019)", or called a dataset or benchmark) and a capitalized ordinary word
+    (a small-caps heading, "3 METHOD In this section", when "method" is in the
+    text) are never reported as undefined or used too early.
     """
     out = Acronyms()
-    mixed = mixed_case_acronyms(body + (abstract or []) + (floats or []))
-    main = _scan_acronyms(body, mixed)
-    abs_found = _scan_acronyms(abstract or [], mixed)
-    float_uses, float_defined = _float_acronyms(floats or [], mixed)
+    everything = body + (abstract or []) + (floats or [])
+    mixed = mixed_case_acronyms(everything)
+    tokens = _caps_tokens(everything + (tables or []))
+    names = _names(everything)
+    lower_words = {w for p in everything for w in re.findall(r"(?<![\w-])[a-z]{3,}(?![\w-])", p)}
+    exempt = lambda acr: acr in names or (len(acr) >= 3 and acr.lower() in lower_words)  # noqa: E731
+    main = _scan_acronyms(body, mixed, tokens)
+    abs_found = _scan_acronyms(abstract or [], mixed, tokens)
+    float_uses, float_defined = _float_acronyms(floats or [], mixed, tokens)
     for acr, n in float_uses.items():
         main.setdefault(acr, _Acro()).other_uses += n
-    table_uses, table_defined = _float_acronyms(tables or [], mixed)
+    table_uses, table_defined = _float_acronyms(tables or [], mixed, tokens)
     float_defined |= table_defined
     out.defined = sum(1 for a in main.values() if a.definitions)
     for acr, a in main.items():
         if a.definitions:
-            if a.first_use is not None and a.first_use < a.definitions[0]:
+            if a.first_use is not None and a.first_use < a.definitions[0] and not exempt(acr):
                 out.before_definition.append(f"'{acr}' first appears in {a.snippet}, before it is spelled out")
             meanings = list(dict.fromkeys(a.expansions + (abs_found[acr].expansions if acr in abs_found else [])))
             if len({_meaning_key(m) for m in meanings}) > 1:
@@ -718,17 +840,21 @@ def acronyms(body: list[str], abstract: list[str] | None = None, floats: list[st
                 out.redefined.append(f"'{acr}' ({len(a.definitions)} times)")
             if a.uses == 0 and a.other_uses == 0 and not table_uses[acr] and a.expansions:  # only the definition: the acronym is never used
                 out.rarely_used.append(f"'{acr}'")
+        elif exempt(acr):
+            continue
         elif acr in abs_found and abs_found[acr].definitions and a.uses:
             out.abstract_only.append(f"'{acr}' (first used in {a.snippet})")
         elif acr in float_defined or a.legend_defined:
             # A legend is read on its own, so spelling an acronym out there does not define it for the main text.
-            if a.uses:
+            if a.uses and legends_reliable:
                 out.legend_only.append(f"'{acr}' (first used in {a.snippet})")
-        elif a.uses + a.other_uses >= _UNDEFINED_MIN_USES:
+        elif a.uses + a.other_uses >= _UNDEFINED_MIN_USES and (a.uses or legends_reliable):
+            # Seen only outside the prose of a PDF's page text, a token is mostly a table's column or row
+            # label (benchmark and task names: "SQA", "RTE", "ACC"), not a term the reader must decode.
             where = f"first in {a.snippet}" if a.uses else "only in figure legends or tables"
             out.undefined.append(f"'{acr}' ({a.uses + a.other_uses}x, {where})")
     for acr, a in abs_found.items():
-        if a.uses and not a.definitions and acr in main and main[acr].definitions:
+        if a.uses and not a.definitions and acr in main and main[acr].definitions and not exempt(acr):
             out.abstract_undefined.append(f"'{acr}'")
     from .prose_check import _mark, _snippet
 
@@ -766,20 +892,50 @@ def _norm(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 
+# The introduction's heading ("1 INTRODUCTION", "1. Introduction"): where an abstract has certainly ended.
+_INTRO_HEADING = re.compile(r"(?<![\w.])(?:1\.?\s*(?:INTRODUCTION|Introduction)|INTRODUCTION)\b")
+
+
 def split_abstract(paragraphs: list[str], abstract_text: str | None) -> tuple[list[str], list[str]]:
-    """``(abstract paragraphs, main-text paragraphs)``: the front matter before the abstract is dropped."""
+    """``(abstract paragraphs, main-text paragraphs)``: the front matter before the abstract is dropped.
+
+    The abstract's own first and last words are looked for first: a PDF's
+    page text often runs the title, the abstract, and the introduction into
+    one paragraph, and matching whole paragraphs then dropped the one holding
+    the abstract and its definitions as front matter. Anything from the
+    introduction's heading on goes back to the main text, since an abstract
+    read from a PDF can run on into it (ICLR 2026 audit: "constrained Markov
+    decision process (CMDP)" and "Nested Subspace Networks (NSNs)" defined in
+    the introduction were read as abstract, and the paper's every later use
+    as never spelled out or used too early).
+    """
     if not abstract_text:
         return [], paragraphs
-    whole = _norm(abstract_text)
-    inside = []
-    for i, p in enumerate(paragraphs):
-        start = re.sub(r"^(?:abstract|summary)\s+", "", _norm(p))[:80]
-        if not _is_heading(p) and len(start) > 20 and start in whole:
-            inside.append(i)
-    if not inside:
-        return _split_abstract_inline(paragraphs, abstract_text)
-    first, last = inside[0], inside[-1]
-    return paragraphs[first : last + 1], paragraphs[last + 1 :]
+    abstract_text = abstract_text_end(abstract_text)
+    abstract, body = _split_abstract_inline(paragraphs, abstract_text)
+    if not abstract:
+        whole = _norm(abstract_text)
+        inside = []
+        for i, p in enumerate(paragraphs):
+            start = re.sub(r"^(?:abstract|summary)\s+", "", _norm(p))[:80]
+            if not _is_heading(p) and len(start) > 20 and start in whole:
+                inside.append(i)
+        if not inside:
+            return [], paragraphs
+        first, last = inside[0], inside[-1]
+        abstract, body = paragraphs[first : last + 1], paragraphs[last + 1 :]
+    for i, p in enumerate(abstract):
+        m = _INTRO_HEADING.search(p)
+        if m and (m.start() > 0 or i > 0):
+            head, rest = p[: m.start()].rstrip(), p[m.start() :]
+            return abstract[:i] + ([head] if head.strip() else []), [rest] + abstract[i + 1 :] + body
+    return abstract, body
+
+
+def abstract_text_end(abstract_text: str) -> str:
+    """``abstract_text`` up to the introduction's heading, where an abstract read from a PDF can run on."""
+    m = _INTRO_HEADING.search(abstract_text or "")
+    return abstract_text[: m.start()] if m and m.start() > 0 else abstract_text
 
 
 def _words_pattern(words: list[str]) -> re.Pattern:
@@ -1023,6 +1179,20 @@ def _body_paragraphs(text, prose_only: bool = False) -> list[str]:
     return _main_paragraphs(text.paragraphs)
 
 
+# The acknowledgments' heading: what follows names funders and authors' initials ("TLG acknowledges
+# support from NSERC"), not terms a reader needs spelled out (ICLR 2026 audit).
+_ACKNOWLEDGMENTS = re.compile(r"(?:^|(?<=\s))(?:ACKNOWLEDG(?:E)?MENTS?|Acknowledg(?:e)?ments?)\b(?!\s+(?:of|that|to|for)\b)")
+
+
+def _before_acknowledgments(body: list[str]) -> list[str]:
+    """``body`` up to the acknowledgments' heading, when it has one past its first half."""
+    for i, p in enumerate(body):
+        m = _ACKNOWLEDGMENTS.search(p)
+        if m and (m.start() == 0 or p[: m.start()].rstrip().endswith((".", "!", "?")) or re.search(r"(?:^|\s)\d+\.?\s*$", p[: m.start()])) and i >= len(body) // 2:
+            return body[:i] + ([p[: m.start()]] if p[: m.start()].strip() else [])
+    return body
+
+
 def _acronym_check(venue: Venue, values: dict[str, str]) -> Outcome:
     from . import document
     from .front_matter_check import manuscript_abstract
@@ -1044,14 +1214,21 @@ def _acronym_check(venue: Venue, values: dict[str, str]) -> Outcome:
 
             abstract_text = " ".join(_tex_paragraphs("\\begin{document}" + abstract_text))
         abstract, body = split_abstract(paragraphs, abstract_text)
+        body = _before_acknowledgments(body)
         doc = document.get(text.path)
         floats: list[str] = []
         tables: list[str] = []
+        pdf_legends = text.checks == PDF_CHECKS and not doc.is_tex
         if doc.is_tex and doc.tex_source:
             floats, tables = _tex_main_floats(doc.tex_source)
         elif text.checks == PDF_CHECKS and doc.page_texts is not None:
             floats = _pdf_main_captions(doc)  # a PDF's tables are in its page text
-        found = acronyms(body, abstract, floats, tables)
+        found = acronyms(body, abstract, floats, tables, legends_reliable=not pdf_legends)
+        # Say the abstract uses an acronym only if the abstract's own text has it: the abstract
+        # paragraphs cut from a PDF can carry figure text after it (ICLR 2026 audit: 'TPP', which
+        # the abstract never uses).
+        in_abstract = abstract_text_end(abstract_text) if abstract_text else " ".join(abstract)
+        found.abstract_undefined = [h for h in found.abstract_undefined if re.search(rf"(?<![\w-]){re.escape(h.split(chr(39))[1])}", in_abstract)]
         for kind, noun, advice, level in _ACRONYM_KINDS:
             hits = getattr(found, kind)
             if hits:

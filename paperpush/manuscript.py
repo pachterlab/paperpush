@@ -367,6 +367,10 @@ def docx_to_text(path: Path, drop_tables: bool = False) -> str | None:
     except (zipfile.BadZipFile, KeyError, OSError) as exc:
         logger.debug("Could not read DOCX %s: %s", path, exc)
         return None
+    # A .docx written with indented XML (pandoc, some converters) has whitespace between the
+    # tags; left in, it reads as blank lines and empty paragraphs. Word puts real line breaks
+    # in <w:br/>, never in the whitespace between elements.
+    xml = re.sub(r">[ \t]*\r?\n\s*<", "><", xml)
     xml = _W_HIDDEN.sub("", xml)
     if drop_tables:
         xml = _W_TABLE.sub("", xml)

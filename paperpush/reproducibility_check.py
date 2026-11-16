@@ -355,6 +355,8 @@ def _code_availability_check(venue: Venue, values: dict[str, str], online: bool)
     for field_id, text in src.statements:
         if not re.search(r"(?i)\bdata\b", text.split(":", 1)[0]) or not _UPON_REQUEST.search(text) or _RESTRICTED_REASON.search(text):
             continue
+        if _DEPOSITED.search(text):
+            continue  # "deposited on Zenodo ... and available from the authors upon request": not only on request
         issues.append(Issue(WARNING, field_id, f'the data are offered only on request, with no reason given ("{_quote(text, _UPON_REQUEST)}"); deposit them in a public repository, or say why they cannot be shared (privacy, consent, licence) and how access is granted'))
         break
     if not src.any():
@@ -386,11 +388,18 @@ def _code_availability_check(venue: Venue, values: dict[str, str], online: bool)
     return Outcome(issues, detail)
 
 
+# A statement that also names a public deposit of the data.
+_DEPOSITED = re.compile(r"(?i)\b(?:deposited|zenodo|figshare|dryad|github|osf\.io|publicly\s+available|public\s+repositor|accession|GEO\b|GSE\d|PRJ[A-Z]{2}\d|SRA\b|ArrayExpress|PRIDE|EMPIAR|EMDB|PDB\b|doi\.org|10\.\d{4,9}/)")
+
+
 def _quote(text: str, pattern: re.Pattern) -> str:
     m = pattern.search(text)
     if not m:
         return ""
     start = max(text.rfind(".", 0, m.start()) + 1, m.start() - 120)
+    if start > 0 and text[start - 1].isalnum():  # not from the middle of a word ("thors declare")
+        space = text.find(" ", start, m.start())
+        start = space + 1 if space >= 0 else start
     end = text.find(".", m.end())
     end = m.end() + 60 if end < 0 else min(end + 1, m.end() + 60)
     return " ".join(text[start:end].split())
