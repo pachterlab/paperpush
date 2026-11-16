@@ -143,7 +143,7 @@
               "type": "null"
             }
           ],
-          "description": "Declarations that must appear in the manuscript text."
+          "description": "Declarations the manuscript must contain, and those the submission system collects instead."
         },
         "figures": {
           "anyOf": [
@@ -301,7 +301,7 @@
               "type": "null"
             }
           ],
-          "description": "Declarations that must appear in the manuscript text."
+          "description": "Declarations the manuscript must contain, and those the submission system collects instead."
         },
         "figures": {
           "anyOf": [
@@ -792,6 +792,42 @@
           ],
           "description": "Whether lists take the serial (Oxford) comma: yes for 'A, B, and C', no for 'A, B and C'. Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent."
         },
+        "footnotes_allowed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "False when the guidelines forbid footnotes (and endnotes) in the manuscript text. Title-page author notes made with LaTeX's \\thanks are not counted."
+        },
+        "max_heading_levels": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Deepest heading level the manuscript may use (3: sections, subsections, and sub-subsections). The title is not a level."
+        },
+        "forbidden_fonts": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Fonts the manuscript must not use anywhere (e.g. Symbol), matched by family name."
+        },
         "initial_submission_any_format": {
           "anyOf": [
             {
@@ -869,6 +905,17 @@
             }
           ],
           "description": "Title page is uploaded as its own file (double-blind venues)."
+        },
+        "own_page": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "When the title page is part of the manuscript file, it is a page of its own: the abstract (or the main text) starts on a new page."
         },
         "title_max_characters": {
           "anyOf": [
@@ -1221,6 +1268,72 @@
           ],
           "description": "Declarations the venue accepts but does not require."
         },
+        "in_submission_form": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "data_availability",
+                  "code_availability",
+                  "competing_interests",
+                  "author_contributions",
+                  "funding",
+                  "acknowledgements",
+                  "ethics_approval",
+                  "consent_to_participate",
+                  "consent_to_publish",
+                  "materials_availability",
+                  "lead_contact",
+                  "inclusion_and_diversity",
+                  "ai_use",
+                  "reproducibility",
+                  "ethics_statement",
+                  "clinical_trial_registration",
+                  "reporting_guidelines"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Declarations the venue collects through its submission system (a form, a declarations tool, or a file uploaded with the manuscript) rather than in the manuscript text. They are not looked for in the manuscript, even when a publisher's house rules list them in required; the author is reminded to have them ready at submission."
+        },
+        "not_in_manuscript": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "data_availability",
+                  "code_availability",
+                  "competing_interests",
+                  "author_contributions",
+                  "funding",
+                  "acknowledgements",
+                  "ethics_approval",
+                  "consent_to_participate",
+                  "consent_to_publish",
+                  "materials_availability",
+                  "lead_contact",
+                  "inclusion_and_diversity",
+                  "ai_use",
+                  "reproducibility",
+                  "ethics_statement",
+                  "clinical_trial_registration",
+                  "reporting_guidelines"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Declarations the guidelines forbid in the manuscript file (they go only in the submission system); a heading for one in the manuscript is reported."
+        },
         "ai_use_if_used": {
           "anyOf": [
             {
@@ -1557,6 +1670,28 @@
             }
           ],
           "description": "Where figures go for the initial submission. combined_file: every figure in one document (Word or PDF), in citation order, each legend after its figure."
+        },
+        "embedded_forbidden": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True when the guidelines forbid figures inside the manuscript file, even when each figure is also uploaded separately."
+        },
+        "caption_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The word figure captions must start with, as the guidelines spell it (e.g. 'Fig' for 'Fig 1', 'Fig.' for 'Fig. 1', 'Figure')."
         },
         "notes": {
           "anyOf": [

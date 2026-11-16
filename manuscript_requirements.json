@@ -787,7 +787,11 @@
     "manuscript": {
       "formats": [
         ".tex",
-        ".pdf"
+        ".pdf",
+        ".zip",
+        ".tar",
+        ".tar.gz",
+        ".tgz"
       ],
       "single_file": true,
       "notes": [
@@ -12593,7 +12597,7 @@
       "https://journals.plos.org/plosone/s/latex",
       "https://journals.plos.org/plosone/s/what-we-publish"
     ],
-    "retrieved": "2026-11-04",
+    "retrieved": "2026-11-15",
     "article_type_field": "article_type",
     "notes": [
       "LaTeX authors should use the PLOS LaTeX template (Overleaf-compatible, includes a BibTeX style file); a submission that does not follow the template format may be sent back for revisions.",
@@ -12617,22 +12621,26 @@
       "tables_placement": "inline",
       "language": "English",
       "initial_submission_any_format": "PLOS ONE waives all formatting requirements until the manuscript has received a provisional Editorial Accept decision.",
+      "footnotes_allowed": false,
+      "max_heading_levels": 3,
+      "forbidden_fonts": [
+        "Symbol"
+      ],
       "notes": [
         "Manuscript files can be DOC, DOCX, or RTF; LaTeX manuscripts must be submitted as PDFs.",
         "Microsoft Word documents must not be locked or protected.",
         "Manuscripts can be any length; there are no restrictions on word count, number of figures, or amount of supporting information.",
-        "Use a standard font size and any standard font except the font named 'Symbol'.",
-        "Limit sections and sub-sections to 3 heading levels.",
         "Do not format text in multiple columns.",
         "Use continuous line numbers (do not restart numbering on each page).",
-        "Footnotes are not permitted.",
         "Define abbreviations at first appearance; do not use non-standard abbreviations unless they appear at least three times.",
-        "The figures page states that PLOS ONE waives all formatting requirements until a provisional Editorial Accept decision."
+        "The figures page states that PLOS ONE waives all formatting requirements until a provisional Editorial Accept decision.",
+        "Use a standard font size and a standard font."
       ]
     },
     "title_page": {
       "required_items": [
         "title",
+        "running_title",
         "authors",
         "affiliations",
         "corresponding_author",
@@ -12693,9 +12701,18 @@
         "clinical_trial_registration",
         "reporting_guidelines"
       ],
+      "in_submission_form": [
+        "funding",
+        "competing_interests",
+        "data_availability",
+        "author_contributions"
+      ],
+      "not_in_manuscript": [
+        "funding",
+        "competing_interests"
+      ],
       "notes": [
         "Do not include funding sources in the Acknowledgments or anywhere else in the manuscript file; funding is entered in the Financial Disclosure section of the submission form.",
-        "Competing interests are declared in the submission system, not in the manuscript file.",
         "The Data Availability Statement is entered in the submission form; accession numbers or DOIs should also be cited where the data set is mentioned in the manuscript.",
         "Methods sections of human-subjects research must include an ethics statement naming the approving IRB/committee and whether consent was written or oral.",
         "Animal research must state in Methods the full name of the approving ethics committee and the permit number(s).",
@@ -12723,13 +12740,16 @@
       "font": "Arial, Times, or Symbol only",
       "multipanel_labels": "lettered panel labels, e.g. (A) or (a)",
       "placement": "separate_files",
+      "legends_location": "with_figure",
+      "embedded_forbidden": true,
+      "caption_label": "Fig",
       "notes": [
         "Resolution must be 300-600 dpi.",
         "Width 789-2250 pixels at 300 dpi (6.68-19.05 cm); maximum height 2625 pixels at 300 dpi (22.23 cm).",
         "TIFF files must be flattened (no layers), have no alpha channels, use LZW compression, and not span multiple pages.",
-        "Each figure is uploaded as an individual file (Fig1.tif, Fig2.eps, ...); do not include figures in the main manuscript file.",
-        "Figure captions go in the manuscript text immediately after the paragraph where the figure is first cited, not in the figure file or a separate document.",
-        "Caption labels use 'Fig' (Fig 1, Fig 2); the caption title should be 15 words or fewer; legends are optional.",
+        "Name each figure file after its caption label (Fig1.tif, Fig2.eps, ...).",
+        "Each figure caption goes immediately after the paragraph where the figure is first cited, not in the figure file or a separate document.",
+        "The caption title should be 15 words or fewer; legends are optional.",
         "Cite figures in ascending numeric order at first appearance.",
         "Do not include author names, article title, or figure number/title/caption within figure files.",
         "PLOS does not accept vector EPS figures generated in LaTeX.",
@@ -19653,6 +19673,219 @@
         "Source code can be uploaded as supplementary material (e.g. anonymized code in a .zip) or linked via an anonymous repository; encouraged but optional.",
         "No supplementary file size cap is stated in the guidelines text.",
         "Supplementary materials are due on the same deadline as the full paper."
+      ]
+    }
+  },
+  "caltechdata": {
+    "source_urls": [
+      "https://library.caltech.edu/search/caltechdata",
+      "https://data.caltech.edu/terms",
+      "https://library.caltech.edu/publish/data",
+      "https://library.caltech.edu/c.php?g=1237965&p=9059086",
+      "https://libanswers.caltech.edu/faq/163209",
+      "https://libanswers.caltech.edu/faq/163208",
+      "https://libanswers.caltech.edu/faq/163212",
+      "https://libanswers.caltech.edu/faq/163211",
+      "https://libanswers.caltech.edu/faq/192438",
+      "https://libanswers.caltech.edu/faq/146996",
+      "https://libanswers.caltech.edu/faq/163214",
+      "https://libanswers.caltech.edu/faq/163215",
+      "https://libanswers.caltech.edu/faq/163217",
+      "https://libanswers.caltech.edu/faq/240347",
+      "https://libanswers.caltech.edu/faq/262131",
+      "https://libanswers.caltech.edu/faq/271978",
+      "https://libanswers.caltech.edu/faq/206864",
+      "https://libanswers.caltech.edu/faq/246167",
+      "https://libanswers.caltech.edu/faq/446288",
+      "https://libanswers.caltech.edu/faq/163218",
+      "https://caltechlibrary.github.io/RDMworkbook/data-sharing.html"
+    ],
+    "retrieved": "2026-11-15",
+    "notes": [
+      "CaltechDATA is for Caltech faculty, staff and students, and the research collaborations they belong to; uploading needs an access.caltech account.",
+      "Any digital files or software may be deposited, of any type; publications belong in CaltechAUTHORS instead.",
+      "Each access.caltech account gets 1 TB of free storage; additional storage is a one-time $200 per TB (5-year availability guarantee) or $400 per TB (10-year guarantee), arranged through data@caltech.edu.",
+      "Large data collections should be discussed with data@caltech.edu before uploading.",
+      "A record can contain at most 550 files; zip files together before uploading if there are more.",
+      "Every record is assigned a DOI.",
+      "Content may be deposited under an embargo with an end date, after which it becomes public automatically; a Share link can give access during the embargo.",
+      "Records cannot be private indefinitely: all data must be intended for public access at some point.",
+      "Depositors must comply with any funder, publisher, or organizational embargo requirements themselves.",
+      "Unpublished data may be deposited, and a related publication can be linked by its DOI in the related identifiers field with the relation \"Is cited by\".",
+      "Creators are the main researchers who produced the data and need not match the authors of a related publication; others who helped can be listed as contributors.",
+      "Depositing grants Caltech Library a non-exclusive, worldwide, perpetual license to use, duplicate, distribute, and reformat the content for archiving, preservation, and access.",
+      "The deposit must be the depositor's original work or one they hold the rights to, with any third-party work clearly identified and acknowledged.",
+      "The deposit must not violate privacy or confidentiality rights, including those protected by HIPAA or FERPA.",
+      "The deposit must not contain high-risk confidential information such as social security numbers, credit card numbers, or other personal identifiers including biometric identifiers.",
+      "The deposit must not contain viruses or other malware.",
+      "Any deposit containing data from individuals, obtained through direct intervention or interaction or from private identifiable information, must be reviewed and approved by the appropriate Institutional Review Board.",
+      "Deposits with unusable or obsolete file formats or inadequate description may be removed, and larger files may face higher standards for retention.",
+      "Depositors can edit the metadata of their records; to change published files, use New Version to receive a new version DOI while the parent DOI points to the latest version, or contact data@caltech.edu to change files without creating a version.",
+      "Caltech Library recommends including a README that describes the files, their relationships, reuse requirements, and project context.",
+      "Test records must remain drafts; publishing generates a DOI that cannot be deleted. The repository provides a separate test system at https://data.caltechlibrary.dev.",
+      "Withdrawn records are replaced by a tombstone page giving the reason, and their DOI and URL are retained.",
+      "Linking a GitHub account lets CaltechDATA preserve each software release of the chosen public repositories automatically, with a DOI for each version.",
+      "The web uploader observed on 2026-11-15 allows 50 files, 50 GB per file and 1000 GB total; the written FAQ permits 550 files per record. These are distinct portal and guideline limits."
+    ]
+  },
+  "zenodo": {
+    "source_urls": [
+      "https://help.zenodo.org/docs/deposit/create-new-upload/",
+      "https://help.zenodo.org/docs/deposit/about-records/",
+      "https://help.zenodo.org/docs/deposit/describe-records/",
+      "https://help.zenodo.org/docs/deposit/describe-records/reserve-doi/",
+      "https://help.zenodo.org/docs/deposit/describe-records/resource-type/",
+      "https://help.zenodo.org/docs/deposit/describe-records/titles/",
+      "https://help.zenodo.org/docs/deposit/describe-records/publication-date/",
+      "https://help.zenodo.org/docs/deposit/describe-records/creators/",
+      "https://help.zenodo.org/docs/deposit/describe-records/descriptions/",
+      "https://help.zenodo.org/docs/deposit/describe-records/licenses/",
+      "https://help.zenodo.org/docs/deposit/describe-records/contributors/",
+      "https://help.zenodo.org/docs/deposit/describe-records/keywords-and-subjects/",
+      "https://help.zenodo.org/docs/deposit/describe-records/publisher/",
+      "https://help.zenodo.org/docs/deposit/describe-records/funding/",
+      "https://help.zenodo.org/docs/deposit/manage-files/",
+      "https://help.zenodo.org/docs/deposit/manage-quota/",
+      "https://help.zenodo.org/docs/deposit/manage-records/",
+      "https://help.zenodo.org/docs/deposit/manage-versions/",
+      "https://about.zenodo.org/policies/",
+      "https://about.zenodo.org/terms/",
+      "https://developers.zenodo.org/"
+    ],
+    "retrieved": "2026-11-14",
+    "notes": [
+      "Zenodo accepts all types of research artifacts from all fields of research, at any stage of the research lifecycle.",
+      "Anyone may register and deposit content for which they possess the appropriate rights; uploading transfers no ownership to CERN.",
+      "Content must not violate privacy or copyright, or breach confidentiality or non-disclosure agreements for data collected from human subjects.",
+      "Sensitive personal data uploaded for open dissemination must be anonymised to an appropriate degree or fully consent cleared.",
+      "All file formats are allowed, but Zenodo recommends open, non-proprietary, preservation-friendly formats and only guarantees bit-level preservation.",
+      "A record can hold up to 100 files and 50GB (50,000 MB) in total; each user has an additional 150GB allowance to allocate across records, and higher quotas can be requested case by case.",
+      "Zenodo recommends packaging 20 or more files in a ZIP archive and removing hidden files such as __MACOSX, .DS_Store and Thumbs.db.",
+      "Required metadata on the upload form: resource type, title, publication date, creators, license and publisher; description, contributors and funding are recommended.",
+      "Users must specify a license for all publicly available files; licenses for closed-access files may be given in the description.",
+      "Metadata is always publicly accessible and licensed under CC0 (except email addresses); only the files can be restricted.",
+      "Files may be public or restricted; restricted files can be shared with specific people, and an embargo makes them public automatically at midnight UTC on the chosen date.",
+      "Zenodo registers a DataCite DOI for every record on publication; a DOI can be reserved before publishing (and is lost if the draft is deleted).",
+      "If the content already has a DOI it must be given, so that no second DOI is registered; the DOI of a journal article the upload supports must not be used.",
+      "After publication the metadata can be edited at any time, but files can only be changed by the owner within the first 30 days (the edit draft must be published within 45 days); later changes need a justified support request.",
+      "Updated files are published as a new version, which is a new record with its own metadata, files and DOI, linked to the other versions.",
+      "Records can be deleted by their owner within 30 days of publication; afterwards only in duly justified cases (e.g. copyright infringement or exposure of personal data).",
+      "Content outside the repository's scope is removed and its Zenodo DOI revoked; a withdrawn record is replaced by a tombstone page that keeps the DOI and URL.",
+      "For textual items English is preferred, but all languages are accepted.",
+      "Software can be archived from GitHub releases, with metadata overridable by a .zenodo.json file in the repository root."
+    ],
+    "upload": {
+      "max_total_mb": 50000
+    }
+  },
+  "sra": {
+    "source_urls": [
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submit/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submitportal/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submitformats/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/sra-data-submission-standards/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submitbio/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submitmeta/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submitfiles/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submitspfiles/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submitquestions/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submitupdate/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submitsra/",
+      "https://www.ncbi.nlm.nih.gov/sra/docs/submitdbgap/",
+      "https://ftp-trace.ncbi.nlm.nih.gov/sra/metadata_table/SRA_metadata.xlsx",
+      "https://www.ncbi.nlm.nih.gov/biosample/docs/packages/",
+      "https://www.ncbi.nlm.nih.gov/bioproject/docs/faq/",
+      "https://www.ncbi.nlm.nih.gov/biosample/docs/submission/faq/"
+    ],
+    "retrieved": "2026-11-14",
+    "notes": [
+      "SRA accepts genetic data and the associated quality scores produced by next generation sequencing technologies.",
+      "SRA requires per-base quality scores for all submitted data, so FASTA and other sequence-only formats are not sufficient on their own (FASTA is accepted as a reference for BAM files or as part of a FASTA/QUAL pair).",
+      "SRA does not accept assembled or consensus sequences, contigs or assembled genomes; consensus-derived reads such as PacBio HiFi/CCS are accepted when they represent individual reads.",
+      "Accepted formats (File Format Guide): BAM (aligned or unaligned), CRAM, SFF, HDF5 (PacBio bas.h5/bax.h5, Oxford Nanopore fast5), FASTQ, FASTA+QUAL and CSFASTA+QUAL pairs, and the legacy SRF, native Illumina and QSEQ formats; SAM files are not accepted.",
+      "NCBI's revised Data Submission Standards, expected to take effect at the end of 2026, accept only FASTQ, BAM or CRAM files.",
+      "Under the revised standards FASTQ must be compressed with gzip or bzip2 (TAR and ZIP are not supported), and BAM or CRAM must not be compressed again (.bam.gz or .cram.bz2 files are rejected).",
+      "Files can be compressed with gzip or bzip2 and packaged in a tarball, but not zipped; each file inside a tar archive must be listed by name on the SRA metadata sheet (except a tar of fast5 files for Oxford Nanopore native submissions).",
+      "Each submitted fastq file should be less than 100 GB, and larger compressed files must be split before submission; the revised standards set a 100 GB maximum for every individual file.",
+      "Studies with more than 5 TB of data should be split across multiple submissions under 5 TB each, linked to the same BioProject, waiting for each submission to complete before uploading the next.",
+      "One Submission Portal submission takes 1000 samples or fewer; larger studies need multiple submissions with the same BioProject reference.",
+      "Paired-end FASTQ must be either separate forward and reverse files with reads in the same order, or interleaved; concatenated FASTQ (all forward reads followed by all reverse reads) is not supported.",
+      "Paired files must always be listed in the same row (RUN) of the SRA metadata, and files from different samples or experiments must not be grouped in the same RUN.",
+      "Only one RUN per EXPERIMENT is allowed in the Submission Portal; an experiment is a unique combination of sample, library, sequencing strategy, layout and instrument model, and each needs a unique library_ID.",
+      "SFF data must be demultiplexed if barcoded.",
+      "Aligned BAM or CRAM files must name the reference assembly (an NCBI, UCSC or Ensembl assembly name or accession); reads aligned to a local reference need the reference FASTA (uncompressed, headers matching the BAM SN names), and unaligned BAM or CRAM takes 'unaligned' in the Reference assembly column.",
+      "Files must contain at least one read and no empty reads, must use valid IUPAC nucleotide codes, and may be flagged or rejected if more than 50% of bases are ambiguous.",
+      "File names must be unique within a submission, include the correct extensions, start with a letter or number, and contain only ASCII letters, digits, underscores, hyphens and periods (no spaces or special characters).",
+      "SRA does not accept duplicate files; to update an existing record, contact the SRA helpdesk instead of resubmitting.",
+      "Every submission must be linked to a BioProject (the study) and BioSamples (the biological source material), which can be registered in the SRA Submission Portal wizard or beforehand in the BioProject and BioSample portals.",
+      "Every organism, metagenome, time point, tissue type or treatment needs its own BioSample, while biological and technical replicates usually do not; samples must not have identical attributes.",
+      "Each SRA experiment needs a clear, informative title and design description, since they appear in the public record.",
+      "All metadata is public, so project titles, sample identifiers, file names and other fields must be anonymized and contain no personally identifiable information.",
+      "Human data may be deposited in public SRA only with the donor's consent to make it available in an unprotected database; unconsented or controlled-access human data must be submitted through dbGaP, not the SRA Submission Portal.",
+      "Human metagenomic data needs donor consent for public archiving, or SRA staff can be asked to screen out human sequences.",
+      "Functional genomics studies are submitted through GEO rather than directly to SRA.",
+      "The release date defaults to release immediately following processing and can be set to a later date; it can be changed in the Submission Portal while the BioProject is unreleased.",
+      "A reviewer link (metadata only) can be generated for an unreleased BioProject in the Submission Portal; it expires when the data are released.",
+      "NCBI recommends citing the BioProject accession (PRJNA#) in publications; the temporary SUB# submission ID cannot be cited.",
+      "MD5 checksums are required in the sequencing metadata spreadsheet for dbGaP (controlled-access) submissions; the public SRA pages do not ask for them.",
+      "After a run is loaded, its files cannot be replaced and file names cannot be changed."
+    ],
+    "upload": {
+      "max_total_mb": 5000000,
+      "max_file_mb": 100000
+    }
+  },
+  "geo": {
+    "source_urls": [
+      "https://www.ncbi.nlm.nih.gov/geo/info/submission.html",
+      "https://www.ncbi.nlm.nih.gov/geo/info/seq.html",
+      "https://www.ncbi.nlm.nih.gov/geo/info/spreadsheet.html",
+      "https://www.ncbi.nlm.nih.gov/geo/info/faq.html",
+      "https://www.ncbi.nlm.nih.gov/geo/info/MIAME.html",
+      "https://www.ncbi.nlm.nih.gov/geo/info/reviewer.html",
+      "https://www.ncbi.nlm.nih.gov/geo/info/update.html"
+    ],
+    "retrieved": "2026-11-14",
+    "notes": [
+      "GEO requires raw data, processed data, and metadata for every submission; raw-data-only submissions go to SRA.",
+      "Submitters need a My NCBI account associated with a GEO Profile.",
+      "Each data type in a study (RNA-seq, ChIP-seq, etc.) is submitted separately, with its own metadata spreadsheet; integrated data types such as Multiome-seq count as one data type.",
+      "A metadata spreadsheet holds at most 1,000 samples; larger studies are split across several submissions.",
+      "All required fields of the metadata spreadsheet must be completed, with STUDY, SAMPLES, and PROTOCOLS information sufficient to interpret and reanalyze the data, avoiding acronyms and abbreviations.",
+      "Metadata must be anonymized and contain no personally identifiable information.",
+      "File names may use only ASCII letters, digits, periods, underscores, and hyphens, with no spaces, and every file name must be unique.",
+      "Every raw file must be listed in the metadata spreadsheet, and every file uploaded must be listed in it; extra files must not be uploaded.",
+      "Processed data must be complete for all features and samples, not selected results such as lists of differentially expressed genes.",
+      "Processed data must use traceable feature identifiers (public accessions or chromosome coordinates), and the genome build must be given in the metadata spreadsheet.",
+      "For matrix tables, column headers must match the library names or sample titles in the SAMPLES section.",
+      "WIG, bedGraph, GFF, and GTF files must follow UCSC format requirements.",
+      "HTS raw data must be FASTQ, BAM, or CRAM, contain at least one read, and contain no empty reads.",
+      "FASTQ files must be compressed with gzip or bzip2; BAM, CRAM, bigWig, bigBed, and HDF5 files must not be compressed again.",
+      "ZIP archives must not be uploaded, and HTS raw data files must not be bundled in .zip, .rar, or .tar archives.",
+      "Paired-end FASTQ sets must be complete, with R1 and R2 files holding the same reads in the same order, plus I1/I2 index files when needed for reanalysis.",
+      "Each HTS raw data file must not exceed 100 GiB.",
+      "An HTS submission must not exceed 5 TiB; larger studies are split into separate submissions.",
+      "Symbolic links, raw files downloaded from SRA, and files already submitted to GEO/SRA must not be submitted.",
+      "Bulk RNA-seq raw data must be demultiplexed, one run file per barcoded sample; most single-cell raw data are submitted multiplexed.",
+      "Single-cell processed data must be cell-level, as MEX matrices, H5/HDF5 archives, RDS objects, or contig_annotations.csv and clonotypes.csv for TCR/BCR.",
+      "MD5 checksums are optional and, when given, go in the metadata spreadsheet's MD5 Checksums tab, not in separate files.",
+      "HTS files are uploaded by FTP into one subfolder per dataset in the personalized upload space, and the metadata spreadsheet is then uploaded on the Submit to GEO page, not by FTP.",
+      "Microarray (GEOarchive) submissions bundle the metadata spreadsheet, matrix table, and raw data files into a .zip, .rar, or .tar archive and send it through the web form, or by FTP for large submissions.",
+      "Affymetrix microarray submissions must include CEL files; other arrays must include the scan software's quantification files.",
+      "An array not already in GEO needs a PLATFORM section with trackable sequence identifiers.",
+      "GEO submission procedures follow the MIAME and MINSEQE checklists, so a submission that provides all requested information is compliant.",
+      "Records can stay private until a manuscript or preprint citing the accession is public, for at most four years; once the accession is cited publicly the records must be released.",
+      "The release date is set during submission and can be changed at any time.",
+      "After approval, a reviewer access token gives editors and reviewers anonymous read-only access to the private records, except sequence files in SRA.",
+      "Accession numbers are normally issued within 5 business days of a complete submission and must not be quoted in a manuscript before GEO's approval e-mail.",
+      "GEO is an unrestricted-access database: human data needing controlled access go to dbGaP, and submitters must have consent to make the data public and must not compromise participant privacy.",
+      "NIH-funded large-scale human genomic data need an Institutional Certification under the NIH Genomic Data Sharing Policy (not submitted to GEO).",
+      "GEO does not accept whole-genome, exome, metagenomic, resequencing, or survey sequencing, transcript assemblies, or mass spectrometry data."
+    ],
+    "upload": {
+      "max_total_mb": 5242880,
+      "notes": [
+        "The 5 TiB cap is GEO's maximum size for one high-throughput sequencing submission."
       ]
     }
   }

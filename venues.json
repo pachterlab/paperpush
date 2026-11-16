@@ -1159,5 +1159,57 @@
     "keywords": [
       "machine learning"
     ]
+  },
+  "caltechdata": {
+    "name": "CaltechDATA",
+    "full_name": "Caltech Research Data Repository (CaltechDATA)",
+    "venue_type": "data_repository",
+    "anonymous": false,
+    "site_url": "https://data.caltech.edu",
+    "submission_guide": "https://library.caltech.edu/search/caltechdata",
+    "description": "Caltech Library's institutional repository for research data and software from Caltech researchers; every record gets a DOI.",
+    "keywords": [
+      "general"
+    ]
+  },
+  "zenodo": {
+    "name": "Zenodo",
+    "full_name": "Zenodo",
+    "venue_type": "data_repository",
+    "anonymous": false,
+    "site_url": "https://zenodo.org",
+    "submission_guide": "https://help.zenodo.org/docs/deposit/create-new-upload/",
+    "description": "General-purpose open research repository run by CERN that takes all types of research artifacts from all fields and registers a DataCite DOI for each published record.",
+    "keywords": [
+      "general"
+    ]
+  },
+  "sra": {
+    "name": "SRA",
+    "full_name": "Sequence Read Archive",
+    "venue_type": "data_repository",
+    "anonymous": false,
+    "site_url": "https://www.ncbi.nlm.nih.gov/sra",
+    "submission_guide": "https://www.ncbi.nlm.nih.gov/sra/docs/submit/",
+    "description": "NCBI's archive of raw next-generation sequencing reads and per-base quality scores, deposited through the SRA Submission Portal and linked to BioProject and BioSample records.",
+    "keywords": [
+      "biology",
+      "genetics",
+      "bioinformatics"
+    ]
+  },
+  "geo": {
+    "name": "GEO",
+    "full_name": "Gene Expression Omnibus",
+    "venue_type": "data_repository",
+    "anonymous": false,
+    "site_url": "https://www.ncbi.nlm.nih.gov/geo/",
+    "submission_guide": "https://www.ncbi.nlm.nih.gov/geo/info/submission.html",
+    "description": "NCBI public repository that archives and distributes microarray, high-throughput sequencing, and other high-throughput functional genomic data.",
+    "keywords": [
+      "biology",
+      "genetics",
+      "bioinformatics"
+    ]
   }
 }

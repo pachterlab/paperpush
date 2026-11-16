@@ -3830,5 +3830,1472 @@
         "help": "Confirms you are aware that accepted submissions, with their author names, will be released to the public after the conference."
       }
     ]
+  },
+  "caltechdata": {
+    "submission_url": "https://data.caltech.edu/uploads/new",
+    "max_upload_mb": 953674.31640625,
+    "fields": [
+      {
+        "id": "community",
+        "label": "Community",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. Exact community name to select. Publication to a community may require review; paperpush stops before sending it.",
+        "autofill": "never"
+      },
+      {
+        "id": "metadata_only",
+        "label": "Metadata-only record",
+        "type": "boolean",
+        "section": "files",
+        "help": "Use yes only for a record without deposited files. Cannot be combined with data_files.",
+        "default": false,
+        "autofill": "never"
+      },
+      {
+        "id": "data_files",
+        "label": "Files",
+        "type": "filelist",
+        "section": "files",
+        "help": "Files to deposit, one per line as 'path | label' (label optional). Any format is accepted. The current web uploader allows 50 files, 50 GB per file and 1000 GB total; the written guidelines allow 550 files per record. Zip larger file collections before using the web form. Labels are retained in the .sub; the uploader displays the original filenames.",
+        "max_count": 50,
+        "max_file_size_mb": 47683.7158203125,
+        "autofill": "filemap"
+      },
+      {
+        "id": "existing_doi",
+        "label": "Existing DOI",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. Only the DOI already assigned to this same deposited object. Put the DOI of a related publication in related_identifiers instead. Leave empty to use a CaltechDATA DOI.",
+        "autofill": "never"
+      },
+      {
+        "id": "reserve_doi",
+        "label": "Reserve a DOI now",
+        "type": "boolean",
+        "section": "metadata",
+        "help": "Optional. yes clicks Get a DOI now to reserve a DOI before publication. Cannot be combined with existing_doi. no leaves DOI registration until publication.",
+        "default": false,
+        "autofill": "never"
+      },
+      {
+        "id": "resource_type",
+        "label": "Resource type",
+        "type": "choice",
+        "required": true,
+        "section": "type",
+        "help": "The kind of resource deposited. Dataset and Software are the most common; if a record mixes images, movies, or sound with other files, use Dataset or Workflow.",
+        "options": [
+          "Collection",
+          "Dataset",
+          "Image",
+          "Interactive Resource",
+          "Map",
+          "Model",
+          "Other",
+          "Software",
+          "Text",
+          "Video/Audio",
+          "Workflow"
+        ],
+        "default": "Dataset",
+        "autofill": "classify"
+      },
+      {
+        "id": "title",
+        "label": "Title",
+        "type": "text",
+        "required": true,
+        "help": "The title of the dataset or software record.",
+        "autofill": "extract"
+      },
+      {
+        "id": "additional_titles",
+        "label": "Additional titles",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "Optional. One line per title as title | type | language. Types: Alternative title, Subtitle, Translated title, Other. Default type: Alternative title. Language is its English name as shown by the portal.",
+        "fields": [
+          "title",
+          "type?",
+          "language?"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "publication_date",
+        "label": "Publication date",
+        "type": "text",
+        "section": "additional",
+        "help": "Publication date of the record (YYYY-MM-DD). The form fills in today's date.",
+        "autofill": "never"
+      },
+      {
+        "id": "authors",
+        "label": "Creators",
+        "type": "authorlist",
+        "required": true,
+        "help": "One creator per line as Name | affiliation | ORCID | type | role. Use Family, Given for a person to preserve name boundaries; an unseparated name uses its last word as the family name. type is Person (default) or Organization; organizational names are kept intact. Separate multiple affiliations with semicolons. Role is optional and must match the portal's DataCite role label.",
+        "fields": [
+          "name",
+          "affiliation?",
+          "orcid?",
+          "type?",
+          "role?"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "abstract",
+        "label": "Description",
+        "type": "textarea",
+        "required": true,
+        "help": "What the record contains and how another researcher could use it. Deposits with inadequate description may be removed.",
+        "autofill": "extract"
+      },
+      {
+        "id": "additional_descriptions",
+        "label": "Additional descriptions",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "Optional. One line per description as text | type | language. Types: Abstract, Methods, Series information, Table of contents, Technical info, Other, External Files, Attached Files.",
+        "fields": [
+          "text",
+          "type",
+          "language?"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "license",
+        "label": "License",
+        "type": "choice",
+        "help": "The license for the deposited content. The form defaults to CC0.",
+        "options": [
+          "Apache License 2.0",
+          "BSD 3-Clause \"New\" or \"Revised\" License",
+          "Creative Commons Attribution 4.0 International",
+          "Creative Commons Attribution Non Commercial 4.0 International",
+          "Creative Commons Zero v1.0 Universal",
+          "GNU General Public License v3.0 or later",
+          "GNU Lesser General Public License v3.0 or later",
+          "MIT License"
+        ],
+        "default": "Creative Commons Zero v1.0 Universal",
+        "autofill": "never"
+      },
+      {
+        "id": "copyright",
+        "label": "Copyright",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. Copyright statement for the deposited resource.",
+        "autofill": "extract"
+      },
+      {
+        "id": "contributors",
+        "label": "Contributors",
+        "type": "authorlist",
+        "section": "authors",
+        "help": "Optional. One contributor per line as Name | role | affiliation | ORCID | type. Role must match the portal DataCite contributor role label (e.g. Data curator, Researcher, Contact person). type is Person (default) or Organization. Use Family, Given to preserve personal name boundaries; multiple affiliations are separated by semicolons.",
+        "fields": [
+          "name",
+          "role",
+          "affiliation?",
+          "orcid?",
+          "type?"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "keywords",
+        "label": "Keywords",
+        "type": "text",
+        "help": "Optional. Comma-separated keywords or subjects.",
+        "autofill": "extract"
+      },
+      {
+        "id": "languages",
+        "label": "Languages",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. Comma-separated language names exactly as shown by the portal (e.g. English).",
+        "autofill": "extract"
+      },
+      {
+        "id": "dates",
+        "label": "Dates",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "Optional. One line per date as date | type | description. Dates use YYYY, YYYY-MM, YYYY-MM-DD or a DATE/DATE interval. Types: Accepted, Available, Collected, Other, Withdrawn, Copyrighted, Submitted, Created, Updated, Issued, Valid.",
+        "fields": [
+          "date",
+          "type",
+          "description?"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "version",
+        "label": "Version",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. The version of the data or software (e.g. v1.0).",
+        "autofill": "extract"
+      },
+      {
+        "id": "publisher",
+        "label": "Publisher",
+        "type": "text",
+        "section": "metadata",
+        "help": "Publisher used to formulate the citation; defaults to CaltechDATA.",
+        "default": "CaltechDATA",
+        "autofill": "extract"
+      },
+      {
+        "id": "funding",
+        "label": "Funding",
+        "type": "textarea",
+        "help": "Optional. One award per line as Funder | award number | award title | award URL. The funder must match the portal's vocabulary; use its exact name or identifier.",
+        "fields": [
+          "funder",
+          "award?",
+          "title?",
+          "url?"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "alternate_identifiers",
+        "label": "Alternate identifiers",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "Optional. One alternate identifier per line as identifier | scheme. Use the exact portal scheme label, e.g. DOI, URL, ISBN, arXiv, Handle.",
+        "fields": [
+          "identifier",
+          "scheme"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "related_identifiers",
+        "label": "Related works",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "Optional. One line as identifier | relation | scheme | resource type. Relation must match the portal label (e.g. Is cited by). DOI and URL schemes are detected when omitted; specify the exact scheme label for other identifiers. Resource type is optional.",
+        "fields": [
+          "identifier",
+          "relation",
+          "scheme?",
+          "resource_type?"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "caltech_groups",
+        "label": "Caltech groups",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. The Caltech group or groups associated with the record, comma-separated.",
+        "autofill": "never"
+      },
+      {
+        "id": "record_visibility",
+        "label": "Full record visibility",
+        "type": "choice",
+        "section": "metadata",
+        "help": "Optional. Access policy on publication. Empty preserves the portal default.",
+        "options": [
+          "Public",
+          "Restricted"
+        ],
+        "autofill": "never"
+      },
+      {
+        "id": "files_visibility",
+        "label": "Files visibility",
+        "type": "choice",
+        "section": "metadata",
+        "help": "Optional. Access policy for files on publication. Empty preserves the portal default. An embargo requires restricted files or a restricted record.",
+        "options": [
+          "Public",
+          "Restricted"
+        ],
+        "autofill": "never"
+      },
+      {
+        "id": "embargo_date",
+        "label": "Embargo end date",
+        "type": "text",
+        "section": "additional",
+        "help": "Optional. Date (YYYY-MM-DD) the embargo ends; files stay restricted until then and then become public automatically. Records cannot be kept private indefinitely.",
+        "autofill": "never"
+      },
+      {
+        "id": "embargo_reason",
+        "label": "Embargo reason",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. Reason for the embargo; requires embargo_date.",
+        "autofill": "never"
+      }
+    ]
+  },
+  "zenodo": {
+    "submission_url": "https://zenodo.org/uploads/new",
+    "max_upload_mb": 50000,
+    "fields": [
+      {
+        "id": "communities",
+        "label": "Communities",
+        "type": "textarea",
+        "section": "additional",
+        "help": "Optional community identifier from its URL. The new-upload form selects one community. Further communities can be added after publication. The runner saves a draft and never sends it to community review.",
+        "autofill": "never",
+        "max_count": 1
+      },
+      {
+        "id": "data_files",
+        "label": "Files",
+        "type": "filelist",
+        "section": "files",
+        "help": "One file per line as 'path | label' (label optional). The web form requires at least one file. Up to 100 files and 50 GB in total per record; package large collections in a ZIP archive. Labels are for the .sub only; Zenodo displays filenames.",
+        "max_count": 100,
+        "autofill": "filemap",
+        "required": true,
+        "min_count": 1
+      },
+      {
+        "id": "doi",
+        "label": "Digital Object Identifier (DOI)",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. Only if the upload already has a DOI for the same object; leave blank and Zenodo registers one on publication. Do NOT enter the DOI of a journal article that this upload supports (put that in related_identifiers instead).",
+        "autofill": "never"
+      },
+      {
+        "id": "resource_type",
+        "label": "Resource type",
+        "type": "choice",
+        "required": true,
+        "section": "type",
+        "help": "The type of the files being shared (Zenodo's list is based on DataCite's ResourceType vocabulary). For mixed uploads, choose the type that best reflects the upload. 'Other' also exists under the Image and Publication groups.",
+        "options": [
+          "Dataset",
+          "Event",
+          "Image",
+          "Image / Diagram",
+          "Image / Drawing",
+          "Image / Figure",
+          "Image / Other",
+          "Image / Photo",
+          "Image / Plot",
+          "Lesson",
+          "Model",
+          "Other",
+          "Physical object",
+          "Poster",
+          "Presentation",
+          "Publication",
+          "Publication / Annotation collection",
+          "Publication / Book",
+          "Publication / Book chapter",
+          "Publication / Conference paper",
+          "Publication / Conference proceeding",
+          "Publication / Data paper",
+          "Publication / Journal",
+          "Publication / Journal article",
+          "Publication / Other",
+          "Publication / Output management plan",
+          "Publication / Patent",
+          "Publication / Peer review",
+          "Publication / Preprint",
+          "Publication / Project deliverable",
+          "Publication / Project milestone",
+          "Publication / Proposal",
+          "Publication / Report",
+          "Publication / Software documentation",
+          "Publication / Standard",
+          "Publication / Taxonomic treatment",
+          "Publication / Technical note",
+          "Publication / Thesis",
+          "Publication / Working paper",
+          "Software",
+          "Software / Computational notebook",
+          "Video/Audio",
+          "Workflow"
+        ],
+        "autofill": "classify"
+      },
+      {
+        "id": "title",
+        "label": "Title",
+        "type": "text",
+        "required": true,
+        "help": "A clear and informative title for the upload.",
+        "autofill": "extract"
+      },
+      {
+        "id": "additional_titles",
+        "label": "Additional titles",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "title | type | language, one per line. Type defaults to Alternative title; language is optional.",
+        "autofill": "extract",
+        "fields": [
+          "title",
+          "type?",
+          "language?"
+        ]
+      },
+      {
+        "id": "publication_date",
+        "label": "Publication date",
+        "type": "text",
+        "required": true,
+        "section": "metadata",
+        "help": "When the upload was first made available to the public (YYYY-MM-DD; EDTF imprecise dates and ranges such as 2023-09 or 2023-01-01/2023-09-23 are accepted). Zenodo defaults it to the date the draft was created. If the content was previously published elsewhere, use the date of first publication.",
+        "autofill": "never"
+      },
+      {
+        "id": "authors",
+        "label": "Creators",
+        "type": "authorlist",
+        "required": true,
+        "help": "One creator per line in citation order: Name | affiliation | ORCID | role | type. For people use 'Family name, Given names'; type defaults to Person. Use Organization to preserve an organisation's full name. Separate affiliations with ';'.",
+        "fields": [
+          "name",
+          "affiliation?",
+          "orcid?",
+          "role?",
+          "type?"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "abstract",
+        "label": "Description",
+        "type": "textarea",
+        "help": "Recommended. Usually an abstract of the record (basic formatting allowed).",
+        "autofill": "extract"
+      },
+      {
+        "id": "additional_descriptions",
+        "label": "Additional descriptions",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "description | type | language, one per line. Type is required; language is optional.",
+        "autofill": "extract",
+        "fields": [
+          "description",
+          "type",
+          "language?"
+        ]
+      },
+      {
+        "id": "license",
+        "label": "License",
+        "type": "choice",
+        "required": true,
+        "help": "The license of the files. Zenodo defaults to Creative Commons Attribution 4.0 International and offers the SPDX license list; a custom license can be added, and several licenses can be declared for mixed uploads.",
+        "options": [
+          "Creative Commons Attribution 4.0 International"
+        ],
+        "options_recommended": true,
+        "default": "Creative Commons Attribution 4.0 International",
+        "autofill": "never"
+      },
+      {
+        "id": "copyright",
+        "label": "Copyright",
+        "type": "text",
+        "section": "metadata",
+        "help": "Copyright statement.",
+        "autofill": "extract"
+      },
+      {
+        "id": "contributors",
+        "label": "Contributors",
+        "type": "textarea",
+        "section": "authors",
+        "help": "One per line: Name | role | affiliation | ORCID | type. Role is required. Type defaults to Person; use Organization for organisations.",
+        "fields": [
+          "name",
+          "role",
+          "affiliation?",
+          "orcid?",
+          "type?"
+        ],
+        "autofill": "never"
+      },
+      {
+        "id": "keywords",
+        "label": "Keywords and subjects",
+        "type": "text",
+        "help": "Optional. Comma-separated keywords. Terms from EuroSciVoc, MeSH or GEMET can be chosen as controlled subjects; anything else is a custom keyword.",
+        "autofill": "extract"
+      },
+      {
+        "id": "languages",
+        "label": "Languages",
+        "type": "text",
+        "section": "metadata",
+        "help": "Comma-separated language names, as offered by the portal (e.g. English).",
+        "autofill": "extract"
+      },
+      {
+        "id": "dates",
+        "label": "Dates",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "date | type | description, one per line. Type is required.",
+        "autofill": "extract",
+        "fields": [
+          "date",
+          "type",
+          "description?"
+        ]
+      },
+      {
+        "id": "version",
+        "label": "Version",
+        "type": "text",
+        "section": "metadata",
+        "help": "Optional. Version of the resource; any string, semantic versioning (e.g. 2.1.5) suggested.",
+        "autofill": "extract"
+      },
+      {
+        "id": "publisher",
+        "label": "Publisher",
+        "type": "text",
+        "required": true,
+        "section": "additional",
+        "help": "Needed for the citation. Zenodo sets it to 'Zenodo'; if the content was previously published elsewhere, use the original publisher's name.",
+        "default": "Zenodo",
+        "autofill": "never"
+      },
+      {
+        "id": "funding",
+        "label": "Funding",
+        "type": "textarea",
+        "help": "Recommended. Awards or grants that funded the work, one per line as 'Funder | award number | award title'. Funders outside Zenodo's standard list must be registered in ROR.",
+        "fields": [
+          "funder",
+          "number?",
+          "title?"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "alternate_identifiers",
+        "label": "Alternate identifiers",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "identifier | scheme, one per line; use the portal scheme label (e.g. URL).",
+        "autofill": "extract",
+        "fields": [
+          "identifier",
+          "scheme"
+        ]
+      },
+      {
+        "id": "related_identifiers",
+        "label": "Related works",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "One per line: identifier | relation | scheme | resource type. Relation is required. DOI and URL schemes can be inferred; supply the portal's scheme label for other identifiers. Resource type is optional.",
+        "fields": [
+          "identifier",
+          "relation",
+          "scheme?",
+          "resource_type?"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "references",
+        "label": "References",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "One bibliographic reference per line.",
+        "autofill": "extract"
+      },
+      {
+        "id": "code_url",
+        "label": "Repository URL",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "journal_title",
+        "label": "Journal title",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "journal_issn",
+        "label": "Journal ISSN",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "journal_volume",
+        "label": "Journal volume",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "journal_issue",
+        "label": "Journal issue",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "journal_pages",
+        "label": "Journal page range or article number",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "imprint_title",
+        "label": "Book, report, or proceedings title",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "imprint_isbn",
+        "label": "Imprint ISBN",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "imprint_place",
+        "label": "Imprint publication place",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "imprint_pages",
+        "label": "Imprint pagination",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "imprint_edition",
+        "label": "Imprint edition",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "thesis_university",
+        "label": "Thesis awarding university",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "thesis_department",
+        "label": "Thesis awarding department",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "thesis_type",
+        "label": "Thesis type",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "thesis_date_submitted",
+        "label": "Thesis submission date",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "thesis_date_defended",
+        "label": "Thesis defense date",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "conference_title",
+        "label": "Conference title",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "conference_acronym",
+        "label": "Conference acronym",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "conference_place",
+        "label": "Conference place",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "conference_dates",
+        "label": "Conference dates",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "conference_session",
+        "label": "Conference session",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "conference_session_part",
+        "label": "Conference part within session",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "conference_url",
+        "label": "Conference website",
+        "type": "text",
+        "section": "metadata",
+        "autofill": "extract"
+      },
+      {
+        "id": "programming_languages",
+        "label": "Programming languages",
+        "type": "text",
+        "section": "metadata",
+        "help": "Comma-separated programming language names, e.g. Python.",
+        "autofill": "extract"
+      },
+      {
+        "id": "development_status",
+        "label": "Development Status",
+        "type": "choice",
+        "section": "metadata",
+        "options": [
+          "Moved",
+          "Abandoned",
+          "Active",
+          "Unsupported",
+          "Inactive",
+          "Wip",
+          "Concept",
+          "Suspended"
+        ],
+        "autofill": "classify"
+      },
+      {
+        "id": "access_right",
+        "label": "Visibility of the files",
+        "type": "choice",
+        "section": "additional",
+        "help": "Visibility of the files once published (metadata is always public). Restricted files can be shared with specific people after publishing.",
+        "options": [
+          "Public",
+          "Restricted"
+        ],
+        "default": "Public",
+        "autofill": "never"
+      },
+      {
+        "id": "embargo_date",
+        "label": "Embargo until",
+        "type": "text",
+        "section": "additional",
+        "help": "Optional, only with Restricted visibility and 'Apply an embargo' (YYYY-MM-DD). The files become public automatically at midnight UTC on this date.",
+        "autofill": "never"
+      },
+      {
+        "id": "embargo_reason",
+        "label": "Embargo reason",
+        "type": "textarea",
+        "section": "additional",
+        "help": "Optional reason, only with embargo_date.",
+        "autofill": "never"
+      }
+    ]
+  },
+  "sra": {
+    "submission_url": "https://submit.ncbi.nlm.nih.gov/subs/sra/",
+    "max_upload_mb": 5000000,
+    "fields": [
+      {
+        "id": "submitter_first_name",
+        "label": "First (given) name",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "submitter_middle_name",
+        "label": "Middle name",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "submitter_last_name",
+        "label": "Last (family) name",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "submitter_email",
+        "label": "Email (primary)",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile. Use your primary email address; NCBI sends processing messages there.",
+        "autofill": "never"
+      },
+      {
+        "id": "submitter_secondary_email",
+        "label": "Email (secondary)",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "submitting_organization",
+        "label": "Submitting organization",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "submitting_organization_url",
+        "label": "Submitting organization URL",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never",
+        "require_url": true
+      },
+      {
+        "id": "department",
+        "label": "Department",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "phone",
+        "label": "Phone",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "fax",
+        "label": "Fax",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "street",
+        "label": "Street",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "city",
+        "label": "City",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "state",
+        "label": "State/Province",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile. Required by the portal for addresses in the USA.",
+        "autofill": "never"
+      },
+      {
+        "id": "postal_code",
+        "label": "Postal code",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.",
+        "autofill": "never"
+      },
+      {
+        "id": "country",
+        "label": "Country",
+        "type": "text",
+        "section": "authors",
+        "help": "Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile. Type the country as NCBI lists it, e.g. 'United States of America (USA)' or 'Germany'; the runner picks the matching entry from the portal's suggestions.",
+        "autofill": "never"
+      },
+      {
+        "id": "update_profile",
+        "label": "Update my contact information in profile",
+        "type": "boolean",
+        "section": "authors",
+        "default": false,
+        "help": "Wizard step 1. yes = also save the submitter details above to your NCBI profile (the portal ticks this by default; paperpush leaves the profile unchanged unless you say yes).",
+        "autofill": "never"
+      },
+      {
+        "id": "bioproject",
+        "label": "BioProject accession",
+        "type": "text",
+        "section": "metadata",
+        "help": "Wizard step 2 (General Info). The accession (PRJNA#) of a BioProject you already registered; the wizard then skips the Project Info step. Leave blank to register a new BioProject in this submission (its accession is assigned after the submission is processed). The project must exist and must not be an umbrella or RefSeq project. To add data to an existing study, give its PRJNA# rather than creating a duplicate project.",
+        "autofill": "extract"
+      },
+      {
+        "id": "release_date",
+        "label": "Release date",
+        "type": "text",
+        "section": "metadata",
+        "help": "Wizard step 2 (General Info). Leave blank (or write 'immediately') to release immediately following processing, or give a date as YYYY-MM-DD to release on that date or upon publication, whichever is first. The portal accepts dates from one week to four years ahead. It can be changed later in the Submission Portal; it also sets the release of the BioProject and BioSamples.",
+        "autofill": "never"
+      },
+      {
+        "id": "title",
+        "label": "Project title",
+        "type": "text",
+        "min_character_count": 20,
+        "character_count": 250,
+        "help": "Wizard step 3 (Project Info), for a new BioProject (ignored when bioproject is given): a brief title, as a phrase or short sentence, for public display, e.g. 'Global studies of microbial diversity on human skin'. 20-250 characters. It is public, so it must not contain sensitive or personally identifying information.",
+        "autofill": "extract"
+      },
+      {
+        "id": "abstract",
+        "label": "Public description",
+        "type": "textarea",
+        "min_character_count": 20,
+        "character_count": 4000,
+        "help": "Wizard step 3 (Project Info), for a new BioProject: a paragraph describing the study goals and relevance, enough for users to understand the research study. 20-4000 characters.",
+        "autofill": "extract"
+      },
+      {
+        "id": "relevance",
+        "label": "Relevance",
+        "type": "choice",
+        "section": "metadata",
+        "options": [
+          "Agricultural",
+          "Medical",
+          "Industrial",
+          "Environmental",
+          "Evolution",
+          "Model organism",
+          "Other"
+        ],
+        "help": "Wizard step 3 (Project Info), for a new BioProject: the primary general relevance of the study. 'Other' needs relevance_description.",
+        "autofill": "classify"
+      },
+      {
+        "id": "relevance_description",
+        "label": "Relevance description",
+        "type": "text",
+        "section": "metadata",
+        "help": "Wizard step 3, required by the portal when relevance is 'Other': a few words on the study's relevance.",
+        "autofill": "extract"
+      },
+      {
+        "id": "external_links",
+        "label": "External links",
+        "type": "textarea",
+        "section": "additional",
+        "fields": [
+          "description",
+          "url"
+        ],
+        "help": "Wizard step 3 (Project Info), for a new BioProject: websites related to the study, one per line as 'display name | URL'.",
+        "autofill": "extract"
+      },
+      {
+        "id": "grants",
+        "label": "Grants",
+        "type": "textarea",
+        "section": "additional",
+        "fields": [
+          "grant_id",
+          "title?",
+          "agency",
+          "agency_abbreviation?"
+        ],
+        "help": "Wizard step 3 (Project Info), for a new BioProject: the study's grants, one per line as 'grant ID | grant title | agency | agency abbreviation', e.g. 'R01HG012345 | Single-cell atlas | National Human Genome Research Institute | NHGRI'. The runner enters them through the portal's 'Enter grants manually' table.",
+        "autofill": "extract"
+      },
+      {
+        "id": "consortium_name",
+        "label": "Consortium name",
+        "type": "text",
+        "section": "additional",
+        "help": "Wizard step 3, optional: the consortium the study was carried out in.",
+        "autofill": "extract"
+      },
+      {
+        "id": "consortium_url",
+        "label": "Consortium URL",
+        "type": "text",
+        "section": "additional",
+        "require_url": true,
+        "help": "Wizard step 3, optional: the consortium's website.",
+        "autofill": "extract"
+      },
+      {
+        "id": "data_providers",
+        "label": "Data providers",
+        "type": "textarea",
+        "section": "additional",
+        "fields": [
+          "name",
+          "url?"
+        ],
+        "help": "Wizard step 3, optional: the data provider (data submitter) if it is someone other than the submitting organization or consortium, e.g. a sequencing center; one per line as 'name | URL'.",
+        "autofill": "extract"
+      },
+      {
+        "id": "biosample_package",
+        "label": "BioSample package",
+        "type": "choice",
+        "section": "metadata",
+        "options": [
+          "SARS-CoV-2.cl.1.0",
+          "SARS-CoV-2.wwsurv.1.0",
+          "Pathogen.cl.1.0",
+          "Pathogen.env.1.0",
+          "Pathogen.combined.1.0",
+          "OneHealthEnteric.1.0",
+          "PHA4GE.wwsurv.1.0",
+          "Microbe.1.0",
+          "Model.organism.animal.1.0",
+          "Metagenome.environmental.1.0",
+          "Invertebrate.1.0",
+          "Human.1.0",
+          "Plant.1.0",
+          "Virus.1.0",
+          "Beta-lactamase.1.0",
+          "MIGS.ba.6.0",
+          "MIGS.ba.agriculture.6.0",
+          "MIGS.ba.air.6.0",
+          "MIGS.ba.built.6.0",
+          "MIGS.ba.food-animal.6.0",
+          "MIGS.ba.food-farm_env.6.0",
+          "MIGS.ba.food-prod_facility.6.0",
+          "MIGS.ba.food-human_foods.6.0",
+          "MIGS.ba.host-associated.6.0",
+          "MIGS.ba.human-associated.6.0",
+          "MIGS.ba.human-gut.6.0",
+          "MIGS.ba.human-oral.6.0",
+          "MIGS.ba.human-skin.6.0",
+          "MIGS.ba.human-vaginal.6.0",
+          "MIGS.ba.hydrocarbon-cores.6.0",
+          "MIGS.ba.hydrocarbon-fluids_swabs.6.0",
+          "MIGS.ba.microbial.6.0",
+          "MIGS.ba.miscellaneous.6.0",
+          "MIGS.ba.plant-associated.6.0",
+          "MIGS.ba.sediment.6.0",
+          "MIGS.ba.soil.6.0",
+          "MIGS.ba.symbiont-associated.6.0",
+          "MIGS.ba.wastewater.6.0",
+          "MIGS.ba.water.6.0",
+          "MIGS.eu.6.0",
+          "MIGS.eu.agriculture.6.0",
+          "MIGS.eu.air.6.0",
+          "MIGS.eu.built.6.0",
+          "MIGS.eu.food-animal.6.0",
+          "MIGS.eu.food-farm_env.6.0",
+          "MIGS.eu.food-prod_facility.6.0",
+          "MIGS.eu.food-human_foods.6.0",
+          "MIGS.eu.host-associated.6.0",
+          "MIGS.eu.human-associated.6.0",
+          "MIGS.eu.human-gut.6.0",
+          "MIGS.eu.human-oral.6.0",
+          "MIGS.eu.human-skin.6.0",
+          "MIGS.eu.human-vaginal.6.0",
+          "MIGS.eu.hydrocarbon-cores.6.0",
+          "MIGS.eu.hydrocarbon-fluids_swabs.6.0",
+          "MIGS.eu.microbial.6.0",
+          "MIGS.eu.miscellaneous.6.0",
+          "MIGS.eu.plant-associated.6.0",
+          "MIGS.eu.sediment.6.0",
+          "MIGS.eu.soil.6.0",
+          "MIGS.eu.symbiont-associated.6.0",
+          "MIGS.eu.wastewater.6.0",
+          "MIGS.eu.water.6.0",
+          "MIGS.vi.6.0",
+          "MIGS.vi.agriculture.6.0",
+          "MIGS.vi.air.6.0",
+          "MIGS.vi.built.6.0",
+          "MIGS.vi.food-animal.6.0",
+          "MIGS.vi.food-farm_env.6.0",
+          "MIGS.vi.food-prod_facility.6.0",
+          "MIGS.vi.food-human_foods.6.0",
+          "MIGS.vi.host-associated.6.0",
+          "MIGS.vi.human-associated.6.0",
+          "MIGS.vi.human-gut.6.0",
+          "MIGS.vi.human-oral.6.0",
+          "MIGS.vi.human-skin.6.0",
+          "MIGS.vi.human-vaginal.6.0",
+          "MIGS.vi.hydrocarbon-cores.6.0",
+          "MIGS.vi.hydrocarbon-fluids_swabs.6.0",
+          "MIGS.vi.microbial.6.0",
+          "MIGS.vi.miscellaneous.6.0",
+          "MIGS.vi.plant-associated.6.0",
+          "MIGS.vi.sediment.6.0",
+          "MIGS.vi.soil.6.0",
+          "MIGS.vi.symbiont-associated.6.0",
+          "MIGS.vi.wastewater.6.0",
+          "MIGS.vi.water.6.0",
+          "MIMAG.6.0",
+          "MIMAG.agriculture.6.0",
+          "MIMAG.air.6.0",
+          "MIMAG.built.6.0",
+          "MIMAG.food-animal.6.0",
+          "MIMAG.food-farm_env.6.0",
+          "MIMAG.food-prod_facility.6.0",
+          "MIMAG.food-human_foods.6.0",
+          "MIMAG.host-associated.6.0",
+          "MIMAG.human-associated.6.0",
+          "MIMAG.human-gut.6.0",
+          "MIMAG.human-oral.6.0",
+          "MIMAG.human-skin.6.0",
+          "MIMAG.human-vaginal.6.0",
+          "MIMAG.hydrocarbon-cores.6.0",
+          "MIMAG.hydrocarbon-fluids_swabs.6.0",
+          "MIMAG.microbial.6.0",
+          "MIMAG.miscellaneous.6.0",
+          "MIMAG.plant-associated.6.0",
+          "MIMAG.sediment.6.0",
+          "MIMAG.soil.6.0",
+          "MIMAG.symbiont-associated.6.0",
+          "MIMAG.wastewater.6.0",
+          "MIMAG.water.6.0",
+          "MIMARKS.specimen.6.0",
+          "MIMARKS.specimen.agriculture.6.0",
+          "MIMARKS.specimen.air.6.0",
+          "MIMARKS.specimen.built.6.0",
+          "MIMARKS.specimen.food-animal.6.0",
+          "MIMARKS.specimen.food-farm_env.6.0",
+          "MIMARKS.specimen.food-prod_facility.6.0",
+          "MIMARKS.specimen.food-human_foods.6.0",
+          "MIMARKS.specimen.host-associated.6.0",
+          "MIMARKS.specimen.human-associated.6.0",
+          "MIMARKS.specimen.human-gut.6.0",
+          "MIMARKS.specimen.human-oral.6.0",
+          "MIMARKS.specimen.human-skin.6.0",
+          "MIMARKS.specimen.human-vaginal.6.0",
+          "MIMARKS.specimen.hydrocarbon-cores.6.0",
+          "MIMARKS.specimen.hydrocarbon-fluids_swabs.6.0",
+          "MIMARKS.specimen.microbial.6.0",
+          "MIMARKS.specimen.miscellaneous.6.0",
+          "MIMARKS.specimen.plant-associated.6.0",
+          "MIMARKS.specimen.sediment.6.0",
+          "MIMARKS.specimen.soil.6.0",
+          "MIMARKS.specimen.symbiont-associated.6.0",
+          "MIMARKS.specimen.wastewater.6.0",
+          "MIMARKS.specimen.water.6.0",
+          "MIMARKS.survey.agriculture.6.0",
+          "MIMARKS.survey.air.6.0",
+          "MIMARKS.survey.built.6.0",
+          "MIMARKS.survey.food-animal.6.0",
+          "MIMARKS.survey.food-farm_env.6.0",
+          "MIMARKS.survey.food-prod_facility.6.0",
+          "MIMARKS.survey.food-human_foods.6.0",
+          "MIMARKS.survey.host-associated.6.0",
+          "MIMARKS.survey.human-associated.6.0",
+          "MIMARKS.survey.human-gut.6.0",
+          "MIMARKS.survey.human-oral.6.0",
+          "MIMARKS.survey.human-skin.6.0",
+          "MIMARKS.survey.human-vaginal.6.0",
+          "MIMARKS.survey.hydrocarbon-cores.6.0",
+          "MIMARKS.survey.hydrocarbon-fluids_swabs.6.0",
+          "MIMARKS.survey.microbial.6.0",
+          "MIMARKS.survey.miscellaneous.6.0",
+          "MIMARKS.survey.plant-associated.6.0",
+          "MIMARKS.survey.sediment.6.0",
+          "MIMARKS.survey.soil.6.0",
+          "MIMARKS.survey.symbiont-associated.6.0",
+          "MIMARKS.survey.wastewater.6.0",
+          "MIMARKS.survey.water.6.0",
+          "MIMS.me.agriculture.6.0",
+          "MIMS.me.air.6.0",
+          "MIMS.me.built.6.0",
+          "MIMS.me.food-animal.6.0",
+          "MIMS.me.food-farm_env.6.0",
+          "MIMS.me.food-prod_facility.6.0",
+          "MIMS.me.food-human_foods.6.0",
+          "MIMS.me.host-associated.6.0",
+          "MIMS.me.human-associated.6.0",
+          "MIMS.me.human-gut.6.0",
+          "MIMS.me.human-oral.6.0",
+          "MIMS.me.human-skin.6.0",
+          "MIMS.me.human-vaginal.6.0",
+          "MIMS.me.hydrocarbon-cores.6.0",
+          "MIMS.me.hydrocarbon-fluids_swabs.6.0",
+          "MIMS.me.microbial.6.0",
+          "MIMS.me.miscellaneous.6.0",
+          "MIMS.me.plant-associated.6.0",
+          "MIMS.me.sediment.6.0",
+          "MIMS.me.soil.6.0",
+          "MIMS.me.symbiont-associated.6.0",
+          "MIMS.me.wastewater.6.0",
+          "MIMS.me.water.6.0",
+          "MISAG.6.0",
+          "MISAG.agriculture.6.0",
+          "MISAG.air.6.0",
+          "MISAG.built.6.0",
+          "MISAG.food-animal.6.0",
+          "MISAG.food-farm_env.6.0",
+          "MISAG.food-prod_facility.6.0",
+          "MISAG.food-human_foods.6.0",
+          "MISAG.host-associated.6.0",
+          "MISAG.human-associated.6.0",
+          "MISAG.human-gut.6.0",
+          "MISAG.human-oral.6.0",
+          "MISAG.human-skin.6.0",
+          "MISAG.human-vaginal.6.0",
+          "MISAG.hydrocarbon-cores.6.0",
+          "MISAG.hydrocarbon-fluids_swabs.6.0",
+          "MISAG.microbial.6.0",
+          "MISAG.miscellaneous.6.0",
+          "MISAG.plant-associated.6.0",
+          "MISAG.sediment.6.0",
+          "MISAG.soil.6.0",
+          "MISAG.symbiont-associated.6.0",
+          "MISAG.wastewater.6.0",
+          "MISAG.water.6.0",
+          "MIUVIG.6.0",
+          "MIUVIG.agriculture.6.0",
+          "MIUVIG.air.6.0",
+          "MIUVIG.built.6.0",
+          "MIUVIG.food-animal.6.0",
+          "MIUVIG.food-farm_env.6.0",
+          "MIUVIG.food-prod_facility.6.0",
+          "MIUVIG.food-human_foods.6.0",
+          "MIUVIG.host-associated.6.0",
+          "MIUVIG.human-associated.6.0",
+          "MIUVIG.human-gut.6.0",
+          "MIUVIG.human-oral.6.0",
+          "MIUVIG.human-skin.6.0",
+          "MIUVIG.human-vaginal.6.0",
+          "MIUVIG.hydrocarbon-cores.6.0",
+          "MIUVIG.hydrocarbon-fluids_swabs.6.0",
+          "MIUVIG.microbial.6.0",
+          "MIUVIG.miscellaneous.6.0",
+          "MIUVIG.plant-associated.6.0",
+          "MIUVIG.sediment.6.0",
+          "MIUVIG.soil.6.0",
+          "MIUVIG.symbiont-associated.6.0",
+          "MIUVIG.wastewater.6.0",
+          "MIUVIG.water.6.0"
+        ],
+        "help": "Wizard step 4 (Sample Type), for new BioSamples: the NCBI BioSample package id that best describes the samples, e.g. 'Model.organism.animal.1.0', 'Human.1.0', 'Microbe.1.0', 'Metagenome.environmental.1.0', or a MIxS package with its environment such as 'MIMS.me.soil.6.0'. The id is the name of the package's template; all packages are listed at https://www.ncbi.nlm.nih.gov/biosample/docs/packages/, and a package's attributes (what each means, which are mandatory, the value each takes) at https://submit.ncbi.nlm.nih.gov/biosample/template/?package-0=<package>&action=definition. Leave blank, together with biosample_attributes_file, when the samples are already registered (the SRA metadata then gives their SAMN# accessions). Human data that needs controlled access goes to dbGaP, not SRA.",
+        "required_if": "biosample_attributes_file",
+        "autofill": "classify"
+      },
+      {
+        "id": "biosample_attributes_file",
+        "label": "BioSample attributes file",
+        "type": "file",
+        "section": "files",
+        "accept": [
+          ".tsv",
+          ".txt",
+          ".xlsx"
+        ],
+        "help": "Wizard step 5 (BioSample attributes), for new BioSamples: the biosample_package's attributes template, one row per sample, as tab-delimited text or Excel (.xlsx; paperpush uploads it as TSV). Templates: https://submit.ncbi.nlm.nih.gov/biosample/template/?package-0=<package>&action=download_tsv (TSV) or https://www.ncbi.nlm.nih.gov/biosample/docs/templates/packages/<package>.xlsx (Excel), e.g. <package> = Model.organism.animal.1.0; what each attribute means and the value it takes: https://submit.ncbi.nlm.nih.gov/biosample/template/?package-0=<package>&action=definition. Mandatory columns are marked '*', and of attributes marked '**' (a group, such as strain/isolate/breed/cultivar/ecotype) each sample needs at least one; write 'not collected', 'not applicable' or 'missing' when a mandatory value is unknown. Fixed-choice attributes (sex) take one of their listed values; collection_date is a date such as 2024-03-15 (format the column as Text in Excel so it stays one); geo_loc_name starts with a country or ocean from https://www.insdc.org/submitting-standards/geo_loc_name-qualifier-vocabulary/, e.g. 'USA: California'; lat_lon is like '38.98 N 77.11 W'. Sample names must be unique within your account, and no two samples may have identical attributes (sample_title and description do not count): add a column, such as replicate, that tells them apart. paperpush validate checks the file against the package's definitions. Leave blank, with biosample_package, when the samples are already registered.",
+        "autofill": "filemap"
+      },
+      {
+        "id": "sra_metadata_file",
+        "label": "SRA metadata file",
+        "type": "file",
+        "section": "files",
+        "required": true,
+        "accept": [
+          ".tsv",
+          ".txt",
+          ".xlsx"
+        ],
+        "help": "Wizard step 6 (SRA Metadata): NCBI's template (https://ftp-trace.ncbi.nlm.nih.gov/sra/metadata_table/SRA_metadata.xlsx) filled in: the .xlsx itself (paperpush reads and uploads its SRA_data sheet as TSV) or that sheet saved as tab-delimited text. One row per experiment (sample + library + strategy + layout + instrument model) with a unique library_ID; columns sample_name (or biosample_accession SAMN# for registered samples), library_ID, title, library_strategy, library_source, library_selection, library_layout, platform, instrument_model, design_description, filetype and filename (filename2... for paired and further files), plus assembly (and fasta_file for a non-NCBI reference) for aligned data. Paired files go in the same row; file names must exactly match the uploaded files.",
+        "autofill": "filemap"
+      },
+      {
+        "id": "upload_method",
+        "label": "Upload method",
+        "type": "choice",
+        "section": "files",
+        "options": [
+          "Web browser upload",
+          "FTP or Aspera preload"
+        ],
+        "default": "Web browser upload",
+        "help": "Wizard step 7 (Files). 'Web browser upload' sends data_files through the browser over HTTP and suits a few small files (each under 2 GB). For larger data, upload the files yourself by FTP or Aspera command line into a dedicated preload folder (see the portal's instructions), wait at least 10 minutes, and choose 'FTP or Aspera preload' with preload_folder. Cloud-bucket transfers are left to you in the portal.",
+        "autofill": "never"
+      },
+      {
+        "id": "preload_folder",
+        "label": "Preload folder",
+        "type": "text",
+        "section": "files",
+        "help": "Wizard step 7, with upload_method 'FTP or Aspera preload': the name of the preload folder that holds this submission's files (one folder per submission, not your root directory).",
+        "autofill": "never"
+      },
+      {
+        "id": "data_files",
+        "label": "Sequence data files",
+        "type": "filelist",
+        "section": "files",
+        "accept": [
+          ".fastq",
+          ".fq",
+          ".bam",
+          ".cram",
+          ".sff",
+          ".h5",
+          ".fast5",
+          ".srf",
+          ".fasta",
+          ".fa",
+          ".fna",
+          ".qual",
+          ".csfasta",
+          ".gz",
+          ".bz2",
+          ".tar",
+          ".tgz"
+        ],
+        "max_file_size_mb": 100000,
+        "help": "Wizard step 7 (Files), with 'Web browser upload': the sequence data files named in the SRA metadata, one path per line; each file name must exactly match a filename column there and be unique. Raw reads with per-base quality scores only; no assemblies, contigs or consensus sequences. Compress with gzip or bzip2 (never zip); a tarball is allowed. Each fastq file must be under 100 GB. File names appear publicly, so they must not contain sensitive information. Leave blank with 'FTP or Aspera preload'.",
+        "autofill": "filemap"
+      }
+    ]
+  },
+  "geo": {
+    "submission_url": "https://submit.ncbi.nlm.nih.gov/geo/submission/",
+    "fields": [
+      {
+        "id": "submission_type",
+        "label": "Data type",
+        "type": "choice",
+        "required": true,
+        "section": "type",
+        "help": "The kind of data being submitted; each type has its own instructions and metadata spreadsheet. A study with several data types (RNA-seq, ChIP-seq, ...) is submitted as one submission per data type.",
+        "options": [
+          "High-throughput sequencing (HTS)",
+          "Microarray and other non-HTS data types"
+        ],
+        "autofill": "classify"
+      },
+      {
+        "id": "title",
+        "label": "Title",
+        "type": "text",
+        "help": "The study (Series) title, as entered in the STUDY section of the GEO metadata spreadsheet.",
+        "autofill": "extract"
+      },
+      {
+        "id": "abstract",
+        "label": "Summary",
+        "type": "textarea",
+        "help": "The study (Series) summary, as entered in the STUDY section of the GEO metadata spreadsheet.",
+        "autofill": "extract"
+      },
+      {
+        "id": "overall_design",
+        "label": "Overall design",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "The experimental design text of the STUDY (Series) section of the metadata spreadsheet: the samples, their relationships, and the experimental factors.",
+        "autofill": "extract"
+      },
+      {
+        "id": "authors",
+        "label": "Contributors",
+        "type": "authorlist",
+        "help": "One contributor per line, in order, as they should appear on the GEO records.",
+        "fields": [
+          "name"
+        ],
+        "autofill": "extract"
+      },
+      {
+        "id": "related_identifiers",
+        "label": "Related identifiers",
+        "type": "textarea",
+        "section": "metadata",
+        "help": "Optional. One per line: the PubMed ID (PMID) of the publication citing the data, or, when the raw data are already in SRA, the PRJNA/SAMN/SRX/SRR accessions.",
+        "autofill": "extract"
+      },
+      {
+        "id": "metadata_file",
+        "label": "Metadata spreadsheet",
+        "type": "file",
+        "required": true,
+        "section": "files",
+        "help": "The completed GEO metadata spreadsheet for this data type (one per data type, at most 1,000 samples). Uploaded on the Submit to GEO page after the FTP transfer is complete, not by FTP.",
+        "autofill": "filemap"
+      },
+      {
+        "id": "data_files",
+        "label": "Processed data files",
+        "type": "filelist",
+        "required": true,
+        "section": "files",
+        "help": "One processed data file per line (a matrix table or one file per sample), with a quantitative component such as counts. Read alignments (BAM, SAM, BED) do not count as processed data. Uploaded by FTP.",
+        "autofill": "filemap"
+      },
+      {
+        "id": "raw_data_files",
+        "label": "Raw data files",
+        "type": "filelist",
+        "required": true,
+        "section": "files",
+        "help": "One raw data file per line. HTS: FASTQ (gzip or bzip2 compressed), BAM, or CRAM, each under 100 GiB. Affymetrix microarrays: CEL files; other arrays: the scan software's quantification files (e.g. GPR). Uploaded by FTP.",
+        "max_file_size_mb": 102400,
+        "autofill": "filemap"
+      },
+      {
+        "id": "release_date",
+        "label": "Release date",
+        "type": "text",
+        "section": "additional",
+        "help": "The date (YYYY-MM-DD) the records become public, at most four years ahead. Records must be released once a manuscript or preprint citing the accession is public.",
+        "autofill": "never"
+      }
+    ]
   }
 }

@@ -23,11 +23,12 @@
           "type": "string"
         },
         "venue_type": {
-          "description": "Kind of venue: a preprint server, a journal, or a conference.",
+          "description": "Kind of venue: a preprint server, a journal, a conference, or a data repository (a database that takes data deposits, such as Zenodo or GEO).",
           "enum": [
             "preprint",
             "journal",
-            "conference"
+            "conference",
+            "data_repository"
           ],
           "type": "string"
         },
