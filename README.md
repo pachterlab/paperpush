@@ -99,6 +99,8 @@ No installation required.
   - Or run every step above in one command: `paperpush prepare-submission VENUE -p MANUSCRIPT_DIR` (autofills through an LLM API key)
   - `submit` is for **initial submissions only**. Upload a revision through the venue's own "submit revision" link for the existing manuscript (prepare it with `/paperpush-respond-to-reviewers`)
 
+[![PaperPush workflows](docs/_static/prepare_submission_workflow.png)](docs/_static/prepare_submission_workflow.pdf)
+
 ## Use with AI
 
 Install the paperpush skills for your agent, so it knows how to autofill, validate, and submit:
