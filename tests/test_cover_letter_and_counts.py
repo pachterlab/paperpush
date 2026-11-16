@@ -95,10 +95,10 @@ def _letter_checks(tmp_path: Path, paragraphs: list[str], venue: Venue | None = 
     return checks
 
 
-def test_stale_cover_letter_is_a_warning(tmp_path):
+def test_stale_cover_letter_is_a_suggestion(tmp_path):
     checks = _letter_checks(tmp_path, ["Lab of Biology", "12 October 2026", "Dear Editors,", "We submit our manuscript to Cell for consideration."])
     status, text = _status(checks, "cover_letter.date")
-    assert status == report.WARNING and "22 days ago" in text
+    assert status == report.SUGGESTION and "22 days ago" in text
     assert _status(checks, "cover_letter.venue")[0] == report.PASSED
 
 

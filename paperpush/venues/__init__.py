@@ -35,8 +35,8 @@ from typing import Callable
 _SCAFFOLD_PORTALS = frozenset({"template"})
 
 
-def _discover_slug_to_module() -> dict[str, str]:
-    """Build the slug -> module registry by scanning the portal subpackages.
+def _discover_slug_to_module() -> tuple[dict[str, str], dict[str, str]]:
+    """Build the slug -> module registries by scanning the portal subpackages.
 
     Each venue leaf module is named ``<slug>.py`` and lives under its portal
     subpackage (``<portal>/<slug>.py``), so the slug is the filename stem and the
@@ -47,10 +47,17 @@ def _discover_slug_to_module() -> dict[str, str]:
     thus never needs Playwright; a half-finished leaf that has not defined its
     ``VENUE`` yet is simply not registered.
 
-    Raises :class:`RuntimeError` if two portals ship a leaf with the same stem,
-    since a slug must resolve to a single module.
+    A leaf that also assigns a module-level ``LOGIN_ONLY = True`` implements
+    sign-in but no submission wizard yet (``paperpush login`` works, ``submit``
+    does not). It goes into the second registry, so it never reads as a venue
+    paperpush can submit to.
+
+    Returns ``(submit_registry, login_only_registry)``. Raises
+    :class:`RuntimeError` if two portals ship a leaf with the same stem, since a
+    slug must resolve to a single module.
     """
     registry: dict[str, str] = {}
+    login_only: dict[str, str] = {}
     origin: dict[str, str] = {}
     venues_dir = Path(__file__).parent
     for module_file in sorted(venues_dir.glob("*/*.py")):
@@ -58,14 +65,16 @@ def _discover_slug_to_module() -> dict[str, str]:
         if stem == "__init__" or portal in _SCAFFOLD_PORTALS or not (module_file.parent / "__init__.py").exists():
             continue
         tree = ast.parse(module_file.read_text(encoding="utf-8"), filename=str(module_file))
-        defines_venue = any(isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "VENUE" for t in node.targets) for node in tree.body)
-        if not defines_venue:
+        assigned = {t.id: node.value for node in tree.body if isinstance(node, ast.Assign) for t in node.targets if isinstance(t, ast.Name)}
+        if "VENUE" not in assigned:
             continue
-        if stem in registry:
+        if stem in origin:
             raise RuntimeError(f"Duplicate venue slug {stem!r} in portals {origin[stem]!r} and {portal!r}; " "a slug must map to a single module.")
-        registry[stem] = f"{portal}.{stem}"
+        marker = assigned.get("LOGIN_ONLY")
+        target = login_only if isinstance(marker, ast.Constant) and marker.value is True else registry
+        target[stem] = f"{portal}.{stem}"
         origin[stem] = portal
-    return registry
+    return registry, login_only
 
 
 # Venue slug -> module (dotted, relative to this package) implementing its runner,
@@ -75,7 +84,12 @@ def _discover_slug_to_module() -> dict[str, str]:
 # ``<portal>/<venue>.py``; a shared portal has a ``main`` engine (no ``VENUE``, so
 # it is not itself a venue) plus one thin module per venue. To add a venue, drop
 # its ``<slug>.py`` into the portal subpackage -- there is nothing to register.
-SLUG_TO_MODULE = _discover_slug_to_module()
+SLUG_TO_MODULE, LOGIN_ONLY_SLUG_TO_MODULE = _discover_slug_to_module()
+
+# Every module with a ``VENUE``: the submit runners plus the login-only venues
+# (``LOGIN_ONLY = True``). Login, session and capability lookups resolve through
+# this; :func:`get_runner` and ``Venue.supports_submit`` use SLUG_TO_MODULE alone.
+_ALL_VENUE_MODULES = {**SLUG_TO_MODULE, **LOGIN_ONLY_SLUG_TO_MODULE}
 
 # Venues that submit *through* another venue's portal -- they share that base
 # venue's runner, stored credentials, and saved browser session. This is a
@@ -181,11 +195,12 @@ def login_required(slug: str) -> bool:
 def import_venue(slug: str):
     """Import and return the module implementing ``slug``'s runner.
 
-    Resolves through :data:`SLUG_TO_MODULE`. Raises :class:`KeyError` if no module
-    is registered for the slug, or propagates :class:`ImportError` if the module
-    exists but a dependency (e.g. Playwright) is missing.
+    Resolves through :data:`SLUG_TO_MODULE`, then the login-only venues. Raises
+    :class:`KeyError` if no module is registered for the slug, or propagates
+    :class:`ImportError` if the module exists but a dependency (e.g. Playwright)
+    is missing.
     """
-    path = SLUG_TO_MODULE[slug.lower()]
+    path = _ALL_VENUE_MODULES[slug.lower()]
     return importlib.import_module(f".{path}", __package__)
 
 
@@ -196,7 +211,7 @@ def try_import_venue(slug: str):
     module (e.g. an optional dependency is absent), so callers that merely probe a
     venue's capabilities can degrade gracefully rather than raising.
     """
-    path = SLUG_TO_MODULE.get(slug.lower())
+    path = _ALL_VENUE_MODULES.get(slug.lower())
     if path is None:
         return None
     try:
@@ -240,9 +255,13 @@ def get_runner(slug: str) -> Callable:
     via :func:`submission_base`; the differing publication is carried in the
     ``.sub`` rather than the code, so one runner serves the whole family.
 
-    Raises :class:`KeyError` if no runner is registered for the venue.
+    Raises :class:`KeyError` if no runner is registered for the venue, including
+    a login-only venue (see :data:`LOGIN_ONLY_SLUG_TO_MODULE`).
     """
-    return get_venue_impl(submission_base(slug)).submit
+    base = submission_base(slug)
+    if base not in SLUG_TO_MODULE:
+        raise KeyError(slug)
+    return get_venue_impl(base).submit
 
 
 def get_field_validators(slug: str) -> dict[str, Callable[[str], str]]:

@@ -92,6 +92,7 @@ transferring between venues, and responding to reviewers).
    sub-file
    validation-checks
    submission-portal
+   ncbi-login
    schemas/venues
    schemas/submission_forms
    schemas/manuscript_requirements

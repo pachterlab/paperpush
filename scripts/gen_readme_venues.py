@@ -92,6 +92,7 @@ PLATFORMS = {
     "discrete_mathematics": "Editorial Manager",
     "arxiv": "arXiv (native)",
     "biorxiv": "openRxiv",
+    "caltechdata": "InvenioRDM",
     "medrxiv": "openRxiv",
     "bioinformatics": "ScholarOne Manuscripts",
     "nature": "eJournalPress",

@@ -160,6 +160,7 @@ def test_manuscript_format_warns_only_when_field_has_no_accept(_use, tmp_path):
     _build_docx(doc, ["hello"])
     issues = _check(_venue(MANUSCRIPT), {"manuscript_file": str(doc)})
     assert any("guidelines accept .pdf" in msg for msg in _messages(issues, WARNING))
+    assert not _messages(issues, ERROR)
     # The field's own accept list is enforced elsewhere; not repeated here.
     strict = Field(id="manuscript_file", label="Manuscript", type="file", accept=[".pdf"])
     assert _check(_venue(strict), {"manuscript_file": str(doc)}) == []
@@ -207,7 +208,7 @@ def test_supplementary_single_pdf_rule(_use, tmp_path):
     assert any("single PDF" in msg for msg in _messages(issues, WARNING))
 
 
-def test_cover_letter_recommended_when_empty(_use):
+def test_required_cover_letter_warns_when_empty(_use):
     _use({"testj": {"cover_letter": {"required": True}}})
     cover = Field(id="cover_letter", label="Cover letter", type="file")
     issues = _check(_venue(cover), {})

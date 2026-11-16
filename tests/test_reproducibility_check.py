@@ -138,6 +138,25 @@ def test_github_repository_contents_are_inspected(tmp_path, monkeypatch):
     messages = _messages(results["rigor.code_availability"])
     assert "no license" in messages and "no README" in messages and "declares no software environment" in messages
     assert "holds no source code" not in messages
+    # Repository hygiene is advice unless the venue asks for licensed, documented code.
+    assert {i.level for i in results["rigor.code_availability"].issues} == {"suggestion"}
+
+
+def test_repository_hygiene_warns_when_the_venue_asks(tmp_path, monkeypatch):
+    from paperpush import requirements as r
+
+    monkeypatch.setattr(r, "_load_raw", lambda: {"$aliases": {}, VENUE.slug: {"notes": ["Code must be deposited with an open-source licence and a README."]}})
+
+    def fake(url, headers=None):
+        if url.endswith("/repos/lab/paper-code"):
+            return 200, {"license": None, "default_branch": "main"}
+        if "/git/trees/main" in url:
+            return 200, {"tree": [{"type": "blob", "path": "fig1.py"}], "truncated": False}
+        return 404, None
+
+    monkeypatch.setattr(rc, "_get_json", fake)
+    results, _ = _run(_values(tmp_path, "Code availability\nhttps://github.com/lab/paper-code (archived at 10.5281/zenodo.42)"), check_repositories=True)
+    assert {i.level for i in results["rigor.code_availability"].issues} == {"warning"}
 
 
 def test_github_rate_limit_is_unchecked_not_passed(tmp_path):

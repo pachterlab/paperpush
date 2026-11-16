@@ -196,7 +196,7 @@ is found on its guideline pages, else its layout rules; the original is never
 changed, and `left_to_author` lists what the author still has to do),
 `convert_manuscript` (move a manuscript between Markdown, Word, and LaTeX; pass
 `embed_source=false` for a .docx that goes to a journal), `submit`, `submit_status`,
-`submit_page`, `submit_act`, `submit_resume`, and `submit_close`. Pass **absolute paths**: the server has its own working
+`submit_page`, `submit_act`, `submit_resume`, `submit_signed_in`, and `submit_close`. Pass **absolute paths**: the server has its own working
 directory, so a relative path means something different to it than it does to
 you.
 
@@ -209,6 +209,16 @@ review and send the form themselves, end your turn, and call `submit_close`
 when they say they are done. It refuses to open a browser at all
 unless the `.sub` validates and, when the portal requires authentication, the
 venue already has a stored login — so run the login check above first.
+
+**Signing in by hand instead.** If the author would rather sign in in the
+browser window than run `paperpush login`, pass `manual_login=true` to
+`submit` (CLI: `paperpush submit --manual-login`). The run opens the portal's
+sign-in page and `submit_status` reports `state: awaiting_sign_in`. Ask the
+author to sign in there (never ask for their password in the chat). The run
+notices the sign-in by itself and goes back to `filling`. If it is still
+`awaiting_sign_in` after they say they are signed in, call
+`submit_signed_in(pid)`. The wait gives up after 30 minutes. A headed run whose
+stored credentials stop working falls back to the same wait.
 
 **When a step fails, the run pauses for you instead of failing** (on every venue
 with a submission runner; sign-in is never part of it). `submit_status` then
@@ -426,6 +436,13 @@ When the venue lets the initial submission be in any format
 (MCP: `initial_submission_rule`); `--initial-submission` (MCP:
 `initial_submission=true`) reports every error as a warning for a first
 submission. Use it only when the author says this is an initial submission.
+`--plagiarism` (MCP: `plagiarism=true`) scans the manuscript's text with
+Winston AI (the default) or Originality.ai (`WINSTON_API_KEY` / `ORIGINALITY_API_KEY`) and
+reports check `integrity.plagiarism`: the score and every matching source,
+and a warning at `--plagiarism-threshold` (default 20%). It sends the
+unpublished text to a third party and costs the author credits, so run it only
+when the author asks. `--plagiarism-accept URL` (MCP: `plagiarism_accept`)
+names sources that may match, such as the author's preprint.
 
 Checks that need a reader's judgment -- lettering in raster figures, whether
 each figure and panel shows what its legend and the text say, a postal

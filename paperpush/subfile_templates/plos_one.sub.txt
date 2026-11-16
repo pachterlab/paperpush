@@ -78,4 +78,23 @@ keywords:
 authors: |
   
 
+# ----------------------------------------------------------------------
+# Declarations
+# ----------------------------------------------------------------------
+
+# Funding statement (textarea, REQUIRED)
+#   The sources of funding for the work, with grant numbers, or a statement that it had none (e.g. 'The author(s) received no specific funding for this work.'). It goes in the submission form only; the author guidelines keep it out of the manuscript file.
+funding_statement: |
+  
+
+# Competing interests statement (textarea, REQUIRED)
+#   Every author's competing interests, or a statement that the authors have none (e.g. 'The authors have declared that no competing interests exist.'). It goes in the submission form only; the author guidelines keep it out of the manuscript file.
+competing_interests: |
+  
+
+# Data availability statement (textarea, REQUIRED)
+#   Where the data underlying the results can be found (repository and accession numbers or DOIs), or why they cannot be shared. Entered in the submission form; copy it from the manuscript if the manuscript has one.
+data_availability: |
+  
+
 # vim: set filetype=yaml :

@@ -27,6 +27,11 @@
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
+            "name": "Debug CaltechDATA",
+            "args": ["submit", "tests/sub_files/caltechdata/caltechdata.sub.txt"],
+            "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
+        },
+        {
             "name": "Debug Cell",
             "args": ["submit", "tests/sub_files/cell/cell.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
@@ -49,6 +54,11 @@
         {
             "name": "Debug Genome Biology",
             "args": ["submit", "tests/sub_files/genome_biology/genome_biology.sub.txt"],
+            "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
+        },
+        {
+            "name": "Debug GEO",
+            "args": ["submit", "tests/sub_files/geo/geo.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         },
         {
@@ -89,6 +99,16 @@
         {
             "name": "Debug Science",
             "args": ["submit", "tests/sub_files/science/science.sub.txt"],
+            "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
+        },
+        {
+            "name": "Debug SRA",
+            "args": ["submit", "tests/sub_files/sra/sra.sub.txt"],
+            "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
+        },
+        {
+            "name": "Debug Zenodo",
+            "args": ["submit", "tests/sub_files/zenodo/zenodo.sub.txt"],
             "type": "debugpy", "request": "launch", "module": "paperpush.cli", "justMyCode": false
         }
     ]

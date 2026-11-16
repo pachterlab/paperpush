@@ -1090,6 +1090,7 @@ def _login_args(venue_slug: str) -> argparse.Namespace:
         password=None,
         confirm_password=False,
         orcid=False,
+        github=False,
         orcid_id=None,
         into=None,
         status=False,
@@ -1110,8 +1111,11 @@ def _describe_identity(cred) -> str:
     registered email, since either may have been given), so ``--list`` and
     ``--status`` read the same way.
     """
+    if cred.method == "github":
+        return f"GitHub account {cred.username}"
     if cred.method != "orcid":
-        return cred.username
+        provider = getattr(cred, "provider", "")
+        return f"{cred.username} ({provider} account)" if provider else cred.username
     who = f"ORCID iD {cred.orcid}" if cred.orcid else f"ORCID account {cred.username}"
     return f"{who} ({cred.display_name})" if cred.display_name else who
 
@@ -1162,6 +1166,7 @@ def _check_login(venue, args: argparse.Namespace) -> int:
             cred.username,
             cred.password,
             method=cred.method,
+            provider=getattr(cred, "provider", ""),
             headless=True,
             timeout=getattr(args, "timeout", DEFAULT_TIMEOUT_SECONDS),
         )
@@ -1241,7 +1246,7 @@ def _cmd_login(args: argparse.Namespace) -> int:
         location = credentials.credential_location(venue.slug)
         store = "OS keyring" if location == "keyring" else "config file"
         who = _describe_identity(cred)
-        if cred.method == "orcid":
+        if cred.method != "password":
             print(f"Logged in to {venue.slug} via {who} (stored in {store}).")
         else:
             print(f"Logged in to {venue.slug} as {who} (stored in {store}).")
@@ -1249,6 +1254,33 @@ def _cmd_login(args: argparse.Namespace) -> int:
 
     if getattr(args, "check", False):
         return _check_login(venue, args)
+
+    github = getattr(args, "github", False)
+    if github and (args.orcid or args.orcid_id):
+        print("error: choose either --github or --orcid, not both", file=sys.stderr)
+        return 2
+    if github:
+        impl = venues.try_get_venue_impl(venue.slug)
+        if impl is None or not impl.supports_github_login:
+            print(f"error: GitHub sign-in is not implemented for {venue.slug}", file=sys.stderr)
+            return 2
+
+    # --provider picks one of several identity providers on a sign-in page that
+    # offers them (NCBI's gateway for sra/geo). Stored with the credential so
+    # submit and --check sign in the same way.
+    provider = (getattr(args, "provider", None) or "").strip().casefold()
+    if provider:
+        if github or args.orcid or args.orcid_id:
+            print("error: --provider cannot be combined with --orcid or --github", file=sys.stderr)
+            return 2
+        impl = venues.try_get_venue_impl(venue.slug)
+        offered = impl.login_providers if impl is not None else ()
+        if not offered:
+            print(f"error: {venue.slug} has a single sign-in form; --provider applies to venues with several identity providers (e.g. sra, geo)", file=sys.stderr)
+            return 2
+        if provider not in offered:
+            print(f"error: {venue.slug} does not offer the sign-in provider {provider!r}; choose from: {', '.join(offered)}", file=sys.stderr)
+            return 2
 
     if args.orcid or args.orcid_id:
         # ORCID sign-in is a journal thing: the preprint servers and conference
@@ -1264,7 +1296,7 @@ def _cmd_login(args: argparse.Namespace) -> int:
     username = args.username or os.environ.get("PAPERPUSH_USERNAME")
     if not username:
         try:
-            username = input(f"{venue.slug} username or email: ").strip()
+            username = input("GitHub username or email: " if github else f"{provider} username or email: " if provider else f"{venue.slug} username or email: ").strip()
         except EOFError:
             username = ""
     if not username:
@@ -1281,7 +1313,7 @@ def _cmd_login(args: argparse.Namespace) -> int:
         password = os.environ.get("PAPERPUSH_PASSWORD")
     if not password:
         try:
-            password = getpass.getpass("Password: ")
+            password = getpass.getpass("GitHub password: " if github else f"{provider} password: " if provider else "Password: ")
             if getattr(args, "confirm_password", False):
                 confirm = getpass.getpass("Confirm password: ")
                 if password != confirm:
@@ -1302,16 +1334,19 @@ def _cmd_login(args: argparse.Namespace) -> int:
 
         print(f"Checking the credentials by signing in to {venue.slug}…")
         try:
-            verify_login(venue.slug, username, password, headless=getattr(args, "verify_headless", False), timeout=getattr(args, "timeout", DEFAULT_TIMEOUT_SECONDS))
-        except LoginVerificationError as exc:
+            verify_login(venue.slug, username, password, headless=getattr(args, "verify_headless", False), timeout=getattr(args, "timeout", DEFAULT_TIMEOUT_SECONDS), provider=provider, **({"method": "github"} if github else {}))
+        except (LoginVerificationError, NotImplementedError) as exc:
             logger.warning("login: verification failed for %s: %s", venue.slug, exc)
             print(f"error: sign-in check failed: {exc}", file=sys.stderr)
+            impl = venues.try_get_venue_impl(venue.slug)
+            if not provider and not github and impl is not None and impl.login_providers:
+                print(f"If your {venue.slug} account signs in through another provider, re-run with --provider ({', '.join(impl.login_providers)}).", file=sys.stderr)
             print("Credentials were not stored. Re-run with --no-verify to store " "them without checking.", file=sys.stderr)
             return 1
         print("Sign-in confirmed.")
 
-    used_keyring = credentials.save_credential(venue.slug, username, password)
-    logger.info("login: stored password credentials for %s (keyring=%s)", venue.slug, used_keyring)
+    used_keyring = credentials.save_credential(venue.slug, username, password, provider=provider, **({"method": "github"} if github else {}))
+    logger.info("login: stored %s credentials for %s (keyring=%s)", "github" if github else "password", venue.slug, used_keyring)
     print(f"Stored credentials for {venue.slug} (user: {username}).")
     if used_keyring:
         print("  Saved to the operating system secret store.")
@@ -1785,6 +1820,9 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     if getattr(args, "reference_check_extended", False) and getattr(args, "web", False):
         print("error: --reference-check-extended is not supported with --web; use it with --ai-tasks so an agent can read the cited papers", file=sys.stderr)
         return 1
+    if check_flags.get("plagiarism") is not None and getattr(args, "web", False):
+        print("error: --plagiarism is not supported with --web; open the page without it and tick its Plagiarism scan box (WINSTON_API_KEY or ORIGINALITY_API_KEY in the environment will do), or run validate --plagiarism in the terminal", file=sys.stderr)
+        return 1
     if getattr(args, "reproduce_figures", False) and getattr(args, "web", False):
         print("error: --reproduce-figures is not supported with --web; use it with --ai-tasks so an agent can run the code", file=sys.stderr)
         return 1
@@ -2039,7 +2077,17 @@ def _cmd_submit(args: argparse.Namespace) -> int:
     # the browser), so a failed or skipped login is advisory, not blocking.
     needs_login = venues.login_required(cred_slug)
     env_creds = bool(os.environ.get("PAPERPUSH_USERNAME") and os.environ.get("PAPERPUSH_PASSWORD"))
-    if needs_login and credentials.get_credential(cred_slug) is None and not sys.stdin.isatty() and not env_creds:
+    manual_login = bool(getattr(args, "manual_login", False) or getattr(args, "sign_in_signal", None))
+    if manual_login and args.headless and needs_login:
+        print("error: --manual-login needs a visible browser to sign in to; drop --headless.", file=sys.stderr)
+        return 1
+    if manual_login:
+        # The author signs in in the browser window: no keyring prompt. Stored
+        # credentials and a saved session are still used when they work.
+        if needs_login and credentials.get_credential(cred_slug) is None:
+            logger.info("submit: --manual-login for %s; skipping the login prompt", cred_slug)
+            print(f"No stored credentials for {cred_slug}; sign in by hand in the browser window when it asks.")
+    elif needs_login and credentials.get_credential(cred_slug) is None and not sys.stdin.isatty() and not env_creds:
         # No terminal (CI, `</dev/null`, the MCP server's silent pipe) and no
         # credentials in the environment: the login prompt would block forever
         # or, worse, read stdin a caller meant for something else -- a CI loop's
@@ -2077,12 +2125,15 @@ def _cmd_submit(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    from .venues.common import SignInRequired
+    from contextlib import nullcontext
+
+    from .venues.common import SignInRequired, use_sign_in_watch
     from .venues.recovery import use_handler
     from .venues.recovery_channel import use_cdp_port
 
+    watch = use_sign_in_watch(getattr(args, "sign_in_signal", None)) if manual_login else nullcontext()
     try:
-        with use_handler(handler), use_cdp_port(cdp_port):
+        with use_handler(handler), use_cdp_port(cdp_port), watch:
             run(subfile.values, headless=args.headless, debug=args.debug, new_session=args.new_session, timeout=args.timeout, keep_open_on_failure=not args.close_on_failure)
     except SignInRequired as exc:
         logger.error("submit: %s", exc)
@@ -2266,6 +2317,8 @@ def _cmd_prepare_submission(args: argparse.Namespace) -> int:
     cred_slug = venues.submission_base(venue.slug)
     if not venues.login_required(cred_slug):
         print(f"{venue.slug}'s portal does not need a login.")
+    elif getattr(args, "manual_login", False):
+        print(f"--manual-login: sign in to {cred_slug} by hand in the browser window when it asks.")
     elif credentials.get_credential(cred_slug) is None:
         if not interactive:
             print(f"error: not logged in to {cred_slug}. Run 'paperpush login {cred_slug}' in a terminal, then run this again.", file=sys.stderr)
@@ -2306,6 +2359,7 @@ def _cmd_prepare_submission(args: argparse.Namespace) -> int:
             recover_dir=None,
             cdp_port=None,
             enable_network_checks=False,
+            manual_login=getattr(args, "manual_login", False),
             _validated=True,
         )
     )
@@ -2587,7 +2641,11 @@ def _cmd_autofill(args: argparse.Namespace) -> int:
         except json.JSONDecodeError as exc:
             print(f"error: {args.values} is not valid JSON: {exc}", file=sys.stderr)
             return 1
-        extraction = parse_extraction(data)
+        try:
+            extraction = parse_extraction(data)
+        except ValueError as exc:
+            print(f"error: {args.values}: {exc}", file=sys.stderr)
+            return 1
 
     confirm_attestations = getattr(args, "confirm_attestations", False)
     keep_existing = getattr(args, "keep_existing", False)
@@ -3320,6 +3378,22 @@ def _add_check_options(parser: argparse.ArgumentParser, *, documented: bool = Tr
         metavar="DAYS",
         help="warn when the date at the top of the cover letter is more than DAYS days old (default: 7). The cover letter is also checked for the name of a different venue, as left over from an earlier submission.",
     )
+    plag = parser.add_argument_group("plagiarism scan", "Off by default. Sends the manuscript's text (without its reference list) to Winston AI or Originality.ai, which costs credits on your account, and reports the similarity score and every matching source. Reaching the threshold is a warning, never an error." if documented else None)
+
+    def add_plag(*flags, help: str, **kwargs) -> None:
+        plag.add_argument(*flags, help=help if documented else argparse.SUPPRESS, **kwargs)
+
+    add_plag("--plagiarism", action="store_true", help="run the plagiarism scan (check integrity.plagiarism). Needs WINSTON_API_KEY or ORIGINALITY_API_KEY in the environment, or --plagiarism-api-key")
+    add_plag("--plagiarism-provider", dest="plagiarism_provider", choices=["winston", "originality"], help="(--plagiarism) the service to use; defaults to the first whose API key is set (WINSTON_API_KEY, then ORIGINALITY_API_KEY), else winston")
+    add_plag("--plagiarism-api-key", dest="plagiarism_api_key", metavar="KEY", help="(--plagiarism) the service's API key, instead of the environment variable (which keeps it out of your shell history)")
+    add_plag(
+        "--plagiarism-accept",
+        dest="plagiarism_accept",
+        action="append",
+        metavar="URL[,URL...]",
+        help="(--plagiarism) a source that may match, such as your own preprint or an earlier conference version: a domain (biorxiv.org), a page (it covers every version and format of it), or a DOI. Accepted sources are still listed in the report, but do not count toward the warning. Repeatable; optional",
+    )
+    add_plag("--plagiarism-threshold", dest="plagiarism_threshold", type=float, default=None, metavar="PERCENT", help="(--plagiarism) warn when this share of the text or more matches sources that are not accepted (default: 20)")
 
 
 def _check_flags(args: argparse.Namespace) -> dict:
@@ -3336,7 +3410,17 @@ def _check_flags(args: argparse.Namespace) -> dict:
         "cover_letter_max_age_days": getattr(args, "cover_letter_max_age", 7),
         "references_alphabetical": getattr(args, "references_alphabetical", False),
         "references_citation_order": getattr(args, "references_citation_order", False),
+        "plagiarism": _plagiarism_options(args),
     }
+
+
+def _plagiarism_options(args: argparse.Namespace):
+    """The plagiarism scan's options for ``--plagiarism``, else None; ValueError without an API key."""
+    if not getattr(args, "plagiarism", False):
+        return None
+    from . import plagiarism_check
+
+    return plagiarism_check.options(args.plagiarism_provider, args.plagiarism_api_key, args.plagiarism_accept or (), args.plagiarism_threshold)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -3579,9 +3663,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_login.add_argument(
         "--orcid",
         action="store_true",
-        help="sign in with your ORCID account instead of a venue " "username/password: prompts for your ORCID iD and ORCID " "password, and signs in through the venue's 'Sign in with " "ORCID' button. Journals only",
+        help="sign in with your ORCID account instead of a venue " "username/password: prompts for your ORCID iD and ORCID " "password, and signs in through the venue's 'Sign in with " "ORCID' button where supported",
     )
     p_login.add_argument("--orcid-id", metavar="ID", dest="orcid_id", help="your ORCID iD (e.g. 0000-0002-1825-0097) or the email " "registered with ORCID; implies --orcid and skips that " "prompt (you are still asked for the ORCID password)")
+    p_login.add_argument("--github", action="store_true", help="sign in through the venue's GitHub button using your GitHub username and password (supported for Zenodo)")
+    p_login.add_argument(
+        "--provider",
+        metavar="NAME",
+        help="for a venue whose sign-in page offers several identity providers, which one the username/password belong to. "
+        "NCBI venues (sra, geo): ncbi (default), era, google, orcid, login.gov, microsoft, nih. "
+        "Two-factor, CAPTCHA and PIV steps are finished by hand in the verification browser",
+    )
     p_login.add_argument("--into", metavar="SUBFILE", help="after an ORCID login, fill the matching author's " "ORCID/name/affiliation in this .sub file, read from " "their public ORCID record")
     p_login.add_argument("--status", action="store_true", help="show whether credentials are stored, then exit")
     p_login.add_argument(
@@ -3606,6 +3698,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_submit.add_argument("--headless", action="store_true", help="run the browser headless (default: headed, so you " "can sign in and review)")
     p_submit.add_argument("--debug", action="store_true", help="open the Playwright Inspector at the first step " "to walk the wizard line by line; reuses a saved " "session from an earlier run to skip sign-in")
     p_submit.add_argument("--new-session", action="store_true", help="discard any saved browser session and sign in " "fresh (use after switching accounts)")
+    p_submit.add_argument(
+        "--manual-login",
+        action="store_true",
+        help="sign in by hand in the browser window instead of with 'paperpush login' credentials: skips the login "
+        "prompt, and when sign-in is needed waits for you in the browser. At a terminal you press Enter once signed in; "
+        "without one (an agent, or '!' in Claude Code) the run watches the page and continues by itself. A saved session "
+        "or stored credentials are still used when they work",
+    )
+    p_submit.add_argument("--sign-in-signal", metavar="FILE", help=argparse.SUPPRESS)
     p_submit.add_argument("-y", "--yes", action="store_true", help="submit without asking when the .sub looks like a revised manuscript (it is in a revisionN/ directory or beside a response to reviewers). submit is for initial submissions; revisions go through the venue's own 'submit revision' link")
     p_submit.add_argument("--skip-validate", action="store_true", help="do not run validate on the .sub before opening the browser " "(default: validate first and stop on any error)")
     p_submit.add_argument(
@@ -3678,6 +3779,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_prepare.add_argument("--ai-checks", dest="ai_checks", action="store_true", help="also run validate's AI checks through the API (as 'validate --ai'); costs more API calls")
     p_prepare.add_argument("--no-submit", dest="no_submit", action="store_true", help="stop after validation")
     p_prepare.add_argument("-y", "--yes", action="store_true", help="do not stop to ask: skip the review pause, go on despite more than 5 warnings, and open the portal without a terminal")
+    p_prepare.add_argument("--manual-login", action="store_true", help="skip the login step and sign in by hand in the browser window (as for 'submit --manual-login')")
     p_prepare.add_argument("--recover", choices=["off", "by-hand", "ai"], default=None, help="what submit does when a portal step fails (as for 'submit --recover')")
     p_prepare.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, metavar="SECONDS", help=f"browser wait cap for login and submit (default: {DEFAULT_TIMEOUT_SECONDS:g}s; 0 waits forever)")
     _add_check_options(p_prepare, documented=False)

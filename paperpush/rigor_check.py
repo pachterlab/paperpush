@@ -46,8 +46,8 @@ from typing import Optional
 
 from .ai_validate import AiTask
 from .database import Venue
-from .requirements import get_requirements, resolve
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .requirements import get_requirements, notes_mention, resolve
+from .validate import SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +270,7 @@ def _rrids_check(venue: Venue, values: dict[str, str], online: bool) -> Outcome:
         counted.append(f"{len(items) - len(missing)}/{len(items)} {_plural(kind, len(items))}")
         if missing:
             shown = ", ".join(missing[:6]) + (f", and {len(missing) - 6} more" if len(missing) > 6 else "")
-            issues.append(Issue(WARNING, field_of.get(kind, ""), f"no RRID found next to {len(missing)} {_plural(kind, len(missing))}: {shown}; give each its RRID (scicrunch.org/resources) or say none exists"))
+            issues.append(Issue(_level_for(venue, values, _RRID_RULE), field_of.get(kind, ""), f"no RRID found next to {len(missing)} {_plural(kind, len(missing))}: {shown}; give each its RRID (scicrunch.org/resources) or say none exists"))
     unchecked = 0
     if online and given:
         for rrid, field_id in list(given.items())[:MAX_LOOKUPS]:
@@ -283,6 +283,19 @@ def _rrids_check(venue: Venue, values: dict[str, str], online: bool) -> Outcome:
     if given:
         detail += ("; " if detail else "") + f"{len(given)} RRID(s) given" + ("" if online else " (not looked up: registry checks are switched off)") + (f", {unchecked} could not be looked up" if unchecked else "")
     return Outcome(issues, detail)
+
+
+# A recorded venue rule makes a missing reporting item a warning; without one it is advice (a suggestion).
+_RRID_RULE = re.compile(r"(?i)\bRRIDs?\b|research resource identifier|key resources table|STAR\s*Methods")
+_CELL_LINE_RULE = re.compile(r"(?i)authenticat|mycoplasma|STR profil|misidentified|MDAR")
+_DESIGN_RULE = re.compile(r"(?i)\bARRIVE\b|\bMDAR\b|blind(?:ing|ed)|randomi[sz]ation|sample[- ]size|\bSAGER\b")
+
+
+def _level_for(venue: Venue, values: dict[str, str], rule: "re.Pattern[str]") -> str:
+    base = get_requirements(venue.slug)
+    if base and "reporting_guidelines" in (resolve(base, values).statements.required or []):
+        return WARNING
+    return WARNING if notes_mention(venue.slug, values, rule) else SUGGESTION
 
 
 # ---------------------------------------------------------------------------
@@ -327,10 +340,11 @@ def _cell_lines_check(venue: Venue, values: dict[str, str], online: bool) -> Out
         raise NotApplicable("no cell lines named")
     first_field = next(iter(lines.values()))
     issues: list[Issue] = []
+    level = _level_for(venue, values, _CELL_LINE_RULE)
     if not _AUTHENTICATION.search(whole):
-        issues.append(Issue(WARNING, first_field, f"the manuscript names cell lines ({', '.join(list(lines)[:4])}) but does not say how they were authenticated (e.g., STR profiling)"))
+        issues.append(Issue(level, first_field, f"the manuscript names cell lines ({', '.join(list(lines)[:4])}) but does not say how they were authenticated (e.g., STR profiling)"))
     if not _MYCOPLASMA.search(whole):
-        issues.append(Issue(WARNING, first_field, "the manuscript does not say whether the cell lines were tested for mycoplasma contamination"))
+        issues.append(Issue(level, first_field, "the manuscript does not say whether the cell lines were tested for mycoplasma contamination"))
     unasked = 0
     if online:
         for name, field_id in list(lines.items())[:MAX_LOOKUPS]:
@@ -399,7 +413,7 @@ def _design_check(venue: Venue, values: dict[str, str]) -> Outcome:
     issues = []
     if missing:
         what = "; ".join(_DESIGN_HINTS[m] for m in missing)
-        issues.append(Issue(WARNING, texts[0][0], f"the methods do not say {what} (MDAR/ARRIVE ask for these, including when they were not done)"))
+        issues.append(Issue(_level_for(venue, values, _DESIGN_RULE), texts[0][0], f"the methods do not say {what} (MDAR/ARRIVE ask for these, including when they were not done)"))
     return Outcome(issues, score)
 
 

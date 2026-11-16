@@ -591,7 +591,7 @@ find venues that fit your manuscript's topic.
      - Data repository
      - https://data.caltech.edu
      - ✅
-     -
+     - ✅
    * - ``geo``
      - GEO
      - biology, genetics, bioinformatics
@@ -605,14 +605,14 @@ find venues that fit your manuscript's topic.
      - Data repository
      - https://www.ncbi.nlm.nih.gov/sra
      - ✅
-     -
+     - ✅
    * - ``zenodo``
      - Zenodo
      - general
      - Data repository
      - https://zenodo.org
      - ✅
-     -
+     - ✅
 
 .. END SUPPORTED VENUES
 

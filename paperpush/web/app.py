@@ -248,6 +248,40 @@ class Settings:
         )
 
 
+def visitor_plagiarism(settings: Settings, req: "ValidateRequest", provider: Optional[str], api_key: Optional[str], *, local: bool = False):
+    """The :class:`~paperpush.plagiarism_check.PlagiarismOptions` for ``req``, or None when it asks for no scan.
+
+    Like :func:`visitor_llm`: the visitor's Winston AI or Originality.ai key
+    comes in the ``X-Plagiarism-Key`` header, is used for this request, and is
+    never written anywhere. Only a ``local`` session may fall back on a key set
+    in the environment (``WINSTON_API_KEY`` / ``ORIGINALITY_API_KEY``), so a
+    public server never spends its own credits.
+    """
+    if not req.plagiarism:
+        return None
+    if not settings.network_checks:
+        raise HTTPException(400, "the plagiarism scan is switched off on this server (it sends the manuscript's text to an outside service)")
+    from .. import plagiarism_check
+
+    api_key = (api_key or "").strip() or None
+    if api_key is None and not local:
+        raise HTTPException(400, "the plagiarism scan needs a Winston AI or Originality.ai API key: add yours on the page")
+    try:
+        return plagiarism_check.options(provider or None, api_key, req.plagiarism_accept, req.plagiarism_threshold)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc).replace(" (or pass --plagiarism-api-key)", ", or add a key on the page")) from None
+
+
+def plagiarism_env_provider() -> Optional[str]:
+    """The plagiarism service whose key is set in the environment, if any (for a local session's page)."""
+    from .. import plagiarism_check
+
+    for provider in plagiarism_check.PROVIDERS:
+        if any(os.environ.get(v, "").strip() for v in plagiarism_check.KEY_ENV[provider]):
+            return provider
+    return None
+
+
 def ai_provider(settings: Settings) -> Optional[str]:
     """The provider configured in the environment, if any (informational only)."""
     if not settings.ai:
@@ -532,14 +566,24 @@ def localize_values(venue: Venue, values: dict[str, str], files: Path) -> dict[s
     return out
 
 
-def _scrub(message: str, files: Path, api_key: Optional[str] = None) -> str:
-    """``message`` with workspace paths made bare and the visitor's API key, should a provider echo it, masked."""
-    if api_key:
-        message = message.replace(api_key, "[your API key]")
+def _scrub(message: str, files: Path, api_key=None) -> str:
+    """``message`` with workspace paths made bare and the visitor's API key(s), should a provider echo one, masked."""
+    for key in [api_key] if isinstance(api_key, str) else api_key or ():
+        if key:
+            message = message.replace(key, "[your API key]")
     return message.replace(f"{files}{os.sep}", "").replace(str(files), "")
 
 
-def _stream_progress(run, files: Path, api_key: Optional[str] = None):
+def _scrub_checks(checks, api_key: Optional[str]):
+    """``checks`` (the report payload) with ``api_key`` masked wherever a service echoed it."""
+    if not api_key:
+        return checks
+    import json
+
+    return json.loads(json.dumps(checks).replace(api_key, "[your API key]"))
+
+
+def _stream_progress(run, files: Path, api_key=None):
     """Yield NDJSON lines for ``run(progress)``: progress events, then its result.
 
     ``run`` works in a thread and reports each stage through ``progress``; this
@@ -804,7 +848,11 @@ def check_group(result: dict[str, Any]) -> str:
 _SWITCHED_OFF = re.compile(r"switched off \(--[a-z._-]+\)")
 
 
+_PLAGIARISM_OFF = re.compile(r"^off by default: run with --plagiarism.*$")
+
+
 def _web_detail(detail: str, files: Path) -> str:
+    detail = _PLAGIARISM_OFF.sub("off by default: tick Plagiarism scan next to Validate (sends the manuscript's text to Winston AI or Originality.ai; costs credits on your account)", detail)
     return _SWITCHED_OFF.sub("switched off on this server", _scrub(detail, files))
 
 
@@ -906,6 +954,13 @@ class ValidateRequest(BaseModel):
     initial_submission: bool = False
     # Report every suggestion on style as a warning (paperpush validate --strict-style).
     strict_style: bool = False
+    # Also run the plagiarism scan (paperpush validate --plagiarism) with the
+    # visitor's key from the X-Plagiarism-Key header. Costs credits on their account.
+    plagiarism: bool = False
+    # Sources that may match (paperpush validate --plagiarism-accept): domains, pages, or DOIs.
+    plagiarism_accept: list[str] = []
+    # Percent of unaccepted matching text that makes a warning (--plagiarism-threshold).
+    plagiarism_threshold: Optional[float] = None
     # Answer with NDJSON: {"progress": {...}} lines as each stage starts, then
     # one {"result": {...}} (or {"error": "..."}) line. The page's progress bar.
     stream: bool = False
@@ -958,6 +1013,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             "network_checks": settings.network_checks,
             "ai": settings.ai,
             "ai_provider": ai_provider(settings),
+            # Run locally (--web), a plagiarism key in the environment will do.
+            "plagiarism_provider": plagiarism_env_provider() if settings.local is not None and settings.network_checks else None,
             "max_workspace_mb": settings.max_workspace_mb,
             "ttl_hours": settings.ttl_hours,
             "local": settings.local is not None,
@@ -1296,10 +1353,13 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         req: ValidateRequest,
         x_llm_provider: Optional[str] = Header(None),
         x_llm_key: Optional[str] = Header(None),
+        x_plagiarism_provider: Optional[str] = Header(None),
+        x_plagiarism_key: Optional[str] = Header(None),
         x_paperpush_token: Optional[str] = Header(None),
     ) -> Any:
         files, local = workspace(ws_id, x_paperpush_token)
         sub, venue = _localized_sub(req.text, files, local)
+        plagiarism = visitor_plagiarism(settings, req, x_plagiarism_provider, x_plagiarism_key, local=local is not None)
         ai = None
         if req.ai:
             provider, api_key = visitor_llm(settings, x_llm_provider, x_llm_key, "the AI checks", local=local is not None)
@@ -1321,29 +1381,35 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                 initial_submission=req.initial_submission,
                 strict_style=req.strict_style,
                 ai=ai,
+                plagiarism=plagiarism,
                 progress=progress,
             )
-            return _validate_payload(report, venue, files, ai, network)
+            return _validate_payload(report, venue, files, ai, network, plagiarism)
 
         if not req.stream:
             return run()
-        return StreamingResponse(_stream_progress(run, files, ai.api_key if ai else None), media_type="application/x-ndjson")
+        return StreamingResponse(_stream_progress(run, files, _secrets(ai, plagiarism)), media_type="application/x-ndjson")
 
-    def _validate_payload(report, venue: Venue, files: Path, ai, network: bool) -> dict[str, Any]:
+    def _secrets(ai, plagiarism) -> list[str]:
+        return [k for k in (ai.api_key if ai else None, plagiarism.api_key if plagiarism else None) if k]
+
+    def _validate_payload(report, venue: Venue, files: Path, ai, network: bool, plagiarism=None) -> dict[str, Any]:
+        secrets = _secrets(ai, plagiarism)
         return {
             "venue": venue.slug,
             "ok": report.ok,
             "ai": report.ai,
-            "ai_error": _scrub(report.ai_error, files, ai.api_key if ai else None),
+            "plagiarism": plagiarism.name if plagiarism else None,
+            "ai_error": _scrub(report.ai_error, files, secrets),
             "counts": report.counts(),
             "network_checks": network,
             "initial_submission_rule": report.initial_submission_rule,
             "initial_submission": report.initial_submission,
             "downgraded": report.downgraded,
             "strict_style": report.strict_style,
-            "checks": _report_payload(report, files),
+            "checks": _scrub_checks(_report_payload(report, files), plagiarism.api_key if plagiarism else None),
             # The same report `paperpush validate -o report.txt` writes, for the Download button.
-            "report_text": _scrub(report_mod.to_text(report), files, ai.api_key if ai else None),
+            "report_text": _scrub(report_mod.to_text(report), files, secrets),
         }
 
     @app.post("/api/workspaces/{ws_id}/autofill")

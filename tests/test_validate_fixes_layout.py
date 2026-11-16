@@ -338,7 +338,8 @@ def test_named_svg_colours_are_compared(tmp_path, run):
     named = _svg(tmp_path, "n.svg", '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><rect fill="brown"/><rect fill="forestgreen"/><rect style="fill: orangered"/><rect fill="olive"/></svg>')
     doc = _docx(tmp_path / "m.docx", _para(LONG))
     rep = run([MANUSCRIPT, FIGURES], {"manuscript_file": str(doc), "figure_files": str(named)}, {"figures": {"max_width_mm": 180}})
-    assert _result(rep, "figures.colorblind").status == report.WARNING
+    # No colour-blind rule in this venue's notes, so the confusable pair is a suggestion.
+    assert _result(rep, "figures.colorblind").status == report.SUGGESTION
 
 
 def test_named_colour_parsing_ignores_keywords():

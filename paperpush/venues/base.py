@@ -57,7 +57,7 @@ from ..database import get_venue
 from .common import DEFAULT_TIMEOUT_SECONDS, apply_default_timeouts, save_storage
 from .common import session_path as _slug_session_path
 from .common import wait_for_manual_sign_in
-from .login import VenueLoginError, first_visible, orcid_unsupported
+from .login import VenueLoginError, first_visible, login_options, orcid_unsupported
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +116,15 @@ class Venue(ABC):
     #: :func:`paperpush.venues.orcid_login_offered`, which says whether the
     #: ``--orcid`` *option* applies to the venue at all.
     supports_orcid_login: bool = False
+    #: Whether ``login`` implements ``github=True`` using GitHub's sign-in page.
+    supports_github_login: bool = False
+    #: Identity providers ``login`` accepts as ``provider=`` (canonical names,
+    #: the default first), for a sign-in page that offers several -- NCBI's
+    #: gateway takes ``ncbi``, ``era``, ``google``, ``orcid``, ``login.gov``,
+    #: ``microsoft`` and ``nih``. ``paperpush login --provider`` stores the choice
+    #: with the credential. Empty (the default) means the venue has one form and
+    #: ``login`` takes no ``provider`` argument.
+    login_providers: tuple[str, ...] = ()
     #: Whether this venue's runner wraps its page with
     #: :func:`paperpush.venues.recovery.guard`, so ``submit --recover`` (and the
     #: MCP server's agent recovery) can resume it after a failed action. Venues
@@ -151,7 +160,7 @@ class Venue(ABC):
         """
 
     @abstractmethod
-    def login(self, page, username: str, password: str, *, orcid: bool = False, timeout_ms: int = 15000) -> None:
+    def login(self, page, username: str, password: str, *, orcid: bool = False, github: bool = False, timeout_ms: int = 15000) -> None:
         """Fill and submit the venue's sign-in form; raise on failure.
 
         Should raise a subclass of
@@ -172,6 +181,10 @@ class Venue(ABC):
         flag: both callers check that first and refuse otherwise, so a venue with
         no ORCID branch omits the parameter entirely rather than carrying one it
         would only ignore.
+
+        ``github=True`` similarly selects GitHub's form and is only passed to
+        venues declaring :attr:`supports_github_login`. ``provider=`` names one
+        of :attr:`login_providers` and is only passed to venues declaring them.
         """
 
     # -- Portal URLs (default to the venue database) ---------------------------
@@ -231,8 +244,9 @@ class Venue(ABC):
         """Drive :meth:`login` for a stored credential. True if the sign-in took.
 
         The one place the stored credential's ``method`` becomes an argument: an
-        ORCID credential calls ``login(..., orcid=True)``, anything else the plain
-        form. A venue that has not recorded its ORCID branch is not called at all
+        ORCID credential calls ``login(..., orcid=True)``, a GitHub credential
+        calls ``login(..., github=True)``, and a password credential uses the plain
+        form. A venue that has not recorded its provider branch is not called at all
         -- :attr:`supports_orcid_login` is checked first. Every foreseeable
         failure (no ORCID branch, or a
         :class:`~paperpush.venues.login.VenueLoginError` because the sign-in did
@@ -247,22 +261,23 @@ class Venue(ABC):
         if cred is None or not cred.username or not cred.password:
             return False
         name = self.display_name
-        via_orcid = cred.method == "orcid"
-        if via_orcid and not self.supports_orcid_login:
-            exc = orcid_unsupported(self)
-            logger.warning("No automated ORCID sign-in for %s: %s", name, exc)
-            print(f"Cannot sign in with ORCID automatically: {exc}")
+        provider = getattr(cred, "provider", "")
+        try:
+            options = login_options(self, cred.method, provider)
+        except (ValueError, NotImplementedError) as exc:
+            logger.warning("Cannot use the stored %s credential automatically: %s", name, exc)
+            if cred.method == "orcid":
+                print(f"Cannot sign in with ORCID automatically: {exc}")
+            else:
+                print(f"Cannot sign in automatically: {exc}; sign in manually.")
             return False
-        kind = "ORCID credentials" if via_orcid else "credentials"
+        kind = "ORCID credentials" if cred.method == "orcid" else "GitHub credentials" if cred.method == "github" else f"{provider} credentials" if provider else "credentials"
         try:
             logger.info("Signing in to %s with stored %s", name, kind)
             print(f"Signing in to {name} with your stored {kind}…")
-            # Passed only when set, so a venue with no ORCID branch does not have
-            # to declare the parameter just to ignore it.
-            if via_orcid:
-                self.login(page, cred.username, cred.password, orcid=True)
-            else:
-                self.login(page, cred.username, cred.password)
+            # Only the branch the venue declares is passed (see login_options), so
+            # a venue with no ORCID branch need not accept the parameter.
+            self.login(page, cred.username, cred.password, **options)
         except VenueLoginError as exc:
             logger.warning("Automatic %s sign-in failed: %s", name, exc)
             print(f"Automatic sign-in failed: {exc}")
@@ -335,9 +350,19 @@ class Venue(ABC):
             return False
 
         logger.info("Falling back to a manual %s sign-in", name)
-        wait_for_manual_sign_in(name, self.slug)
+        wait_for_manual_sign_in(name, self.slug, page, self._sign_in_detector())
         save_storage(context, session)
         return True
+
+    def _sign_in_detector(self):
+        """The check a watched manual sign-in polls, or ``None`` if it cannot be trusted.
+
+        A portal whose only marker is the *sign-in* field
+        (``logged_in_present_means_in = False``) reads any other page -- an ORCID
+        redirect, say -- as signed in, so it is not polled; the author confirms
+        instead (see :func:`~paperpush.venues.common.wait_for_manual_sign_in`).
+        """
+        return self.is_logged_in if self.logged_in_present_means_in else None
 
     # -- Session persistence ---------------------------------------------------
 

@@ -88,6 +88,12 @@ _ASSET_BUILDERS = {
     "cover_letter": lambda f, ext: f.cover_letter(ext, name="cover_letter"),
     "declaration_of_interest": lambda f, ext: f.supplement(ext, name="declaration_of_interest"),
     "manuscript_tex_bundle": lambda f, ext: f.latex_bundle(name="manuscript_tex_bundle"),
+    # Synthetic archives containing source code and figure images.
+    "media_supplement": lambda f, ext: f.latex_bundle(name="media_supplement", ext=ext),
+    "code_data_supplement": lambda f, ext: f.latex_bundle(name="code_data_supplement", ext=ext),
+    "biosample_attributes": lambda f, ext: f.sra_biosample_attributes(ext=ext),
+    "sra_metadata": lambda f, ext: f.sra_metadata(ext=ext),
+    **{f"pp_test_{i}_R{r}.fastq": (lambda name: lambda f, ext: f.fastq(name, ext))(f"pp_test_{i}_R{r}.fastq") for i in (1, 2) for r in (1, 2)},
 }
 
 

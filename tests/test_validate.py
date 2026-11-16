@@ -67,7 +67,7 @@ def _errors(issues: list[Issue]) -> list[Issue]:
 
 
 def _warnings(issues: list[Issue]) -> list[Issue]:
-    return [i for i in issues if not i.is_error]
+    return [i for i in issues if i.is_warning]
 
 
 def _for(issues: list[Issue], field_id: str) -> list[Issue]:
@@ -295,11 +295,12 @@ def _recommended_choice(**kwargs) -> Venue:
     )
 
 
-def test_recommended_choice_off_list_value_is_warning_not_error():
+def test_recommended_choice_off_list_value_is_suggestion():
     j = _recommended_choice()
     issues = _validate(j, {"statement": "Data are in the lab notebook."})
     assert _errors(issues) == []
-    warns = _warnings(issues)
+    assert not _warnings(issues)
+    warns = [i for i in issues if i.is_suggestion]
     assert len(warns) == 1
     assert "not in the recommended list" in warns[0].message
     assert "entered as custom text" in warns[0].message
@@ -400,7 +401,7 @@ def test_multichoice_invalid_option_is_error():
     assert any("a | b | c" in i.message for i in errs)
 
 
-def test_multichoice_recommended_off_list_option_is_warning():
+def test_multichoice_recommended_off_list_option_is_suggestion():
     j = _venue(
         Field(
             id="kw",
@@ -412,7 +413,8 @@ def test_multichoice_recommended_off_list_option_is_warning():
     )
     issues = _validate(j, {"kw": "a, z"})
     assert _errors(issues) == []
-    assert any("added as a custom keyword" in i.message for i in _warnings(issues))
+    assert any(i.is_suggestion and "added as a custom keyword" in i.message for i in issues)
+    assert not _warnings(issues)
 
 
 def test_multichoice_file_backed_invalid_option_points_at_command():
@@ -750,14 +752,14 @@ def test_file_field_existing_pdf_passes(manuscript_pdf):
     assert _errors(_validate(j, {"ms": str(manuscript_pdf)})) == []
 
 
-def test_file_field_wrong_extension_is_warning(samples):
+def test_file_field_wrong_extension_is_error(samples):
     fig = samples.figure("fig1", ".png")
     j = _venue(Field(id="ms", label="Manuscript", type="file", accept=[".pdf", ".docx"]))
     issues = _validate(j, {"ms": str(fig)})
-    assert _errors(issues) == []
-    warns = _warnings(issues)
-    assert len(warns) == 1
-    assert "expects one of" in warns[0].message
+    errors = _errors(issues)
+    assert len(errors) == 1
+    assert "expects one of" in errors[0].message
+    assert not _warnings(issues)
 
 
 def test_file_field_expands_user(monkeypatch, tmp_path, samples):

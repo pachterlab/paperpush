@@ -454,3 +454,104 @@ def test_template_module_still_reads_sources(tmp_path):
     path = tmp_path / "m.tex"
     path.write_text("\\usepackage[margin=1in]{geometry}\n", encoding="utf-8")
     assert list(template_check.source_problems(path.read_text()))
+
+
+# --- title page on a page of its own, and statements the submission form collects ---------
+
+PAGE_BREAK = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'
+
+
+def _own_page(slug: str, manuscript: Path, **extra):
+    venue, values = venue_values(slug, manuscript, **extra)
+    base = requirements.get_requirements(slug)
+    reqs = replace(base, title_page=replace(base.title_page, own_page=True))
+    checks = Checks()
+    checks.run("guidelines.title_page_own_page", "t", "c", check._title_page_own_page_check, venue, reqs, values)
+    return checks.results[-1]
+
+
+def test_docx_abstract_on_the_title_page_warns(tmp_path):
+    path = make_docx(tmp_path / "m.docx", para("A study of cities") + para("A. Author, University") + para("Abstract") + para(words(50)))
+    result = _own_page("nature", path)
+    assert result.status == "warning" and "page of its own" in result.issues[0].message
+
+
+@pytest.mark.parametrize(
+    "between",
+    [
+        PAGE_BREAK,
+        '<w:p><w:pPr><w:sectPr><w:type w:val="nextPage"/></w:sectPr></w:pPr></w:p>',
+        "<w:p><w:pPr><w:sectPr/></w:pPr></w:p>",
+    ],
+)
+def test_docx_page_or_section_break_before_the_abstract_passes(tmp_path, between):
+    path = make_docx(tmp_path / "m.docx", para("A study of cities") + para("A. Author, University") + between + para("Abstract") + para(words(50)))
+    assert _own_page("nature", path).status == "passed"
+
+
+def test_docx_page_break_before_on_the_abstract_heading_passes(tmp_path):
+    heading = "<w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:t>Abstract</w:t></w:r></w:p>"
+    path = make_docx(tmp_path / "m.docx", para("A study of cities") + para("A. Author") + heading + para(words(50)))
+    assert _own_page("nature", path).status == "passed"
+
+
+def test_docx_continuous_section_break_is_not_a_new_page(tmp_path):
+    between = '<w:p><w:pPr><w:sectPr><w:type w:val="continuous"/></w:sectPr></w:pPr></w:p>'
+    path = make_docx(tmp_path / "m.docx", para("A study of cities") + para("A. Author") + between + para("Abstract") + para(words(50)))
+    assert _own_page("nature", path).status == "warning"
+
+
+def test_pdf_abstract_on_page_two_passes_and_on_page_one_warns(tmp_path):
+    title = text_line(72, 720, "A study of cities") + text_line(72, 700, "A. Author, University")
+    body = text_line(72, 660, "Abstract") + text_line(72, 640, words(10))
+    apart = write_pdf(tmp_path / "apart.pdf", [title, body])
+    together = write_pdf(tmp_path / "together.pdf", [title + body])
+    assert _own_page("nature", apart).status == "passed"
+    assert _own_page("nature", together).status == "warning"
+
+
+def test_manuscript_opening_with_its_abstract_is_unchecked(tmp_path):
+    path = make_docx(tmp_path / "m.docx", para("Abstract") + para(words(50)))
+    assert _own_page("nature", path).status == "unchecked"
+
+
+def test_markdown_has_no_pages(tmp_path):
+    path = markdown(tmp_path / "m.md", {"Abstract": 50, "Introduction": 50})
+    assert _own_page("nature", path).status == "not_applicable"
+
+
+def test_own_page_not_applicable_without_the_rule(tmp_path):
+    path = make_docx(tmp_path / "m.docx", para("Title") + para("Abstract") + para(words(5)))
+    venue, values = venue_values("nature", path)
+    checks = Checks()
+    checks.run("guidelines.title_page_own_page", "t", "c", check._title_page_own_page_check, venue, requirements.get_requirements("nature"), values)
+    assert checks.results[-1].status == "not_applicable"
+
+
+def _with_statements(slug: str, **rules):
+    base = requirements.get_requirements(slug)
+    return replace(base, statements=replace(base.statements, **rules))
+
+
+def test_statement_collected_in_the_submission_form_is_not_looked_for(tmp_path):
+    path = markdown(tmp_path / "m.md", {"Abstract": 50, "Introduction": 50, "Data availability": 20})
+    reqs = _with_statements("nature", required=["competing_interests", "data_availability"], in_submission_form=["competing_interests"])
+    result = run("nature", path, "guidelines.statements", reqs)
+    assert result.status == "passed"
+    assert "competing interests" in result.detail and "submission system" in result.detail
+
+
+def test_statement_in_text_still_required_beside_form_ones(tmp_path):
+    path = markdown(tmp_path / "m.md", {"Abstract": 50, "Introduction": 50})
+    reqs = _with_statements("nature", required=["competing_interests", "data_availability"], in_submission_form=["competing_interests"])
+    result = run("nature", path, "guidelines.statements", reqs)
+    assert result.status == "warning"
+    assert [i for i in result.issues if "data availability" in i.message]
+    assert not [i for i in result.issues if "competing" in i.message]
+
+
+def test_only_form_statements_still_reports_them(tmp_path):
+    path = markdown(tmp_path / "m.md", {"Abstract": 50, "Introduction": 50})
+    reqs = _with_statements("nature", required=None, in_submission_form=["author_contributions"])
+    result = run("nature", path, "guidelines.statements", reqs)
+    assert result.status == "passed" and "author contributions" in result.detail

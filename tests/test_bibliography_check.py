@@ -152,7 +152,7 @@ def test_self_citation_share(tmp_path):
     assert status == report.PASSED and detail.startswith("3 of 5 references (60%)")
     many = NUMBERED.replace("3. Smith, A.", "3. Doe, J.").replace("4. Lee, B.", "4. Roe, J.")
     status, message, _ = _run(_md(tmp_path, many))["bibliography.self_citations"]
-    assert status == report.WARNING and "5 of 5 references (100%)" in message and "more than 80% of the list" in message
+    assert status == report.SUGGESTION and "5 of 5 references (100%)" in message and "more than 80% of the list" in message
 
 
 def test_self_citation_count(tmp_path):
@@ -160,7 +160,7 @@ def test_self_citation_count(tmp_path):
     refs += "\n" + "\n".join(f"{i}. Lee, B. Paper {i}. Journal (2020)." for i in range(17, 41))
     text = "Body [" + ",".join(str(i) for i in range(1, 41)) + "].\n\nReferences\n\n" + refs + "\n"
     status, message, _ = _run(_md(tmp_path, text))["bibliography.self_citations"]
-    assert status == report.WARNING and "16 of 40" in message and "more than 15" in message
+    assert status == report.SUGGESTION and "16 of 40" in message and "more than 15" in message
 
 
 def test_self_citations_need_authors(tmp_path):
@@ -206,3 +206,59 @@ def test_docx_numbered_list_keeps_its_numbers(tmp_path):
 def test_docx_without_numbering_part_is_unchanged(tmp_path):
     path = _numbered_docx(tmp_path / "m.docx", _para("Hello", "1"), numbering=None)
     assert docx_to_text(path).strip() == "Hello"
+
+
+AUTHOR_YEAR_CITED_NUMBERED_LIST = """Title
+
+Introduction
+
+Cells grow (Doe et al., 2019). Models fail (Smith, 2021). Others (Lee and Roe, 2022). More (Doe, 2020).
+
+References
+
+1. Doe, J. & Roe, J. Growth of cells. Nature 1, 2 (2019).
+2. Doe, J. Other growth. Cell 3, 4 (2020).
+3. Smith, A. Models. Science 5, 6 (2021).
+4. Lee, B. Failing models. PNAS 7, 8 (2022).
+"""
+
+NUMBER_CITED_AUTHOR_YEAR_LIST = """Title
+
+Introduction
+
+Cells grow [1]. Models fail [2, 3]. Others [4].
+
+References
+
+Doe, J. & Roe, J. (2019). Growth of cells. Nature 1, 2.
+Doe, J. (2020). Other growth. Cell 3, 4.
+Lee, B. (2022). Failing models. PNAS 7, 8.
+Smith, A. (2021). Models. Science 5, 6.
+"""
+
+
+def test_citation_style_author_year_against_numbered_list(tmp_path):
+    status, message, _ = _run(_md(tmp_path, AUTHOR_YEAR_CITED_NUMBERED_LIST))["bibliography.citation_style"]
+    assert status == report.WARNING
+    assert "cites author-year style (4 citations" in message and "reference list is numbered" in message
+
+
+def test_citation_style_numbers_against_author_year_list(tmp_path):
+    status, message, _ = _run(_md(tmp_path, NUMBER_CITED_AUTHOR_YEAR_LIST))["bibliography.citation_style"]
+    assert status == report.WARNING
+    assert "cites numbered style (3 citations" in message and "reference list is author-year" in message
+
+
+def test_citation_style_matches(tmp_path):
+    status, _, detail = _run(_md(tmp_path, NUMBERED))["bibliography.citation_style"]
+    assert status == report.PASSED and "5 numbered references (4 cited in that style)" in detail
+    text = NUMBER_CITED_AUTHOR_YEAR_LIST.replace("[1]", "(Doe and Roe, 2019)").replace("[2, 3]", "(Doe, 2020; Lee, 2022)").replace("[4]", "(Smith, 2021)")
+    status, _, _ = _run(_md(tmp_path, text))["bibliography.citation_style"]
+    assert status == report.PASSED
+
+
+def test_citation_style_prose_mention_beside_numbered_citations(tmp_path):
+    # "as Smith (2021) showed [3]" names a work in prose; the numbered citations still win.
+    text = NUMBERED.replace("Models fail [3-4].", "As Smith (2021) and Lee et al. (2022) and Doe (2019) showed, models fail [3-4].")
+    status, _, _ = _run(_md(tmp_path, text))["bibliography.citation_style"]
+    assert status == report.PASSED

@@ -3,6 +3,7 @@
 #
 # Edit the values below, then:
 #   - to validate against venue guidelines: `paperpush validate caltechdata.sub.txt`
+#   - to fill out submission portal: `paperpush submit caltechdata.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:
@@ -20,18 +21,23 @@
 # Deposit type
 # ----------------------------------------------------------------------
 
-# Resource type (choice, optional)
+# Resource type (choice, REQUIRED)
 #   The kind of resource deposited. Dataset and Software are the most common; if a record mixes images, movies, or sound with other files, use Dataset or Workflow.
-#   options: Annotation collection | Book | Book section | Collection | Conference paper | Data management plan | Dataset | Diagram | Drawing | Figure | Image | Interactive Resource | Journal article | Lesson | Map | Model | Other | Patent | Photo | Plot | Poster | Preprint | Presentation | Project deliverable | Project milestone | Proposal | Report | Software | Software documentation | Taxonomic treatment | Technical note | Text | Thesis | Video/Audio | Workflow | Working paper
+#   options: Collection | Dataset | Image | Interactive Resource | Map | Model | Other | Software | Text | Video/Audio | Workflow
 resource_type: 
 
 # ----------------------------------------------------------------------
 # Files
 # ----------------------------------------------------------------------
 
+# Metadata-only record (boolean, optional)
+#   Use yes only for a record without deposited files. Cannot be combined with data_files.
+metadata_only: 
+
 # Files (filelist, optional)
-#   The files to deposit, one per line as 'path | label' (label optional). Any file type is accepted. A record can hold at most 550 files; zip them first if there are more.
-#   provide 0-550 item(s), one per line
+#   Files to deposit, one per line as 'path | label' (label optional). Any format is accepted. The current web uploader allows 50 files, 50 GB per file and 1000 GB total; the written guidelines allow 550 files per record. Zip larger file collections before using the web form. Labels are retained in the .sub; the uploader displays the original filenames.
+#   provide 0-50 item(s), one per line
+#   each file at most 47683.7 MB
 data_files: |
   
 
@@ -39,7 +45,7 @@ data_files: |
 # Deposit details
 # ----------------------------------------------------------------------
 
-# Title (text, optional)
+# Title (text, REQUIRED)
 #   The title of the dataset or software record.
 title: 
 
@@ -52,12 +58,56 @@ abstract: |
 #   Optional. Comma-separated keywords or subjects.
 keywords: 
 
+# Community (text, optional)
+#   Optional. Exact community name to select. Publication to a community may require review; paperpush stops before sending it.
+community: 
+
+# Existing DOI (text, optional)
+#   Optional. Only the DOI already assigned to this same deposited object. Put the DOI of a related publication in related_identifiers instead. Leave empty to use a CaltechDATA DOI.
+existing_doi: 
+
+# Reserve a DOI now (boolean, optional)
+#   Optional. yes clicks Get a DOI now to reserve a DOI before publication. Cannot be combined with existing_doi. no leaves DOI registration until publication.
+reserve_doi: 
+
+# Additional titles (textarea, optional)
+#   Optional. One line per title as title | type | language. Types: Alternative title, Subtitle, Translated title, Other. Default type: Alternative title. Language is its English name as shown by the portal.
+additional_titles: |
+  
+
+# Additional descriptions (textarea, optional)
+#   Optional. One line per description as text | type | language. Types: Abstract, Methods, Series information, Table of contents, Technical info, Other, External Files, Attached Files.
+additional_descriptions: |
+  
+
+# Copyright (text, optional)
+#   Optional. Copyright statement for the deposited resource.
+copyright: 
+
+# Languages (text, optional)
+#   Optional. Comma-separated language names exactly as shown by the portal (e.g. English).
+languages: 
+
+# Dates (textarea, optional)
+#   Optional. One line per date as date | type | description. Dates use YYYY, YYYY-MM, YYYY-MM-DD or a DATE/DATE interval. Types: Accepted, Available, Collected, Other, Withdrawn, Copyrighted, Submitted, Created, Updated, Issued, Valid.
+dates: |
+  
+
 # Version (text, optional)
 #   Optional. The version of the data or software (e.g. v1.0).
 version: 
 
+# Publisher (text, optional)
+#   Publisher used to formulate the citation; defaults to CaltechDATA.
+publisher: 
+
+# Alternate identifiers (textarea, optional)
+#   Optional. One alternate identifier per line as identifier | scheme. Use the exact portal scheme label, e.g. DOI, URL, ISBN, arXiv, Handle.
+alternate_identifiers: |
+  
+
 # Related works (textarea, optional)
-#   Optional. One related work per line as 'identifier | relation', e.g. the DOI of the paper that uses the data with the relation 'Is cited by', or a CaltechTHESIS record URL.
+#   Optional. One line as identifier | relation | scheme | resource type. Relation must match the portal label (e.g. Is cited by). DOI and URL schemes are detected when omitted; specify the exact scheme label for other identifiers. Resource type is optional.
 related_identifiers: |
   
 
@@ -65,25 +115,40 @@ related_identifiers: |
 #   Optional. The Caltech group or groups associated with the record, comma-separated.
 caltech_groups: 
 
+# Full record visibility (choice, optional)
+#   Optional. Access policy on publication. Empty preserves the portal default.
+#   options: Public | Restricted
+record_visibility: 
+
+# Files visibility (choice, optional)
+#   Optional. Access policy for files on publication. Empty preserves the portal default. An embargo requires restricted files or a restricted record.
+#   options: Public | Restricted
+files_visibility: 
+
+# Embargo reason (text, optional)
+#   Optional. Reason for the embargo; requires embargo_date.
+embargo_reason: 
+
 # ----------------------------------------------------------------------
 # Authors
 # ----------------------------------------------------------------------
 
 # Creators (authorlist, REQUIRED)
-#   One creator per line, in order, as 'Name | affiliation | ORCID' (affiliation and ORCID optional). Creators are the main researchers involved in producing the data; they need not match the authors of a related publication.
+#   One creator per line as Name | affiliation | ORCID | type | role. Use Family, Given for a person to preserve name boundaries; an unseparated name uses its last word as the family name. type is Person (default) or Organization; organizational names are kept intact. Separate multiple affiliations with semicolons. Role is optional and must match the portal's DataCite role label.
 authors: |
   
 
-# Contributor email (text, optional)
-#   Optional. Entering an email address here signs it up for email alerts about the CaltechDATA record.
-contributor_email: 
+# Contributors (authorlist, optional)
+#   Optional. One contributor per line as Name | role | affiliation | ORCID | type. Role must match the portal DataCite contributor role label (e.g. Data curator, Researcher, Contact person). type is Person (default) or Organization. Use Family, Given to preserve personal name boundaries; multiple affiliations are separated by semicolons.
+contributors: |
+  
 
 # ----------------------------------------------------------------------
 # Declarations
 # ----------------------------------------------------------------------
 
 # Funding (textarea, optional)
-#   Optional. One award per line as 'Funder | award number' (award number optional).
+#   Optional. One award per line as Funder | award number | award title | award URL. The funder must match the portal's vocabulary; use its exact name or identifier.
 funding: |
   
 

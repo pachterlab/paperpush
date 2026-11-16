@@ -40,8 +40,8 @@ manuscript_file: tests/manuscript_files/medrxiv/manuscript.pdf
 # Figure / image files (filelist, optional)
 #   Optional. One file per line as 'path | label' (label optional). Uploaded to the figure dropzone.
 figure_files: |
-  tests/manuscript_files/medrxiv/figures/fig1.png | Figure 1
-  tests/manuscript_files/medrxiv/figures/fig2.png | Figure 2
+  tests/manuscript_files/medrxiv/figures/fig1.tif | Figure 1
+  tests/manuscript_files/medrxiv/figures/fig2.tif | Figure 2
 
 # Supplementary files (filelist, optional)
 #   Optional. One file per line as 'path | type | linktext' (these are the only three fields; type and linktext optional). type is the bioRxiv supplemental file-type and must be one of: avi, csv, doc, docx, gif, gz, html, jpg, mov, mp4, mpg, pdf, ppt, pptx, tif, tsv, txt, wmv, xls, xlsx, zip. linktext is the displayed link text. Uploaded to the supplemental dropzone.

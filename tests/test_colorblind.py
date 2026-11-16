@@ -170,7 +170,7 @@ def test_svg_colours_are_read_from_fill_and_stroke():
 def test_attached_raster_figure_is_flagged(tmp_path):
     fig = _chart(tmp_path / "fig1.png", ["#d62728", "#2ca02c"])
     result = _result(_report(FIGURES, figure_files=str(fig)))
-    assert result.status == report.WARNING
+    assert result.status == report.SUGGESTION
     (issue,) = result.issues
     assert issue.field == "figure_files"
     assert (
@@ -192,7 +192,7 @@ def test_attached_vector_pdf_figure_is_flagged(tmp_path):
     fig = write_pdf(tmp_path / "fig1.pdf", [ops], width=400, height=200)
     result = _result(_report(FIGURES, figure_files=str(fig)))
     assert (
-        result.status == report.WARNING
+        result.status == report.SUGGESTION
         and "red" in result.issues[0].message
         and "green" in result.issues[0].message
     )
@@ -218,5 +218,13 @@ def test_manuscript_drawing_is_flagged(tmp_path):
     pdf = tmp_path / "ms.pdf"
     _write_pdf_with_form(pdf, "q 1 0 0 1 100 200 cm /Fm1 Do Q\n", drawing)
     result = _result(_report(MANUSCRIPT, manuscript_file=str(pdf)))
-    assert result.status == report.WARNING
+    assert result.status == report.SUGGESTION
     assert result.issues[0].message.startswith("ms.pdf page 1, drawing 1: ")
+
+
+def test_confusable_palette_warns_when_guidelines_ask_for_colour_blind_safe_figures(tmp_path, monkeypatch):
+    monkeypatch.setattr(r, "_load_raw", lambda: {"$aliases": {}, "testj": {"figures": {"notes": ["Avoid red-green combinations; use colour-blind-safe palettes."]}}})
+    drawing = "0.839 0.153 0.157 rg 10 10 80 80 re f 0.173 0.627 0.173 rg 100 10 80 80 re f"
+    pdf = tmp_path / "ms.pdf"
+    _write_pdf_with_form(pdf, "q 1 0 0 1 100 200 cm /Fm1 Do Q\n", drawing)
+    assert _result(_report(MANUSCRIPT, manuscript_file=str(pdf))).status == report.WARNING

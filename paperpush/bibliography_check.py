@@ -19,6 +19,12 @@
 
   The text searched is everything except the reference list itself, so
   citations in figure legends printed after it count.
+* ``bibliography.citation_style`` -- the text cites in the reference list's
+  own style: bracketed numbers ("[3]") for a numbered list, "(Smith et al.,
+  2020)" for an author-year list, "[BMR+20]" for an alphabetic one. A text
+  that cites "(Smith et al., 2020)" against a numbered list leaves every entry
+  uncited, and a reader cannot find the work. LaTeX source is not checked: its
+  bibliography style prints both.
 * ``bibliography.self_citations`` -- the share of references that include
   one of this paper's authors (from the ``.sub``'s author list). A surname
   counts only next to the author's first initial ("Rich, J.", "J. Rich",
@@ -46,7 +52,7 @@ from pathlib import Path
 
 from . import document
 from .database import Field, Venue
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .validate import SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -553,6 +559,7 @@ def is_self_citation(ref: Ref, authors: list[tuple[str, str, str]]) -> bool:
 
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("bibliography.uncited", "Every reference is cited, and every citation has a reference", REFERENCES, _uncited_check, venue, values)
+    checks.run("bibliography.citation_style", "In-text citations match the reference list's style (numbered or author-year)", REFERENCES, _citation_style_check, venue, values)
     checks.run("bibliography.self_citations", "Self-citations within limits (at most 15, and at most 80% of references)", REFERENCES, _self_citation_check, venue, values)
     checks.run("bibliography.entries", "BibTeX entries are complete, closed, and have unique keys, and no work is listed twice", REFERENCES, _bib_entries_check, venue, values)
 
@@ -621,6 +628,40 @@ def _uncited_check(venue: Venue, values: dict[str, str]) -> Outcome:
     if bib.printed_only_cited:
         return Outcome(issues, f"{len(bib.cited & set(defined))} cited keys, all in the .bib (BibTeX prints only cited entries)")
     return Outcome(issues, f"all {len(bib.refs)} references cited{via}")
+
+
+# Fewer citations of the other style than this are not enough to call the text's style.
+MIN_STYLE_CITATIONS = 3
+_LIST_STYLE = {"numbered": "numbered", "labels": "alphabetic-label", "author-year": "author-year"}
+_STYLE_EXAMPLE = {"numbered": "[1]", "labels": "[Smi20]", "author-year": "(Smith et al., 2020)"}
+
+
+def _citation_style_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    """Whether the text cites in the style of the reference list (numbered, alphabetic labels, or author-year)."""
+    from .requirements_check import _AUTHOR_YEAR_CITE
+
+    field, path = _manuscripts(venue, values)[0]
+    doc = document.get(path)
+    if doc.is_tex and doc.tex_source is not None and _tex_bibliography(path, doc.tex_source) is not None:
+        raise NotApplicable(f"{path.name} is LaTeX source: its bibliography style prints the citations and the list alike")
+    bib = read_bibliography(path)
+    if bib is None or doc.text is None:
+        raise Unchecked(f"could not find the reference list in {path.name}")
+    parts = _split(doc.text)
+    body = parts[0] if parts else doc.text
+    numbered = citation_groups(body, len(bib.refs)) if bib.mode != "numbered" else []
+    labels = re.findall(r"\[[A-Z][A-Za-z]{0,6}\+?\d{2}[a-z]?(?:\s*[,;]\s*[A-Z][A-Za-z]{0,6}\+?\d{2}[a-z]?)*\]", body) if bib.mode != "labels" else []
+    author_year = _AUTHOR_YEAR_CITE.findall(body) if bib.mode != "author-year" else []
+    own = len((bib.cited or set()) & {r.key for r in bib.refs})
+    found = [(style, n) for style, n in (("numbered", len(numbered)), ("labels", len(labels)), ("author-year", len(author_year))) if n >= MIN_STYLE_CITATIONS]
+    # The other style must outnumber the entries the list's own style cites: a few "(Smith,
+    # 2020)" beside a fully cited numbered list are prose ("as Smith (2020) showed [4]").
+    found = [(style, n) for style, n in found if n > own]
+    listed = f"{len(bib.refs)} {_LIST_STYLE[bib.mode]} references"
+    if not found:
+        return Outcome([], f"citations match the {listed} ({own} cited in that style)")
+    style, n = max(found, key=lambda x: x[1])
+    return Outcome([Issue(WARNING, field.id, f"{path.name} cites {_LIST_STYLE[style]} style ({n} citations like '{_STYLE_EXAMPLE[style]}') but its reference list is {_LIST_STYLE[bib.mode]} ({listed}, {own} cited like '{_STYLE_EXAMPLE[bib.mode]}'); cite in the reference list's style, or reformat the list")])
 
 
 # --- one work listed twice ------------------------------------------------------------------
@@ -751,7 +792,7 @@ def _self_citation_check(venue: Venue, values: dict[str, str]) -> Outcome:
     too_large = len(refs) >= MIN_REFERENCES_FOR_SHARE and share > MAX_SELF_CITATION_SHARE
     if too_many or too_large:
         limit = f"more than {MAX_SELF_CITATIONS}" if too_many else f"more than {MAX_SELF_CITATION_SHARE:.0%} of the list"
-        return Outcome([Issue(WARNING, field.id, f"{summary} ({limit}); editors and reviewers may see this as excessive self-citation: {_list([r.label for r in own])}")])
+        return Outcome([Issue(SUGGESTION, field.id, f"{summary} ({limit}); editors and reviewers may see this as excessive self-citation: {_list([r.label for r in own])}")])
     return Outcome([], summary)
 
 

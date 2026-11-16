@@ -21,7 +21,7 @@
 PaperPush provides the following services:
 - A standardized system to share all metadata submitted to a venue (the .sub file - [see an example here](https://paperpush.readthedocs.io/en/latest/sub-file.html#sub-file-example))
 <!-- BEGIN VALIDATION CHECK COUNT -->
-- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, anonymization, and much, much more — 160 distinct validation check types in total. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html)
+- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, anonymization, and much, much more — 170 distinct validation check types in total. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html)
 <!-- END VALIDATION CHECK COUNT -->
 - A central database of journal/conference [manuscript requirements](https://paperpush.readthedocs.io/en/latest/schemas/manuscript_requirements.html) ([`paperpush/manuscript_requirements.json`](https://github.com/pachterlab/paperpush/blob/main/paperpush/manuscript_requirements.json)) and [submission data](https://paperpush.readthedocs.io/en/latest/schemas/submission_forms.html) ([`paperpush/submission_forms.json`](https://github.com/pachterlab/paperpush/blob/main/paperpush/submission_forms.json))
 - Automated and fast submission portal filling with deterministic scripts - [see an example here](https://paperpush.readthedocs.io/en/latest/submission-portal.html)
@@ -142,7 +142,7 @@ Use the agent skill `/paperpush-prepare-submission` to run this entire pipeline.
 1. `paperpush subfile VENUE`: creates a file VENUE.sub.txt that is a template for the VENUE submission. Fields are grouped into the same sections for every venue (manuscript type, files, details, authors, reviewers, declarations, additional); add `--venue-order` to list them in the order the venue's portal asks for them instead.
 2. **fill out VENUE.sub.txt:** Open VENUE.sub.txt in a text editor to edit manually, or run `paperpush web VENUE.sub.txt` to edit in a web browser. Use the agent skill `/paperpush-autofill My manuscript files are in /PATH/TO/MANUSCRIPT/DIRECTORY. Fill out VENUE.sub.txt` or the command `paperpush autofill --engine api -p /PATH/TO/MANUSCRIPT/DIRECTORY ... VENUE.sub.txt` (API) to automatically fill from the manuscript directory with AI. `paperpush autofill` requires the provider's API key. The AI agent may not be able to fill out all fields if some information is not in the manuscript directory.
 3. `paperpush validate VENUE.sub.txt`: run the pre-submission checks on the filled `VENUE.sub.txt`. Use the agent skill `/paperpush-validate` or the CLI flag `--ai` (API) to run checks with AI. The AI checks require the provider's API key. To check files without a `.sub`, name them instead: `paperpush validate --manuscript main.tex --title-page title.tex --figures fig1.png fig2.png ...` runs the checks that apply to any manuscript (links, references, hidden text, citation order, prose, etc.), and adding `--venue VENUE` checks them against that venue's author guidelines too. Use the agent skill `/paperpush-fix` to fix the issues validate finds: it edits the manuscript sources and the `.sub`, validates again until nothing fixable is left, and reports what needs your decision.
-4. `paperpush login VENUE`: log in to the VENUE submission portal.
+4. `paperpush login VENUE`: log in to the VENUE submission portal. (Optional: pass `--manual-login` to `submit` instead to sign in by hand in its browser window, with nothing stored.)
 5. `paperpush submit VENUE.sub.txt`: Fill out the VENUE submission portal. Will not actually submit the manuscript. We highly recommend reviewing the submission form in the venue portal before clicking submit. Use the agent skill `/paperpush-submit` to run login and submit on a .sub file. Use the agent skill `/paperpush-portal-debug` or the CLI flag `--ai` (API) to have AI fix any issues that may arise. Ignore validation checks with the `--skip-validate` flag. **Use `submit` only for initial submissions**: it opens a new submission, so a revision sent this way becomes a duplicate. Upload revisions through the venue's own "submit revision" link instead (`/paperpush-respond-to-reviewers` prepares the revised manuscript, marked manuscript, and response to reviewers). `submit` warns and asks before continuing when the `.sub` is in a `revisionN/` directory or sits beside a response-to-reviewers document (`--yes` skips the question).
 
 Helper commands:
@@ -265,10 +265,10 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 
 | Venue | Slug | Validate + basic .sub | Submit + full .sub |
 | --- | --- | :---: | :---: |
-| [CaltechDATA](https://data.caltech.edu) | `caltechdata` | ✅ |  |
+| [CaltechDATA](https://data.caltech.edu) | `caltechdata` | ✅ | ✅ |
 | [GEO](https://www.ncbi.nlm.nih.gov/geo/) | `geo` | ✅ |  |
-| [SRA](https://www.ncbi.nlm.nih.gov/sra) | `sra` | ✅ |  |
-| [Zenodo](https://zenodo.org) | `zenodo` | ✅ |  |
+| [SRA](https://www.ncbi.nlm.nih.gov/sra) | `sra` | ✅ | ✅ |
+| [Zenodo](https://zenodo.org) | `zenodo` | ✅ | ✅ |
 <!-- END SUPPORTED VENUES -->
 
 View the list on the command line with `paperpush venues`. See more information on major conferences at [conference-agent](https://conferenceagent.vercel.app).

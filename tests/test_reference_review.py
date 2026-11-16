@@ -34,7 +34,7 @@ References
 1. Doe, J. Cell growth. Journal of Cells ( {old} ).
 2. Roe, A. New cells. Journal of Cells ( {recent} ).
 """)
-    assert results["bibliography.age"].status == report.WARNING
+    assert results["bibliography.age"].status == report.SUGGESTION
     assert "over 15 years old" in results["bibliography.age"].issues[0].message
     assert results["bibliography.density"].status == report.PASSED
     assert "3 citation occurrences" in results["bibliography.density"].detail

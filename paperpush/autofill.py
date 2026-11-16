@@ -245,6 +245,15 @@ def parse_extraction(data: dict) -> Extraction:
     Both front-ends emit this shape, so the same loader serves the API engine
     and the skill's ``--values`` file.
     """
+    if not isinstance(data, dict):
+        raise ValueError(f"expected a JSON object with 'fields' and 'unfilled' lists, got {type(data).__name__}")
+    unknown = sorted(set(data) - {"fields", "unfilled"})
+    if unknown:
+        hint = ' (put each value in \'fields\' as {"id": ..., "value": ...})' if "fields" not in data else ""
+        raise ValueError(f"unexpected top-level key(s) {', '.join(map(repr, unknown[:5]))}; the values file holds only 'fields' and 'unfilled'{hint}")
+    for key in ("fields", "unfilled"):
+        if not isinstance(data.get(key) or [], list) or any(not isinstance(item, dict) or "id" not in item for item in data.get(key) or []):
+            raise ValueError(f"'{key}' must be a list of objects, each with an 'id'")
     proposals: list[Proposal] = []
     for item in data.get("fields", []) or []:
         proposals.append(

@@ -1173,6 +1173,31 @@ def test_verify_login_orcid_not_offered_raises_not_implemented(monkeypatch):
     assert captured["headless"] is None  # refused before opening a browser
 
 
+def test_verify_login_github_dispatches_the_provider_flag(monkeypatch):
+    from unittest.mock import Mock
+
+    from paperpush.venues.login import verify_login
+
+    module = _FakeVerifyLoginModule()
+    module.supports_github_login = True
+    module.login = Mock()
+    captured = _stub_verify_login(monkeypatch, module)
+    verify_login("cell", "test-user", _PASSWORD, method="github")
+    assert module.login.call_args.args[1:] == ("test-user", _PASSWORD)
+    assert module.login.call_args.kwargs == {"github": True}
+    assert captured["save_calls"]
+
+
+def test_verify_login_refuses_an_unsupported_github_flow_before_launch(monkeypatch):
+    from paperpush.venues.login import verify_login
+
+    module = _FakeVerifyLoginModule()
+    captured = _stub_verify_login(monkeypatch, module)
+    with pytest.raises(NotImplementedError, match="GitHub sign-in is not implemented"):
+        verify_login("cell", "test-user", _PASSWORD, method="github")
+    assert captured["headless"] is None
+
+
 def test_verify_login_headless_failure_raises_login_error(monkeypatch):
     from paperpush.venues.login import LoginVerificationError, verify_login
 

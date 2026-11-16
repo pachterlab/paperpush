@@ -119,7 +119,10 @@ python scripts/gen_subfile_templates.py
 - Put the selectors that are likely to break (portal ids, button names,
   widget CSS) in named constants at the top of the file.
 - End the module with `VENUE = <Class>()`. Discovery finds it by that
-  name.
+  name. A module that also sets `LOGIN_ONLY = True` (such as
+  `ncbi/geo.py`) registers for `paperpush login` only;
+  delete that line once `submit` is implemented so the venue counts as
+  submittable.
 - Stop before the final submit and hand off with `hold_open`, as the
   template does. **Never click the send control, in code or by hand.**
 

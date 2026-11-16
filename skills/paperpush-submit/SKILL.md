@@ -91,16 +91,25 @@ password changed since they logged in. Over MCP, call
   venue "could not be checked", or `check.status` `unchecked`, also counts as a
   pass. Some venues need no login (`login_status` says so); go on to step 2.
 - Exit 1, or `failed` / `timed_out`, means nothing is stored or the sign-in
-  failed. **Stop and ask the user** to run, in their own terminal window
-  (not with `!` in this session, which gets no keyboard input, so the
-  username and password prompts fail),
+  failed. **Stop and ask the user** which way they want to sign in:
 
-  ```
-  paperpush login <venue>
-  ```
+  1. **Store a login** (the next runs sign in by themselves). They run, in
+     their own terminal window (not with `!` in this session, which gets no
+     keyboard input, so the username and password prompts fail),
 
-  This opens a browser and may need their password, ORCID, CAPTCHA, or
-  two-factor code. In the same message, tell them:
+     ```
+     paperpush login <venue>
+     ```
+
+     This opens a browser and may need their password, ORCID, CAPTCHA, or
+     two-factor code.
+  2. **Sign in by hand in the submission's browser window**, with nothing
+     stored. Go on to step 2 with manual login (see
+     [Manual sign-in](#manual-sign-in)).
+
+  If the user already said they want to sign in themselves in the browser
+  ("I'll log in manually", "don't store my password"), take option 2 without
+  asking. For option 1, tell them in the same message:
   - If they have no account on the venue's submission system yet, they must
     register there first. Give them the portal URL: `submission_url` from
     `describe_venue`, or without MCP
@@ -113,6 +122,22 @@ password changed since they logged in. Over MCP, call
 
   When they say they are done, run the check again. Never run
   `paperpush login` yourself, and never ask for a password in the chat.
+
+#### Manual sign-in
+
+The run opens the portal's sign-in page and waits there for the user, then
+fills the form once they are signed in. Pass it through:
+
+```
+submit(subfile=<abs .sub>, manual_login=true)
+```
+
+Without MCP, have the user run `! paperpush submit <abs .sub> --manual-login`
+(or the same in their own terminal, where they press Enter once signed in).
+It needs a visible browser, so never combine it with `headless`. The session
+is saved afterwards, so the next run usually skips the sign-in. Tell the user
+the browser will stop at the sign-in page for them, and that the run
+carries on by itself once they are signed in.
 
 ### 2. Confirm, then submit
 
@@ -169,6 +194,15 @@ portal: point that out and suggest autofill first.
 **MCP run.** `submit` returns a `pid` as soon as the browser opens. Poll
 `submit_status(pid)` while its `state` is `filling`, then act on the state:
 
+- `awaiting_sign_in`: the browser is on the portal's sign-in page, waiting
+  for the user (a manual-login run, or stored credentials that stopped
+  working). Ask them to sign in in that window, without typing anything
+  into the chat, and poll less often. The run notices the sign-in and goes back
+  to `filling`. If it is still `awaiting_sign_in` after they say they are
+  signed in, call `submit_signed_in(pid)`. If it ends `exited` with
+  `auth_required` in the log (30 minutes passed, or the window was closed),
+  offer to start it again.
+
 - `ready_for_review`: the wizard finished. Tell the user the form is filled
   and waiting for them in the browser, then **stop polling and end your
   turn**. The process stays `running` on purpose (it holds the browser open
@@ -184,7 +218,8 @@ portal: point that out and suggest autofill first.
   minutes): stop polling, tell the user which step it stopped at (from the
   output tail), and offer to hand it to `paperpush-portal-debug`, which starts
   a fresh run to reproduce it.
-- `action_required` (no stored login): go back to step 1.
+- `action_required` (no stored login): go back to step 1, which also
+  offers manual sign-in.
 
 **CLI run in the user's terminal.** With `--recover by-hand`, a failed step
 pauses there. The user fixes the page in the browser and chooses to continue.
@@ -199,7 +234,8 @@ way.
 
 ## Rules
 
-- Never run `paperpush login` yourself or ask for a password.
+- Never run `paperpush login` yourself or ask for a password. With manual
+  sign-in, the user signs in in the browser window, never through you.
 - Never press, or try to press, the final submit button.
 - `submit` is for initial submissions. Warn and ask before submitting a `.sub`
   that looks like a revision (step 0b).

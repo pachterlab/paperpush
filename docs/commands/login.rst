@@ -8,8 +8,8 @@ in the ``.sub`` file.
 .. code-block:: text
 
    usage: paperpush login [-h] [-v] [-q] [--list] [-u USERNAME]
-                          [--password PASSWORD] [--confirm-password] [--orcid]
-                          [--orcid-id ID] [--into SUBFILE] [--status] [--check]
+                          [--password PASSWORD] [--confirm-password] [--orcid] [--github]
+                          [--provider NAME] [--orcid-id ID] [--into SUBFILE] [--status] [--check]
                           [--logout] [--no-verify] [--verify-headless]
                           [--timeout SECONDS]
                           [venue]
@@ -20,6 +20,33 @@ Synopsis
 .. code-block:: bash
 
    paperpush login biorxiv
+
+Zenodo supports these three sign-in methods:
+
+.. code-block:: bash
+
+   paperpush login zenodo           # Zenodo email and password
+   paperpush login zenodo --orcid   # ORCID iD/email and ORCID password
+   paperpush login zenodo --github  # GitHub username/email and GitHub password
+
+Run the command in your own terminal. Provider credentials are entered only on
+the provider's sign-in page. Complete any two-factor, authorization, or account
+linking prompts in the open browser, then return to the terminal. The saved
+login remembers the selected method for subsequent sign-ins and ``--check``.
+
+NCBI services (``sra``, ``geo``) sign in through NCBI's account page, which
+offers several identity providers; ``--provider`` picks the one your account
+uses:
+
+.. code-block:: bash
+
+   paperpush login sra                      # NCBI account username and password
+   paperpush login sra --provider google    # Google account
+   paperpush login geo --provider era       # eRA Commons
+   paperpush login geo --orcid              # ORCiD (same as --provider orcid)
+
+GEO is login-only for now: the sign-in and saved session work, but
+``paperpush submit`` has no runner for its portal yet. SRA supports both.
 
 By default this prompts for your username and password, then **opens a browser
 and verifies them** against the venue's sign-in page before saving. Verifying up
@@ -77,8 +104,8 @@ Journals and preprint servers both offer it; conference portals run on their own
 accounts, so ``--orcid`` is refused there (as it is for Discrete Mathematics,
 whose portal has no ORCID control). Driving the hand-off has so far been recorded
 for bioRxiv, medRxiv, arXiv, every Editorial Manager journal (Cell, Cell Systems,
-Cell Genomics, PLOS Computational Biology), BMC Bioinformatics, and Genome
-Biology. Asking any other venue for an ORCID sign-in reports that it is not
+Cell Genomics, PLOS Computational Biology), BMC Bioinformatics, Genome Biology,
+and Zenodo. Asking any other venue for an ORCID sign-in reports that it is not
 implemented yet and stores nothing, so use a username and password there.
 
 paperpush is not a registered ORCID API client and runs no OAuth flow: the
@@ -100,6 +127,30 @@ medRxiv, arXiv), whichever that portal opens.
    ORCID / email / affiliation into the matching author line of this ``.sub``
    file. A convenience, not part of signing in — it needs an iD rather than an
    email, and a failed lookup does not fail the login.
+
+Sign in with GitHub
+~~~~~~~~~~~~~~~~~~~
+
+``--github``
+   Sign in through the venue's "Sign in with GitHub" button using your GitHub
+   username/email and GitHub password. Currently supported for Zenodo. Cannot
+   be combined with ``--orcid`` or ``--orcid-id``. Verification, secure storage,
+   and later reuse follow the same flow as email login. MFA, authorization, and
+   account linking are completed by the author in the browser.
+
+Choose an identity provider
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``--provider NAME``
+   For a venue whose sign-in page offers several identity providers, which one
+   the username and password belong to. The NCBI venues (``sra``, ``geo``) take
+   ``ncbi`` (the default), ``era`` (eRA Commons), ``google``, ``orcid``,
+   ``login.gov``, ``microsoft`` and ``nih``; see :doc:`../ncbi-login`. The
+   choice is stored with the credential, so ``submit`` and ``--check`` sign in
+   the same way. Cannot be combined with ``--orcid`` or ``--github``. Two-factor,
+   CAPTCHA, PIV and account-linking steps are finished by hand in the
+   verification browser, so keep it headed (no ``--verify-headless``) for
+   providers that always ask for them, such as Login.gov.
 
 Manage stored credentials
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

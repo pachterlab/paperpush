@@ -413,6 +413,27 @@ def test_login_takes_no_password_argument():
     assert not params & {"username", "password", "user", "secret"}
 
 
+@pytest.mark.parametrize("method", ["orcid", "github"])
+def test_login_hands_back_the_selected_provider_command(monkeypatch, method):
+    monkeypatch.delenv("PAPERPUSH_USERNAME", raising=False)
+    monkeypatch.delenv("PAPERPUSH_PASSWORD", raising=False)
+    result = mcp_server.login("zenodo", method=method)
+    assert result["status"] == "action_required"
+    assert result["command"] == f"paperpush login zenodo --{method}"
+
+
+def test_login_switches_provider_instead_of_reusing_a_different_login(monkeypatch):
+    monkeypatch.delenv("PAPERPUSH_USERNAME", raising=False)
+    monkeypatch.delenv("PAPERPUSH_PASSWORD", raising=False)
+    credentials.save_credential("zenodo", "author@example.org", "test-password")
+    assert mcp_server.login("zenodo", method="github")["status"] == "action_required"
+
+
+def test_login_refuses_github_where_it_is_not_implemented():
+    with pytest.raises(ValueError, match="GitHub sign-in is not implemented"):
+        mcp_server.login(VENUE, method="github")
+
+
 def test_login_runs_the_cli_when_the_environment_supplies_credentials(monkeypatch):
     monkeypatch.setenv("PAPERPUSH_USERNAME", "ada@example.com")
     monkeypatch.setenv("PAPERPUSH_PASSWORD", "hunter2")
@@ -578,6 +599,60 @@ def test_submit_refuses_without_a_stored_login(no_launch):
     result = mcp_server.submit(str(VALID_SUB))
     assert result["status"] == "action_required"
     assert result["command"] == f"paperpush login {VENUE}"
+
+
+def test_submit_manual_login_launches_without_a_stored_login(fake_launch):
+    """The author signs in in the browser window instead of through 'paperpush login'."""
+    result = mcp_server.submit(str(VALID_SUB), manual_login=True)
+    assert result["status"] == "running"
+    command = fake_launch.instances[0].command
+    assert "--manual-login" in command
+    assert "--sign-in-signal" in command
+
+
+def test_submit_manual_login_refuses_a_headless_browser(no_launch):
+    with pytest.raises(ValueError, match="visible browser"):
+        mcp_server.submit(str(VALID_SUB), manual_login=True, headless=True)
+
+
+def test_submit_headed_runs_can_always_fall_back_to_a_watched_sign_in(fake_launch):
+    """Stored credentials that stop working must not leave the child blocked on a stdin nobody writes to."""
+    credentials.save_credential(VENUE, "ada@example.com", "hunter2")
+    mcp_server.submit(str(VALID_SUB))
+    assert "--sign-in-signal" in fake_launch.instances[0].command
+    assert "--manual-login" not in fake_launch.instances[0].command
+    mcp_server.submit(str(VALID_SUB), headless=True)
+    assert "--sign-in-signal" not in fake_launch.instances[1].command
+
+
+def test_submit_status_says_awaiting_sign_in_until_the_sign_in_finishes(fake_launch):
+    from paperpush.venues.common import AWAITING_SIGN_IN_BANNER, SIGN_IN_DONE_BANNER
+
+    result = mcp_server.submit(str(VALID_SUB), manual_login=True)
+    log = Path(result["log_path"])
+    log.write_text(f"Opening biorxiv…\n\n{AWAITING_SIGN_IN_BANNER}\nSign in to bioRxiv there.\n", encoding="utf-8")
+    status = mcp_server.submit_status(result["pid"])
+    assert status["state"] == "awaiting_sign_in"
+    assert "sign in" in status["next_step"]
+    log.write_text(log.read_text(encoding="utf-8") + f"{SIGN_IN_DONE_BANNER}\nStep 2 of 7\n", encoding="utf-8")
+    assert mcp_server.submit_status(result["pid"])["state"] == "filling"
+
+
+def test_submit_signed_in_creates_the_signal_file(fake_launch):
+    result = mcp_server.submit(str(VALID_SUB), manual_login=True)
+    command = fake_launch.instances[0].command
+    signal = Path(command[command.index("--sign-in-signal") + 1])
+    assert not signal.exists()
+    assert mcp_server.submit_signed_in(result["pid"])["status"] == "signalled"
+    assert signal.exists()
+
+
+def test_submit_signed_in_rejects_a_run_that_does_not_sign_in_by_hand(fake_launch):
+    pid = mcp_server.submit(str(LOGINLESS_SUB))["pid"]
+    with pytest.raises(ValueError, match="does not sign in by hand"):
+        mcp_server.submit_signed_in(pid)
+    with pytest.raises(ValueError, match="no submission with pid 999"):
+        mcp_server.submit_signed_in(999)
 
 
 def test_submit_launches_and_returns_a_handle(fake_launch):
@@ -775,7 +850,7 @@ def test_build_server_exposes_typed_arguments():
     tool = by_name["validate_subfile"]
     # Renamed from inputSchema to input_schema in MCP SDK 2.0.
     schema = getattr(tool, "input_schema", None) or tool.inputSchema
-    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "venue", "manuscript", "title_page", "cover_letter", "figures", "tables", "supplement", "check_links", "check_sensitive", "check_references", "reference_check_extended", "reproduce_figures", "reproduce_minutes", "reproduce_download_gb", "references_alphabetical", "references_citation_order", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "colorblind", "initial_submission", "strict_style", "ai_only", "cover_letter_max_age_days", "publisher", "issn", "journal", "disable", "enable"}
+    assert set(schema["properties"]) == {"subfile", "manuscript_dir", "venue", "manuscript", "title_page", "cover_letter", "figures", "tables", "supplement", "check_links", "check_sensitive", "check_references", "reference_check_extended", "reproduce_figures", "reproduce_minutes", "reproduce_download_gb", "references_alphabetical", "references_citation_order", "check_manuscript", "anonymous", "check_hidden_text", "check_openreview", "ai_results", "output", "colorblind", "initial_submission", "strict_style", "ai_only", "cover_letter_max_age_days", "publisher", "issn", "journal", "disable", "enable", "plagiarism", "plagiarism_provider", "plagiarism_accept", "plagiarism_threshold"}
     # Files can be named instead of a .sub, so nothing is required.
     assert not schema.get("required")
 

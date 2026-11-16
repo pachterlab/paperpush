@@ -43,7 +43,8 @@ from pathlib import Path
 
 from .ai_validate import AiTask
 from .database import Venue
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .requirements import notes_mention
+from .validate import SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -292,6 +293,14 @@ def github_repo(owner: str, repo: str) -> RepoInfo:
         return RepoInfo("unknown")
 
 
+# A venue whose notes ask for archived, licensed, or documented code makes those gaps
+# warnings; elsewhere they are good-practice advice (suggestions).
+_CODE_ARCHIVE_RULE = re.compile(r"(?i)\b(?:code|software)\b[^.]*\b(?:archiv\w*|Zenodo|Software Heritage|DOI|persistent identifier)|\b(?:archiv\w*|Zenodo|Software Heritage)\b[^.]*\b(?:code|software)\b")
+_CODE_HYGIENE_RULE = re.compile(r"(?i)\b(?:code|software)\b[^.]*\b(?:licen[cs]\w*|README|documentation|dependenc\w*|environment)|\b(?:licen[cs]\w*|README)\b[^.]*\b(?:code|software)\b")
+# Problems in _repo_problems that are good practice rather than a broken deposit.
+_HYGIENE_PROBLEMS = ("has no license file", "has no README", "declares no software environment")
+
+
 def _repo_problems(name: str, info: RepoInfo) -> list[str]:
     problems = []
     names = {Path(p).name.lower(): p for p in info.paths}
@@ -353,7 +362,8 @@ def _code_availability_check(venue: Venue, values: dict[str, str], online: bool)
             issues.append(Issue(WARNING, where, f"the manuscript describes computational work ({src.computational} mentions of code, scripts, or analysis software) but links no code repository or archive and attaches no code; add a code availability statement with a public repository"))
         return Outcome(issues, "no code repository, archive, or attached code found")
     if src.repos and not src.pinned:
-        issues.append(Issue(WARNING, where, f"the code is linked only as a repository ({', '.join(src.repos[:3])}), which can change after publication; archive the release the paper used (GitHub's Zenodo integration gives it a DOI) or cite the exact commit or tag"))
+        archive_level = WARNING if notes_mention(venue.slug, values, _CODE_ARCHIVE_RULE) else SUGGESTION
+        issues.append(Issue(archive_level, where, f"the code is linked only as a repository ({', '.join(src.repos[:3])}), which can change after publication; archive the release the paper used (GitHub's Zenodo integration gives it a DOI) or cite the exact commit or tag"))
     checked = []
     if online and src.github:
         unknown = []
@@ -366,7 +376,8 @@ def _code_availability_check(venue: Venue, values: dict[str, str], online: bool)
                 unknown.append(name)
                 continue
             checked.append(name)
-            issues.extend(Issue(WARNING, where, p) for p in _repo_problems(name, info))
+            hygiene_level = WARNING if notes_mention(venue.slug, values, _CODE_HYGIENE_RULE) else SUGGESTION
+            issues.extend(Issue(hygiene_level if any(h in p for h in _HYGIENE_PROBLEMS) else WARNING, where, p) for p in _repo_problems(name, info))
         if unknown:
             from .validate import unchecked
 

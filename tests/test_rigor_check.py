@@ -237,3 +237,49 @@ def test_no_reader_tasks_without_a_manuscript():
     queue = _Queue()
     rc._queue_reader_tasks(queue, VENUE, {})
     assert queue.tasks == []
+
+
+# --- severity follows the venue's rules -----------------------------------------
+
+
+def _with_notes(monkeypatch, notes: list[str], statements: list[str] | None = None) -> None:
+    from paperpush import requirements as r
+
+    entry: dict = {"notes": notes}
+    if statements:
+        entry["statements"] = {"required": statements}
+    monkeypatch.setattr(r, "_load_raw", lambda: {"$aliases": {}, "testj": entry})
+
+
+@pytest.mark.parametrize(
+    ("notes", "statements", "level"),
+    [
+        ([], None, "suggestion"),
+        (["Give RRIDs for antibodies, cell lines, and model organisms."], None, "warning"),
+        ([], ["reporting_guidelines"], "warning"),
+    ],
+)
+def test_missing_rrid_level_follows_venue_rule(tmp_path, monkeypatch, notes, statements, level):
+    _with_notes(monkeypatch, notes, statements)
+    monkeypatch.setattr(rc, "resolve_rrid", lambda rrid: True)
+    out = rc._rrids_check(VENUE, _values(tmp_path, _METHODS), True)
+    assert {i.level for i in out.issues if "no RRID found" in i.message} == {level}
+
+
+def test_unknown_rrid_and_problematic_cell_line_stay_warnings(tmp_path, monkeypatch):
+    _with_notes(monkeypatch, [])
+    monkeypatch.setattr(rc, "resolve_rrid", lambda rrid: rrid != "AB_303395")
+    monkeypatch.setattr(rc, "cellosaurus_problem", lambda name: ("CVCL_0372", "Contaminated.") if name == "KB" else False)
+    rrids = rc._rrids_check(VENUE, _values(tmp_path, _METHODS), True)
+    assert next(i for i in rrids.issues if "is not known" in i.message).level == "warning"
+    lines = rc._cell_lines_check(VENUE, _values(tmp_path, "The KB cell line and HeLa cells were used."), True)
+    levels = {("CVCL_0372" in i.message): i.level for i in lines.issues}
+    assert levels == {True: "warning", False: "suggestion"}
+
+
+def test_design_gap_warns_only_under_arrive(tmp_path, monkeypatch):
+    text = "Methods\n\nMale and female mice were used. Mice were randomly assigned to groups. The mice were housed in pairs. Investigators were blinded to genotype."
+    _with_notes(monkeypatch, [])
+    assert rc._design_check(VENUE, _values(tmp_path, text)).issues[0].level == "suggestion"
+    _with_notes(monkeypatch, ["Animal studies must follow the ARRIVE guidelines."])
+    assert rc._design_check(VENUE, _values(tmp_path, text)).issues[0].level == "warning"

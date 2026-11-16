@@ -77,6 +77,11 @@ fly. See step 1.
      fails, they should check the details (or reset the password on the portal)
      and run it again.
 
+   Also tell them that, instead, they can sign in by hand in the submission's
+   browser window when it opens, with nothing stored (paperpush-submit's
+   manual sign-in). If they choose that, or already said they would rather log
+   in themselves in the browser, pass it on to paperpush-submit.
+
    Then **carry on with steps 1-3 anyway** while they do it; a missing login
    only blocks step 4. Never ask for their password in the chat.
 

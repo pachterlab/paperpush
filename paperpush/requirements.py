@@ -212,6 +212,9 @@ class ManuscriptRules:
     group_four_digit_numbers: Annotated[Optional[bool], PField(description="Whether four-digit numbers take the thousands separator too: yes for 1,000, no for 1000 (SI and some house styles). Empty when the guidelines do not say.")] = None
     et_al_period: Annotated[Optional[bool], PField(description="Whether 'et al' takes a full stop: yes for 'et al.', no for 'et al' (AMA and RSNA house style). Empty when the guidelines do not say; `validate` then asks for 'et al.'.")] = None
     serial_comma: Annotated[Optional[bool], PField(description="Whether lists take the serial (Oxford) comma: yes for 'A, B, and C', no for 'A, B and C'. Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent.")] = None
+    footnotes_allowed: Annotated[Optional[bool], PField(description="False when the guidelines forbid footnotes (and endnotes) in the manuscript text. Title-page author notes made with LaTeX's \\thanks are not counted.")] = None
+    max_heading_levels: Annotated[Optional[int], PField(description="Deepest heading level the manuscript may use (3: sections, subsections, and sub-subsections). The title is not a level.")] = None
+    forbidden_fonts: Annotated[Optional[list[str]], PField(description="Fonts the manuscript must not use anywhere (e.g. Symbol), matched by family name.")] = None
     initial_submission_any_format: Annotated[Optional[str], PField(description="Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings.")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key, one per string.")] = _notes()
 
@@ -222,6 +225,7 @@ class TitlePageRules:
 
     required_items: Annotated[Optional[list[TitlePageItem]], PField(description="Canonical ids of the items the title page must carry.")] = None
     separate_file: Annotated[Optional[bool], PField(description="Title page is uploaded as its own file (double-blind venues).")] = None
+    own_page: Annotated[Optional[bool], PField(description="When the title page is part of the manuscript file, it is a page of its own: the abstract (or the main text) starts on a new page.")] = None
     title_max_characters: Annotated[Optional[int], PField(description="Maximum title length in characters (spaces included).")] = None
     title_max_words: Annotated[Optional[int], PField(description="Maximum title length in words.")] = None
     running_title_max_characters: Annotated[Optional[int], PField(description="Maximum running/short title length in characters.")] = None
@@ -265,10 +269,12 @@ class SectionRules:
 
 @dataclass(frozen=True)
 class StatementRules:
-    """Declarations that must appear in the manuscript text."""
+    """Declarations the manuscript must contain, and those the submission system collects instead."""
 
     required: Annotated[Optional[list[StatementId]], PField(description="Canonical ids of the declarations the manuscript must contain (matched via $aliases).")] = None
     optional: Annotated[Optional[list[StatementId]], PField(description="Declarations the venue accepts but does not require.")] = None
+    in_submission_form: Annotated[Optional[list[StatementId]], PField(description="Declarations the venue collects through its submission system (a form, a declarations tool, or a file uploaded with the manuscript) rather than in the manuscript text. They are not looked for in the manuscript, even when a publisher's house rules list them in required; the author is reminded to have them ready at submission.")] = None
+    not_in_manuscript: Annotated[Optional[list[StatementId]], PField(description="Declarations the guidelines forbid in the manuscript file (they go only in the submission system); a heading for one in the manuscript is reported.")] = None
     ai_use_if_used: Annotated[Optional[bool], PField(description="Use of generative AI (LLMs, image generators) must be disclosed when there was any. To require a statement whether or not AI was used, list ai_use in required instead.")] = None
     ai_use_locations: Annotated[Optional[list[AiUseLocation]], PField(description="Where in the manuscript the AI-use disclosure may go; any one of them will do: methods, acknowledgements, statement (a section of its own), supplementary (the supplementary material), figure_captions (the legend of each AI-touched figure). Unset: anywhere.")] = None
     ai_use_cover_letter: Annotated[Optional[bool], PField(description="The AI-use disclosure must also be made in the cover letter.")] = None
@@ -302,6 +308,8 @@ class FigureRules:
     color_charge: Annotated[Optional[bool], PField(description="Color figures carry a charge.")] = None
     print_grayscale: Annotated[Optional[bool], PField(description="The print edition shows figures in grayscale, so colors that differ only in hue merge (figures.grayscale checks this; color_charge implies it).")] = None
     placement: Annotated[Optional[Placement], PField(description="Where figures go for the initial submission. combined_file: every figure in one document (Word or PDF), in citation order, each legend after its figure.")] = None
+    embedded_forbidden: Annotated[Optional[bool], PField(description="True when the guidelines forbid figures inside the manuscript file, even when each figure is also uploaded separately.")] = None
+    caption_label: Annotated[Optional[str], PField(description="The word figure captions must start with, as the guidelines spell it (e.g. 'Fig' for 'Fig 1', 'Fig.' for 'Fig. 1', 'Figure').")] = None
     notes: Annotated[list[str], PField(description="Rules with no structured key.")] = _notes()
 
 
@@ -1079,6 +1087,26 @@ def any_format_initial_rule(slug: str, values: Optional[dict[str, str]] = None) 
     if values is not None:
         reqs = resolve(reqs, values)
     return (reqs.manuscript.initial_submission_any_format or "").strip()
+
+
+def notes_mention(slug: str, values: Optional[dict[str, str]], pattern: "re.Pattern[str] | str") -> bool:
+    """Whether any free-text note in the venue's rules matches ``pattern``.
+
+    Used by checks with no structured rule key of their own (RRIDs, ARRIVE,
+    colour-blind palettes, ...) to tell a venue requirement, which warrants a
+    warning, from general advice, which is a suggestion. Reads the rules for
+    the article type ``values`` selects (the top-level rules when None).
+    """
+    reqs = get_requirements(slug)
+    if reqs is None:
+        return False
+    if values is not None:
+        reqs = resolve(reqs, values)
+    regex = re.compile(pattern) if isinstance(pattern, str) else pattern
+    notes = list(reqs.notes)
+    for f in dataclass_fields(reqs):
+        notes.extend(getattr(getattr(reqs, f.name), "notes", None) or [])
+    return any(isinstance(n, str) and regex.search(n) for n in notes)
 
 
 def heading_aliases(kind: str) -> dict[str, list[str]]:

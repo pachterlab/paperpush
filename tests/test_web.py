@@ -286,6 +286,57 @@ def test_ai_features_require_a_visitor_key_even_if_server_has_one(tmp_path, monk
             assert "add yours on the page" in res.json()["detail"]
 
 
+def _plagiarism_client(tmp_path, monkeypatch, **settings):
+    for name in ("ORIGINALITY_API_KEY", "ORIGINALITY_AI_API_KEY", "WINSTON_API_KEY", "WINSTON_AI_API_KEY", "GOWINSTON_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    return TestClient(create_app(Settings(data_dir=tmp_path / "web", **settings)))
+
+
+def test_plagiarism_scan_is_off_when_the_server_makes_no_network_requests(tmp_path, monkeypatch):
+    with _plagiarism_client(tmp_path, monkeypatch, network_checks=False) as client:
+        ws = client.post("/api/workspaces").json()["id"]
+        res = client.post(f"/api/workspaces/{ws}/validate", json={"text": _filled_template(), "plagiarism": True}, headers={"X-Plagiarism-Key": "k"})
+        assert res.status_code == 400 and "switched off" in res.json()["detail"]
+
+
+def test_plagiarism_scan_needs_the_visitors_key_not_the_servers(tmp_path, monkeypatch):
+    with _plagiarism_client(tmp_path, monkeypatch) as client:
+        monkeypatch.setenv("ORIGINALITY_API_KEY", "server-key")
+        assert client.get("/api/info").json()["plagiarism_provider"] is None  # only a local session sees it
+        ws = client.post("/api/workspaces").json()["id"]
+        res = client.post(f"/api/workspaces/{ws}/validate", json={"text": _filled_template(), "plagiarism": True, "check_links": False, "check_references": False})
+        assert res.status_code == 400 and "add yours on the page" in res.json()["detail"]
+
+
+def test_plagiarism_scan_runs_with_the_visitors_key_and_masks_it(tmp_path, monkeypatch):
+    import importlib
+
+    validate_mod = importlib.import_module("paperpush.validate")
+    seen = {}
+
+    def fake_scan(venue, values, options):
+        seen["options"] = options
+        return validate_mod.Outcome([], f"Winston AI: 3% of 1000 words match (key {options.api_key})")
+
+    monkeypatch.setattr(validate_mod, "_plagiarism_issues", fake_scan)
+    with _plagiarism_client(tmp_path, monkeypatch) as client:
+        ws = client.post("/api/workspaces").json()["id"]
+        body = {"text": _filled_template(), "plagiarism": True, "plagiarism_accept": ["biorxiv.org"], "plagiarism_threshold": 15, "check_links": False, "check_references": False}
+        res = client.post(f"/api/workspaces/{ws}/validate", json=body, headers={"X-Plagiarism-Provider": "winston", "X-Plagiarism-Key": "visitor-plag-key"})
+        assert res.status_code == 200, res.text
+        out = res.json()
+        assert out["plagiarism"] == "Winston AI"
+        opts = seen["options"]
+        assert (opts.provider, opts.api_key, opts.accepted_urls, opts.threshold) == ("winston", "visitor-plag-key", ("biorxiv.org",), 15.0)
+        check = next(c for c in out["checks"] if c["id"] == "integrity.plagiarism")
+        assert check["status"] == "passed"
+        assert "visitor-plag-key" not in res.text and "[your API key]" in check["detail"]
+        # A plain validate leaves it off, pointing at the button.
+        plain = client.post(f"/api/workspaces/{ws}/validate", json={"text": _filled_template(), "check_links": False, "check_references": False}).json()
+        check = next(c for c in plain["checks"] if c["id"] == "integrity.plagiarism")
+        assert check["status"] == "unchecked" and "tick Plagiarism scan" in check["detail"]
+
+
 def test_visitor_brings_their_own_api_key(tmp_path, monkeypatch, caplog):
     from fastapi import HTTPException
 

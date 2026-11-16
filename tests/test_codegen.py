@@ -11,6 +11,7 @@ from paperpush.codegen.model import (
     Node,
     Script,
     choose_path,
+    parse_code,
     render,
     render_locator,
     suggest_branch_name,
@@ -132,12 +133,88 @@ def test_branch_is_a_match_with_one_case_per_path():
     assert '"branch_1": "Biological research",' in py
 
 
-def test_branch_names_count_up_and_cannot_nest():
+def test_branch_names_count_up_and_nest():
     s = Script()
     record_branch(s)
     assert s.enter_branch() == "branch_2"
-    with pytest.raises(ValueError):
-        s.enter_branch()
+    assert s.enter_branch() == "branch_3" and s.depth == 2
+    assert s.exit_branch() and s.depth == 1 and s.exit_branch() and s.depth == 0
+
+
+def check(label: str) -> Node:
+    return Node("check", locator=[["locator", ["#" + label], {}]], label=label)
+
+
+def record_nested(s: Script) -> None:
+    """branch_1: path A1 is a nested branch_2 (opened before any action), path B holds branch_3 mid-path."""
+    s.enter_branch()
+    s.enter_branch()  # nested before the outer path has an action
+    s.add(check("A1"))
+    s.next_path()
+    s.add(check("A2"))
+    s.exit_branch()
+    s.add(Node("click", locator=[["locator", ["#cont"], {}]], label="cont"))
+    s.next_path()
+    s.add(check("B"))
+    s.enter_branch()
+    s.add(check("B1"))
+    s.next_path()
+    s.add(check("B2"))
+    s.exit_branch()
+    s.exit_branch()
+    s.add(Node("click", locator=[["locator", ["#end"], {}]], label="end"))
+
+
+def test_nested_branches_render_nested_matches():
+    s = Script()
+    s.enter_branch()
+    s.enter_branch()
+    # An outer path that so far holds only an empty nested branch is still valid code.
+    code = render(s).code
+    compiles(code)
+    assert '    case "path 1":\n        # branch_2: no paths recorded yet\n        pass\n' in code
+    s.undo(), s.undo()
+
+    record_nested(s)
+    lines = body(s)
+    compiles("\n".join(lines))
+    assert lines[lines.index("match branch_1:") :] == [
+        "match branch_1:",
+        '    case "A1":',  # the nested branch's path took the first action's label
+        "        match branch_2:",
+        '            case "A1":',
+        '                page.locator("#A1").check()',
+        '            case "A2":',
+        '                page.locator("#A2").check()',
+        '        page.locator("#cont").click()',
+        '    case "B":',
+        '        page.locator("#B").check()',
+        "        match branch_3:",
+        '            case "B1":',
+        '                page.locator("#B1").check()',
+        '            case "B2":',
+        '                page.locator("#B2").check()',
+        'page.locator("#end").click()',
+    ]
+    compiles(render(s, "python").code)
+    assert s.branch_paths(0) == [1, 8] and s.branch_paths(1) == [2, 4]
+    assert s.path_head(6) == 1 and s.path_head(9) == 8 and s.path_head(12) == 12 and s.variable_target(1) == ("branch", 1)
+    # The outer path key can still be retyped on the nested branch's case line.
+    s.edit_line("option", 1, 'case "Research":')
+    assert '    case "Research":' in body(s)
+
+
+def test_replay_follows_nested_paths():
+    from paperpush.codegen.session import CodegenSession
+
+    session = CodegenSession()
+    record_nested(session.script)
+    names = lambda: [session.script.nodes[i].label for i in session.replay_plan()]  # noqa: E731
+    assert names() == ["B", "B2", "end"]  # no values: the paths recorded last
+    session.sub_values = {"branch_1": "A1", "branch_2": "A1"}
+    assert names() == ["A1", "cont", "end"]
+    session.sub_values = {"branch_1": "B", "branch_3": "B1"}
+    assert names() == ["B", "B1", "end"]
 
 
 def test_empty_or_open_branch_renders_valid_code():
@@ -384,6 +461,15 @@ FORM = """<!doctype html><title>Wizard</title><body style="max-width: 420px">
 <label><input type="radio" name="s" id="bio"> Biological research</label></fieldset>
 <button onclick="document.body.dataset.continued = '1'">Continue</button>
 <div role="listbox" aria-label="Subject"><div role="option">Biochemistry</div><div role="option">Genomics</div></div>
+<div class="field"><label for="metadata.resource_type">Resource type</label>
+<div role="combobox" id="metadata.resource_type" aria-expanded="false" class="ui fluid search selection dropdown">
+<input aria-autocomplete="list" autocomplete="off" class="search" tabindex="0" type="text" value="" id="rt-search">
+<div aria-atomic="true" aria-live="polite" role="alert" class="divider default text">Select resource type</div>
+<i aria-hidden="true" class="dropdown icon"></i>
+<div role="listbox" class="menu transition"><div role="option" class="item"><span class="text">Dataset</span></div>
+<div role="option" class="item"><span class="text">Software</span></div></div></div></div>
+<div class="field"><label>Languages</label><div role="combobox" class="ui multiple search selection dropdown">
+<input class="search" id="lang-search" type="text"><div role="listbox" class="menu transition"></div></div></div>
 """
 
 
@@ -542,9 +628,23 @@ def test_toolbar_is_one_row_with_code_shown(recorder):
     last = page.evaluate("() => window.__ppToolbarRect('copy')")
     assert abs(first["y"] - last["y"]) < 2
     assert page.evaluate("() => window.__ppToolbarRect('.code')") is not None
-    order = page.evaluate("() => ['endbranch', 'optional', 'pickoptions', 'variable', 'pickhtml', 'copyhtml', 'panel', 'copy', 'save'].map(c => window.__ppToolbarRect(c).x)")
+    order = page.evaluate("() => ['endbranch', 'optional', 'comment', 'pickoptions', 'variable', 'pickhtml', 'copyhtml', 'copy', 'save'].map(c => window.__ppToolbarRect(c).x)")
     assert order == sorted(order)
     assert page.evaluate("() => window.__ppToolbarRect('step')") is None
+
+
+def test_code_hide_toggle_sits_in_the_code_bar(recorder):
+    _, page, settle, _, _ = recorder
+    assert page.evaluate("() => window.__ppToolbarText('panel')") == "▾ Hide code"
+    window_btn = page.evaluate("() => window.__ppToolbarRect('codewindow')")
+    toggle = page.evaluate("() => window.__ppToolbarRect('panel')")
+    assert abs(window_btn["y"] - toggle["y"]) < 2 and toggle["x"] > window_btn["x"]
+    toolbar_click(page, settle, "panel")
+    assert page.evaluate("() => window.__ppToolbarRect('.code')") is None
+    assert page.evaluate("() => window.__ppToolbarRect('codewindow')") is not None  # bar stays to show it again
+    assert page.evaluate("() => window.__ppToolbarText('panel')") == "▸ Show code"
+    toolbar_click(page, settle, "panel")
+    assert page.evaluate("() => window.__ppToolbarRect('.code')") is not None
 
 
 def test_branch_records_each_option_as_a_path(recorder):
@@ -633,6 +733,8 @@ def test_options_comment_lists_a_dropdowns_choices(recorder):
         (page.get_by_label("Article type"), ['# Options of "Article type" (2):', "#   - Research", "#   - Review"]),
         (page.locator("#epi"), ['# Options of "Is your manuscript better suited for medRxiv?" (3):', "#   - Biological research"]),
         (page.get_by_role("option", name="Genomics"), ['# Options of "Subject" (2):', "#   - Genomics"]),
+        # A Semantic UI search dropdown (InvenioRDM: CaltechDATA, Zenodo): the click lands on its search input.
+        (page.locator("#rt-search"), ['# Options of "Resource type" (2):', "#   - Dataset", "#   - Software"]),
     )
     for target, expected in cases:
         toolbar_click(page, settle, "pickoptions")
@@ -649,6 +751,60 @@ def test_options_comment_lists_a_dropdowns_choices(recorder):
     settle()
     assert "no options" in session.message
     assert page.evaluate("document.body.dataset.continued") is None
+    # A search dropdown whose options load as you type: say so.
+    toolbar_click(page, settle, "pickoptions")
+    page.locator("#lang-search").click()
+    settle()
+    assert "Languages" in session.message and "type in its search box" in session.message
+
+
+def test_toolbar_branch_nests_and_numbers_the_button(recorder):
+    session, page, settle, _, _ = recorder
+    label = lambda: page.evaluate("() => window.__ppToolbarText('branch')")  # noqa: E731
+    assert label() == "⑂ Branch"
+    toolbar_click(page, settle, "branch")
+    assert label() == "⑂ Branch (1)"
+    toolbar_click(page, settle, "branch")  # nested before any action
+    assert label() == "⑂ Branch (2)" and session.script.depth == 2
+    page.locator("#diagnostic").check()
+    settle()
+    toolbar_click(page, settle, "endbranch")
+    assert label() == "⑂ Branch (1)"
+    toolbar_click(page, settle, "endbranch")
+    assert label() == "⑂ Branch"
+    lines = session.rendered().lines
+    compiles("\n".join(lines))
+    assert '    case "Diagnostic tools or medical equipment tested in humans":' in lines
+
+
+def test_code_window_toggles_and_drives_the_panel(recorder):
+    session, page, settle, _, _ = recorder
+    page.get_by_role("button", name="Continue").click()
+    settle()
+    assert page.evaluate("() => window.__ppToolbarText('codewindow')") == "⧉ Window"
+    toolbar_click(page, settle, "codewindow")
+    win = session.code_window
+    assert win is not None and win not in session.context.pages  # its own context: not recorded
+    settle(300)
+    assert page.evaluate("() => window.__ppToolbarRect('.code')") is None  # embedded panel hidden
+    assert win.evaluate("() => window.__ppToolbarText('codewindow')") == "⧈ Embed"
+    # Clicking a line in the window selects it.
+    point = win.evaluate("() => window.__ppToolbarRect('.ln.own[data-owner=\"0\"]')")
+    win.mouse.click(point["x"], point["y"])
+    settle()
+    assert session.selected == 0 and not any(n.kind == "click" and n.page != "page" for n in session.script.nodes)
+    # Embed brings it back.
+    point = win.evaluate("() => window.__ppToolbarRect('codewindow')")
+    win.mouse.click(point["x"], point["y"])
+    settle(300)
+    assert session.code_window is None and win.is_closed()
+    assert page.evaluate("() => window.__ppToolbarRect('.code')") is not None
+    # Closing the window by hand embeds the code too.
+    toolbar_click(page, settle, "codewindow")
+    session.code_window.close()
+    settle()
+    assert session.code_window is None and session.state()["codeWindow"] is False
+    assert len(session.script.nodes) == 1
 
 
 def test_options_comment_inside_a_branch_compiles():
@@ -679,6 +835,69 @@ def test_save_code_writes_the_file(tmp_path):
     assert session.message.startswith("Give a file name")
 
 
+def full_script() -> Script:
+    """A script using every kind of line, for the load round trip."""
+    s = Script()
+    record_nested(s)
+    s.add_step("Files")
+    s.add(Node("goto", value="https://example.org"))
+    s.add(Node("fill", locator=TITLE_BOX, value="hunter2", sensitive=True, var="password"))
+    s.add(Node("click", locator=ROLE_NEXT, value=1, popup="page1", button="right", modifiers=["Shift"]))
+    s.add(Node("click", page="page1", locator=ROLE_NEXT, value=1, dialog="accept"))
+    s.toggle_optional()
+    s.add(Node("select", locator=TITLE_BOX, value=["Research"]))
+    s.add(Node("press", value="Enter"))
+    s.toggle_optional()
+    s.add_comment("Kind", ["A", "B"])
+    s.add(Node("click", locator=[["frame_locator", ["#ed"], {}], ["get_by_text", ["Go"], {}], ["nth", [0], {}]], value=1, t=1))
+    s.add(Node("chooser_upload", locator=[], value=["/x/ms.pdf"], var="manuscript_file", t=2))
+    s.add(Node("new_page", page="page2"))
+    s.add(Node("upload", page="page2", locator=[["locator", ["input"], {}]], value=["/a", "/b"]))
+    return s
+
+
+@pytest.mark.parametrize("target", ["paperpush", "python"])
+def test_saved_code_loads_back_into_the_same_script(target):
+    s = full_script()
+    code = render(s, target, file_fields=["manuscript_file"]).code
+    loaded = Script()
+    loaded.nodes = parse_code(code).nodes
+    assert render(loaded, target, file_fields=["manuscript_file"]).code == code
+
+
+def test_loaded_python_code_keeps_its_values_and_branch_choice():
+    s = Script()
+    record_branch(s)
+    s.add(Node("fill", locator=TITLE_BOX, value="My title", var="title"))
+    code = render(s, "python").code.replace('"branch_1": "Biological research"', '"branch_1": "Epidemiology"')
+    loaded = parse_code(code)
+    assert loaded.values["branch_1"] == "Epidemiology"
+    assert loaded.nodes[-1].value == "My title" and loaded.nodes[-1].var == "title"
+
+
+def test_parse_code_refuses_hand_written_logic():
+    with pytest.raises(ValueError, match="line 2: not a recorded action"):
+        parse_code('page.goto("https://example.org")\nif x:\n    page.reload()\n')
+
+
+def test_load_replaces_the_script_and_asks_to_play(tmp_path):
+    from paperpush.codegen.session import CodegenSession
+
+    saved = CodegenSession()
+    record_branch(saved.script)
+    path = tmp_path / "steps.py"
+    saved.save(str(path))
+
+    session = CodegenSession(sub_values={"branch_1": "epidemiology"})
+    session.script.add(Node("goto", value="https://example.org"))
+    assert session.load(str(path))
+    assert session.play_requested and session.message.startswith("Loaded 4 actions from steps.py")
+    assert session.rendered().code == saved.rendered().code
+    assert session.replay_plan() == [3, 7]  # the .sub still picks the path
+    assert session.script.undo() and [n.kind for n in session.script.nodes] == ["goto"]
+    assert not session.load(str(tmp_path / "missing.py")) and session.message.startswith("Could not read")
+
+
 def test_optional_toggle_wraps_section_in_comments():
     s = Script()
     s.add(Node("click", locator=[["get_by_role", ["button"], {"name": "A"}]], label="A"))
@@ -689,6 +908,36 @@ def test_optional_toggle_wraps_section_in_comments():
     start = lines.index("# ---OPTIONAL---")
     assert "name=\"B\"" in lines[start + 1] and lines[start + 2] == "# ---END OPTIONAL---"
     assert s.undo() and s.optional_open()
+
+
+def test_comment_goes_at_the_end_of_the_line_and_round_trips():
+    s = Script()
+    s.add(Node("goto", value="https://example.org"))
+    s.add(Node("click", locator=[["get_by_role", ["button"], {"name": "A"}]], label="A"))
+    s.toggle_optional()
+    assert s.note_target(None) == 1  # a marker line comments the action before it
+    s.set_note(1, "  # opens the form\n")
+    s.add(Node("fill", locator=TITLE_BOX, value="T"))
+    upload = [["get_by_role", ["button"], {"name": "Upload"}]]
+    s.add(Node("click", locator=upload, label="Upload"))
+    s.add(Node("chooser_upload", locator=upload, value=["paper.pdf"]))
+    s.set_note(s.note_target(None), "manuscript")
+    s.toggle_optional()
+    s.enter_branch()
+    s.add(Node("click", locator=[["get_by_label", ["Yes"], {}]], label="Yes"))
+    s.set_note(len(s.nodes) - 1, "only for yes")
+    s.next_path()
+    s.add(Node("click", locator=[["get_by_label", ["No"], {}]], label="No"))
+    s.exit_branch()
+    for target in ("paperpush", "python"):
+        code = render(s, target).code
+        assert 'name="A").click()  # opens the form' in code
+        assert code.count("# manuscript") == 1 and code.count("# only for yes") == 1
+        nodes = parse_code(code).nodes
+        assert [n.note for n in nodes if n.kind in ("click", "fill", "chooser_upload")] == ["opens the form", None, "manuscript", "only for yes", None]
+    s.set_note(1, "")
+    assert s.nodes[1].note is None and "# opens the form" not in render(s).code
+    assert s.undo() and s.nodes[1].note == "opens the form"
 
 
 def test_codegen_sub_accepts_the_other_suffix(tmp_path, monkeypatch):
@@ -713,3 +962,26 @@ def test_codegen_sub_accepts_the_other_suffix(tmp_path, monkeypatch):
     assert main(["codegen", "--sub", "biorxiv.sub", "--new-session"]) == 0
     assert "biorxiv" in seen["header"]
     assert seen["fields"]
+
+
+def test_toolbar_load_button_loads_and_plays_saved_code(recorder, tmp_path):
+    session, page, settle, _, _ = recorder
+    saved = tmp_path / "saved.py"
+    script = Script()
+    script.add(Node("goto", value=page.url))
+    script.add(Node("fill", locator=[["get_by_label", ["Manuscript title"], {}]], value="Loaded title"))
+    saved.write_text(render(script, "python").code)
+    play = page.evaluate("() => window.__ppToolbarRect('play')")
+    load = page.evaluate("() => window.__ppToolbarRect('load')")
+    assert abs(play["y"] - load["y"]) < 2 and load["x"] > play["x"]  # next to Play
+    toolbar_click(page, settle, "load")
+    page.keyboard.press("ControlOrMeta+a")
+    page.keyboard.type(str(saved))
+    page.keyboard.press("Enter")
+    settle()
+    assert session.play_requested and session.message.startswith("Loaded 2 actions")
+    session.play_requested = False
+    session.replay()
+    assert session.message == "Replay finished."
+    replayed = [p for p in session.context.pages if p in session.replay_pages][0]
+    assert replayed.locator("#t").input_value() == "Loaded title"

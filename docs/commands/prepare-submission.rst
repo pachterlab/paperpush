@@ -45,7 +45,9 @@ The steps
    ``--anonymous``, and ``--initial-submission`` flags.
 5. **Login.** Re-checks a stored login by signing in, and offers to sign in
    again if that fails. With no stored login, it starts ``paperpush login`` in a
-   terminal, and stops without one.
+   terminal, and stops without one. ``--manual-login`` skips this step: you
+   sign in by hand in the browser window at the next step (see
+   :doc:`submit`).
 6. **Submit.** Runs :doc:`submit` without validating again. As always, it stops
    before the final submit button.
 

@@ -216,7 +216,8 @@
 
   function statusFor(issues) {
     if (issues.some((i) => i.level === "error")) return "failed";
-    if (issues.length) return "warning";
+    if (issues.some((i) => i.level === "warning")) return "warning";
+    if (issues.length) return "suggestion";
     return "passed";
   }
 
@@ -272,7 +273,7 @@
           if (!choice || accepted.has(choice)) continue;
           if (field.options_recommended) {
             const entered = field.type === "multichoice" ? "added as a custom keyword" : "entered as custom text";
-            buckets["form.options"].push(issue("warning", field.id, `${field.label}: '${choice}' is not in the recommended list; it will be ${entered}`));
+            buckets["form.options"].push(issue("suggestion", field.id, `${field.label}: '${choice}' is not in the recommended list; it will be ${entered}`));
           } else if (["multichoice", "text", "textarea"].includes(field.type)) {
             // A closed single choice is a <select> here, and validate reports a bad one under form.schema.
             buckets["form.options"].push(issue("error", field.id, `${field.label}: '${choice}' is not a valid option`));

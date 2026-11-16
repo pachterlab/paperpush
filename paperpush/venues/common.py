@@ -106,8 +106,115 @@ def wait_for_human(prompt: str) -> bool:
     return True
 
 
-def wait_for_manual_sign_in(name: str, slug: str) -> None:
-    """Pause for a manual sign-in to ``name``; raise :class:`SignInRequired` if nobody can do it."""
+# The banners a manual sign-in prints when nobody is at a terminal (see
+# :func:`use_sign_in_watch`). The MCP server's submit_status looks for them to
+# report ``awaiting_sign_in``, so change them here only.
+AWAITING_SIGN_IN_BANNER = "Waiting for you to sign in in the browser window."
+SIGN_IN_DONE_BANNER = "Sign-in finished; continuing the submission."
+
+#: How long a watched manual sign-in waits before giving up, in seconds.
+MANUAL_SIGN_IN_TIMEOUT_SECONDS = 30 * 60
+#: Seconds between two looks at the page while watching a manual sign-in.
+_SIGN_IN_POLL_SECONDS = 2.0
+
+
+class _SignInWatch:
+    """How a manual sign-in is noticed when nobody can press Enter.
+
+    ``signal`` is a file whose appearance means "the author says they are signed
+    in" (the MCP server's ``submit_signed_in`` creates it); ``timeout`` caps the wait.
+    """
+
+    def __init__(self, signal: Path | None, timeout: float):
+        self.signal = signal
+        self.timeout = timeout
+
+
+_sign_in_watch: _SignInWatch | None = None
+
+
+@contextmanager
+def use_sign_in_watch(signal: str | Path | None = None, timeout: float = MANUAL_SIGN_IN_TIMEOUT_SECONDS):
+    """Let a manual sign-in proceed without a terminal while this block runs.
+
+    Without a watch, a manual sign-in waits for Enter in the terminal and, when
+    there is none, raises :class:`SignInRequired` (the CI behavior). With one, a
+    run without a terminal instead leaves the sign-in page open for the author,
+    watches it for a signed-in session, and also continues once ``signal``
+    exists. ``submit --manual-login`` and the MCP server's ``submit`` set it.
+    """
+    global _sign_in_watch
+    previous = _sign_in_watch
+    _sign_in_watch = _SignInWatch(Path(signal) if signal else None, timeout)
+    try:
+        yield
+    finally:
+        _sign_in_watch = previous
+
+
+def _stdin_is_terminal() -> bool:
+    import sys
+
+    try:
+        return sys.stdin is not None and sys.stdin.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
+def _watch_sign_in(name: str, watch: _SignInWatch, page, is_logged_in) -> bool:
+    """Wait for the author to sign in in the browser. True once they have.
+
+    Two positive looks in a row count as signed in, so a page caught between
+    redirects is not mistaken for the dashboard. False on timeout or a closed page.
+    """
+    import time
+
+    print(f"\n{AWAITING_SIGN_IN_BANNER}")
+    print(f"Sign in to {name} there; the submission continues by itself once you are signed in.", flush=True)
+    deadline = time.monotonic() + watch.timeout if watch.timeout else None
+    hits = 0
+    while deadline is None or time.monotonic() < deadline:
+        if watch.signal is not None and watch.signal.exists():
+            logger.info("Manual %s sign-in confirmed through %s", name, watch.signal)
+            break
+        if page is not None and page.is_closed():
+            logger.warning("The %s sign-in page was closed before the sign-in finished", name)
+            return False
+        signed_in = False
+        if is_logged_in is not None:
+            try:
+                signed_in = bool(is_logged_in(page, timeout_ms=1000))
+            except Exception as exc:  # noqa: BLE001 -- a page mid-navigation can raise anything
+                logger.debug("Sign-in check failed mid-navigation (%s)", exc)
+        hits = hits + 1 if signed_in else 0
+        if hits >= 2:
+            logger.info("Manual %s sign-in detected on the page", name)
+            break
+        if page is not None:
+            page.wait_for_timeout(int(_SIGN_IN_POLL_SECONDS * 1000))
+        else:
+            time.sleep(_SIGN_IN_POLL_SECONDS)
+    else:
+        return False
+    print(SIGN_IN_DONE_BANNER, flush=True)
+    return True
+
+
+def wait_for_manual_sign_in(name: str, slug: str, page=None, is_logged_in=None) -> None:
+    """Pause for a manual sign-in to ``name``; raise :class:`SignInRequired` if nobody can do it.
+
+    At a terminal, waits for Enter. Without one, and inside
+    :func:`use_sign_in_watch`, watches ``page`` with ``is_logged_in(page,
+    timeout_ms=...)`` (pass ``None`` for a portal whose check cannot tell a
+    half-finished sign-in apart, so only the watch's signal file continues).
+    """
+    watch = _sign_in_watch
+    if watch is not None and not _stdin_is_terminal():
+        if is_logged_in is None and watch.signal is None:
+            raise SignInRequired(f"auth_required: {name} cannot tell from the page when a sign-in has finished, and there is " f"no terminal to confirm it. Run 'paperpush submit' in a terminal, or 'paperpush login {slug}' first.")
+        if _watch_sign_in(name, watch, page, is_logged_in):
+            return
+        raise SignInRequired(f"auth_required: the manual sign-in to {name} did not finish (the wait ran out or the window was closed). " f"Run the submission again, or 'paperpush login {slug}' in a terminal so it can sign in by itself.")
     if not wait_for_human(f"Sign in to {name} in the browser window"):
         raise SignInRequired(
             f"auth_required: {name} needs a sign-in and there is no terminal to do it by hand "

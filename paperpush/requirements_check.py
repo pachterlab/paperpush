@@ -62,7 +62,7 @@ from .manuscript import headings as manuscript_headings
 from .manuscript import normalize_heading, pages_before_references, reference_count, section_word_counts, structured_abstract_labels, title_page_text, total_pages, total_words, words_before_references, words_excluding
 from .report import NOT_APPLICABLE, NOT_IMPLEMENTED
 from .requirements import ManuscriptRequirements, get_requirements, heading_aliases, resolve
-from .validate import BYTES_PER_MB, ERROR, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked, unchecked
+from .validate import BYTES_PER_MB, ERROR, WARNING, Checks, _accepts_name, Issue, NotApplicable, Outcome, Unchecked, unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -172,15 +172,14 @@ def _existing(paths: list[Path]) -> list[Path]:
 
 
 def _format_issues(field: Field, paths: list[Path], formats: list[str] | None, what: str) -> list[Issue]:
-    """WARN on a file whose extension the guidelines do not list.
+    """WARN on a file whose extension the guidelines do not list (a list read from guidelines can miss a format the portal takes).
 
     Skipped when the field declares its own ``accept`` list: the portal's rule
     is already enforced by the generic file check and would only be repeated.
     """
     if not formats or field.accept:
         return []
-    allowed = {f.lower() for f in formats}
-    return [Issue(WARNING, field.id, f"{p.name} has extension '{p.suffix}'; the {what} guidelines accept {', '.join(formats)}") for p in paths if p.suffix.lower() not in allowed]
+    return [Issue(WARNING, field.id, f"{p.name} has extension '{''.join(p.suffixes[-2:]) if p.name.lower().endswith('.tar.gz') else p.suffix}'; the {what} guidelines accept {', '.join(formats)}") for p in paths if not _accepts_name(p.name, formats)]
 
 
 def _size_issues(field: Field, paths: list[Path], limit_mb: float | None, what: str) -> list[Issue]:
@@ -354,7 +353,9 @@ def _heading_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> l
     required_sections = list(reqs.sections.required or [])
     # rigor.trial_registration covers this one: it applies only to trials and
     # looks for the registry ID itself, which a heading does not show.
-    required_statements = [s for s in (reqs.statements.required or []) if s != "clinical_trial_registration"]
+    # A declaration the submission system collects is not in the manuscript text.
+    in_form = set(reqs.statements.in_submission_form or [])
+    required_statements = [s for s in (reqs.statements.required or []) if s != "clinical_trial_registration" and s not in in_form]
     if not required_sections and not required_statements:
         return []
     found = manuscript_headings(path)
@@ -390,7 +391,7 @@ def _heading_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> l
                     body = _body_text(path)
                 if body and STATEMENT_IN_TEXT[name].search(body):
                     continue
-            label = _STATEMENT_LABELS.get(name, name.replace("_", " "))
+            label = statement_label(name)
             issues.append(Issue(WARNING, field.id, f"no {label} statement found in {path.name}; the author guidelines require one"))
     return issues
 
@@ -565,7 +566,7 @@ def _text_field_issues(venue: Venue, reqs: ManuscriptRequirements, values: dict[
         if rules.max_words is not None and field.word_count is None and words > rules.max_words:
             issues.append(Issue(ERROR, field.id, f"{field.label}: {words} words exceeds the {rules.max_words}-word limit in the author guidelines"))
         if rules.min_words is not None and words < rules.min_words:
-            issues.append(Issue(WARNING, field.id, f"{field.label}: {words} words is under the {rules.min_words}-word minimum in the author guidelines"))
+            issues.append(Issue(ERROR, field.id, f"{field.label}: {words} words is under the {rules.min_words}-word minimum in the author guidelines"))
         if rules.max_characters is not None and field.character_count is None and len(raw) > rules.max_characters:
             issues.append(Issue(ERROR, field.id, f"{field.label}: {len(raw)} characters exceeds the {rules.max_characters}-character limit in the author guidelines"))
         # abstract.structured and abstract.no_references: see front_matter_check.
@@ -700,18 +701,24 @@ def _reference_style_issues(field: Field, path: Path, reqs: ManuscriptRequiremen
     if text is None:
         return [unchecked(field.id, f"could not read {path.name} as text; its citation style was not checked")]
     body = manuscript.truncate_at_references(text)
-    bracket = _citation_groups(body, reference_count(path))
+    listed = reference_count(path)
+    bracket = _citation_groups(body, listed)
     author_year = _AUTHOR_YEAR_CITE.findall(body)
-    if len(bracket) < 3 and len(author_year) < 3:
+    # A short paper's few citations still tell its style when they are all of one
+    # kind and account for the whole reference list; otherwise a stray match (a
+    # "(Smith, 2020)" in a paper cited by superscript numbers) could decide it.
+    few = len(bracket) + len(author_year)
+    one_style = not (bracket and author_year)
+    if len(bracket) < 3 and len(author_year) < 3 and not (one_style and few and listed and few >= listed):
         if doc.is_tex and doc.pdf is None:
             return [unchecked(field.id, f"the citation style of {path.name} can only be read from a compiled PDF; install latexmk or pdflatex, or upload the PDF")]
         return [unchecked(field.id, f"found too few bracketed or author-year citations in {path.name} to tell its citation style (superscript citations cannot be told apart from other numbers in extracted text)")]
     style = "numbered" if len(bracket) >= 2 * len(author_year) else "author-year" if len(author_year) >= 2 * len(bracket) else "mixed"
     issues: list[Issue] = []
     if rules.numbered is True and style == "author-year":
-        issues.append(Issue(WARNING, field.id, f"{path.name} cites references author-year style ({len(author_year)} citations like '(Smith et al., 2020)'); the author guidelines ask for numbered citations"))
+        issues.append(Issue(WARNING, field.id, f"{path.name} cites references author-year style ({len(author_year)} citation{'s' if len(author_year) != 1 else ''} like '(Smith et al., 2020)'); the author guidelines ask for numbered citations"))
     elif rules.numbered is False and style == "numbered":
-        issues.append(Issue(WARNING, field.id, f"{path.name} cites references by number ({len(bracket)} citations like '[1]'); the author guidelines ask for author-year citations"))
+        issues.append(Issue(WARNING, field.id, f"{path.name} cites references by number ({len(bracket)} citation{'s' if len(bracket) != 1 else ''} like '[1]'); the author guidelines ask for author-year citations"))
     elif style == "mixed":
         issues.append(Issue(WARNING, field.id, f"{path.name} mixes numbered ({len(bracket)}) and author-year ({len(author_year)}) citations"))
     if style == "numbered" and (rules.numbered or _IN_ORDER.search(rules.style or "")):
@@ -823,7 +830,7 @@ def _title_page_file_issues(venue: Venue, values: dict[str, str]) -> list[Issue]
         raise NotApplicable("the form has no separate title-page upload")
     issues = []
     for field in fields:
-        if not values.get(field.id, "").strip():
+        if not field.required and not values.get(field.id, "").strip():
             issues.append(Issue(WARNING, field.id, f"{field.label} is empty; the author guidelines ask for the title page as a separate file"))
     return issues
 
@@ -842,19 +849,20 @@ HANDLED_RULES = frozenset(
         "manuscript.single_file", "manuscript.figures_placement", "manuscript.tables_placement", "manuscript.anonymized",
         "manuscript.template_required", "manuscript.latex_class", "manuscript.template_layout", "manuscript.language",
         "manuscript.thousands_separator", "manuscript.group_four_digit_numbers", "manuscript.et_al_period", "manuscript.serial_comma",
-        "title_page.required_items", "title_page.separate_file", "title_page.title_max_characters",
+        "manuscript.footnotes_allowed", "manuscript.max_heading_levels", "manuscript.forbidden_fonts",
+        "title_page.required_items", "title_page.separate_file", "title_page.own_page", "title_page.title_max_characters",
         "title_page.title_max_words", "title_page.running_title_max_characters",
         "abstract.max_words", "abstract.min_words", "abstract.max_characters", "abstract.structured",
         "abstract.structured_headings", "abstract.no_references", "abstract.no_abbreviations",
         "keywords.min", "keywords.max",
         "sections.required", "sections.order", "sections.combined_allowed", "sections.max_words",
-        "statements.required", "statements.ai_use_if_used", "statements.ai_use_locations", "statements.ai_use_cover_letter",
+        "statements.required", "statements.in_submission_form", "statements.not_in_manuscript", "statements.ai_use_if_used", "statements.ai_use_locations", "statements.ai_use_cover_letter",
         "statements.ai_copyediting_exempt", "statements.ai_authorship_prohibited",
         "figures.formats", "figures.min_dpi", "figures.min_dpi_line_art",
         "figures.max_file_size_mb", "figures.max_count", "figures.single_column_width_mm", "figures.double_column_width_mm",
         "figures.max_width_mm", "figures.max_height_mm", "figures.color_mode", "figures.min_font_size_pt",
         "figures.max_font_size_pt", "figures.font", "figures.legend_max_words", "figures.legends_location",
-        "figures.multipanel_labels", "figures.placement", "figures.print_grayscale",
+        "figures.multipanel_labels", "figures.placement", "figures.print_grayscale", "figures.embedded_forbidden", "figures.caption_label",
         "tables.formats", "tables.editable", "tables.max_count", "tables.placement",
         "supplementary.formats", "supplementary.max_file_size_mb", "supplementary.max_count", "supplementary.combined_single_pdf", "supplementary.max_pages",
         "references.style", "references.numbered", "references.max_count", "references.include_titles",
@@ -956,6 +964,7 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     run("guidelines.ai_policy", "Use of generative AI disclosed where the guidelines ask, and no AI tool listed as an author", ai_policy.check, venue, reqs, values)
     run("guidelines.title_page", "Title page carries the required items", _title_page_check, checks, venue, reqs, values)
     run("guidelines.title_page_file", "Title page uploaded as a separate file", _title_page_file_check, venue, reqs, values)
+    run("guidelines.title_page_own_page", "Title page on a page of its own, before the abstract", _title_page_own_page_check, venue, reqs, values)
     run("guidelines.reference_count", "Reference count within the limit", _reference_count_check, venue, reqs, values)
     run("guidelines.reference_style", "Citation style matches the guidelines (numbered or author-year)", _reference_style_check, venue, reqs, values)
     run("guidelines.reference_list", "Reference entries follow the guidelines' rules on DOIs, preprints, and unpublished work", _reference_list_check, venue, reqs, values)
@@ -1050,9 +1059,40 @@ def _section_part(field: Field, path: Path, reqs: ManuscriptRequirements) -> lis
     return _heading_issues(field, path, replace(reqs, statements=replace(reqs.statements, required=None)))
 
 
-def _statements_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
-    _need(reqs.statements.required, "the guidelines require no particular statements")
-    return _per_manuscript(venue, values, lambda f, p: _heading_issues(f, p, replace(reqs, sections=replace(reqs.sections, required=None))))
+def statement_label(name: str) -> str:
+    """How a statement id reads in a message ("competing interests", "AI-use")."""
+    return _STATEMENT_LABELS.get(name, name.replace("_", " "))
+
+
+def _forbidden_statement_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> list[Issue]:
+    """WARN on a heading for a declaration the guidelines keep out of the manuscript file."""
+    found = manuscript_headings(path)
+    if found is None:
+        return [unchecked(field.id, f"could not read {path.name} as text; whether it carries declarations that belong only in the submission system was not checked")]
+    aliases = heading_aliases("statements")
+    issues: list[Issue] = []
+    for name in reqs.statements.not_in_manuscript or []:
+        wordings = set(aliases.get(name, [name.replace("_", " ")]))
+        heading = next((h for h in found if h in wordings or any(re.fullmatch(rf"(?:\d+\W*)?{re.escape(w)}", h) for w in wordings)), None)
+        if heading:
+            issues.append(Issue(WARNING, field.id, f"{path.name} has a '{heading.title()}' section; the author guidelines say the {statement_label(name)} statement goes only in the submission system, not in the manuscript file"))
+    return issues
+
+
+def _statements_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]):
+    in_form = list(reqs.statements.in_submission_form or [])
+    forbidden = list(reqs.statements.not_in_manuscript or [])
+    _need(reqs.statements.required or in_form or forbidden, "the guidelines require no particular statements")
+    in_text = [s for s in reqs.statements.required or [] if s not in in_form]
+    issues = _per_manuscript(venue, values, lambda f, p: _heading_issues(f, p, replace(reqs, sections=replace(reqs.sections, required=None)))) if in_text else []
+    if forbidden:
+        extra = _per_manuscript(venue, values, _forbidden_statement_issues, reqs)
+        issues = (issues.issues if isinstance(issues, Outcome) else list(issues)) + (extra.issues if isinstance(extra, Outcome) else list(extra))
+    if not in_form:
+        return issues
+    issues = issues.issues if isinstance(issues, Outcome) else issues
+    labels = ", ".join(statement_label(s) for s in in_form)
+    return Outcome(issues, detail=f"the venue collects these through its submission system, not in the manuscript, so they were not looked for: {labels}; have them ready when you submit")
 
 
 def _section_order_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]):
@@ -1114,6 +1154,71 @@ def _title_page_check(checks: Checks, venue: Venue, reqs: ManuscriptRequirements
 def _title_page_file_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:
     _need(reqs.title_page.separate_file, "the guidelines do not ask for a separate title page")
     return _title_page_file_issues(venue, values)
+
+
+def _title_page_own_page_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]):
+    _need(reqs.title_page.own_page, "the guidelines do not ask for the title page on a page of its own")
+    uploaded = [p for f in venue.fields if "title_page" in f.id and f.type in ("file", "filelist") for p in _existing(_paths(f, values))]
+    _need(not uploaded, "the title page is uploaded as a separate file")
+    return _per_manuscript(venue, values, _title_page_own_page_issues)
+
+
+# What follows the title page: an abstract heading or label, else the first
+# section heading. A line of its own, or a label ending in a colon or period.
+_AFTER_TITLE_PAGE = re.compile(r"^[ \t]*(?:#+[ \t]*)?(?:\d+\.?[ \t]*)?(?:abstract|summary|introduction|background)\b[ \t]*(?:[:.\u2014-]|$)", re.IGNORECASE | re.MULTILINE)
+_W_PARAGRAPH = re.compile(r"<w:p\b.*?</w:p>", re.DOTALL)
+_W_RUN_TEXT = re.compile(r"<w:t(?:\s[^>]*)?>([^<]*)</w:t>")
+# A page break, a rendered page boundary, or a section break that starts a new
+# page (a w:sectPr inside a paragraph ends a section; nextPage is the default).
+_W_PAGE_BREAK = re.compile(r'<w:br\b[^>]*w:type="page"|<w:lastRenderedPageBreak/>|<w:pageBreakBefore(?:\s+w:val="(?:1|true|on)")?\s*/>')
+_W_SECTION_BREAK = re.compile(r"<w:sectPr\b[^>]*/>|<w:sectPr\b.*?</w:sectPr>", re.DOTALL)
+_W_CONTINUOUS = re.compile(r'<w:type\s+w:val="(?:continuous|nextColumn)"')
+
+
+def _docx_section_breaks_page(para: str) -> bool:
+    return any(not _W_CONTINUOUS.search(m.group(0)) for m in _W_SECTION_BREAK.finditer(para))
+
+
+def _title_page_own_page_issues(field: Field, path: Path) -> list[Issue]:
+    """WARN when the abstract (or first section) starts on the title page."""
+    from . import document
+
+    doc = document.get(path)
+    message = f"{field.label}: the abstract starts on the same page as the title in {path.name}; the author guidelines ask for the title page on a page of its own (put a page break before the abstract, or upload the title page separately)"
+    if doc.is_docx:
+        xml = doc.docx_part("word/document.xml")
+        if xml is None:
+            return [unchecked(field.id, f"could not read {path.name} as a Word file; whether the title page is a page of its own was not checked")]
+        broke = False
+        seen_text = False
+        for para in _W_PARAGRAPH.findall(xml):
+            text = "".join(_W_RUN_TEXT.findall(para)).strip()
+            first = para.find("<w:t")
+            before_text = para if first < 0 else para[:first]
+            if text and _AFTER_TITLE_PAGE.match(text):
+                if not seen_text:
+                    return [unchecked(field.id, f"{path.name} opens with its abstract or first section, with no title page before it; whether the title page is a page of its own was not checked")]
+                return [] if broke or _W_PAGE_BREAK.search(before_text) else [Issue(WARNING, field.id, message)]
+            seen_text = seen_text or bool(text)
+            if _W_PAGE_BREAK.search(para) or _docx_section_breaks_page(para):
+                broke = broke or seen_text
+        return [unchecked(field.id, f"no abstract or first section heading found in {path.name}; whether the title page is a page of its own was not checked")]
+    if doc.is_markdown or doc.suffix == ".txt":
+        raise NotApplicable(f"{path.name} has no fixed pages")
+    pages = doc.page_texts
+    if pages is None:
+        reason = "compiling the LaTeX source needs latexmk or pdflatex" if doc.is_tex else f"could not read the pages of {path.name}"
+        return [unchecked(field.id, f"{reason}; whether the title page is a page of its own was not checked")]
+    for number, page in enumerate(pages):
+        m = _AFTER_TITLE_PAGE.search(page)
+        if m is None:
+            continue
+        if number > 0:
+            return Outcome([], detail=f"the abstract or first section starts on page {number + 1}")
+        if not page[: m.start()].strip():
+            return [unchecked(field.id, f"{path.name} opens with its abstract or first section, with no title page before it; whether the title page is a page of its own was not checked")]
+        return [Issue(WARNING, field.id, message)]
+    return [unchecked(field.id, f"no abstract or first section heading found in {path.name}; whether the title page is a page of its own was not checked")]
 
 
 def _reference_count_check(venue: Venue, reqs: ManuscriptRequirements, values: dict[str, str]) -> list[Issue]:

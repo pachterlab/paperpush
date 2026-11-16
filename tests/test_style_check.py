@@ -396,7 +396,7 @@ def test_acronyms_read_as_main_text_when_there_is_no_introduction(tmp_path):
     doc = tmp_path / "ms.md"
     doc.write_text("# A title\n\n## Abstract\n\nWe trained a model on mice.\n\n## Materials and methods\n\nWe used a hidden Markov model (HMM) on the mice here.\n")
     status, message, _ = _run(doc)[0]["prose.acronyms"]
-    assert status == report.WARNING and "'HMM'" in message
+    assert status == report.SUGGESTION and "'HMM'" in message
 
 
 def test_full_term_written_out_before_the_acronym_is_defined():

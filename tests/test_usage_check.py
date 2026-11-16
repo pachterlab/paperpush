@@ -153,14 +153,14 @@ def test_usage_check(tmp_path):
 def test_spelling_variant_mixed(tmp_path):
     doc = _md(tmp_path, "The colour of the tumor and the color of the tumour.")
     status, message, _ = _run(doc)["prose.spelling_variant"]
-    assert status == report.WARNING and "mixes American" in message
+    assert status == report.SUGGESTION and "mixes American" in message
 
 
 def test_spelling_variant_against_the_authors_location(tmp_path):
     doc = _md(tmp_path, "The colour of the tumours was analysed in the centre.")
     us = "Ada Lovelace | ada@example.edu | Stanford University, Stanford, CA 94305, USA |  | yes"
     status, message, _ = _run(doc, authors=us)["prose.spelling_variant"]
-    assert status == report.WARNING and "affiliation is in the US" in message
+    assert status == report.SUGGESTION and "affiliation is in the US" in message
     uk = "Ada Lovelace | ada@example.ac.uk | University of Oxford, Oxford, UK |  | yes"
     assert _run(doc, authors=uk)["prose.spelling_variant"][0] == report.PASSED
     assert _run(doc)["prose.spelling_variant"][0] == report.PASSED  # no authors: nothing to compare with

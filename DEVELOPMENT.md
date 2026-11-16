@@ -17,11 +17,15 @@ pip install -e .[dev]
   - when you create a branch, you will continue down that path until you click `next`, at which point you will enter the next switch statement. 
   - you can end a branch to return back to the upper level
 - `optional block`: a toggle that wraps code in an "optional" comment
+- `comment`: add a comment at the end of the selected (or last recorded) line, e.g. `line_of_code  # COMMENT`
 - `dropdown choices`: click on an expanded dropdown list to copy all options as a comment
   - does not work unless the dropdown list is expanded (i.e., options are displayed on the screen)
 - `variable`: replace a highlighted snippet with a variable inserted at the top of the script. 
   - great for replacing placeholder values with their variable name from the subfile 
 - `HTML`: grab the HTML for a specific element, or copy for the entire page. 
+- `load`: load a python file saved earlier with `Save Code` and play it in a new tab
+  - replaces the current script (undo brings it back); keep recording to add to it
+  - only code codegen wrote can be loaded, not hand-edited logic such as `if` blocks or loops
 
 `paperpush codegen` usage:
 
@@ -38,12 +42,13 @@ The toolbar (drag it by its grip; the code panel shows below it):
 | Record | start/stop recording (off: your clicks are not recorded) |
 | Play / Pause / Stop | replay the script in a new tab of the same context; with `--sub`, bound variables replay the `.sub` values |
 | Undo / Redo | undo or redo the last change to the script (not to the page) |
-| Branch / Next / End | record a choice between paths, such as a question's options: press Branch, record the first option's actions, press Next before each further option, press End after the last, then carry on (e.g. click Continue) |
+| Branch / Next / End | record a choice between paths, such as a question's options: press Branch, record the first option's actions, press Next before each further option, press End after the last, then carry on (e.g. click Continue). Branch inside a branch nests one (also before the path has any action); the button shows how many are open, `Branch (2)`, and Next/End act on the innermost |
 | Optional | toggle: press to start an optional section (`# ---OPTIONAL---`), press again to end it (`# ---END OPTIONAL---`) |
+| Comment | add a comment at the end of the selected line, else the line recorded last (`line_of_code  # comment`); leave it empty to remove it |
 | Dropdown Choices | pick a dropdown, list or radio group: its choices go into the code as a comment (`# Options of "Article type" (3):`), to bind or branch on later |
 | Variable | replace the selected line's value with a variable (`values.get(...)`), or rename the selected branch |
 | HTML / Copy Page HTML | copy one picked element's HTML, or the page's HTML (all frames) |
-| Code / Copy Code / Save Code | show or hide the code panel; copy the code; save it to a file (asks for the path, default `-o` or `paperpush_codegen.py`) |
+| Copy Code / Save Code | copy the code; save it to a file (asks for the path, default `-o` or `paperpush_codegen.py`). The buttons in the code panel's top-left corner hide/show the code (`▾ Hide code` / `▸ Show code`) and move it to a separate window and back (`⧉ Window` / `⧈ Embed`) |
 
 A branch renders as a `match` on its variable, one `case` per path keyed by the
 element's label, so a run takes the path its `.sub` value names:

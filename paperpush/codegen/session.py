@@ -9,9 +9,15 @@ the new state back to every page (``window.__ppSetState``). Playwright's sync
 API dispatches events only while a call is waiting, so the loop waits on the
 page in short slices.
 
+The code panel can also live in a separate window (the toolbar's code
+panel has a toggle in its top-left corner): a page in a browser context of its
+own, so nothing done there is recorded, showing the same panel through the same
+script.
+
 Play replays the script in a new tab of the same context, so a saved sign-in
 carries over. At a branch it takes the path the ``.sub`` value of the branch's
-variable names, else the path recorded last.
+variable names, else the path recorded last. Load reads code saved earlier
+(either target) back into the script and plays it.
 """
 
 from __future__ import annotations
@@ -25,10 +31,11 @@ import subprocess  # nosec B404 -- only to hand text to the platform's clipboard
 import sys
 import time
 from collections import deque
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
-from .model import Node, Rendered, Script, apply_locator, choose_path, render, suggest_branch_name, suggest_variable
+from .model import Node, Rendered, Script, apply_locator, choose_path, parse_code, render, suggest_branch_name, suggest_variable
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +46,7 @@ NAVIGATION_QUIET_SECONDS = 8.0
 #: How long each replayed action may take.
 REPLAY_TIMEOUT_MS = 15000
 #: Toolbar commands that change the script, refused while a replay runs.
-EDIT_COMMANDS = {"record", "undo", "redo", "branch", "nextpath", "endbranch", "optional", "step", "variable", "editline"}
+EDIT_COMMANDS = {"load", "record", "undo", "redo", "branch", "nextpath", "endbranch", "optional", "step", "variable", "comment", "editline"}
 #: What the toolbar's pick mode is for: copying an element's HTML, or noting a dropdown's options.
 PICK_PURPOSES = ("html", "options")
 
@@ -50,6 +57,10 @@ _FRAME_SELECTOR_JS = """(el) => {
   if (el.name) return `${el.localName}[name='${CSS.escape(el.name)}']`;
   return el.localName;
 }"""
+
+#: Where the separate code window's page is served from (routed, never fetched).
+CODE_WINDOW_URL = "http://paperpush-codegen.invalid/code"
+_CODE_WINDOW_HTML = '<!doctype html><meta charset="utf-8"><title>paperpush codegen: code</title><body style="margin:0;background:#0d1117">'
 
 _HOST_TAG = re.compile(r"<paperpush-codegen\b[^>]*>\s*</paperpush-codegen>")
 
@@ -121,8 +132,11 @@ class CodegenSession:
         self.selected: int | None = None
         self.message = ""
         self.save_path = str(self.output) if self.output else "paperpush_codegen.py"
+        #: Values declared by loaded code (the python target's ``values`` dict); the .sub's win.
+        self.loaded_values: dict[str, Any] = {}
         self.last_event: dict[str, float] = {}
         self.context = None
+        self.code_window = None  # the separate code window's page, while it is open
         self._dirty = True
 
     # ------------------------------------------------------------------ run
@@ -213,6 +227,9 @@ class CodegenSession:
             self.on_navigation(page, frame)
         elif kind == "dialog":
             self.on_dialog(page, payload)
+        elif kind == "codeclosed":
+            if page is self.code_window:  # the author closed the window itself
+                self.close_code_window()
 
     def _register_page(self, page, name: str) -> None:
         self.pages[page] = name
@@ -407,7 +424,12 @@ class CodegenSession:
             except ValueError as exc:
                 self.message = f"{str(exc)[0].upper()}{str(exc)[1:]}."
                 return
-            self.message = f"Branch {branch}: record the first option's actions, press Next before each further option, and End before the action that follows the choice."
+            stack = self.script.branch_stack()
+            if len(stack) > 1:
+                outer = self.script.nodes[stack[-2]].value
+                self.message = f"Branch {branch} (level {len(stack)}), nested in {outer}: record its first option's actions, press Next before each further option, and End to go back to {outer}."
+            else:
+                self.message = f"Branch {branch}: record the first option's actions, press Next before each further option, and End before the action that follows the choice."
         elif name == "nextpath":
             branch = self.script.open_branch()
             if branch is None:
@@ -421,7 +443,9 @@ class CodegenSession:
             branch = self.script.open_branch()
             if self.script.exit_branch():
                 paths = len(self.script.branch_paths(branch))
-                self.message = f"Ended {self.script.nodes[branch].value} with {paths} path{'s' if paths != 1 else ''}."
+                outer = self.script.open_branch()
+                back = f"; back in {self.script.nodes[outer].value}" if outer is not None else ""
+                self.message = f"Ended {self.script.nodes[branch].value} with {paths} path{'s' if paths != 1 else ''}{back}."
             else:
                 self.message = "Not in a branch."
         elif name == "optional":
@@ -435,6 +459,8 @@ class CodegenSession:
                 self.script.add_step(label)
         elif name == "variable":
             self.on_variable(cmd)
+        elif name == "comment":
+            self.on_comment(cmd)
         elif name == "editline":
             try:
                 self.message = self.script.edit_line(str(cmd.get("kind")), int(cmd.get("index")), str(cmd.get("text") or ""))
@@ -451,6 +477,20 @@ class CodegenSession:
             self.copy(self.page_html(page), "the page HTML")
         elif name == "save":
             self.save(str(cmd.get("path") or ""))
+        elif name == "load":
+            self.load(str(cmd.get("path") or ""))
+        elif name == "codewindow":
+            if self.code_window is None:
+                self.open_code_window()
+            else:
+                self.close_code_window()
+                self.message = "The code is back in this window."
+        elif name == "focuscode":
+            if self.code_window is not None:
+                try:
+                    self.code_window.bring_to_front()
+                except Exception:  # closed meanwhile
+                    self.close_code_window()
         elif name == "pick":
             self.picking = cmd.get("purpose") if cmd.get("purpose") in PICK_PURPOSES else "html"
             self.message = ""
@@ -467,6 +507,10 @@ class CodegenSession:
                 return
             found = cmd.get("options") or {}
             options = [str(o) for o in found.get("options") or [] if str(o).strip()]
+            if not options and found.get("unloaded"):
+                what = f"{found.get('label')!r}" if found.get("label") else "This dropdown"
+                self.message = f"{what} has no options loaded yet: open it (or type in its search box) so its choices show, then pick it again."
+                return
             if not options:
                 self.message = "That element has no options to list: pick a dropdown, a list, or a radio button (open a custom dropdown first)."
                 return
@@ -474,6 +518,47 @@ class CodegenSession:
             self.message = f"Noted {len(options)} options of {node.label!r}." if node.label else f"Noted {len(options)} options."
         else:
             self.copy(str(cmd.get("html") or ""), "the element's HTML")
+
+    # --------------------------------------------------------- code window
+    def open_code_window(self) -> None:
+        """Show the code panel in a window of its own (a separate browser context, so nothing there is recorded)."""
+        try:
+            context = self.context.browser.new_context(no_viewport=True)
+        except Exception as exc:
+            self.message = f"Could not open the code window: {_first_line(exc)}"
+            return
+        try:
+            context.expose_binding("__ppCommand", lambda source, cmd: self.queue.append(("cmd", source.get("page"), source.get("frame"), cmd)))
+            context.add_init_script(script="window.__ppCodeWindow = true;")
+            context.add_init_script(script=RECORDER_JS.read_text(encoding="utf-8"))
+            context.route(CODE_WINDOW_URL, lambda route: route.fulfill(status=200, content_type="text/html", body=_CODE_WINDOW_HTML))
+            page = context.new_page()
+            self._size_window(context, page, 720, 900)
+            page.on("close", lambda p: self.queue.append(("codeclosed", p, None, None)))
+            page.goto(CODE_WINDOW_URL)
+        except Exception as exc:
+            self.message = f"Could not open the code window: {_first_line(exc)}"
+            with suppress(Exception):
+                context.close()
+            return
+        self.code_window = page
+        self.message = "The code is in its own window; press ⧈ Embed there (or close it) to bring it back."
+
+    @staticmethod
+    def _size_window(context, page, width: int, height: int) -> None:
+        with suppress(Exception):
+            cdp = context.new_cdp_session(page)
+            window = cdp.send("Browser.getWindowForTarget")["windowId"]
+            cdp.send("Browser.setWindowBounds", {"windowId": window, "bounds": {"width": width, "height": height}})
+            cdp.detach()
+
+    def close_code_window(self) -> None:
+        """Close the code window (if open); the code shows in the toolbar again."""
+        page, self.code_window = self.code_window, None
+        self._dirty = True
+        if page is not None:
+            with suppress(Exception):
+                page.context.close()
 
     def save(self, path: str) -> None:
         """Write the code to ``path`` (relative to where codegen was started); it becomes the next default."""
@@ -490,6 +575,33 @@ class CodegenSession:
             return
         self.save_path = path
         self.message = f"Saved the code to {target.resolve()}."
+
+    def load(self, path: str, *, play: bool = True) -> bool:
+        """Replace the script with the code saved at ``path`` (one undo step) and, with ``play``, replay it."""
+        path = path.strip()
+        if not path:
+            self.message = "Give the path of the code to load."
+            return False
+        source = Path(path).expanduser()
+        try:
+            loaded = parse_code(source.read_text(encoding="utf-8"))
+        except OSError as exc:
+            self.message = f"Could not read {source}: {exc.strerror or exc}"
+            return False
+        except ValueError as exc:
+            self.message = f"Could not load {source.name}: {exc}"
+            return False
+        self.script.replace(loaded.nodes)
+        self.loaded_values = loaded.values
+        self.selected = None
+        self.save_path = path
+        missing = sorted({n.var for n in loaded.nodes if n.var and n.value in (None, "", []) and not self.sub_values.get(n.var)})
+        actions = sum(1 for n in loaded.nodes if n.kind not in ("step", "branch", "next_path", "end_branch", "comment", "optional", "end_optional"))
+        note = f" No value for {', '.join(missing)} (give a .sub with --sub)." if missing else ""
+        self.message = f"Loaded {actions} action{'s' if actions != 1 else ''} from {source.name}.{note}"
+        if play:
+            self.play_requested = True
+        return True
 
     def variable_index(self, requested: Any) -> int | None:
         """The line the Variable button acts on: the selected one, else the latest that has something to name."""
@@ -520,6 +632,25 @@ class CodegenSession:
         more = f" (and {len(changed) - 1} more)" if len(changed) > 1 else ""
         self.message = f"Line now uses {var}{more}." if var else "Put the recorded value back."
 
+    def note_index(self, requested: Any = None) -> int | None:
+        """The action the Comment button annotates: the selected line's (or the one before it), else the latest."""
+        if not (isinstance(requested, int) and 0 <= requested < len(self.script.nodes)):
+            requested = self.selected if self.selected is not None and self.selected < len(self.script.nodes) else None
+        return self.script.note_target(requested)
+
+    def on_comment(self, cmd: dict) -> None:
+        index = self.note_index(cmd.get("index"))
+        if index is None:
+            self.message = "Nothing to comment on yet: record an action first."
+            return
+        try:
+            self.script.set_note(index, str(cmd.get("text") or ""))
+        except ValueError as exc:
+            self.message = str(exc)
+            return
+        node = self.script.nodes[index]
+        self.message = f"Comment added to '{node.summary()}'." if node.note else f"Comment removed from '{node.summary()}'."
+
     def copy(self, text: str, what: str) -> None:
         if self.clipboard(text):
             self.message = f"Copied {what} ({len(text):,} characters)."
@@ -543,23 +674,34 @@ class CodegenSession:
 
     # -------------------------------------------------------------- replay
     def replay_plan(self) -> list[int]:
-        """The node indices a replay runs: everything outside branches, and one path per branch."""
+        """The node indices a replay runs: everything outside branches, and one path per branch (nested ones too)."""
         plan: list[int] = []
-        chosen: int | None = None
-        in_branch = False
+        # One entry per open branch: [the path the replay takes, the path being walked].
+        stack: list[list[int | None]] = []
+
+        def on_chosen_paths() -> bool:
+            return all(chosen == current for chosen, current in stack)
+
         for i, node in enumerate(self.script.nodes):
+            if stack and node.option is not None:
+                stack[-1][1] = i  # this node starts a path of the innermost branch
             if node.kind == "branch":
-                in_branch = True
-                chosen = choose_path(self.script, i, self.sub_values.get(node.value))
+                value = self.sub_values.get(node.value) or self.loaded_values.get(node.value)
+                chosen = choose_path(self.script, i, value) if on_chosen_paths() else None
+                stack.append([chosen, None])
                 continue
             if node.kind == "end_branch":
-                in_branch = False
+                if stack:
+                    stack.pop()
                 continue
-            if node.kind in ("step", "comment", "next_path", "optional", "end_optional"):
+            if node.kind == "next_path":
+                if stack:
+                    stack[-1][1] = None
                 continue
-            if in_branch and self.script.path_head(i) != chosen:
+            if node.kind in ("step", "comment", "optional", "end_optional"):
                 continue
-            plan.append(i)
+            if on_chosen_paths():
+                plan.append(i)
         return plan
 
     def replay(self) -> None:
@@ -571,7 +713,7 @@ class CodegenSession:
         self.replay_pages.add(page)
         page.set_default_timeout(REPLAY_TIMEOUT_MS)
         pages = {"page": page}
-        self.message = "Playing in a new tab..."
+        self.message = f"{self.message} Playing in a new tab..." if self.message.startswith("Loaded ") else "Playing in a new tab..."
         self._dirty = True
         current = None
         try:
@@ -703,6 +845,7 @@ class CodegenSession:
             "pathOpen": self.script.path_open(),
             "optional": self.script.optional_open(),
             "branch": self.script.nodes[self.script.open_branch()].value if self.script.depth else "",
+            "branches": [self.script.nodes[i].value for i in self.script.branch_stack()],
             "can_undo": self.script.can_undo,
             "can_redo": self.script.can_redo,
             "lines": rendered.lines,
@@ -711,10 +854,19 @@ class CodegenSession:
             "selected": selected,
             "variable": variable,
             "variableIndex": var_index,
+            "comment": self._comment_state(),
             "message": self.message,
             "fields": self.fields,
             "savePath": self.save_path,
+            "codeWindow": self.code_window is not None,
         }
+
+    def _comment_state(self) -> dict | None:
+        index = self.note_index()
+        if index is None:
+            return None
+        node = self.script.nodes[index]
+        return {"index": index, "current": node.note or "", "what": node.summary()}
 
     def push_state(self) -> None:
         full = self.state()
@@ -730,3 +882,8 @@ class CodegenSession:
                     frame.evaluate("s => window.__ppSetState && window.__ppSetState(s)", payload)
                 except Exception:  # navigating or detached; it says hello when it loads
                     pass
+        if self.code_window is not None and not self.code_window.is_closed():
+            try:
+                self.code_window.evaluate("s => window.__ppSetState && window.__ppSetState(s)", full)
+            except Exception:  # still loading; it says hello when it loads
+                pass

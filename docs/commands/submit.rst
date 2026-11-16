@@ -37,7 +37,8 @@ saved browser session across runs where possible.
 Before you run it, make sure you have:
 
 1. A filled ``.sub`` file that passes :doc:`validate`.
-2. Stored credentials for the venue (:doc:`login`).
+2. Stored credentials for the venue (:doc:`login`), or ``--manual-login`` to
+   sign in by hand in the browser window instead.
 
 .. _submit-validation:
 
@@ -78,6 +79,17 @@ Options
    Open the Playwright Inspector at the first step so you can step through the
    submission wizard one action at a time. Reuses a saved session from an
    earlier run to skip sign-in.
+
+``--manual-login``
+   Sign in by hand in the browser window instead of with credentials stored by
+   :doc:`login`. ``submit`` skips the login prompt, opens the portal's sign-in
+   page when it needs one, and waits there. In a terminal, press Enter once
+   you are signed in. With no terminal (an AI agent, or ``!`` in Claude Code),
+   the run watches the page and carries on by itself once it shows you are
+   signed in, giving up after 30 minutes. A saved session or stored
+   credentials are still used first when they work, and the session is saved
+   afterwards so the next run can skip the sign-in. Cannot be combined with
+   ``--headless``. Over MCP, pass ``manual_login=true`` to ``submit``.
 
 ``--new-session``
    Discard any saved browser session and sign in fresh. Use this after

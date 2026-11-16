@@ -787,7 +787,11 @@
     "manuscript": {
       "formats": [
         ".tex",
-        ".pdf"
+        ".pdf",
+        ".zip",
+        ".tar",
+        ".tar.gz",
+        ".tgz"
       ],
       "single_file": true,
       "notes": [
@@ -12593,7 +12597,7 @@
       "https://journals.plos.org/plosone/s/latex",
       "https://journals.plos.org/plosone/s/what-we-publish"
     ],
-    "retrieved": "2026-11-04",
+    "retrieved": "2026-11-15",
     "article_type_field": "article_type",
     "notes": [
       "LaTeX authors should use the PLOS LaTeX template (Overleaf-compatible, includes a BibTeX style file); a submission that does not follow the template format may be sent back for revisions.",
@@ -12617,22 +12621,26 @@
       "tables_placement": "inline",
       "language": "English",
       "initial_submission_any_format": "PLOS ONE waives all formatting requirements until the manuscript has received a provisional Editorial Accept decision.",
+      "footnotes_allowed": false,
+      "max_heading_levels": 3,
+      "forbidden_fonts": [
+        "Symbol"
+      ],
       "notes": [
         "Manuscript files can be DOC, DOCX, or RTF; LaTeX manuscripts must be submitted as PDFs.",
         "Microsoft Word documents must not be locked or protected.",
         "Manuscripts can be any length; there are no restrictions on word count, number of figures, or amount of supporting information.",
-        "Use a standard font size and any standard font except the font named 'Symbol'.",
-        "Limit sections and sub-sections to 3 heading levels.",
         "Do not format text in multiple columns.",
         "Use continuous line numbers (do not restart numbering on each page).",
-        "Footnotes are not permitted.",
         "Define abbreviations at first appearance; do not use non-standard abbreviations unless they appear at least three times.",
-        "The figures page states that PLOS ONE waives all formatting requirements until a provisional Editorial Accept decision."
+        "The figures page states that PLOS ONE waives all formatting requirements until a provisional Editorial Accept decision.",
+        "Use a standard font size and a standard font."
       ]
     },
     "title_page": {
       "required_items": [
         "title",
+        "running_title",
         "authors",
         "affiliations",
         "corresponding_author",
@@ -12693,9 +12701,18 @@
         "clinical_trial_registration",
         "reporting_guidelines"
       ],
+      "in_submission_form": [
+        "funding",
+        "competing_interests",
+        "data_availability",
+        "author_contributions"
+      ],
+      "not_in_manuscript": [
+        "funding",
+        "competing_interests"
+      ],
       "notes": [
         "Do not include funding sources in the Acknowledgments or anywhere else in the manuscript file; funding is entered in the Financial Disclosure section of the submission form.",
-        "Competing interests are declared in the submission system, not in the manuscript file.",
         "The Data Availability Statement is entered in the submission form; accession numbers or DOIs should also be cited where the data set is mentioned in the manuscript.",
         "Methods sections of human-subjects research must include an ethics statement naming the approving IRB/committee and whether consent was written or oral.",
         "Animal research must state in Methods the full name of the approving ethics committee and the permit number(s).",
@@ -12723,13 +12740,16 @@
       "font": "Arial, Times, or Symbol only",
       "multipanel_labels": "lettered panel labels, e.g. (A) or (a)",
       "placement": "separate_files",
+      "legends_location": "with_figure",
+      "embedded_forbidden": true,
+      "caption_label": "Fig",
       "notes": [
         "Resolution must be 300-600 dpi.",
         "Width 789-2250 pixels at 300 dpi (6.68-19.05 cm); maximum height 2625 pixels at 300 dpi (22.23 cm).",
         "TIFF files must be flattened (no layers), have no alpha channels, use LZW compression, and not span multiple pages.",
-        "Each figure is uploaded as an individual file (Fig1.tif, Fig2.eps, ...); do not include figures in the main manuscript file.",
-        "Figure captions go in the manuscript text immediately after the paragraph where the figure is first cited, not in the figure file or a separate document.",
-        "Caption labels use 'Fig' (Fig 1, Fig 2); the caption title should be 15 words or fewer; legends are optional.",
+        "Name each figure file after its caption label (Fig1.tif, Fig2.eps, ...).",
+        "Each figure caption goes immediately after the paragraph where the figure is first cited, not in the figure file or a separate document.",
+        "The caption title should be 15 words or fewer; legends are optional.",
         "Cite figures in ascending numeric order at first appearance.",
         "Do not include author names, article title, or figure number/title/caption within figure files.",
         "PLOS does not accept vector EPS figures generated in LaTeX.",
@@ -19673,9 +19693,14 @@
       "https://libanswers.caltech.edu/faq/163217",
       "https://libanswers.caltech.edu/faq/240347",
       "https://libanswers.caltech.edu/faq/262131",
-      "https://libanswers.caltech.edu/faq/271978"
+      "https://libanswers.caltech.edu/faq/271978",
+      "https://libanswers.caltech.edu/faq/206864",
+      "https://libanswers.caltech.edu/faq/246167",
+      "https://libanswers.caltech.edu/faq/446288",
+      "https://libanswers.caltech.edu/faq/163218",
+      "https://caltechlibrary.github.io/RDMworkbook/data-sharing.html"
     ],
-    "retrieved": "2026-11-14",
+    "retrieved": "2026-11-15",
     "notes": [
       "CaltechDATA is for Caltech faculty, staff and students, and the research collaborations they belong to; uploading needs an access.caltech account.",
       "Any digital files or software may be deposited, of any type; publications belong in CaltechAUTHORS instead.",
@@ -19695,9 +19720,12 @@
       "The deposit must not contain viruses or other malware.",
       "Any deposit containing data from individuals, obtained through direct intervention or interaction or from private identifiable information, must be reviewed and approved by the appropriate Institutional Review Board.",
       "Deposits with unusable or obsolete file formats or inadequate description may be removed, and larger files may face higher standards for retention.",
-      "Uploaded files cannot be changed; embargoed files can be replaced with a new version through data@caltech.edu, and the embargo date and other metadata can be edited until the files become public.",
+      "Depositors can edit the metadata of their records; to change published files, use New Version to receive a new version DOI while the parent DOI points to the latest version, or contact data@caltech.edu to change files without creating a version.",
+      "Caltech Library recommends including a README that describes the files, their relationships, reuse requirements, and project context.",
+      "Test records must remain drafts; publishing generates a DOI that cannot be deleted. The repository provides a separate test system at https://data.caltechlibrary.dev.",
       "Withdrawn records are replaced by a tombstone page giving the reason, and their DOI and URL are retained.",
-      "Linking a GitHub account lets CaltechDATA preserve each software release of the chosen public repositories automatically, with a DOI for each version."
+      "Linking a GitHub account lets CaltechDATA preserve each software release of the chosen public repositories automatically, with a DOI for each version.",
+      "The web uploader observed on 2026-11-15 allows 50 files, 50 GB per file and 1000 GB total; the written FAQ permits 550 files per record. These are distinct portal and guideline limits."
     ]
   },
   "zenodo": {

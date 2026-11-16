@@ -183,6 +183,7 @@
           <button type="button" class="btn primary" id="validate-btn">Validate</button>
           <span class="ai-button-wrap" id="validate-ai-wrap" tabindex="0"><button type="button" class="btn" id="validate-ai-btn" disabled><span aria-hidden="true">✨</span> Validate, extended with AI</button></span>
           <span class="ai-button-wrap initial-wrap" id="initial-wrap" tabindex="0"><label class="initial-check"><input type="checkbox" id="initial-submission" disabled> initial submission (any format)</label></span>
+          <label class="initial-check" title="Also check the manuscript's text against published sources with Winston AI or Originality.ai when validating (your own API key; costs credits)"><input type="checkbox" id="plagiarism-check"> plagiarism scan</label>
           <span id="validate-status" role="status" class="small"></span>
         </div>
         <div class="stats" id="check-stats" hidden></div>
@@ -231,6 +232,26 @@
         <button type="button" class="btn primary" id="rec-run">Recommend</button>
       </div>
       <div id="rec-results"></div>
+    </form>
+  </dialog>
+
+  <dialog id="plagiarism-dialog">
+    <form method="dialog" class="dialog-inner" id="plagiarism-form" autocomplete="off">
+      <h2>Plagiarism scan</h2>
+      <p class="hint">While the box is ticked, Validate also sends the manuscript's text (without its reference list) to Winston AI or Originality.ai, which reports the share of it that matches other sources and lists every match. <strong>Each scan costs credits on your account with that service.</strong> Reaching the threshold is a warning, never an error.</p>
+      <div class="rec-grid">
+        <label class="rec-field"><span class="name">Service</span>
+          <select id="plag-provider" class="input"><option value="winston">Winston AI</option><option value="originality">Originality.ai</option></select></label>
+        <label class="rec-field"><span class="name">Warn at (% matching)</span><input type="number" id="plag-threshold" class="input" min="0" max="100" step="1" placeholder="20"></label>
+        <label class="rec-field rec-wide"><span class="name">API key</span><input type="password" id="plag-key" class="input mono" autocomplete="off" spellcheck="false" placeholder="Your Winston AI or Originality.ai API key"><span class="hint small" id="plag-key-note"></span></label>
+        <label class="rec-field rec-wide plag-remember"><input type="checkbox" id="plag-remember"> Remember this key on this device <span class="hint small">(otherwise it is forgotten when you close this tab)</span></label>
+        <label class="rec-field rec-wide"><span class="name">Sources that may match (optional)</span><textarea id="plag-accept" class="input mono" rows="3" placeholder="One per line: your own preprint or an earlier conference version, as a domain (biorxiv.org), a page, or a DOI"></textarea><span class="hint small">Still listed in the report, but they do not count toward the warning.</span></label>
+      </div>
+      <div class="dialog-actions">
+        <span id="plag-status" class="small muted" role="status"></span>
+        <button type="button" class="btn" id="plag-close">Cancel</button>
+        <button type="button" class="btn primary" id="plag-run">Turn on the scan</button>
+      </div>
     </form>
   </dialog>
 

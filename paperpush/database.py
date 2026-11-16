@@ -755,7 +755,30 @@ def default_form(slug: str) -> dict[str, Any]:
         {"id": "supplementary_files", "autofill": "filemap", "label": "Supplementary files", "type": "filelist", "help": "Optional. One supplementary file per line as 'path | label' (label optional)."},
         {"id": "cover_letter", "autofill": "filemap", "label": "Cover letter", "type": "file", "help": "Optional. Path to the cover letter."},
     ]
+    # Declarations the venue collects in its submission system rather than the
+    # manuscript: the .sub carries them so validate can check they are given.
+    if reqs is not None:
+        kept_out = set(reqs.statements.not_in_manuscript or [])
+        for statement in reqs.statements.in_submission_form or []:
+            spec = FORM_STATEMENT_FIELDS.get(statement)
+            if spec is None:
+                continue
+            where = "It goes in the submission form only; the author guidelines keep it out of the manuscript file." if statement in kept_out else "Entered in the submission form; copy it from the manuscript if the manuscript has one."
+            fields.append({"id": spec[0], "autofill": "extract", "label": spec[1], "type": "textarea", "required": spec[2], "help": f"{spec[3]} {where}"})
     return {"fields": fields}
+
+
+# The .sub field a validate-only venue's form gets for each declaration its
+# submission system collects (statements.in_submission_form): (field id, label,
+# required, help). The ids are the ones submit-supported forms use, so
+# consistency.statements and the autofill skill recognise them.
+FORM_STATEMENT_FIELDS: dict[str, tuple[str, str, bool, str]] = {
+    "funding": ("funding_statement", "Funding statement", True, "The sources of funding for the work, with grant numbers, or a statement that it had none (e.g. 'The author(s) received no specific funding for this work.')."),
+    "competing_interests": ("competing_interests", "Competing interests statement", True, "Every author's competing interests, or a statement that the authors have none (e.g. 'The authors have declared that no competing interests exist.')."),
+    "data_availability": ("data_availability", "Data availability statement", True, "Where the data underlying the results can be found (repository and accession numbers or DOIs), or why they cannot be shared."),
+    "code_availability": ("code_availability", "Code availability statement", False, "Optional. Where the code behind the analysis can be found."),
+    "ethics_statement": ("ethics_statement", "Ethics statement", False, "For research with human participants, animals, or field sites: the approving committee, the approval or permit number, and how consent was obtained."),
+}
 
 
 def _read_database(path: Path) -> dict[str, Any]:

@@ -26,6 +26,9 @@ The legends are checked against ``figures.legend_max_words`` and
 ``figures.legends_location`` (at the end of the manuscript, after the
 references, or with each figure).
 
+``citations.supplementary_attachments`` warns when the manuscript references
+supplementary material but the submission lists no supplementary uploads.
+
 ``citations.cross_references`` looks for cross-references that point at
 nothing, in the manuscript and the supplementary files:
 
@@ -611,10 +614,52 @@ def _cross_reference_check(venue: Venue, values: dict[str, str]) -> Outcome:
     return Outcome(issues, "" if issues else f"read {', '.join(read)}")
 
 
+_SUPPLEMENT_REFERENCE = re.compile(
+    r"\b(?:supplementary|supplemental|supporting)\s+(?:information|materials?|data|files?|methods?|results|appendi(?:x|ces)|text|notes?|videos?|movies?|datasets?|protocols?)\b(?:\s+S?\d{1,3}\b)?"
+    r"|\bS\d{1,3}\s+(?:fig(?:ure)?s?\.?|tables?|files?|texts?|videos?|movies?|datasets?)\b"
+    r"|\b(?:supplements?|additional\s+files?)\s+\d+\b"
+    r"|\b(?:see|in)\s+(?:the\s+)?(?:online\s+)?supplement\b(?:\s+\d+\b)?",
+    re.IGNORECASE,
+)
+
+
+def _supplementary_attachment_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    """A supplement mentioned in the manuscript needs an upload in the form.
+
+    Do not infer one file per numbered item: a single supplement can contain
+    all the supplementary figures, tables, and text. Missing paths already
+    named in the form are reported by the upload check.
+    """
+    from .manuscript import without_reference_list
+    from .requirements_check import manuscript_files
+
+    if _attached_count(venue, values, "supplementary"):
+        return Outcome([], "supplementary files listed")
+    files = manuscript_files(venue, values)
+    if not files:
+        raise NotApplicable("no manuscript file to read")
+    issues: list[Issue] = []
+    for field, path in files:
+        text = document.get(path).text
+        if text is None:
+            raise Unchecked(f"could not read {path.name} as text")
+        text = without_reference_list(text)
+        references = [m.text for m in mentions(text) if not m.caption and m.series.startswith(("supp_", "ed_"))]
+        references += [m.group() for m in _SUPPLEMENT_REFERENCE.finditer(text)]
+        examples = list(dict.fromkeys(" ".join(ref.split()) for ref in references))[:5]
+        if examples:
+            quoted = ", ".join(f"“{ref}”" for ref in examples)
+            issues.append(Issue(WARNING, field.id, f"{path.name}: manuscript references supplementary material ({quoted}), but no supplementary files are attached; add the referenced supplement to the submission's supplementary-file field"))
+    if not issues:
+        raise NotApplicable("no supplementary material referenced in the manuscript")
+    return Outcome(issues)
+
+
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     from .report import NOT_APPLICABLE, UNCHECKED
 
     checks.run("citations.cross_references", CROSS_REF_TITLE, CITATIONS, _cross_reference_check, venue, values)
+    checks.run("citations.supplementary_attachments", "Referenced supplementary material is attached", CITATIONS, _supplementary_attachment_check, venue, values)
     checks.run("citations.duplicate_captions", "No two figures or tables share a caption or a number", CITATIONS, _duplicate_caption_check, venue, values)
     checks.run("citations.missing_captions", "Every figure and table has a caption", CITATIONS, _missing_caption_check, venue, values)
     try:
@@ -1009,10 +1054,29 @@ def _legend_checks(checks: Checks, venue: Venue, values: dict[str, str], found, 
 
     base = get_requirements(venue.slug)
     rules = resolve(base, values).figures if base is not None else None
-    if rules is None or (not rules.legend_max_words and not rules.legends_location):
-        checks.record("figures.legends", "Figure legends within the length limit and placed where the guidelines ask", "Figures", NOT_APPLICABLE, detail="the guidelines set no legend length or location")
+    if rules is None or (not rules.legend_max_words and not rules.legends_location and not rules.caption_label):
+        checks.record("figures.legends", LEGENDS_TITLE, "Figures", NOT_APPLICABLE, detail="the guidelines set no legend length, label, or location")
         return
-    checks.run("figures.legends", "Figure legends within the length limit and placed where the guidelines ask", "Figures", _legend_check, venue, values, rules)
+    checks.run("figures.legends", LEGENDS_TITLE, "Figures", _legend_check, venue, values, rules)
+
+
+LEGENDS_TITLE = "Figure legends within the length limit, labeled, and placed where the guidelines ask"
+# The label a figure caption starts with ("Figure 1.", "Fig. 2", "FIG 3").
+_CAPTION_LABEL = re.compile(r"\s*(Fig(?:ure)?\.?)\s*S?\d", re.IGNORECASE)
+_TEX_FIGURENAME = re.compile(r"\\renewcommand\s*\{?\s*\\figurename\s*\}?\s*\{([^}]*)\}|figurename\s*=\s*\{?([^,}\]]+)")
+
+
+def caption_label_problems(labels: list[tuple[int, str]], wanted: str, where: str) -> list[str]:
+    """Captions whose label ("Figure", "Fig.") is not the one the guidelines ask for."""
+    want = wanted.strip()
+    wrong = [(n, label) for n, label in labels if label.lower() != want.lower()]
+    if not wrong:
+        return []
+    ask = f"the author guidelines label figures '{want} 1', '{want} 2', ..."
+    if len(wrong) == 1:
+        return [f"the caption of Figure {wrong[0][0]} in {where} starts '{wrong[0][1]} {wrong[0][0]}'; {ask}"]
+    numbers = ", ".join(str(n) for n, _ in wrong[:5]) + (", ..." if len(wrong) > 5 else "")
+    return [f"{len(wrong)} figure captions in {where} (Figures {numbers}) start '{wrong[0][1]} {wrong[0][0]}' or similar; {ask}"]
 
 
 def _legend_check(venue: Venue, values: dict[str, str], rules) -> Outcome:
@@ -1066,5 +1130,13 @@ def _legend_check(venue: Venue, values: dict[str, str], rules) -> Outcome:
                 issues.append(Issue(WARNING, field.id, f"the legend of Figure {early[0]} comes before the references in {path.name}; the author guidelines put figure legends {where}"))
     elif location == "with_figure" and refs_pos is not None and all(pos > refs_pos for _, pos, _ in found) and not (doc.is_tex and doc.pdf is None):
         issues.append(Issue(WARNING, field.id, f"all figure legends in {path.name} are collected after the references; the author guidelines put each legend with its figure"))
+    if rules.caption_label and location_known:
+        if doc.is_tex and doc.pdf is None:
+            named = _TEX_FIGURENAME.search(doc.tex_source or "")
+            label = ((named.group(1) or named.group(2)) if named else "Figure").strip()
+            labels = [(n, label) for n, _, _ in found]
+        else:
+            labels = [(n, m.group(1)) for n, _, t in found if (m := _CAPTION_LABEL.match(t))]
+        issues += [Issue(WARNING, field.id, p) for p in caption_label_problems(labels, rules.caption_label, path.name)]
     longest = max(len(t.split()) for _, _, t in found)
     return Outcome(issues, f"{len(found)} legend(s), longest about {longest} words")

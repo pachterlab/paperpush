@@ -570,6 +570,11 @@ dialog { background: var(--panel); }
 #portal-body .portal-download { margin-bottom: 4px; }
 #portal-body .portal-download p { margin: 0 0 4px; }
 .dialog-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+/* ---- plagiarism scan */
+#plagiarism-dialog { max-width: 620px; }
+#plagiarism-dialog .dialog-actions { align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+#plag-status { margin-right: auto; }
+.rec-field.plag-remember { flex-direction: row; align-items: center; gap: 6px; display: flex; font-size: 14px; }
 /* ---- recommend a venue */
 dialog.wide { max-width: 860px; }
 .rec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin: 12px 0 4px; }

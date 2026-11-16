@@ -12,8 +12,7 @@ from .ai_validate import AiTask
 from .bibliography_check import read_bibliography
 from .database import Venue
 from .requirements import get_requirements, resolve
-from .validate import Checks, Issue, NotApplicable, Outcome, Unchecked, WARNING
-
+from .validate import Checks, Issue, NotApplicable, Outcome, Unchecked, SUGGESTION, WARNING
 
 CATEGORY = "Manuscript details"
 
@@ -110,7 +109,8 @@ def _reference_order(venue: Venue, values: dict[str, str], alphabetical: bool, c
     if citation_order and not cite_ok:
         issues.append(Issue(WARNING, "", f"{path.name}: author-year references are not ordered by first citation"))
     if not (alphabetical or citation_order or venue_other_order) and not (alpha_ok or cite_ok):
-        issues.append(Issue(WARNING, "", f"{path.name}: author-year references are neither alphabetical nor ordered by first citation"))
+        # No rule asks for either order, so this is consistency advice.
+        issues.append(Issue(SUGGESTION, "", f"{path.name}: author-year references are neither alphabetical nor ordered by first citation"))
     return Outcome(issues, f"alphabetical: {'yes' if alpha_ok else 'no'}; first-citation order: {'yes' if cite_ok else 'no'}")
 
 
@@ -256,7 +256,7 @@ def _affiliation_superscripts(venue: Venue, values: dict[str, str]) -> Outcome:
             continue
         read.append(path.name)
         for name in dict.fromkeys(hits):
-            issues.append(Issue(WARNING, "", f"{path.name}: the affiliation number after '{name}' is not superscripted (e.g. '{name}1' should be '{name}¹')"))
+            issues.append(Issue(SUGGESTION, "", f"{path.name}: the affiliation number after '{name}' is not superscripted (e.g. '{name}1' should be '{name}¹')"))
     if not read:
         raise Unchecked("could not read the author line of any manuscript or title page")
     return Outcome(issues, f"checked {len(names)} author name(s) in {', '.join(read)}")
@@ -285,10 +285,16 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         ("author_details", "Title page lists authors, affiliations, corresponding author, and contact emails", "Extract and report the title as printed on the title page. Check that all authors, affiliations, corresponding author designation, and contact email addresses are present where required. State whether each email domain is institutional for its stated affiliation; flag a public address as noncompliant only when the venue requires an institutional one. Check word count, keywords, and running head where required."),
         ("abstract_reporting", "Abstract has the required form and subheadings (plus PRISMA/CONSORT items for reviews and trials)", "Check that the manuscript has an abstract and that its structured or unstructured form and exact subheadings meet venue rules. If it is a systematic review or clinical trial, check the abstract against applicable PRISMA or CONSORT abstract reporting items, naming missing items; do not apply either checklist to unrelated article types."),
         ("supplementary", "Every mention of supplementary material has a matching uploaded item", "Check whether the manuscript refers to any uploaded supplementary material or appendix, and whether every such mention has a corresponding item. Treat a manuscript with no supplement and no appendix mention as not applicable."),
-        ("trademarks", "Trademarked product names and ™/® symbols flagged", "Identify explicit trademark symbols and named commercial products likely to be registered marks. Report the name and location; do not assume every product name is a registered trademark, and return unclear if registration cannot be verified from the supplied files."),
+        ("trademarks", "Trademarked product names and ™/® symbols flagged", "Identify explicit trademark symbols and named commercial products likely to be registered marks. Report the name and location; do not assume every product name is a registered trademark, and return unclear if registration cannot be verified from the supplied files. Return 'suggest' for optional changes to product names or trademark symbols; return 'fail' only for a violation of an explicit venue rule."),
         ("misplaced_content", "Content is in the section it belongs to", "Read the manuscript section by section and find content in the wrong section: findings or data reported in the Introduction or Methods, procedures described in the Results that the Methods never gives, new results that first appear in the Discussion or Conclusions, and interpretation that belongs in the Discussion but makes up a Results paragraph. Quote each passage and name the section it belongs in. A sentence of motivation or a brief recap of an earlier section is fine, and so is a combined Results and Discussion or a venue's own section order. Flag only clear cases."),
         ("heading_content", "Section headings match the text under them", "Compare each section and subsection heading with the text under it, down to the next heading. Flag a heading that names a topic the text does not cover (a 'Statistical analysis' section that describes only sample preparation), a section that also carries a major topic its heading does not suggest, and a descriptive Results heading that claims a finding the text under it does not report. Name each heading and say what the text covers instead. Do not flag headings for style or wording alone."),
         ("nih_grant_numbers", "NIH funding statements give grant numbers", "Find the funding statement or acknowledgments. If they name the NIH, National Institutes of Health, or an NIH institute or center (NCI, NHLBI, NIAID, NIGMS, NHGRI, NIMH, NIA, NINDS, NIDDK, NLM, and so on) as a funder, check that each such award has a grant number, for example R01GM123456 or U54 CA209891. Report each NIH funder named without a number, quoting the sentence. If the manuscript names no NIH funding, the check passes; do not apply it to other funders. Do not report an NIH employee or facility mentioned without funding."),
     ]
+    in_form = list(reqs.statements.in_submission_form or []) if reqs else []
+    if in_form:
+        from .requirements_check import statement_label
+
+        labels = ", ".join(statement_label(s) for s in in_form)
+        tasks = [(s, t, f"{i} This venue collects these through its submission system rather than in the manuscript, so do not report them as missing from it: {labels}.") if s == "declarations" else (s, t, i) for s, t, i in tasks]
     for suffix, title, instructions in tasks:
         checks.needs_ai(AiTask(id=f"ai.details.{suffix}", title=title, category=CATEGORY, instructions=f"{instructions} {guideline}", files=files))

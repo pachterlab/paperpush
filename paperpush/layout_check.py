@@ -737,12 +737,128 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     run("layout.line_spacing", "Text is double-spaced", rules.double_spacing, "the guidelines do not ask for double spacing", lambda f, m: _spacing(f, m))
     run("layout.line_numbers", "Lines numbered continuously", rules.line_numbers, "the guidelines do not ask for line numbers", lambda f, m: _line_numbers(f, m))
     run("layout.page_numbers", "Pages are numbered", rules.page_numbers, "the guidelines do not ask for page numbers", lambda f, m: _page_numbers(f, m))
+    run("layout.footnotes", "No footnotes or endnotes where the guidelines forbid them", rules.footnotes_allowed is False, "the guidelines allow footnotes", lambda f, m: _footnotes(f, m))
+    run("layout.heading_levels", "Headings within the guidelines' number of levels", rules.max_heading_levels, "the guidelines set no limit on heading levels", lambda f, m: _heading_levels(f, m, rules.max_heading_levels))
+    run("layout.forbidden_fonts", "No fonts the guidelines forbid (e.g., Symbol)", rules.forbidden_fonts, "the guidelines forbid no fonts", lambda f, m: _forbidden_fonts(f, m, rules.forbidden_fonts))
     language = (rules.language or "").strip()
     applies = bool(language) and language.lower() not in ("english",)
     if applies:
         checks.run("layout.language", "Spelling follows the required English variant (US or UK)", LAYOUT, _language_check, venue, values, language)
     else:
         checks.record("layout.language", "Spelling follows the required English variant (US or UK)", LAYOUT, _na(), detail="the guidelines name no spelling variant")
+
+
+# Word marks a footnote or endnote where the text cites it.
+_DOCX_NOTE_REF = re.compile(r"<w:(footnote|endnote)Reference\b")
+_TEX_FOOTNOTE = re.compile(r"\\footnote(?:text)?\s*(?:\[[^\]]*\])?\s*\{")
+_MD_FOOTNOTE = re.compile(r"^\[\^[^\]]+\]:", re.MULTILINE)
+
+
+def _footnotes(field: Field, m: _Measured):
+    """WARN on footnotes or endnotes in a manuscript whose guidelines forbid them."""
+    doc = document.get(m.path)
+    if doc.is_docx:
+        found = Counter(kind for kind in _DOCX_NOTE_REF.findall(doc.docx_part("word/document.xml") or ""))
+        what = " and ".join(f"{n} {kind}(s)" for kind, n in sorted(found.items()))
+    elif doc.is_tex and doc.tex_source:
+        n = len(_TEX_FOOTNOTE.findall(_uncommented(doc.tex_source)))
+        found, what = Counter(footnote=n) if n else Counter(), f"{n} \\footnote(s)"
+    elif doc.is_markdown:
+        n = len(_MD_FOOTNOTE.findall(_markdown_source(doc)))
+        found, what = Counter(footnote=n) if n else Counter(), f"{n} footnote(s)"
+    else:
+        return None, f"footnotes cannot be told apart from body text in {m.path.name}; check it has none"
+    if found:
+        return [_issue(field, f"{m.path.name} has {what}; the author guidelines do not permit footnotes: move them into the text or the reference list")], ""
+    return [], "no footnotes"
+
+
+_TEX_HEADING = re.compile(r"\\(chapter|section|subsection|subsubsection|paragraph|subparagraph)\b\*?\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}")
+_TEX_DEPTH = {"chapter": 0, "section": 1, "subsection": 2, "subsubsection": 3, "paragraph": 4, "subparagraph": 5}
+# PLOS-style supporting-information captions are \paragraph*{S1 Fig. ...}, not headings.
+_SI_CAPTION = re.compile(r"^\s*S\d+\s+(?:Fig|Figure|Table|Appendix|File|Text|Dataset|Data|Video|Movie|Checklist)\b", re.IGNORECASE)
+_MD_HEADING = re.compile(r"^(#{1,6})\s+\S", re.MULTILINE)
+
+
+def _markdown_source(doc: document.Document) -> str:
+    try:
+        return doc.path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def heading_depths(doc: document.Document) -> list[int] | None:
+    """The level of each heading in ``doc``, the shallowest counted as 1; None when the file does not mark its headings."""
+    depths: list[int] = []
+    if doc.is_docx:
+        root = safe_xml(doc.docx_part("word/document.xml"))
+        if root is None:
+            return None
+        levels: dict[str, int] = {}
+        styles = safe_xml(doc.docx_part("word/styles.xml"))
+        for style in styles.findall(f"{_W}style") if styles is not None else []:
+            name = style.find(f"{_W}name")
+            match = re.fullmatch(r"heading\s*(\d)", (name.get(f"{_W}val", "") if name is not None else "").strip(), re.IGNORECASE)
+            outline = style.find(f"{_W}pPr/{_W}outlineLvl")
+            if match:
+                levels[style.get(f"{_W}styleId", "")] = int(match.group(1))
+            elif outline is not None and (outline.get(f"{_W}val") or "").isdigit() and int(outline.get(f"{_W}val")) < 9:
+                levels[style.get(f"{_W}styleId", "")] = int(outline.get(f"{_W}val")) + 1
+        for para in root.iter(f"{_W}p"):
+            if not "".join(t.text or "" for t in para.iter(f"{_W}t")).strip():
+                continue
+            ppr = para.find(f"{_W}pPr")
+            outline = ppr.find(f"{_W}outlineLvl") if ppr is not None else None
+            pstyle = ppr.find(f"{_W}pStyle") if ppr is not None else None
+            if outline is not None and (outline.get(f"{_W}val") or "").isdigit() and int(outline.get(f"{_W}val")) < 9:
+                depths.append(int(outline.get(f"{_W}val")) + 1)
+            elif pstyle is not None and pstyle.get(f"{_W}val") in levels:
+                depths.append(levels[pstyle.get(f"{_W}val")])
+    elif doc.is_tex and doc.tex_source:
+        source = _uncommented(doc.tex_source)
+        body = source[source.find("\\begin{document}") :] if "\\begin{document}" in source else source
+        depths = [_TEX_DEPTH[cmd] for cmd, title in _TEX_HEADING.findall(body) if not _SI_CAPTION.match(title)]
+    elif doc.is_markdown:
+        depths = [len(h) for h in _MD_HEADING.findall(re.sub(r"^```.*?^```", "", _markdown_source(doc), flags=re.MULTILINE | re.DOTALL))]
+        # A lone top-level heading over deeper ones is the title.
+        if depths.count(min(depths, default=0)) == 1 and depths and depths[0] == min(depths) and len(set(depths)) > 1:
+            depths = depths[1:]
+    else:
+        return None
+    if not depths:
+        return None
+    top = min(depths)
+    return [d - top + 1 for d in depths]
+
+
+def _heading_levels(field: Field, m: _Measured, limit: int):
+    doc = document.get(m.path)
+    depths = heading_depths(doc)
+    if depths is None:
+        why = "uses no Word heading styles" if doc.is_docx else "marks no headings in a form that can be read" if (doc.is_tex or doc.is_markdown) else "does not mark its heading levels"
+        return None, f"{m.path.name} {why}, so its heading levels were not counted"
+    deepest = max(depths)
+    if deepest > limit:
+        return [_issue(field, f"{m.path.name} uses {deepest} heading levels; the author guidelines allow at most {limit}")], ""
+    return [], f"{deepest} heading level(s)"
+
+
+_DOCX_FONT_ATTR = re.compile(r'<w:(?:rFonts|sym)\b[^>]*?\bw:(?:ascii|hAnsi|font)="([^"]+)"')
+
+
+def _forbidden_fonts(field: Field, m: _Measured, forbidden: list[str]):
+    """WARN on a font the guidelines forbid. Word files only: a PDF also embeds fonts its writer chose (Word's list bullets are set in Symbol)."""
+    doc = document.get(m.path)
+    if not doc.is_docx:
+        return None, f"only a Word file records the fonts its author chose; check {m.path.name} by hand"
+    banned = {re.sub(r"[^a-z0-9]", "", f.lower()) for f in forbidden}
+    used = Counter(_DOCX_FONT_ATTR.findall(doc.docx_part("word/document.xml") or ""))
+    if m.docx is not None:
+        used.update({name: 0 for name in m.docx.fonts})
+    hits = sorted({name for name in used if re.sub(r"[^a-z0-9]", "", font_family(name)[0].lower()) in banned or re.sub(r"[^a-z0-9]", "", name.lower()) in banned})
+    if hits:
+        return [_issue(field, f"{m.path.name} sets text in {', '.join(hits)}; the author guidelines do not allow {'this font' if len(hits) == 1 else 'these fonts'} (insert symbols as Unicode characters in the body font instead)")], ""
+    return [], "none of the forbidden fonts used"
 
 
 def _na() -> str:

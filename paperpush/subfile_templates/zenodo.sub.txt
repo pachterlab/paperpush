@@ -3,6 +3,7 @@
 #
 # Edit the values below, then:
 #   - to validate against venue guidelines: `paperpush validate zenodo.sub.txt`
+#   - to fill out submission portal: `paperpush submit zenodo.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:
@@ -22,16 +23,16 @@
 
 # Resource type (choice, REQUIRED)
 #   The type of the files being shared (Zenodo's list is based on DataCite's ResourceType vocabulary). For mixed uploads, choose the type that best reflects the upload. 'Other' also exists under the Image and Publication groups.
-#   options: Annotation collection | Book | Book chapter | Computational notebook | Conference paper | Conference proceeding | Data paper | Dataset | Diagram | Drawing | Event | Figure | Image | Journal | Journal article | Lesson | Model | Other | Output management plan | Patent | Peer review | Photo | Physical object | Plot | Poster | Preprint | Presentation | Project deliverable | Project milestone | Proposal | Publication | Report | Software | Software documentation | Standard | Taxonomic treatment | Technical note | Thesis | Video/Audio | Workflow | Working paper
+#   options: Dataset | Event | Image | Image / Diagram | Image / Drawing | Image / Figure | Image / Other | Image / Photo | Image / Plot | Lesson | Model | Other | Physical object | Poster | Presentation | Publication | Publication / Annotation collection | Publication / Book | Publication / Book chapter | Publication / Conference paper | Publication / Conference proceeding | Publication / Data paper | Publication / Journal | Publication / Journal article | Publication / Other | Publication / Output management plan | Publication / Patent | Publication / Peer review | Publication / Preprint | Publication / Project deliverable | Publication / Project milestone | Publication / Proposal | Publication / Report | Publication / Software documentation | Publication / Standard | Publication / Taxonomic treatment | Publication / Technical note | Publication / Thesis | Publication / Working paper | Software | Software / Computational notebook | Video/Audio | Workflow
 resource_type: 
 
 # ----------------------------------------------------------------------
 # Files
 # ----------------------------------------------------------------------
 
-# Files (filelist, optional)
-#   Optional. One file per line as 'path | label' (label optional). Up to 100 files and 50GB in total per record (more storage can be allocated, see the requirements notes). Zenodo recommends packaging 20 or more files in a ZIP archive.
-#   provide 0-100 item(s), one per line
+# Files (filelist, REQUIRED)
+#   One file per line as 'path | label' (label optional). The web form requires at least one file. Up to 100 files and 50 GB in total per record; package large collections in a ZIP archive. Labels are for the .sub only; Zenodo displays filenames.
+#   provide 1-100 item(s), one per line
 data_files: |
   
 
@@ -56,30 +57,140 @@ keywords:
 #   Optional. Only if the upload already has a DOI for the same object; leave blank and Zenodo registers one on publication. Do NOT enter the DOI of a journal article that this upload supports (put that in related_identifiers instead).
 doi: 
 
+# Additional titles (textarea, optional)
+#   title | type | language, one per line. Type defaults to Alternative title; language is optional.
+additional_titles: |
+  
+
 # Publication date (text, REQUIRED)
 #   When the upload was first made available to the public (YYYY-MM-DD; EDTF imprecise dates and ranges such as 2023-09 or 2023-01-01/2023-09-23 are accepted). Zenodo defaults it to the date the draft was created. If the content was previously published elsewhere, use the date of first publication.
 publication_date: 
 
-# Related works (textarea, optional)
-#   Optional. Persistent identifiers of related publications and datasets, one per line as 'identifier | relation' (e.g. '10.1234/foo | Is supplement to' for the paper this deposit supports). Identifiers: DOI, Handle, ARK, PURL, ISSN, ISBN, PubMed ID, PubMed Central ID, ADS Bibliographic Code, arXiv, LSID, EAN-13, ISTC, URN or URL. Relations: Cites, Compiles, Continues, Describes, Documents, Has metadata, Has part, Has version, Is cited by, Is compiled by, Is continued by, Is derived from, Is described by, Is documented by, Is identical to, Is metadata for, Is new version of, Is obsoleted by, Is original form of, Is part of, Is previous version of, Is published in, Is referenced by, Is required by, Is reviewed by, Is source of, Is supplement to, Is supplemented by, Is variant form of, Is version of, Obsoletes, References, Requires, Reviews.
-related_identifiers: |
+# Additional descriptions (textarea, optional)
+#   description | type | language, one per line. Type is required; language is optional.
+additional_descriptions: |
+  
+
+# Copyright (text, optional)
+#   Copyright statement.
+copyright: 
+
+# Languages (text, optional)
+#   Comma-separated language names, as offered by the portal (e.g. English).
+languages: 
+
+# Dates (textarea, optional)
+#   date | type | description, one per line. Type is required.
+dates: |
   
 
 # Version (text, optional)
 #   Optional. Version of the resource; any string, semantic versioning (e.g. 2.1.5) suggested.
 version: 
 
+# Alternate identifiers (textarea, optional)
+#   identifier | scheme, one per line; use the portal scheme label (e.g. URL).
+alternate_identifiers: |
+  
+
+# Related works (textarea, optional)
+#   One per line: identifier | relation | scheme | resource type. Relation is required. DOI and URL schemes can be inferred; supply the portal's scheme label for other identifiers. Resource type is optional.
+related_identifiers: |
+  
+
+# References (textarea, optional)
+#   One bibliographic reference per line.
+references: |
+  
+
+# Repository URL (text, optional)
+code_url: 
+
+# Journal title (text, optional)
+journal_title: 
+
+# Journal ISSN (text, optional)
+journal_issn: 
+
+# Journal volume (text, optional)
+journal_volume: 
+
+# Journal issue (text, optional)
+journal_issue: 
+
+# Journal page range or article number (text, optional)
+journal_pages: 
+
+# Book, report, or proceedings title (text, optional)
+imprint_title: 
+
+# Imprint ISBN (text, optional)
+imprint_isbn: 
+
+# Imprint publication place (text, optional)
+imprint_place: 
+
+# Imprint pagination (text, optional)
+imprint_pages: 
+
+# Imprint edition (text, optional)
+imprint_edition: 
+
+# Thesis awarding university (text, optional)
+thesis_university: 
+
+# Thesis awarding department (text, optional)
+thesis_department: 
+
+# Thesis type (text, optional)
+thesis_type: 
+
+# Thesis submission date (text, optional)
+thesis_date_submitted: 
+
+# Thesis defense date (text, optional)
+thesis_date_defended: 
+
+# Conference title (text, optional)
+conference_title: 
+
+# Conference acronym (text, optional)
+conference_acronym: 
+
+# Conference place (text, optional)
+conference_place: 
+
+# Conference dates (text, optional)
+conference_dates: 
+
+# Conference session (text, optional)
+conference_session: 
+
+# Conference part within session (text, optional)
+conference_session_part: 
+
+# Conference website (text, optional)
+conference_url: 
+
+# Programming languages (text, optional)
+#   Comma-separated programming language names, e.g. Python.
+programming_languages: 
+
+# Development Status (choice, optional)
+#   options: Moved | Abandoned | Active | Unsupported | Inactive | Wip | Concept | Suspended
+development_status: 
+
 # ----------------------------------------------------------------------
 # Authors
 # ----------------------------------------------------------------------
 
 # Creators (authorlist, REQUIRED)
-#   One creator (person or organisation) per line, in citation order. Format: Name | affiliation | ORCID | role. Write a person's name as 'Family name, Given names'. Affiliation, identifier (ORCID, ISNI, GND or ROR) and role (e.g. Editor) are optional; separate several affiliations with ';'.
+#   One creator per line in citation order: Name | affiliation | ORCID | role | type. For people use 'Family name, Given names'; type defaults to Person. Use Organization to preserve an organisation's full name. Separate affiliations with ';'.
 authors: |
   
 
 # Contributors (textarea, optional)
-#   Recommended. People or organisations who contributed but are not in the citation (supervisors, contact persons, sponsors), one per line as 'Name | role | affiliation | ORCID'. A role from DataCite's contributor vocabulary is required.
+#   One per line: Name | role | affiliation | ORCID | type. Role is required. Type defaults to Person; use Organization for organisations.
 contributors: |
   
 
@@ -101,6 +212,12 @@ funding: |
 #   options: Creative Commons Attribution 4.0 International
 license: 
 
+# Communities (textarea, optional)
+#   Optional community identifier from its URL. The new-upload form selects one community. Further communities can be added after publication. The runner saves a draft and never sends it to community review.
+#   provide 0-1 item(s), one per line
+communities: |
+  
+
 # Publisher (text, REQUIRED)
 #   Needed for the citation. Zenodo sets it to 'Zenodo'; if the content was previously published elsewhere, use the original publisher's name.
 publisher: 
@@ -114,9 +231,9 @@ access_right:
 #   Optional, only with Restricted visibility and 'Apply an embargo' (YYYY-MM-DD). The files become public automatically at midnight UTC on this date.
 embargo_date: 
 
-# Communities (textarea, optional)
-#   Optional. Community identifiers to submit the record to, one per line. The community's owner is notified and can accept or reject the record.
-communities: |
+# Embargo reason (textarea, optional)
+#   Optional reason, only with embargo_date.
+embargo_reason: |
   
 
 # vim: set filetype=yaml :

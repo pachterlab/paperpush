@@ -68,6 +68,26 @@ Options
 ``--no-browser``
    Print the page's address instead of opening it in your browser.
 
+The plagiarism scan
+-------------------
+
+Tick **plagiarism scan**, next to **Validate**, to run the plagiarism scan
+whenever you validate (``paperpush validate --plagiarism``). Ticking it opens
+a dialog for the service (Winston AI, the default, or Originality.ai), your
+API key for it, the sources that may match (your own preprint or an earlier
+conference version, as a domain, page, or DOI), and the percentage that
+makes a warning (default 20). Cancelling the dialog leaves the box unticked;
+untick and tick it again to change the settings. The key is separate from
+the AI provider's key at the top of the page. It is sent only with validate
+requests, never stored on the server, and kept in the browser only for that
+tab unless you tick *Remember this key on this device*. Each scan sends the
+manuscript's text (without its reference list) to that service and costs
+credits on your account, so the box starts unticked whenever the page loads.
+The website never uses a key of its own. On a ``--web`` page, leave the key
+empty to use ``WINSTON_API_KEY`` or ``ORIGINALITY_API_KEY`` from your
+environment. A server started with link checks switched off
+(``PAPERPUSH_WEB_NETWORK_CHECKS=0``) switches the scan off too.
+
 The buttons at the bottom of the page
 -------------------------------------
 

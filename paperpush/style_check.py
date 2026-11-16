@@ -738,14 +738,14 @@ def acronyms(body: list[str], abstract: list[str] | None = None, floats: list[st
 
 _ACRONYM_KINDS = (
     ("before_definition", "acronym(s) used before they are spelled out", "define each at its first use in the main text", WARNING),
-    ("expanded_before_definition", "acronym(s) whose full term is written out before the acronym is defined", "define the acronym at the first use of the term", WARNING),
+    ("expanded_before_definition", "acronym(s) whose full term is written out before the acronym is defined", "define the acronym at the first use of the term", SUGGESTION),
     ("abstract_only", "acronym(s) spelled out only in the abstract", "the main text should define them again at first use", WARNING),
     ("abstract_undefined", "acronym(s) the abstract uses without spelling out (the main text does)", "an abstract is read on its own, so define them there too", WARNING),
     ("legend_only", "acronym(s) spelled out only in a figure or table legend", "a legend is read on its own, so define them at first use in the main text too", WARNING),
-    ("redefined", "acronym(s) spelled out more than once in the main text", "define once, then use the acronym", WARNING),
+    ("redefined", "acronym(s) spelled out more than once in the main text", "define once, then use the acronym", SUGGESTION),
     ("expanded_after_definition", "acronym(s) whose full term is written out again after the acronym is defined (outside a section's first paragraph)", "use the acronym once it is defined", SUGGESTION),
     ("undefined", "acronym(s) used but never spelled out", "define them at first use, unless every reader knows them (a gene, a unit, a name)", WARNING),
-    ("rarely_used", "acronym(s) spelled out but never used again", "write the full term and drop the acronym", WARNING),
+    ("rarely_used", "acronym(s) spelled out but never used again", "write the full term and drop the acronym", SUGGESTION),
     ("conflicting", "acronym(s) spelled out with different meanings", "give each acronym one meaning", WARNING),
 )
 

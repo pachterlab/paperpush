@@ -110,7 +110,7 @@ def test_validate_reports_default_colors(tmp_path, run):
     doc = _docx(tmp_path / "m.docx", _para(LONG))
     rep = run({"manuscript_file": str(doc), "figure_files": str(fig)})
     default = _result(rep, "figures.default_colors")
-    assert default.status == report.WARNING and "matplotlib" in default.issues[0].message and "fig1.svg" in default.issues[0].message
+    assert default.status == report.SUGGESTION and "matplotlib" in default.issues[0].message and "fig1.svg" in default.issues[0].message
     assert _result(rep, "figures.grayscale").status == report.NOT_APPLICABLE  # the venue prints in color
 
 

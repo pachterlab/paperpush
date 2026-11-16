@@ -782,7 +782,7 @@ def test_figures_in_different_typefaces_are_flagged(_use, tmp_path):
     two = _svg_fig(tmp_path / "fig2.svg", ("Times New Roman", "Expression level"), ("Times New Roman", "Time after dose"))
     rep = _report(_venue(FIGURES), {"figure_files": f"{one} | Figure 1\n{two} | Figure 2"})
     res = _result(rep, "figures.font_consistency")
-    assert res.status != report.PASSED
+    assert res.status == report.SUGGESTION
     message = " ".join(i.message for i in res.issues)
     assert "different typefaces" in message and "fig1.svg" in message and "fig2.svg" in message
     assert "mixes" not in message  # Arial and Helvetica count as one

@@ -11,6 +11,8 @@
   window.__ppInstalled = true;
 
   const IS_TOP = (() => { try { return window.top === window; } catch (e) { return false; } })();
+  // The separate code window (its own browser context): it shows only the code panel.
+  const CODE_WINDOW = IS_TOP && !!window.__ppCodeWindow;
   const state = { recording: true, playing: false, paused: false, picking: null };
   let full = null; // last full state from Python (top frame only)
   let host = null, root = null, highlight = null, ui = {};
@@ -24,7 +26,7 @@
       if (typeof fn === 'function') { const p = fn(payload); if (p && p.catch) p.catch(() => {}); }
     } catch (e) { /* binding not ready or page closing */ }
   };
-  const record = (evt) => { if (state.recording && !state.playing) call('__ppRecord', evt); };
+  const record = (evt) => { if (state.recording && !state.playing && !CODE_WINDOW) call('__ppRecord', evt); };
   const command = (cmd) => call('__ppCommand', cmd);
 
   // ----------------------------------------------------------------- locators
@@ -229,7 +231,7 @@
     const texts = (els) => els.map((o) => norm(o.label !== undefined && o.localName === 'option' ? (o.label || o.textContent) : textOf(o))).filter(Boolean);
     let el = target;
     const select = el.closest && el.closest('select');
-    if (select) return { label: labelOf(select), options: texts([...select.options]) };
+    if (select) return { label: controlLabel(select), options: texts([...select.options]) };
     if (el.localName === 'input' && el.list) return { label: labelOf(el), options: [...el.list.options].map((o) => norm(o.value || o.label)).filter(Boolean) };
     const radio = el.localName === 'input' && el.type === 'radio' ? el : (el.localName === 'label' && el.control && el.control.type === 'radio' ? el.control : null);
     if (radio && radio.name) {
@@ -240,17 +242,30 @@
       const label = legend ? textOf(legend) : (groupEl && labelOf(groupEl)) || questionBefore(group[0]) || radio.name;
       return { label, options: group.map((r) => labelOf(r)).filter(Boolean) };
     }
-    // A combobox points at its popup list (only in the DOM while it is open).
-    const combo = el.closest && el.closest('[role=combobox]');
+    // A combobox either points at its popup list (aria-controls/aria-owns, on it or on the
+    // input inside it; often only in the DOM while open) or holds the list itself, as Semantic
+    // UI's dropdowns do (InvenioRDM: CaltechDATA, Zenodo), where the click lands on the inner
+    // search input. Semantic UI dropdowns without ARIA roles hold a .menu of .items.
+    const combo = el.closest && el.closest('[role=combobox],[aria-haspopup=listbox],.ui.dropdown');
     if (combo) {
-      const id = combo.getAttribute('aria-controls') || combo.getAttribute('aria-owns');
-      const list = id && el.ownerDocument.getElementById(id.split(/\s+/)[0]);
-      if (list) return { label: labelOf(combo), options: texts([...list.querySelectorAll('[role=option]')]) };
+      const doc = el.ownerDocument;
+      const ids = [combo, ...combo.querySelectorAll('[aria-controls],[aria-owns]')]
+        .flatMap((n) => (n.getAttribute('aria-controls') || n.getAttribute('aria-owns') || '').split(/\s+/)).filter(Boolean);
+      for (const id of ids) {
+        const list = doc.getElementById(id);
+        const items = list ? [...list.querySelectorAll('[role=option],option')] : [];
+        if (items.length) return { label: controlLabel(combo), options: texts(items) };
+      }
+      let items = [...combo.querySelectorAll('[role=option],option')];
+      if (!items.length) items = [...combo.querySelectorAll('.menu > .item')];
+      const options = texts(items);
+      if (options.length) return { label: controlLabel(combo), options };
+      return { label: controlLabel(combo), options: [], unloaded: true };
     }
     const listbox = el.closest && el.closest('[role=listbox],[role=menu],[role=radiogroup],datalist');
     if (listbox) {
       const items = [...listbox.querySelectorAll('[role=option],[role=menuitem],[role=menuitemradio],[role=radio],option')];
-      if (items.length) return { label: labelOf(listbox), options: texts(items) };
+      if (items.length) return { label: controlLabel(listbox), options: texts(items) };
     }
     const list = el.closest && el.closest('ul,ol,menu');
     if (list) return { label: labelOf(list), options: texts([...list.children].filter((c) => c.localName === 'li')) };
@@ -272,6 +287,27 @@
       }
     }
     return '';
+  }
+
+  // The question a dropdown-like control answers: its ARIA name, a <label for> it, the label
+  // of its form field, else the text before it. Never its own text, which is its options.
+  function controlLabel(el) {
+    const aria = accName(el, getRole(el));
+    if (aria) return aria;
+    const r = rootOf(el);
+    if (el.id) {
+      const l = r.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+      if (l) { const text = labelText(l, el); if (text) return text; }
+    }
+    const inner = el.querySelector && el.querySelector('input:not([type=hidden]),select,textarea');
+    if (inner && inner.labels && inner.labels.length) {
+      const text = norm([...inner.labels].map((l) => labelText(l, inner)).join(' '));
+      if (text) return text;
+    }
+    const field = el.closest('.field,.form-group,fieldset');
+    const label = field && field.querySelector('label,legend');
+    if (label && !el.contains(label)) { const text = labelText(label, el); if (text) return text; }
+    return questionBefore(el);
   }
 
   // What the element says, for a branch path's key: its accessible name, else its text.
@@ -478,8 +514,15 @@
                     padding: 3px 6px; color: #e6edf3; font: 12px ui-monospace, Menlo, monospace; }
     .status { padding: 3px 8px; color: #8b949e; border-top: 1px solid #444c56; }
     .status:empty { display: none; }
-    .code { contain: inline-size; margin: 0; max-height: 40vh; overflow: auto; border-top: 1px solid #444c56; background: #0d1117;
+    .codewrap { display: flex; flex-direction: column; min-height: 0; border-top: 1px solid #444c56; }
+    .codebar { display: flex; align-items: center; gap: 6px; padding: 2px 4px; background: #161b22; color: #8b949e; }
+    .codebar button { padding: 1px 6px; font-size: 11px; }
+    .code { contain: inline-size; margin: 0; max-height: 40vh; overflow: auto; background: #0d1117;
             font: 11px/1.45 ui-monospace, Menlo, monospace; padding: 4px 0; }
+    .tb.window { inset: 0; top: 0; left: 0; right: 0; bottom: 0; max-width: none; border: 0; border-radius: 0; box-shadow: none; }
+    .tb.window .row, .tb.window .prompt { display: none; }
+    .tb.window .codewrap { flex: 1; border-top: 0; }
+    .tb.window .code { max-height: none; flex: 1; }
     .ln { display: block; padding: 0 8px; white-space: pre; cursor: default; color: #c9d1d9; min-width: max-content; }
     .ln.own { cursor: pointer; }
     .ln.own:hover { background: #161b22; }
@@ -491,32 +534,34 @@
   const BUTTONS = [
     ['record', '● Record', 'Start or stop recording actions'],
     ['play', '▶ Play', 'Replay the recorded script in a new tab (resumes when paused)'],
+    ['load', '⏏ Load', 'Load code saved earlier (Save Code) in place of this script, and play it'],
     ['pause', '❚❚ Pause', 'Pause the replay after the current action'],
     ['stop', '■ Stop', 'Stop the replay'],
     '|',
     ['undo', 'Undo', 'Undo the last change to the script'],
     ['redo', 'Redo', 'Redo the change just undone'],
     '|',
-    ['branch', '⑂ Branch', 'Start a choice between paths: what you record from now on is the first path (one option of the question)'],
-    ['nextpath', '⑂ Next', 'Finish this path: what you record from now on is the branch\'s next path'],
-    ['endbranch', '⑂ End', 'End the branch: press before the action that follows the choice (e.g. Continue)'],
-    ['optional', '? Optional', 'Mark what you record next as optional (# ---OPTIONAL---); press again to end the section (# ---END OPTIONAL---)'],
+    ['branch', '⑂ Branch', 'Start a choice between paths: what you record from now on is the first path (one option of the question). Inside a branch it starts a nested one; the number is how many branches are open'],
+    ['nextpath', '⑂ Next', 'Finish this path of the innermost branch: what you record from now on is its next path'],
+    ['endbranch', '⑂ End', 'End the innermost branch: press before the action that follows the choice (e.g. Continue)'],
     '|',
+    ['optional', '? Optional', 'Mark what you record next as optional (# ---OPTIONAL---); press again to end the section (# ---END OPTIONAL---)'],
+    ['comment', '# Comment', 'Add a comment at the end of the selected line (else the line recorded last): line_of_code  # comment. Leave it empty to remove one'],
     ['pickoptions', '⌖ Dropdown Choices', 'Pick a dropdown, list or radio group: its choices go into the code as a comment'],
     ['variable', '{x} Variable', 'Replace the selected line\'s value with a variable (a .sub field), or rename the selected branch'],
     '|',
     ['pickhtml', '⌖ HTML', 'Pick an element and copy its HTML'],
     ['copyhtml', 'Copy Page HTML', 'Copy the HTML of this page and its frames'],
     '|',
-    ['panel', 'Code', 'Show or hide the generated code'],
     ['copy', 'Copy Code', 'Copy the generated code'],
     ['save', 'Save Code', 'Save the generated code to a file'],
   ];
 
   let dragging = null;
-  let prompt = null; // { kind: 'variable' | 'save', index }
+  let prompt = null; // { kind: 'variable' | 'comment' | 'save' | 'load', index }
   let editing = null; // { span, kind, index }
   let codeSig = null; // the code the panel shows, to skip needless rebuilds
+  let panelHidden = false; // the author hid the embedded code (Hide button in the code bar)
 
   function buildToolbar() {
     const tb = document.createElement('div');
@@ -524,7 +569,7 @@
     const row = document.createElement('div');
     row.className = 'row';
     const grip = document.createElement('span');
-    grip.className = 'grip'; grip.textContent = '⠿ paperpush'; grip.title = 'Drag to move';
+    grip.className = 'grip'; grip.textContent = '⠿'; grip.title = 'paperpush codegen: drag to move';
     row.appendChild(grip);
     for (const b of BUTTONS) {
       if (b === '|') { const s = document.createElement('span'); s.className = 'sep'; row.appendChild(s); continue; }
@@ -546,14 +591,30 @@
     ui.datalist = pr.querySelector('datalist');
 
     const status = document.createElement('div'); status.className = 'status'; tb.appendChild(status); ui.status = status;
-    const code = document.createElement('pre'); code.className = 'code'; tb.appendChild(code); ui.code = code;
+    const wrap = document.createElement('div'); wrap.className = 'codewrap';
+    const bar = document.createElement('div'); bar.className = 'codebar';
+    const dock = document.createElement('button');
+    dock.dataset.cmd = 'codewindow';
+    bar.appendChild(dock); ui.codewindow = dock;
+    const toggle = document.createElement('button');
+    toggle.dataset.cmd = 'panel';
+    bar.appendChild(toggle); ui.panel = toggle;
+    wrap.appendChild(bar);
+    const code = document.createElement('pre'); code.className = 'code'; wrap.appendChild(code); ui.code = code; ui.codewrap = wrap;
+    tb.appendChild(wrap);
     root.appendChild(tb);
     ui.tb = tb;
-    try {
-      const pos = JSON.parse(sessionStorage.getItem('__ppToolbarPos') || 'null');
-      if (pos) placeToolbar(pos.left, pos.top);
-      if (sessionStorage.getItem('__ppPanel') === '0') code.hidden = true;
-    } catch (e) { /* storage blocked */ }
+    if (CODE_WINDOW) {
+      tb.classList.add('window');
+      host.style.pointerEvents = 'auto';
+      document.title = 'paperpush codegen: code';
+    } else {
+      try {
+        const pos = JSON.parse(sessionStorage.getItem('__ppToolbarPos') || 'null');
+        if (pos) placeToolbar(pos.left, pos.top);
+        panelHidden = sessionStorage.getItem('__ppPanel') === '0';
+      } catch (e) { /* storage blocked */ }
+    }
     render();
   }
 
@@ -588,6 +649,19 @@
     ui.prompt.hidden = false;
     setTimeout(() => { ui.promptInput.focus(); ui.promptInput.select(); }, 0);
   }
+  // Comment: a note at the end of the selected line (else the latest action): line_of_code  # note.
+  function openComment() {
+    if (!full) return;
+    const c = full.comment;
+    if (!c) { command({ cmd: 'comment', text: '' }); return; } // the session explains there is nothing to comment on
+    prompt = { kind: 'comment', index: c.index };
+    ui.promptLabel.textContent = 'comment on ' + c.what + ' →';
+    ui.promptLabel.title = c.what;
+    ui.promptInput.value = c.current || '';
+    ui.datalist.innerHTML = '';
+    ui.prompt.hidden = false;
+    setTimeout(() => { ui.promptInput.focus(); ui.promptInput.select(); }, 0);
+  }
   function openSave() {
     if (!full) return;
     prompt = { kind: 'save' };
@@ -598,10 +672,22 @@
     ui.prompt.hidden = false;
     setTimeout(() => { ui.promptInput.focus(); ui.promptInput.select(); }, 0);
   }
+  function openLoad() {
+    if (!full) return;
+    prompt = { kind: 'load' };
+    ui.promptLabel.textContent = 'load and play code from';
+    ui.promptLabel.title = 'A .py file saved by paperpush codegen (relative paths are from where paperpush codegen was started). It replaces the script; Undo brings it back';
+    ui.promptInput.value = full.savePath || '';
+    ui.datalist.innerHTML = '';
+    ui.prompt.hidden = false;
+    setTimeout(() => { ui.promptInput.focus(); ui.promptInput.select(); }, 0);
+  }
   function closePrompt() { prompt = null; if (ui.prompt) ui.prompt.hidden = true; }
   function submitPrompt() {
     if (!prompt) return;
     if (prompt.kind === 'save') command({ cmd: 'save', path: ui.promptInput.value });
+    else if (prompt.kind === 'load') command({ cmd: 'load', path: ui.promptInput.value });
+    else if (prompt.kind === 'comment') command({ cmd: 'comment', index: prompt.index, text: ui.promptInput.value });
     else command({ cmd: 'variable', index: prompt.index, name: ui.promptInput.value });
     closePrompt();
   }
@@ -665,14 +751,16 @@
     const cmd = btn.dataset.cmd;
     switch (cmd) {
       case 'variable': openVariable(); return;
+      case 'comment': openComment(); return;
       case 'save': openSave(); return;
+      case 'load': openLoad(); return;
       case 'pickoptions': command({ cmd: 'pick', purpose: 'options' }); return;
       case 'prompt-ok': submitPrompt(); return;
       case 'prompt-cancel': closePrompt(); return;
       case 'pickhtml': command({ cmd: 'pick', purpose: 'html' }); return;
       case 'panel':
-        ui.code.hidden = !ui.code.hidden;
-        try { sessionStorage.setItem('__ppPanel', ui.code.hidden ? '0' : '1'); } catch (err) { /* ignore */ }
+        panelHidden = !panelHidden;
+        try { sessionStorage.setItem('__ppPanel', panelHidden ? '0' : '1'); } catch (err) { /* ignore */ }
         render();
         return;
       default: command({ cmd });
@@ -690,16 +778,30 @@
     ui.play.disabled = s.playing && !s.paused;
     ui.pause.hidden = ui.stop.hidden = !s.playing;
     ui.pause.disabled = s.paused;
-    for (const c of ['record', 'branch', 'nextpath', 'endbranch', 'optional', 'variable', 'pickoptions']) ui[c].disabled = s.playing;
+    for (const c of ['load', 'record', 'branch', 'nextpath', 'endbranch', 'optional', 'comment', 'variable', 'pickoptions']) ui[c].disabled = s.playing;
     ui.optional.classList.toggle('active', !!s.optional);
     ui.optional.textContent = s.optional ? '? End Optional' : '? Optional';
     ui.undo.disabled = s.playing || !s.can_undo;
     ui.redo.disabled = s.playing || !s.can_redo;
-    ui.branch.disabled = s.playing || !!s.depth;
+    ui.branch.disabled = s.playing;
+    ui.branch.textContent = s.depth ? `⑂ Branch (${s.depth})` : '⑂ Branch';
     ui.nextpath.disabled = s.playing || !s.pathOpen;
     ui.endbranch.disabled = s.playing || !s.depth;
-    ui.panel.classList.toggle('active', !ui.code.hidden);
-    ui.depth.textContent = s.depth ? `in ${s.branch}` : '';
+    ui.depth.textContent = s.depth ? `in ${(s.branches && s.branches.length ? s.branches : [s.branch]).join(' › ')}` : '';
+    // The code shows here, or in its own window (then the embedded panel is hidden).
+    if (CODE_WINDOW) {
+      ui.codewindow.textContent = '⧈ Embed';
+      ui.codewindow.title = 'Show the code inside the recording window again (closes this window)';
+    } else {
+      ui.codewindow.textContent = '⧉ Window';
+      ui.codewindow.title = 'Show the code in a separate window';
+      // The bar (Window / Hide) stays when the code is hidden, so it can be shown again.
+      ui.codewrap.hidden = !!s.codeWindow;
+      ui.code.hidden = panelHidden;
+    }
+    ui.panel.hidden = CODE_WINDOW;
+    ui.panel.textContent = panelHidden ? '▸ Show code' : '▾ Hide code';
+    ui.panel.title = panelHidden ? 'Show the generated code' : 'Hide the generated code';
     const pickHelp = { html: 'Click an element to copy its HTML (Esc to cancel)', options: 'Click a dropdown, list or radio button: its options go into the code (Esc to cancel)' };
     setStatus(s.message || pickHelp[s.picking] || '');
 
@@ -714,7 +816,7 @@
         span.classList.toggle('sel', on);
         if (on && !selected) selected = span;
       }
-      if (!ui.code.hidden && selected && !codeSelected()) selected.scrollIntoView({ block: 'nearest' });
+      if (!ui.codewrap.hidden && selected && !codeSelected()) selected.scrollIntoView({ block: 'nearest' });
       return;
     }
     codeSig = sig;
@@ -734,7 +836,7 @@
       ui.code.appendChild(span);
       if (own && owner === s.selected && !selected) selected = span;
     });
-    if (ui.code.hidden) return;
+    if (ui.codewrap.hidden) return;
     if (s.selected !== null && s.selected !== undefined && selected) selected.scrollIntoView({ block: 'nearest' });
     else if (atBottom) ui.code.scrollTop = ui.code.scrollHeight;
   }
@@ -742,9 +844,13 @@
   // Where a toolbar control is on screen, for tests (the shadow root is closed to Playwright).
   window.__ppToolbarRect = (cmd) => {
     const el = root && root.querySelector(cmd.startsWith('.') ? cmd : `[data-cmd="${cmd}"]`);
-    if (!el) return null;
+    if (!el || !el.getClientRects().length) return null; // missing or hidden
     const r = el.getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
+  window.__ppToolbarText = (cmd) => {
+    const el = root && root.querySelector(cmd.startsWith('.') ? cmd : `[data-cmd="${cmd}"]`);
+    return el ? el.textContent : null;
   };
 
   // ------------------------------------------------------------- python -> us
@@ -756,7 +862,7 @@
     if (!state.picking) hideHighlight();
     if (IS_TOP && s.lines) { full = s; ensureHost(); render(); }
     // Replay tabs are driven by Playwright: keep the toolbar out of the way of its clicks.
-    if (host) host.style.display = s.hidden ? 'none' : '';
+    if (host && !CODE_WINDOW) host.style.display = s.hidden ? 'none' : '';
   };
 
   // Frames other than the top one only get a host (for the pick highlight) when they need it.

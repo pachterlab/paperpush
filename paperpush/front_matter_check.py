@@ -25,8 +25,21 @@ Three slips editors return a manuscript for, checked for every venue:
   venue, where the manuscript must not identify its authors; deferred to
   ``guidelines.title_page`` when the venue's guidelines already require the
   corresponding author's e-mail there.
+* ``front_matter.institutional_email`` -- the authors' e-mail addresses (in
+  the ``.sub``'s author list and on the manuscript's title page) are
+  institutional, not personal webmail (Gmail, Outlook, Yahoo, QQ, ...).
+  Editors and readers trust, and can verify, an institutional address, and
+  many journals ask for one. A warning, since an author with no institution
+  may have only a personal address. At a double-blind venue only the ``.sub``
+  is read.
+* ``front_matter.orcid`` -- at least one author's ORCID iD appears in the
+  ``.sub`` or the manuscript (or title page). ORCID iDs are optional at most
+  venues, so finding none is only a suggestion. Not applicable when the
+  venue already requires them (an ORCID on the title page in the guidelines,
+  or a required ORCID column in the author list), since those checks report it.
+  At a double-blind venue the suggestion points at the submission form only.
 
-Every finding is a WARNING: the abstract is located heuristically in extracted
+Abstract findings are WARNINGs: the abstract is located heuristically in extracted
 text.
 """
 
@@ -38,7 +51,7 @@ from pathlib import Path
 
 from . import document
 from .database import Field, Venue
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked, unchecked
+from .validate import DEFAULT_AUTHOR_FIELDS, SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked, unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +279,28 @@ _SPELLED_EMAIL = re.compile(
 )
 
 
+# Webmail and consumer-ISP domains: an address at one of these is personal, not institutional.
+PERSONAL_EMAIL_DOMAINS = frozenset(
+    "gmail.com googlemail.com outlook.com hotmail.com live.com msn.com aol.com icloud.com me.com mac.com "
+    "ymail.com rocketmail.com protonmail.com protonmail.ch proton.me pm.me tutanota.com tuta.io fastmail.com "
+    "zoho.com mail.com email.com gmx.com gmx.net gmx.de web.de t-online.de freenet.de mail.ru inbox.ru bk.ru "
+    "list.ru rambler.ru yandex.com yandex.ru ya.ru qq.com foxmail.com 163.com 126.com yeah.net sina.com sina.cn "
+    "sohu.com 139.com aliyun.com naver.com hanmail.net daum.net kakao.com rediffmail.com libero.it virgilio.it "
+    "tiscali.it alice.it orange.fr wanadoo.fr free.fr laposte.net sfr.fr btinternet.com sky.com comcast.net "
+    "verizon.net att.net sbcglobal.net bellsouth.net cox.net charter.net earthlink.net optonline.net "
+    "shaw.ca rogers.com sympatico.ca bigpond.com optusnet.com.au seznam.cz wp.pl o2.pl onet.pl interia.pl "
+    "uol.com.br bol.com.br terra.com.br hush.com".split()
+)
+# Webmail brands that register the same name under many country domains (yahoo.co.uk, hotmail.fr).
+_PERSONAL_EMAIL_BRANDS = re.compile(r"^(?:yahoo|hotmail|outlook|live|gmx|yandex|aol|msn)\.(?:[a-z]{2,3}\.)?[a-z]{2,3}$")
+
+
+def is_personal_email(address: str) -> bool:
+    """Whether ``address`` is at a webmail or consumer-ISP domain rather than an institution's."""
+    domain = address.rsplit("@", 1)[-1].strip().strip(".>").lower()
+    return domain in PERSONAL_EMAIL_DOMAINS or bool(_PERSONAL_EMAIL_BRANDS.match(domain))
+
+
 def emails_in(text: str) -> list[str]:
     """E-mail addresses written in ``text`` (as LaTeX ``\\email{}``, plain, or spelled out)."""
     found = EMAIL.findall(text) + _TEX_EMAIL.findall(text)
@@ -281,7 +316,55 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("front_matter.abstract_citations", "Abstract cites no references", FRONT_MATTER, _abstract_citations_check, venue, values)
     checks.run("front_matter.structured_abstract", "Abstract structured with the required headings", FRONT_MATTER, _structured_check, venue, values)
     checks.run("front_matter.contact_email", "Manuscript gives a contact e-mail address", FRONT_MATTER, _email_check, venue, values)
+    checks.run("front_matter.institutional_email", "Author e-mail addresses are institutional, not personal (Gmail, Outlook, ...)", FRONT_MATTER, _institutional_email_check, venue, values)
     checks.run("front_matter.keywords", "Keywords given in the .sub or the manuscript", FRONT_MATTER, _keywords_check, venue, values)
+    checks.run("front_matter.orcid", "ORCID iDs given in the .sub or the manuscript", FRONT_MATTER, _orcid_check, venue, values)
+
+
+# An ORCID iD (0000-0002-1825-0097, checksum X allowed), an orcid.org link, or LaTeX's \orcid / \orcidlink.
+ORCID = re.compile(r"(?<![\d-])\d{4}-\d{4}-\d{4}-\d{3}[\dX](?![\d-])|orcid\.org/\d|\\orcid(?:link|id)?\b", re.IGNORECASE)
+
+
+def _orcid_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    from .requirements_check import _existing, _fields_for, _paths
+    from .validate import _subfield_specs
+
+    reqs = _rules(venue, values)
+    if reqs is not None and "orcid" in (reqs.title_page.required_items or []):
+        raise NotApplicable("the author guidelines require ORCID iDs on the title page; see guidelines.title_page")
+    author_fields = [f for f in venue.fields if f.type == "authorlist" and "author" in f.id.lower()]
+    orcid_columns = [f for f in author_fields if any(name == "orcid" for name, _ in _subfield_specs(f.fields or DEFAULT_AUTHOR_FIELDS))]
+    if any(required for f in orcid_columns for name, required in _subfield_specs(f.fields or DEFAULT_AUTHOR_FIELDS) if name == "orcid"):
+        raise NotApplicable("the submission form requires each author's ORCID iD; see form.authors")
+    if ORCID.search("\n".join(str(v) for v in values.values())):
+        return Outcome([], "ORCID iD(s) given in the .sub")
+    files = [(f, p) for role in ("manuscript", "title_page") for f in _fields_for(venue, role) for p in _existing(_paths(f, values))]
+    authors_given = any(str(values.get(f.id, "")).strip() for f in author_fields)
+    if not files and not authors_given:
+        raise NotApplicable("no authors in the .sub and no manuscript file to read")
+    read = []
+    for _, path in files:
+        doc = document.get(path)
+        whole = "\n".join(t for t in (doc.tex_source, doc.text) if t)
+        if not whole:
+            continue
+        if ORCID.search(whole):
+            return Outcome([], f"ORCID iD(s) in {path.name}")
+        read.append(path.name)
+    if files and not read and not authors_given:
+        raise Unchecked("could not read " + ", ".join(p.name for _, p in files))
+    where = " or ".join(["the .sub"] + ([", ".join(read)] if read else []))
+    field_id = (orcid_columns or author_fields or [f for f, _ in files])[0].id
+    if orcid_columns:
+        place = "the ORCID column of the .sub's author list"
+    else:
+        place = "the authors' profiles in the submission portal"
+    if not venue.anonymous:
+        place += " and the manuscript's title page (next to each author's name)"
+    advice = f"consider adding ORCID iDs (at least the corresponding author's) to {place}. Many journals and funders ask for them, and they link the paper to the right author record"
+    if venue.anonymous:
+        advice += " (keep them out of the manuscript, which must stay anonymous)"
+    return Outcome([Issue(SUGGESTION, field_id, f"no ORCID iDs in {where}; {advice}")])
 
 
 # A "Keywords" label (at a line's start, or anywhere when followed by a colon or dash), or LaTeX's \\keywords{} and keyword environments.
@@ -312,7 +395,11 @@ def _keywords_check(venue: Venue, values: dict[str, str]) -> Outcome:
     if not read:
         raise Unchecked("could not read " + ", ".join(p.name for _, p in files))
     field_id = fields[0].id if fields else files[0][0].id
-    return Outcome([Issue(WARNING, field_id, f"no keywords in the .sub or in {', '.join(read)}; most venues and indexing services ask for them, so add 3-6 terms that say what the paper is about")])
+    rules = _rules(venue, values)
+    required = any(f.required or (f.min_count or 0) > 0 for f in fields) or bool(rules and (rules.keywords.min or 0) > 0)
+    level = WARNING if required else SUGGESTION
+    advice = "the venue requires keywords" if required else "consider adding keywords to help indexing and discovery"
+    return Outcome([Issue(level, field_id, f"no keywords in the .sub or in {', '.join(read)}; {advice}")])
 
 
 def _rules(venue: Venue, values: dict[str, str]):
@@ -407,4 +494,48 @@ def _email_check(venue: Venue, values: dict[str, str]) -> Outcome:
     return Outcome([Issue(WARNING, field.id, f"{path.name} gives no e-mail address; add the corresponding author's e-mail to the title page{hint}")])
 
 
-__all__ = ["TEX_CITE", "citations_in", "emails_in", "labelled", "manuscript_abstract", "run_checks"]
+def _title_page_emails(venue: Venue, values: dict[str, str]) -> tuple[Field, Path, list[str]] | None:
+    """The plain e-mail addresses on the manuscript's title page (or its first pages), or None with no manuscript."""
+    from .consistency import _title_page_source
+    from .manuscript import truncate_at_references
+
+    try:
+        field, path, front = _title_page_source(venue, values)
+    except Unchecked:
+        found = _manuscript(venue, values)
+        if found is None:
+            return None
+        field, path, doc = found
+        # No first pages to read (Markdown, plain text): the text before the references.
+        front = truncate_at_references(doc.text or "")
+    doc = document.get(path)
+    if doc.is_tex and doc.tex_source:
+        from .manuscript import title_page_text
+
+        front = (title_page_text(path) or "") + "\n" + front
+    return field, path, list(dict.fromkeys(EMAIL.findall(front)))
+
+
+def _institutional_email_check(venue: Venue, values: dict[str, str]) -> Outcome:
+    author_fields = [f for f in venue.fields if f.type == "authorlist"]
+    sources: list[tuple[str, str, list[str]]] = []  # (field id, where, addresses)
+    for f in author_fields:
+        found = list(dict.fromkeys(EMAIL.findall(str(values.get(f.id, "")))))
+        if found:
+            sources.append((f.id, "the .sub's author list", found))
+    if not venue.anonymous:
+        page = _title_page_emails(venue, values)
+        if page is not None and page[2]:
+            sources.append((page[0].id, f"the title page of {page[1].name}", page[2]))
+    if not sources:
+        raise NotApplicable("no author e-mail addresses in the .sub or on the title page")
+    issues: list[Issue] = []
+    for field_id, where, found in sources:
+        personal = [a for a in found if is_personal_email(a)]
+        if personal:
+            issues.append(Issue(SUGGESTION, field_id, f"{where} gives personal e-mail address(es): {', '.join(personal)}; use institutional addresses where the authors have them, especially the corresponding author's"))
+    n = len({a.lower() for _, _, found in sources for a in found})
+    return Outcome(issues, "" if issues else f"{n} e-mail address{'es' if n != 1 else ''}, all institutional")
+
+
+__all__ = ["ORCID", "TEX_CITE", "citations_in", "emails_in", "is_personal_email", "labelled", "manuscript_abstract", "run_checks"]

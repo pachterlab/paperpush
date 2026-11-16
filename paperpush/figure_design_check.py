@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from . import colorblind as cb
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .validate import SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 if TYPE_CHECKING:
     from .database import Venue
@@ -172,7 +172,7 @@ def _default_colors_check(drawings: list, unread: list[str], inv) -> Outcome:
     for tool, (codes, names, field_id) in by_tool.items():
         issues.append(
             Issue(
-                WARNING,
+                SUGGESTION,
                 field_id,
                 f"{', '.join(names[:6])}{' and others' if len(names) > 6 else ''} use{'s' if len(names) == 1 else ''} {tool} ({', '.join(codes)}), the plotting tool's default colors. " "Load one shared style in every figure script and assign colors by meaning (e.g. from the Okabe-Ito palette), so the same thing has the same color in every figure",
             )
@@ -184,7 +184,7 @@ _DESIGN_RULES = """\
 - Axis labels: every axis and color bar names the quantity, with its unit in parentheses when it has one ("Time (s)", "Expression (log2 TPM)"). Fail bare "x"/"y", a column name left in ("df$time", "value"), or a unit missing from a physical quantity.
 - Ticks and scale bars: plot axes keep their numeric tick labels; an image or micrograph has a scale bar (with its length stated) instead of axes.
 - Axis limits: bar charts start at zero; an axis zoomed onto clustered values (accuracies of 0.95-0.98 drawn to fill the panel) fails unless an axis break or the legend makes the zoom plain.
-- Chart type: no pie or donut charts (a bar or dot plot shows the same values more accurately); two quantities measured on the same items drawn as two separate bar charts should be one scatter of one against the other.
+- Chart type (optional style advice): consider a bar or dot plot instead of a pie or donut chart; consider a scatter plot for two quantities measured on the same items. A defensible chart choice alone is not a failure.
 - Color meaning: each color means one thing across every panel and figure. Fail a color that stands for treatment in one panel and cell type in the next, or a group (e.g. Control) drawn in different colors in different figures.
 - Color as the only channel: where color alone tells series or groups apart, a second channel (marker shape, line style, or a direct label) should too, so the figure survives gray printing and color-blind readers."""
 
@@ -212,7 +212,7 @@ def _design_task(checks: Checks, venue: "Venue", values: dict[str, str], inv) ->
             id="ai.figures.design",
             title=DESIGN_TITLE,
             category=FIGURES,
-            instructions=(f"{where} Look at every figure and panel and check these design rules:\n{_DESIGN_RULES}\n" + ("\n".join(lines) + "\n" if lines else "") + "Judge only these rules, not whether the content matches the legend, nor lettering size or typeface; other checks cover those. " "Photographs and micrographs are judged only on the scale bar. Report 'fail' naming each figure and panel, what is wrong, and the fix " "(e.g. 'Figure 2b: y axis labeled \"value\" with no unit; Figure 4: a pie chart of cell-type shares, use a bar chart'), else 'pass'."),
+            instructions=(f"{where} Look at every figure and panel and check these design rules:\n{_DESIGN_RULES}\n" + ("\n".join(lines) + "\n" if lines else "") + "Judge only these rules, not whether the content matches the legend, nor lettering size or typeface; other checks cover those. " "Photographs and micrographs are judged only on the scale bar. Report 'fail' naming each figure and panel, what is wrong, and the fix " "(e.g. 'Figure 2b: y axis labeled \"value\" with no unit'). Return 'suggest' when only optional chart-type or styling advice remains, else 'pass'."),
             files=files,
         )
     )

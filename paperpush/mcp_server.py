@@ -736,6 +736,10 @@ def validate_subfile(
     journal: Optional[str] = None,
     disable: Optional[list[str]] = None,
     enable: Optional[list[str]] = None,
+    plagiarism: bool = False,
+    plagiarism_provider: Optional[str] = None,
+    plagiarism_accept: Optional[list[str]] = None,
+    plagiarism_threshold: Optional[float] = None,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file and report every check.
 
@@ -841,6 +845,17 @@ def validate_subfile(
     `strict_style` reports every suggestion on style as a warning instead
     (only when the author or the venue wants the house style enforced).
 
+    `plagiarism` (off by default; only when the author asks for it) sends the
+    manuscript's text, without its reference list, to Winston AI or
+    Originality.ai (`plagiarism_provider`: winston, the default, or originality;
+    the key comes from WINSTON_API_KEY or ORIGINALITY_API_KEY in this server's environment)
+    and reports check integrity.plagiarism: the similarity score and every
+    matching source in its detail, and a warning when the score reaches
+    `plagiarism_threshold` percent (default 20). It costs credits on the
+    author's account. `plagiarism_accept` lists sources that may match (the
+    author's preprint: a domain, page URL, or DOI); they are still listed but
+    do not count toward the warning.
+
     `checks` lists every check with its status: passed, failed, warning,
     suggestion, unchecked (could not run here), needs_ai, not_implemented, or
     not_applicable. `errors` block submission; `warnings` are advisory;
@@ -859,7 +874,12 @@ def validate_subfile(
     files = {"manuscript": manuscript, "title_page": title_page, "cover_letter": cover_letter, "figures": figures, "tables": tables, "supplement": supplement}
     path, sub, venue_def, files_only, notes = _validation_inputs(subfile, manuscript_dir, venue, files, publisher, issn, journal)
     ai = AiOptions.from_results(ai_results, "the agent") if ai_results is not None else None
-    result = _run_validate_report(sub, venue_def, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, reproduce_figures=reproduce_figures, reproduce_minutes=reproduce_minutes, reproduce_download_gb=reproduce_download_gb, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, disable=disable or (), enable=enable or (), initial_submission=initial_submission, strict_style=strict_style, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
+    plagiarism_opts = None
+    if plagiarism:
+        from . import plagiarism_check
+
+        plagiarism_opts = plagiarism_check.options(plagiarism_provider, None, plagiarism_accept or (), plagiarism_threshold)
+    result = _run_validate_report(sub, venue_def, plagiarism=plagiarism_opts, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, reproduce_figures=reproduce_figures, reproduce_minutes=reproduce_minutes, reproduce_download_gb=reproduce_download_gb, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, disable=disable or (), enable=enable or (), initial_submission=initial_submission, strict_style=strict_style, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
     out: dict[str, Any] = {
         "path": str(path or ""),
         # When it ran and a fingerprint of each input, to tell later whether the result is stale.
@@ -1146,6 +1166,8 @@ def login_status(venue: Optional[str] = None, check: bool = False) -> dict[str, 
             return entry
         entry["method"] = credential.method
         entry["identity"] = credential.identity
+        if credential.provider:
+            entry["provider"] = credential.provider
         if credential.display_name:
             entry["display_name"] = credential.display_name
         entry["stored_in"] = "OS keyring" if credentials.credential_location(base) == "keyring" else "config file"
@@ -1177,8 +1199,17 @@ def login(
     verify: bool = True,
     verify_headless: bool = False,
     timeout_seconds: float = LOGIN_TIMEOUT_SECONDS,
+    method: str = "password",
+    provider: str = "",
 ) -> dict[str, Any]:
     """Ensure credentials are stored for a venue, running `paperpush login` if it can.
+
+    `method` selects "password" (venue email/username), "orcid", or "github".
+    GitHub is supported for Zenodo. Provider credentials stay in the terminal.
+    `provider` (with method "password") names the identity provider on a sign-in
+    page that offers several -- for the NCBI venues (sra, geo): ncbi (default),
+    era, google, orcid, login.gov, microsoft, nih. Ask the author which one their
+    account uses.
 
     Checks `login_status` first and returns `already_logged_in` without doing
     anything when credentials exist -- so it is safe to call unconditionally
@@ -1208,6 +1239,22 @@ def login(
     slug = _slug_from_reference(venue)
     resolved = _venue_or_error(slug)
     base = venues_pkg.submission_base(resolved.slug)
+    if method not in {"password", "orcid", "github"}:
+        raise ValueError("method must be password, orcid, or github")
+    if method == "github":
+        impl = venues_pkg.try_get_venue_impl(base)
+        if impl is None or not impl.supports_github_login:
+            raise ValueError(f"GitHub sign-in is not implemented for {base}")
+    if method == "orcid" and not venues_pkg.orcid_login_offered(base):
+        raise ValueError(f"ORCID sign-in is not offered for {base}")
+    provider = provider.strip().casefold()
+    if provider:
+        if method != "password":
+            raise ValueError("provider applies only with method='password'")
+        impl = venues_pkg.try_get_venue_impl(base)
+        offered = impl.login_providers if impl is not None else ()
+        if provider not in offered:
+            raise ValueError(f"{base} does not offer the sign-in provider {provider!r}" + (f"; choose from: {', '.join(offered)}" if offered else " (it has a single sign-in form)"))
     if not resolved.has_form or not venues_pkg.login_required(base):
         return {
             "status": "not_required",
@@ -1217,9 +1264,15 @@ def login(
         }
     command = _paperpush_command("login", base)
     display_command = " ".join(["paperpush", "login", base])
+    if method != "password":
+        command.append(f"--{method}")
+        display_command += f" --{method}"
+    if provider:
+        command += ["--provider", provider]
+        display_command += f" --provider {provider}"
 
     existing = credentials.get_credential(base)
-    if existing is not None:
+    if existing is not None and (method == "password" or existing.method == method) and (not provider or existing.provider == provider):
         identity = existing.identity
         return {
             "status": "already_logged_in",
@@ -1252,8 +1305,9 @@ def login(
     logger.info("login: running %s for %s", display_command, base)
     try:
         # Audited for B603 (subprocess without shell=True check): argv is a
-        # fixed list, never a shell string, and its only interpolated element is
-        # a venue slug already checked against the database by _venue_or_error.
+        # fixed list, never a shell string, and its only interpolated elements are
+        # a venue slug already checked against the database by _venue_or_error
+        # and a provider checked against the venue's login_providers.
         completed = subprocess.run(  # nosec B603
             command,
             capture_output=True,
@@ -1301,8 +1355,9 @@ def login(
 class SubmissionRun:
     """A detached ``paperpush submit`` process and the log it is writing."""
 
-    def __init__(self, process: subprocess.Popen, log_path: Path, log_file: IO[bytes], venue: str, subfile: Path, recover_dir: Optional[Path] = None, cdp_port: Optional[int] = None):
+    def __init__(self, process: subprocess.Popen, log_path: Path, log_file: IO[bytes], venue: str, subfile: Path, recover_dir: Optional[Path] = None, cdp_port: Optional[int] = None, sign_in_signal: Optional[Path] = None):
         self.process = process
+        self.sign_in_signal = sign_in_signal
         self.recover_dir = recover_dir
         self.cdp_port = cdp_port
         self.log_path = log_path
@@ -1317,7 +1372,7 @@ class SubmissionRun:
 
     def snapshot(self) -> dict[str, Any]:
         """Current state plus the tail of the run's output."""
-        from .venues.common import HOLD_OPEN_FAILED_BANNER, HOLD_OPEN_FINISHED_BANNER
+        from .venues.common import AWAITING_SIGN_IN_BANNER, HOLD_OPEN_FAILED_BANNER, HOLD_OPEN_FINISHED_BANNER, SIGN_IN_DONE_BANNER
 
         exit_code = self.process.poll()
         try:
@@ -1331,11 +1386,15 @@ class SubmissionRun:
             paused = recovery_channel.read_paused(self.recover_dir)
         # The banner hold_open printed last says why the process is parked: a
         # finished wizard and a failed one both stay `running` to keep the window.
-        held = next((line.strip() for line in reversed(lines) if line.strip() in (HOLD_OPEN_FINISHED_BANNER, HOLD_OPEN_FAILED_BANNER)), None)
+        # A manual sign-in prints its own pair of banners; the last banner of any
+        # kind is the one that says where the run is now.
+        held = next((line.strip() for line in reversed(lines) if line.strip() in (HOLD_OPEN_FINISHED_BANNER, HOLD_OPEN_FAILED_BANNER, AWAITING_SIGN_IN_BANNER, SIGN_IN_DONE_BANNER)), None)
         if exit_code is not None:
             state = "exited"
         elif paused:
             state = "paused"
+        elif held == AWAITING_SIGN_IN_BANNER:
+            state = "awaiting_sign_in"
         elif held == HOLD_OPEN_FINISHED_BANNER:
             state = "ready_for_review"
         elif held == HOLD_OPEN_FAILED_BANNER:
@@ -1353,7 +1412,9 @@ class SubmissionRun:
             "log_path": str(self.log_path),
             "log_tail": lines[-LOG_TAIL_LINES:],
         }
-        if state == "ready_for_review":
+        if state == "awaiting_sign_in":
+            report["next_step"] = _AWAITING_SIGN_IN_NEXT_STEP
+        elif state == "ready_for_review":
             report["next_step"] = _READY_NEXT_STEP
         elif state == "stopped_on_error":
             report["next_step"] = _STOPPED_NEXT_STEP
@@ -1409,6 +1470,14 @@ _PAUSED_NEXT_STEP = (
     "select, check, upload a .sub file). Finally call submit_resume with 'resolved' if the step is "
     "now done, 'retry' to have the script try it again, or 'abort' to stop. Never try to send the "
     "submission; it is refused, and that step is the author's."
+)
+
+_AWAITING_SIGN_IN_NEXT_STEP = (
+    "The portal needs a sign-in and the browser is waiting on its sign-in page. Ask the user to sign in "
+    "there themselves (password, ORCID, CAPTCHA, two-factor -- never ask for any of it in the chat). The "
+    "run notices the sign-in by itself and goes on filling; if it still says awaiting_sign_in after they "
+    "say they are signed in, call submit_signed_in. Poll submit_status sparingly meanwhile. The wait "
+    "gives up after 30 minutes."
 )
 
 _READY_NEXT_STEP = (
@@ -1473,6 +1542,7 @@ def submit(
     expose_cdp: bool = False,
     skip_validate: bool = False,
     confirm_new_submission: bool = False,
+    manual_login: bool = False,
     network_checks: bool = False,
     disable: Optional[list[str]] = None,
     enable: Optional[list[str]] = None,
@@ -1512,11 +1582,18 @@ def submit(
       `--skip-validate`): use it only when the author asked to skip
       validation, since an empty required field or missing file is then likely
       to break the run partway.
-    - A venue that requires login must already have stored credentials. Without
-      them the run would stall on a password prompt it has no terminal to ask on,
-      so it comes back as `action_required` with the `paperpush login` command
-      instead. Loginless public forms skip this preflight. Call `login_status`
-      first to tell which case applies.
+    - A venue that requires login must already have stored credentials, unless
+      `manual_login` is set. Without either, it comes back as `action_required`
+      with the `paperpush login` command instead. Loginless public forms skip
+      this preflight. Call `login_status` first to tell which case applies.
+
+    `manual_login` is for an author who would rather sign in in the browser
+    window than store a login with `paperpush login`: the run opens the portal's
+    sign-in page and waits there (state `awaiting_sign_in`) until they have
+    signed in, then fills the form. A saved session or stored credentials are
+    still used first when they work. Even without it, a headed run whose stored
+    credentials stop working falls back to the same wait. It needs a visible
+    browser, so it cannot be combined with `headless`.
 
     `headless` runs without a visible window -- only useful for a smoke test,
     since the point is a browser the author can look at. `new_session` discards
@@ -1573,14 +1650,17 @@ def submit(
         }
 
     base = venues_pkg.submission_base(venue.slug)
-    if venues_pkg.login_required(base) and credentials.get_credential(base) is None:
+    needs_login = venues_pkg.login_required(base)
+    if manual_login and headless and needs_login:
+        raise ValueError("manual_login needs a visible browser for the author to sign in to; drop headless")
+    if needs_login and not manual_login and credentials.get_credential(base) is None:
         return {
             "status": "action_required",
             "venue": venue.slug,
             "credential_stored_under": base,
             "subfile": str(path),
             "command": f"paperpush login {base}",
-            "reason": (f"No credentials are stored for {base}. Submitting would stall on a sign-in " "prompt with no terminal to answer it, so nothing was launched. Ask the user " "to run this command in their own terminal first."),
+            "reason": (f"No credentials are stored for {base}, so nothing was launched. Ask the user " "to run this command in their own terminal first, or, if they would rather sign in " "in the browser window, call submit again with manual_login=true."),
         }
 
     command = _paperpush_command("submit", str(path))
@@ -1595,6 +1675,14 @@ def submit(
 
             cdp_port = free_port()
             command += ["--cdp-port", str(cdp_port)]
+    # A headed run that has to sign in by hand waits on the page rather than on a
+    # terminal it does not have; submit_signed_in creates this file to say "done".
+    sign_in_signal: Optional[Path] = None
+    if needs_login and not headless:
+        sign_in_signal = (recover_dir or _submit_run_dir(venue.slug)) / "signed-in"
+        command += ["--sign-in-signal", str(sign_in_signal)]
+    if manual_login:
+        command.append("--manual-login")
     if headless:
         command.append("--headless")
     if new_session:
@@ -1649,7 +1737,7 @@ def submit(
         log_file.close()
         raise ValueError(f"could not start the submission: {exc}") from exc
 
-    run = SubmissionRun(process, log_path, log_file, venue.slug, path, recover_dir=recover_dir, cdp_port=cdp_port)
+    run = SubmissionRun(process, log_path, log_file, venue.slug, path, recover_dir=recover_dir, cdp_port=cdp_port, sign_in_signal=sign_in_signal)
     _RUNS[run.pid] = run
     logger.info("submit: launched %s for %s as pid %d (log: %s)", venue.slug, path, run.pid, log_path)
 
@@ -1662,7 +1750,7 @@ def submit(
         "headless": headless,
         "recovery": recover_dir is not None,
         **({"cdp_endpoint": f"http://127.0.0.1:{cdp_port}"} if cdp_port is not None else {}),
-        "next_step": ("The browser is opening and the wizard will fill itself in from the .sub file. " "Poll submit_status for progress until its `state` is no longer `filling`. If it reports recovery.paused, a step failed: " "inspect it with submit_page, fix it with submit_act, then call submit_resume. " "It stops before the final submit (state `ready_for_review`) -- tell the " "user to review the form in the browser and click submit themselves, then stop polling; call " "submit_close to shut the browser once they say they are done."),
+        "next_step": ("The browser is opening and the wizard will fill itself in from the .sub file. " "Poll submit_status for progress until its `state` is no longer `filling`. If it is `awaiting_sign_in`, ask the user to sign in in the browser window. If it reports recovery.paused, a step failed: " "inspect it with submit_page, fix it with submit_act, then call submit_resume. " "It stops before the final submit (state `ready_for_review`) -- tell the " "user to review the form in the browser and click submit themselves, then stop polling; call " "submit_close to shut the browser once they say they are done."),
     }
 
 
@@ -1676,7 +1764,9 @@ def submit_status(pid: Optional[int] = None) -> dict[str, Any]:
     not, and the tail of its output -- which is where the step it reached, or
     the traceback that stopped it, will appear.
 
-    `state` says where the run is: `filling` (keep polling), `paused` (a step
+    `state` says where the run is: `filling` (keep polling), `awaiting_sign_in`
+    (the browser waits on the portal's sign-in page for the author; see
+    submit_signed_in), `paused` (a step
     failed and waits for submit_page / submit_act / submit_resume),
     `ready_for_review` (the wizard finished and the browser is parked open for
     the author -- the normal, good end state; stop polling), `stopped_on_error`
@@ -1690,6 +1780,29 @@ def submit_status(pid: Optional[int] = None) -> dict[str, Any]:
             raise ValueError(f"no submission with pid {pid} was started by this server; " f"known pids: {sorted(_RUNS) or 'none'}")
         return run.snapshot()
     return {"submissions": [run.snapshot() for run in _RUNS.values()]}
+
+
+def submit_signed_in(pid: int) -> dict[str, Any]:
+    """Tell a run waiting at the sign-in page (`awaiting_sign_in`) that the author has signed in.
+
+    The run normally notices a finished sign-in on the page by itself. Call this
+    only when the author says they are signed in and `submit_status` still says
+    `awaiting_sign_in` -- a portal whose page cannot be read for it, or one that
+    left them somewhere unexpected. The run then saves the session and fills
+    the form. Never sign in for the author.
+    """
+    run = _RUNS.get(pid)
+    if run is None:
+        raise ValueError(f"no submission with pid {pid} was started by this server; " f"known pids: {sorted(_RUNS) or 'none'}")
+    if run.process.poll() is not None:
+        raise ValueError(f"submission {pid} has already exited (code {run.process.returncode})")
+    if run.sign_in_signal is None:
+        raise ValueError(f"submission {pid} does not sign in by hand (it is headless, or the portal needs no login)")
+    run.sign_in_signal.parent.mkdir(parents=True, exist_ok=True)
+    run.sign_in_signal.touch()
+    snapshot = run.snapshot()
+    snapshot["status"] = "signalled"
+    return snapshot
 
 
 def submit_close(pid: int) -> dict[str, Any]:
@@ -1888,6 +2001,7 @@ TOOLS = (
     submit_page,
     submit_act,
     submit_resume,
+    submit_signed_in,
     submit_close,
     recovery_report,
 )
@@ -1930,7 +2044,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile (format_manuscript reformats a .docx/.tex for the venue, with its template when one is found; convert_manuscript moves a manuscript between Markdown, Word, and LaTeX) -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status until `state` is `ready_for_review` (then stop polling; the process stays running to hold the browser); if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first); " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile (format_manuscript reformats a .docx/.tex for the venue, with its template when one is found; convert_manuscript moves a manuscript between Markdown, Word, and LaTeX) -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status until `state` is `ready_for_review` (then stop polling; the process stays running to hold the browser); if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first) -- " "or manual_login=true, when the author would rather sign in in the browser window: the run then waits " "(state `awaiting_sign_in`) until they have, continuing by itself or on submit_signed_in; " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal, and a manual_login run waits for them to sign in in the browser."),
     )
     for tool in TOOLS:
         server.tool()(tool)

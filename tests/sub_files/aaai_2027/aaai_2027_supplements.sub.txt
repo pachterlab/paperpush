@@ -82,12 +82,12 @@ technical_supplement: tests/manuscript_files/aaai_2027/declaration_of_interest.p
 # Media supplement (file, optional)
 #   Optional. Media (video / audio / images) supplement. Maximum 50 MB.
 #   each file at most 50 MB
-media_supplement: tests/manuscript_files/aaai_2027/cover_letter.pdf
+media_supplement: tests/manuscript_files/aaai_2027/media_supplement.zip
 
 # Code and data supplement (file, optional)
 #   Optional. Code and/or data supplement. Maximum 50 MB.
 #   each file at most 50 MB
-code_data_supplement: tests/manuscript_files/aaai_2027/manuscript.pdf
+code_data_supplement: tests/manuscript_files/aaai_2027/code_data_supplement.zip
 
 # Self-declared conflicts of interest (authorlist, optional)
 #   Optional. Self-declared conflicts of interest, one per line, in the same format as Authors: Open Review ID | Name | Email suffixes | Reciprocal Reviewer. Leave the Reciprocal Reviewer column blank -- it is not used for conflicts. If Open Review ID is added, then name and email suffixes are optional; otherwise the name is searched against OpenReview and must match a profile. Each conflict must NOT be one of the submission's authors. A profile that OpenReview's search does not return is warned about and skipped.

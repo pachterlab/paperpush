@@ -182,6 +182,16 @@ Read the whole file first. Every key has a comment describing it.
   declared; `ai_authorship_prohibited: yes` when AI tools may not be authors.
   Keep in `statements.notes` only what these keys cannot say (what the
   disclosure must contain, banned uses such as AI-generated images).
+- If the guidelines say a declaration (competing interests, data
+  availability, author contributions, ...) is given in the submission system
+  (a form, a declarations tool such as Elsevier's, or a file uploaded beside
+  the manuscript) rather than in the manuscript text, list it in
+  `statements.in_submission_form`, not `required`. `validate` then stops
+  looking for it in the manuscript, even when the publisher's house rules
+  require it there, and reminds the author to have it ready.
+- If the guidelines want the title page as the manuscript's first page with
+  the abstract starting on a new page, set `title_page.own_page: yes` (use
+  `title_page.separate_file` when it is uploaded as a file of its own).
 - If the guidelines let the initial submission be in any format, put that rule
   in one sentence in `manuscript.initial_submission_any_format`.
 - If the guidelines (or their style or language page) say how to write large

@@ -248,7 +248,7 @@ def _check_file_field(field: Field, raw: str) -> list[Issue]:
         if not _accepts_name(path.name, field.accept):
             issues.append(
                 Issue(
-                    WARNING,
+                    ERROR,
                     field.id,
                     f"{path.name} has extension '{path.suffix}'; " f"{field.label} expects one of {', '.join(field.accept)}",
                 )
@@ -330,7 +330,7 @@ def _annotation_for(field: Field, custom_validator=None):
     in one place (the database) and are not duplicated in this module. When the
     field sets ``options_recommended`` the list is advisory instead (the portal
     offers an "Other" free-text entry), so it validates as a plain string and an
-    off-list value is only warned about in :func:`validate`.
+    off-list value produces only a suggestion in :func:`validate`.
 
     ``custom_validator``, when given, is a venue-specific check contributed by
     the venue's runner module (see
@@ -1039,7 +1039,11 @@ def _reference_version_issues(venue: Venue, values: dict[str, str], ctx: _Refere
         arxiv_records=getattr(search, "arxiv_records", None),
         arxiv_checked=getattr(search, "arxiv_checked", ()),
     )
-    return Outcome(_findings_to_issues(findings), f"checked {len(cited) + len(arxiv_refs)} cited work(s) for a newer version")
+    issues = _findings_to_issues(findings)
+    # Citing an older arXiv version is a preference (the latest version); a published
+    # preprint or a work listed twice is a real reference error and stays a warning.
+    issues = [replace(i, level=SUGGESTION) if f.category == "older preprint version" else i for f, i in zip(findings, issues)]
+    return Outcome(issues, f"checked {len(cited) + len(arxiv_refs)} cited work(s) for a newer version")
 
 
 def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
@@ -1170,6 +1174,34 @@ def _openreview_profile_issues(venue: Venue, values: dict[str, str]) -> list[Iss
         return []
     logger.info("Checking OpenReview author profiles (%s)", venue.slug)
     return [Issue(ERROR if p.error else WARNING, p.field, f"openreview: {p.message}", unchecked=p.unchecked) for p in openreview_profiles.check(venue, values)]
+
+
+def _plagiarism_issues(venue: Venue, values: dict[str, str], options) -> "Outcome":
+    """Scan the manuscript's text with a plagiarism service (see :mod:`paperpush.plagiarism_check`).
+
+    Opt-in (``--plagiarism``); sends the text, without its reference list, to
+    the service. The score and the matching sources are always reported, in the
+    check's note; reaching the threshold is a warning.
+    """
+    from . import plagiarism_check
+    from .manuscript import manuscript_text, without_reference_list
+    from .requirements_check import manuscript_files
+
+    files = manuscript_files(venue, values)
+    if not files:
+        raise NotApplicable("no manuscript file to scan")
+    field_id = files[0][0].id
+    texts = []
+    for _, path in files:
+        text = manuscript_text(path)
+        if text is None:
+            raise Unchecked(f"could not read the text of {path.name}")
+        texts.append(without_reference_list(text))
+    try:
+        issues, detail = plagiarism_check.check_text("\n\n".join(texts), options, field_id)
+    except plagiarism_check.PlagiarismError as exc:
+        raise Unchecked(f"{options.name}: {exc}") from None
+    return Outcome(issues, detail)
 
 
 def _manuscript_requirement_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
@@ -1372,7 +1404,7 @@ class Checks:
         return tuple(swap(a) for a in args), {k: swap(v) for k, v in kwargs.items()}
 
     def _label_publisher_issues(self, fn, args: tuple, kwargs: dict, out: "Outcome") -> "Outcome":
-        """``out`` with the issues only the publisher's house rules raise turned into labelled warnings."""
+        """Label publisher-only findings, capping errors at warning and preserving suggestions."""
         from dataclasses import replace
 
         from .requirements import own_rules_only
@@ -1396,7 +1428,7 @@ class Checks:
             del self.ai_tasks[tasks:]
         own_issues = own_out.issues if isinstance(own_out, Outcome) else (own_out or [])
         own_keys = {(i.field, i.message) for i in own_issues}
-        labelled = [i if i.unchecked or (i.field, i.message) in own_keys else replace(i, level=WARNING, message=i.message + fallback.suffix) for i in out.issues]
+        labelled = [i if i.unchecked or (i.field, i.message) in own_keys else replace(i, level=WARNING if i.is_error else i.level, message=i.message + fallback.suffix) for i in out.issues]
         return Outcome(labelled, out.detail)
 
     def disabled_by(self, check_id: str) -> str:
@@ -1581,6 +1613,7 @@ def validate(
     cover_letter_max_age_days: int = 7,
     references_alphabetical: bool = False,
     references_citation_order: bool = False,
+    plagiarism=None,
     disable: Iterable[str] = (),
     enable: Iterable[str] = (),
 ) -> list[Issue]:
@@ -1612,6 +1645,7 @@ def validate(
         cover_letter_max_age_days=cover_letter_max_age_days,
         references_alphabetical=references_alphabetical,
         references_citation_order=references_citation_order,
+        plagiarism=plagiarism,
         disable=disable,
         enable=enable,
     ).issues()
@@ -1637,6 +1671,7 @@ def validate_report(
     cover_letter_max_age_days: int = 7,
     references_alphabetical: bool = False,
     references_citation_order: bool = False,
+    plagiarism=None,
     ai=None,
     subfile_path: str = "",
     ai_only: bool = False,
@@ -1715,6 +1750,12 @@ def validate_report(
     ``strict_style`` reports every suggestion (a stylistic finding, such as
     repetitive word choice or a spelled-out number) as a warning instead, for
     an author or venue that wants the house style enforced.
+
+    ``plagiarism`` (a :class:`~paperpush.plagiarism_check.PlagiarismOptions`)
+    sends the manuscript's text to Winston AI or Originality.ai and reports the
+    similarity score and the matching sources, warning at the threshold (see
+    :mod:`paperpush.plagiarism_check`). None (the default) leaves the check off:
+    it costs credits and shares the text with the service.
 
     ``cover_letter_max_age_days`` is how old the cover letter's date may be
     before it is reported (see :mod:`paperpush.cover_letter_check`, which also
@@ -1802,6 +1843,7 @@ def validate_report(
         (check_anonymous, "Anonymity"),
         (check_hidden_text, "Hidden text"),
         (openreview_applies and check_openreview, "OpenReview profiles"),
+        (plagiarism is not None, "Plagiarism"),
     )
     stages = ["Submission form"] + [label for on, label in optional if on]
     if check_manuscript:
@@ -1821,6 +1863,8 @@ def validate_report(
             checks.run("form.schema", "Field values have the right type and known field ids", form, _schema_issues, venue, values)
             _field_checks(checks, venue, form_values)
         checks.run("files.total_size", "Combined upload size within the portal's limit", "Files", _total_size_check, venue, values)
+        if not files_only and any(f.id == "biosample_attributes_file" for f in venue.fields):
+            checks.run("files.biosample_attributes", "BioSample attributes file follows its NCBI package (mandatory attributes, allowed values, formats)", "Files", _biosample_attributes_issues, venue, values)
 
     bar.run("Submission form", _form_checks)
 
@@ -1870,6 +1914,11 @@ def validate_report(
         bar.run("OpenReview profiles", checks.run, "integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, _openreview_profile_issues, venue, values)
     else:
         checks.record("integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, report.UNCHECKED, detail="switched off (--disable-integrity.openreview)")
+    plagiarism_title = "The manuscript's text does not match other sources (plagiarism scan)"
+    if plagiarism is not None:
+        bar.run("Plagiarism", checks.run, "integrity.plagiarism", plagiarism_title, integrity, _plagiarism_issues, venue, values, plagiarism)
+    else:
+        checks.record("integrity.plagiarism", plagiarism_title, integrity, report.UNCHECKED, detail="off by default: run with --plagiarism and WINSTON_API_KEY or ORIGINALITY_API_KEY set (sends the manuscript's text to that service; costs credits)")
 
     if check_manuscript:
         from . import requirements_check
@@ -2023,6 +2072,39 @@ def _total_size_check(venue: Venue, values: dict[str, str]) -> list[Issue]:
     return issues
 
 
+def _biosample_attributes_issues(venue: Venue, values: dict[str, str]) -> Outcome:
+    """Hold an NCBI BioSample attributes file to its package's attribute definitions (see :mod:`paperpush.biosample`)."""
+    from . import biosample
+
+    package = str(values.get("biosample_package") or "").strip()
+    raw = str(values.get("biosample_attributes_file") or "").strip()
+    if not package and not raw:
+        raise NotApplicable("no new BioSamples (no biosample_package or biosample_attributes_file)")
+    if not raw:
+        return Outcome([Issue(ERROR, "biosample_attributes_file", f"is empty, but biosample_package is {package}: fill in its attributes template, one row per sample")], biosample.template_links(package))
+    if not package:
+        return Outcome([Issue(ERROR, "biosample_package", f"is empty: name the BioSample package whose template biosample_attributes_file follows ({biosample.PACKAGES_URL})")])
+    path = Path(raw).expanduser()
+    if not path.is_file():
+        raise NotApplicable(f"biosample_attributes_file does not exist: {path} (reported under files.uploads)")
+    samples = None
+    metadata = Path(str(values.get("sra_metadata_file") or "").strip()).expanduser()
+    if str(values.get("sra_metadata_file") or "").strip() and metadata.is_file():
+        try:
+            header, rows = biosample.read_table(metadata, "SRA_data" if metadata.suffix.lower() == ".xlsx" else "")
+        except (ValueError, OSError, UnicodeDecodeError) as exc:
+            logger.debug("could not read %s for its sample names: %s", metadata, exc)
+        else:
+            if "sample_name" in header:
+                samples = [row.get("sample_name", "") for row in rows if not row.get("biosample_accession")]
+    try:
+        issues, pkg = biosample.check_attributes(path, package, metadata_samples=samples)
+    except (ValueError, UnicodeDecodeError) as exc:
+        return Outcome([Issue(ERROR, "biosample_attributes_file", f"could not be read ({exc}); save it as tab-delimited text or .xlsx")], biosample.template_links(package))
+    detail = f"{pkg.display_name if pkg else package}: {biosample.template_links(package)}"
+    return Outcome(issues, detail)
+
+
 def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     """The per-field checks, each recorded as its own check in the report."""
     from . import report
@@ -2073,7 +2155,7 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         # count is bounded by the generic item-count check below.
         #
         # When ``options_recommended`` is set, the list is advisory: an off-list
-        # value is allowed and only flagged as a WARNING (e.g. Bioinformatics'
+        # value is allowed and only flagged as a SUGGESTION (e.g. Bioinformatics'
         # free Keywords box, where any typed term is accepted, or Discrete
         # Mathematics' research-data statement, whose dropdown has an "Other"
         # free-text entry). Otherwise the list is closed. A closed multichoice is
@@ -2099,7 +2181,7 @@ def _field_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
                     entered = "added as a custom keyword" if field.type == "multichoice" else "entered as custom text"
                     buckets["options"].append(
                         Issue(
-                            WARNING,
+                            SUGGESTION,
                             field.id,
                             f"{field.label}: '{choice}' is not in the recommended " f"list; it will be {entered}",
                         )

@@ -39,8 +39,8 @@ from pathlib import Path
 
 from . import document
 from .database import Venue
-from .requirements import FigureRules, ManuscriptRequirements, get_requirements, resolve
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .requirements import FigureRules, ManuscriptRequirements, get_requirements, notes_mention, resolve
+from .validate import SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -639,7 +639,7 @@ def _raster_ai_task(checks: Checks, inv: _Inventory, rules: FigureRules) -> int:
     if rules.multipanel_labels:
         wants.append(f"multi-panel figures label their panels {rules.multipanel_labels}")
     if len(inv.figures) > 1:
-        wants.append("all figures use the same typeface (this is good practice even where the guidelines are silent)")
+        wants.append("all figures use the same typeface (optional style advice; return 'suggest' if this is the only finding)")
     if not wants:
         return 0
     lines = []
@@ -666,7 +666,7 @@ def _raster_ai_task(checks: Checks, inv: _Inventory, rules: FigureRules) -> int:
             id="ai.figures.raster_lettering",
             title="Lettering in raster figures (size, typeface, panel labels)",
             category=FIGURES,
-            instructions="These figures are pixel images, so their lettering cannot be measured from the file. The author guidelines ask for: " + "; ".join(wants) + ".\n" + "\n".join(lines) + "\nReport 'fail' naming each figure and what is wrong (e.g. axis tick labels too small, a serif font, unlabelled panels), else 'pass'.",
+            instructions="These figures are pixel images, so their lettering cannot be measured from the file. Check these guideline and readability rules, plus any explicitly optional style advice: " + "; ".join(wants) + ".\n" + "\n".join(lines) + "\nReport 'fail' naming each figure and what is wrong (e.g. axis tick labels too small, a serif font, unlabelled panels). Return 'suggest' if only optional typeface consistency advice remains, else 'pass'.",
             files=list(dict.fromkeys(files)),
         )
     )
@@ -1327,11 +1327,11 @@ def _font_consistency_check(checks: Checks, venue: Venue, values: dict[str, str]
         mixed = [(family, count) for family, count in others if count >= MIXED_MIN_CHARS and count / total >= MIXED_SHARE]
         if mixed:
             parts = ", ".join(f"{family} ({100 * count / total:.0f}%)" for family, count in mixed)
-            issues.append(Issue(WARNING, fig.field_id, f"{fig.name} mixes typefaces: {main} ({100 * families[main] / total:.0f}% of its lettering) and {parts}; set all of a figure's lettering in one typeface"))
+            issues.append(Issue(SUGGESTION, fig.field_id, f"{fig.name} mixes typefaces: {main} ({100 * families[main] / total:.0f}% of its lettering) and {parts}; set all of a figure's lettering in one typeface"))
     if len(main_of) > 1:
         groups = sorted(main_of.items(), key=lambda kv: -len(kv[1]))
         listed = "; ".join(f"{family}: {', '.join(names[:4])}{' and more' if len(names) > 4 else ''}" for family, names in groups)
-        issues.append(Issue(WARNING, "", f"the figures are set in different typefaces ({listed}); use one typeface for the lettering of every figure"))
+        issues.append(Issue(SUGGESTION, "", f"the figures are set in different typefaces ({listed}); use one typeface for the lettering of every figure"))
     queued = _raster_ai_task(checks, inv, rules)
     if not main_of:
         raise Unchecked(f"no vector lettering whose font can be read in the {where}" + (f"; {queued} raster figure(s) are queued for the AI check" if queued else ""))
@@ -1527,6 +1527,11 @@ def _read_figure_drawings(venue: Venue, values: dict[str, str], inv: _Inventory,
     return drawings
 
 
+# Guidelines that ask for colour-blind-safe figures make a confusable palette a warning;
+# elsewhere it is accessibility advice (a suggestion).
+_COLORBLIND_RULE = re.compile(r"(?i)colou?r[- ]?blind|colou?r[- ]vision|red[-/ ]green|colou?r[- ]?safe|accessible colou?r")
+
+
 def _colorblind_check(venue: Venue, values: dict[str, str], inv: _Inventory) -> Outcome:
     unread: list[str] = []
     drawings = _figure_drawings(venue, values, inv, unread)
@@ -1546,6 +1551,7 @@ def _colorblind_check(venue: Venue, values: dict[str, str], inv: _Inventory) -> 
     issues: list[Issue] = []
     if unread:
         issues.append(Issue(WARNING, "", could_not, unchecked=True))
+    level = WARNING if notes_mention(venue.slug, values, _COLORBLIND_RULE) else SUGGESTION
     for d in checked:
         pairs = d.confusions()
         if not pairs:
@@ -1554,7 +1560,7 @@ def _colorblind_check(venue: Venue, values: dict[str, str], inv: _Inventory) -> 
         listed = "; ".join(c.describe() for c in pairs)
         issues.append(
             Issue(
-                WARNING,
+                level,
                 d.field_id,
                 f"{d.name}: {listed} {'look' if len(pairs) == 1 else 'are pairs that look'} alike with red-green colour blindness "
                 f"(simulated {worst.deficiency}: colour difference {worst.simulated:.0f}, against {worst.normal:.0f} with normal vision). "
@@ -1608,7 +1614,8 @@ def _dimensions_check(inv: _Inventory, rules: FigureRules) -> list[Issue]:
 def _placement_check(venue: Venue, values: dict[str, str], inv: _Inventory, placement: str | None, reqs: ManuscriptRequirements) -> Outcome:
     from .requirements_check import _fields_for, manuscript_files
 
-    if not placement:
+    forbidden = bool(reqs.figures.embedded_forbidden)
+    if not placement and not forbidden:
         raise NotApplicable("the guidelines say nowhere in particular for figures to go")
     files = manuscript_files(venue, values)
     if not files:
@@ -1619,9 +1626,12 @@ def _placement_check(venue: Venue, values: dict[str, str], inv: _Inventory, plac
     issues: list[Issue] = []
     if placement == "combined_file":
         return _combined_placement(venue, values, inv, embedded)
-    if placement in ("separate", "separate_files"):
+    if placement in ("separate", "separate_files") or not placement:
         if has_fields and not attached and embedded:
             issues.append(Issue(WARNING, "", "the figures are only embedded in the manuscript; the author guidelines ask for each figure as a separate file"))
+        elif forbidden and embedded:
+            names = sorted({f.path.name for f in embedded})
+            issues.append(Issue(WARNING, embedded[0].field_id, f"{len(embedded)} figure(s) embedded in {', '.join(names)}; the author guidelines ask for figures only as separate files, not in the manuscript file"))
         return Outcome(issues, "figures attached as separate files" if attached else "")
     if not embedded:
         doc = document.get(files[0][1])

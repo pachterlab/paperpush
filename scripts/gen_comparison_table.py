@@ -175,7 +175,7 @@ def paperpush_column() -> dict:
 
 
 # Date the other tools' data was last researched (shown in the table).
-RESEARCHED = "2026-11-11"
+RESEARCHED = "2026-11-15"
 
 # --------------------------------------------------------------------------
 # Other tools. Researched 2026-11-07 from the vendors' sites and listings.
@@ -188,16 +188,16 @@ _CLOSED = (NO, "No")
 TOOLS = [
     {
         "name": "Paperpal",
-        "price": (NO, "Free tier; $25/mo"),
+        "price": (PARTIAL, "Free tier; $25/mo"),
         "open_source": _CLOSED,
         "tailored_checks": (PARTIAL, "Publisher Preflight only"),
         "num_checks": (YES, "30+"),
         "chk_references": (PARTIAL, "Hallucinated refs"),
-        "chk_figures": (NO, ""),
+        "chk_figures": (PARTIAL, "Citations, legends, captions"),
         "chk_limits": (YES, "Word counts"),
         "chk_layout": (UNKNOWN, "?"),
         "chk_anonymity": (NO, ""),
-        "chk_rigor": (PARTIAL, "Ethics statements"),
+        "chk_rigor": (PARTIAL, "Ethics, COI, funding statements"),
         "chk_language": (YES, ""),
         "reformat": (NO, ""),
         "requirement_db": (NO, ""),
@@ -224,7 +224,7 @@ TOOLS = [
     },
     {
         "name": "Penelope.ai",
-        "price": (NO, "Journals pay (from $750/mo)"),
+        "price": (NO, "£750+/yr (publisher) or $9.50/report (author)"),
         "open_source": _CLOSED,
         "tailored_checks": (YES, "Licensing journals"),
         "num_checks": (YES, "30+"),
@@ -244,7 +244,7 @@ TOOLS = [
         "transfer": (NO, ""),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
-        "privacy": (UNKNOWN, "?"),
+        "privacy": (PARTIAL, "Retained; metadata used for research"),
         "venue_picking": (NO, ""),
         "file_validation": (YES, "Track changes, counts"),
         "reviewer_selection": (NO, ""),
@@ -260,16 +260,16 @@ TOOLS = [
     },
     {
         "name": "Trinka AI",
-        "price": (NO, "Free tier; $80/yr"),
+        "price": (PARTIAL, "Free tier; $80/yr"),
         "open_source": _CLOSED,
         "tailored_checks": (NO, "Generic checks"),
         "num_checks": (YES, "25+"),
         "chk_references": (YES, "Retracted, hallucinated"),
-        "chk_figures": (UNKNOWN, "?"),
-        "chk_limits": (UNKNOWN, "?"),
-        "chk_layout": (UNKNOWN, "?"),
-        "chk_anonymity": (UNKNOWN, "?"),
-        "chk_rigor": (UNKNOWN, "?"),
+        "chk_figures": (PARTIAL, "Captions, citations"),
+        "chk_limits": (PARTIAL, "Manuscript length"),
+        "chk_layout": (PARTIAL, "Headings, format"),
+        "chk_anonymity": (NO, ""),
+        "chk_rigor": (PARTIAL, "Ethics, consent, trial IDs"),
         "chk_language": (YES, ""),
         "reformat": (PARTIAL, "Citations only"),
         "requirement_db": (NO, ""),
@@ -288,7 +288,7 @@ TOOLS = [
         "non_ai_checks": (UNKNOWN, "?"),
         "portal_db": (NO, ""),
         "web": (YES, ""),
-        "sources": ["https://trinka.ai/features", "https://trinka.ai/pricing", "https://www.trinka.ai/features"],
+        "sources": ["https://trinka.ai/features", "https://trinka.ai/pricing", "https://www.trinka.ai/features", "https://www.trinka.ai/features/technical-checks"],
     },
     {
         "name": "Research Eagle",
@@ -299,9 +299,9 @@ TOOLS = [
         "chk_references": (NO, ""),
         "chk_figures": (PARTIAL, "DPI"),
         "chk_limits": (YES, "Word limits"),
-        "chk_layout": (UNKNOWN, "?"),
-        "chk_anonymity": (UNKNOWN, "?"),
-        "chk_rigor": (UNKNOWN, "?"),
+        "chk_layout": (YES, ""),
+        "chk_anonymity": (YES, ""),
+        "chk_rigor": (PARTIAL, "COI, data, funding statements"),
         "chk_language": (NO, ""),
         "reformat": (NO, ""),
         "requirement_db": (PARTIAL, "18,960 journals, private"),
@@ -320,7 +320,7 @@ TOOLS = [
         "non_ai_checks": (YES, "Standard check uses no AI"),
         "portal_db": (NO, ""),
         "web": (YES, ""),
-        "sources": ["https://researcheagle.org/", "https://researcheagle.org/pricing", "https://researcheagle.org/privacy-policy/"],
+        "sources": ["https://researcheagle.org/", "https://researcheagle.org/pricing", "https://researcheagle.org/privacy-policy/", "https://researcheagle.org/check-my-manuscript/?sample=1"],
     },
     {
         "name": "Articlo",
@@ -328,13 +328,13 @@ TOOLS = [
         "open_source": _CLOSED,
         "tailored_checks": (YES, "2,875 journals"),
         "num_checks": (PARTIAL, "Formatting checklist"),
-        "chk_references": (NO, ""),
+        "chk_references": (PARTIAL, "Citation matching"),
         "chk_figures": (UNKNOWN, "?"),
-        "chk_limits": (UNKNOWN, "?"),
-        "chk_layout": (YES, "Applies journal layout"),
-        "chk_anonymity": (NO, ""),
-        "chk_rigor": (UNKNOWN, "?"),
-        "chk_language": (NO, ""),
+        "chk_limits": (PARTIAL, "Abstract length"),
+        "chk_layout": (YES, "Margins, fonts, spacing, line nos."),
+        "chk_anonymity": (PARTIAL, "Strips author metadata"),
+        "chk_rigor": (PARTIAL, "Ethics, competing interests"),
+        "chk_language": (PARTIAL, "Journal language checklist"),
         "reformat": (YES, "Word output"),
         "requirement_db": (PARTIAL, "2,875 journals, private"),
         "metadata_file": (NO, ""),
@@ -352,7 +352,7 @@ TOOLS = [
         "non_ai_checks": (YES, "Rule-based formatting"),
         "portal_db": (NO, ""),
         "web": (YES, ""),
-        "sources": ["https://getarticlo.com/", "https://getarticlo.com/journals"],
+        "sources": ["https://getarticlo.com/", "https://getarticlo.com/journals", "https://getarticlo.com/journals/academy-of-management-journal"],
     },
     {
         "name": "CheckMyManuscript",
@@ -363,7 +363,7 @@ TOOLS = [
         "chk_references": (PARTIAL, "Citation matching"),
         "chk_figures": (PARTIAL, "Citations, captions"),
         "chk_limits": (YES, "Word limits"),
-        "chk_layout": (UNKNOWN, "?"),
+        "chk_layout": (YES, ""),
         "chk_anonymity": (NO, ""),
         "chk_rigor": (NO, ""),
         "chk_language": (YES, ""),
@@ -381,14 +381,14 @@ TOOLS = [
         "file_validation": (PARTIAL, "Format checks"),
         "reviewer_selection": (YES, "Reviewer Finder"),
         "respond_reviewers": (NO, ""),
-        "non_ai_checks": (UNKNOWN, "?"),
+        "non_ai_checks": (NO, "Described as AI"),
         "portal_db": (NO, ""),
         "web": (YES, ""),
         "sources": ["https://checkmymanuscript.com/", "https://checkmymanuscript.com"],
     },
     {
         "name": "SciScore",
-        "price": (NO, "Paid; free via some journals"),
+        "price": (NO, "$39.99 for 3 reports"),
         "open_source": _CLOSED,
         "tailored_checks": (NO, "Rigor criteria only"),
         "num_checks": (PARTIAL, "Rigor score"),
@@ -408,7 +408,7 @@ TOOLS = [
         "transfer": (NO, ""),
         "portal_filling": (NO, ""),
         "offline": (NO, ""),
-        "privacy": (UNKNOWN, "?"),
+        "privacy": (PARTIAL, "Not shared with third parties"),
         "venue_picking": (NO, ""),
         "file_validation": (NO, ""),
         "reviewer_selection": (NO, ""),
@@ -419,6 +419,7 @@ TOOLS = [
         "sources": [
             "https://jmir.org/2022/6/e37324",
             "https://sciscore.com/",
+            "https://www.scicrunch.com/privacy-statement",
             "https://pmc.ncbi.nlm.nih.gov/articles/PMC7644557/",
         ],
     },
@@ -429,27 +430,24 @@ DEFAULT_TEXT = {YES: "Yes", NO: "No", PARTIAL: "Partial", UNKNOWN: "?"}
 CSS = """
 @page { size: 17in 15in; margin: 0.35in; }
 * { box-sizing: border-box; }
-body { margin: 0; padding: 16px; background: #ffffff; color: #1f2328;
-       font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
-h1 { font-size: 20px; margin: 0 0 4px; }
-p.sub { margin: 0 0 12px; color: #57606a; font-size: 12px; }
-table { border-collapse: separate; border-spacing: 3px; width: 100%; table-layout: fixed; }
-th, td { font-size: 11.5px; padding: 6px 5px; text-align: center; border-radius: 4px;
-         line-height: 1.25; }
-th.tool { background: #f6f8fa; font-weight: 600; vertical-align: bottom; }
-th.tool.us { background: #0969da; color: #fff; }
-td small { display: block; font-weight: 400; font-size: 9.5px; margin-top: 2px; }
-th.tool small { display: block; font-weight: 400; font-size: 10px; color: #6e7781; }
-th.feature { text-align: left; background: #f6f8fa; font-weight: 600; width: 190px; }
-tr.group th { text-align: left; font-size: 12.5px; font-weight: 700; padding: 12px 4px 3px;
-              background: none; border-bottom: 1.5px solid #1f2328; border-radius: 0; }
+body { margin: 0; padding: 16px; background: #ffffff; color: #000;
+       font-family: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif; }
+h1 { font-size: 21px; font-weight: 700; margin: 0 0 12px; }
+table { border-collapse: separate; border-spacing: 2px; width: 100%; table-layout: fixed; }
+th, td { font-size: 12px; padding: 6px 5px; text-align: center; line-height: 1.25; }
+th.tool { background: #eeeeee; font-weight: 700; vertical-align: bottom; }
+td small { display: block; font-weight: 400; font-size: 10px; margin-top: 2px; }
+th.tool small { display: block; font-weight: 400; font-size: 10px; color: #444; }
+th.feature { text-align: left; background: #eeeeee; font-weight: 700; width: 190px; }
+tr.group th { text-align: left; font-size: 13px; font-weight: 700; padding: 12px 4px 3px;
+              background: none; border-bottom: 1.5px solid #000; }
 td.yes { background: #c9f0d1; color: #0a5c22; }
 td.no { background: #ffd6d6; color: #8a1010; }
 td.partial { background: #ffe9b0; color: #6b4800; }
-td.unknown { background: #e5e7ea; color: #57606a; }
-td.us { font-weight: 700; outline: 2px solid #1a7f37; }
-.legend { margin-top: 10px; font-size: 11px; color: #57606a; }
-.legend span { display: inline-block; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
+td.unknown { background: #e5e7ea; color: #444; }
+.foot { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; font-size: 12px; }
+.legend span { display: inline-block; padding: 2px 8px; margin-right: 6px; }
+.checked { color: #000; }
 """
 
 
@@ -461,30 +459,28 @@ def cell(tool: dict, key: str) -> tuple[str, str, str]:
 
 def build_html(columns: list[dict]) -> str:
     head = ['<th class="feature">Feature</th>']
-    for i, t in enumerate(columns):
+    for t in columns:
         note = f"<small>{html.escape(t['note'])}</small>" if t.get("note") else ""
-        cls = "tool us" if i == 0 else "tool"
-        head.append(f'<th class="{cls}">{html.escape(t["name"])}{note}</th>')
+        head.append(f'<th class="tool">{html.escape(t["name"])}{note}</th>')
     rows = []
     for section, features in SECTIONS:
         rows.append(f'<tr class="group"><th colspan="{len(columns) + 1}">{html.escape(section)}</th></tr>')
         for key, label in features:
             tds = [f'<th class="feature">{html.escape(label)}</th>']
-            for i, t in enumerate(columns):
+            for t in columns:
                 status, text, note = cell(t, key)
-                cls = f"{status} us" if i == 0 else status
                 note_html = f"<small>{html.escape(note)}</small>" if note else ""
-                tds.append(f'<td class="{cls}">{html.escape(text)}{note_html}</td>')
+                tds.append(f'<td class="{status}">{html.escape(text)}{note_html}</td>')
             rows.append("<tr>" + "".join(tds) + "</tr>")
     return f"""<!doctype html><html><head><meta charset="utf-8">
 <title>PaperPush comparison</title><style>{CSS}</style></head><body>
 <h1>PaperPush compared with other manuscript tools</h1>
-<p class="sub">Feature support as advertised by each tool, checked {RESEARCHED}.</p>
 <table><thead><tr>{''.join(head)}</tr></thead><tbody>{''.join(rows)}</tbody></table>
-<div class="legend"><span style="background:#c9f0d1">Supported</span>
+<div class="foot"><div class="legend"><span style="background:#c9f0d1">Supported</span>
 <span style="background:#ffe9b0">Partial</span>
 <span style="background:#ffd6d6">Not supported</span>
 <span style="background:#e5e7ea">Unknown</span></div>
+<div class="checked">Checked on {RESEARCHED}</div></div>
 </body></html>"""
 
 

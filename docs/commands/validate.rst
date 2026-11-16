@@ -22,7 +22,11 @@ check manuscript files without a ``.sub``, with or without a venue (see
                              [--tables FILE [FILE ...]]
                              [--supplement FILE [FILE ...]]
                              [--publisher PUBLISHER] [--issn ISSN]
-                             [--journal TITLE]
+                             [--journal TITLE] [--plagiarism]
+                             [--plagiarism-provider {winston,originality}]
+                             [--plagiarism-api-key KEY]
+                             [--plagiarism-accept URL[,URL...]]
+                             [--plagiarism-threshold PERCENT]
                              [subfile]
 
 Synopsis
@@ -38,6 +42,7 @@ Synopsis
    paperpush validate --manuscript main.tex --figures fig1.png fig2.png   # no .sub, no venue
    paperpush validate --venue nature --manuscript main.pdf --cover-letter cover.docx
    paperpush validate --issn 0012-365X --manuscript main.pdf   # a journal paperpush does not list
+   paperpush validate biorxiv.sub.txt --plagiarism --plagiarism-accept 10.1101/2025.01.01.123456  # plagiarism scan (API key)
 
 ``validate`` prints a report of every check, grouped and colored by what
 happened to it: **failed** (red), **warnings** (amber), **suggestions**
@@ -115,10 +120,10 @@ leaves that check out. An ISSN or title that turns out to be a journal
 paperpush lists is checked against that venue's own guidelines. When the
 publisher has no house rules recorded, only the general checks run.
 
-Everything a house rule catches is a warning, marked "house rule", never an
-error: a journal can depart from its publisher's rules, so read the journal's
-own guidelines before acting on one. The same holds for a listed venue: where
-its own guidelines are silent and its publisher's house rules state a rule,
+Violations caught only by a house rule are capped at warning, marked
+"house rule"; optional style advice remains a suggestion. A journal can depart
+from its publisher's rules, so read the journal's own guidelines before acting
+on one. The same holds for a listed venue: where its own guidelines are silent and its publisher's house rules state a rule,
 that rule applies as a warning. These options are refused for a ``.sub`` made
 for a listed venue.
 
@@ -379,6 +384,29 @@ Arguments
    house style enforced. The report opens with a note saying how many were
    promoted. They then count toward ``prepare-submission``'s limit of 5
    warnings.
+
+``--plagiarism``
+   Scan the manuscript for text matching published sources (check
+   ``integrity.plagiarism``), through `Winston AI <https://gowinston.ai>`_ (the
+   default) or `Originality.ai <https://originality.ai>`_. Off by default: it sends the
+   manuscript's text (without its reference list, which always matches) to
+   that service and costs credits on your account (Winston AI charges 2
+   credits a word). The key is read from ``WINSTON_API_KEY`` or
+   ``ORIGINALITY_API_KEY`` (or given with ``--plagiarism-api-key KEY``, which
+   leaves it in your shell history); ``--plagiarism-provider`` picks the
+   service when both are set (otherwise Winston AI). Originality.ai is asked not to store the scan.
+
+   The report always shows the similarity score and the matching sources, so
+   you can see when a match is your own preprint. A score at or over
+   ``--plagiarism-threshold PERCENT`` (default 20) is a warning, listing each
+   source with a passage it matches; it is never an error, since methods
+   sections and quotations always match something. ``--plagiarism-accept``
+   (optional, repeatable, comma-separated) names sources that may match, such
+   as your preprint or an earlier conference version: a domain
+   (``biorxiv.org``), a page (any version and format of it), or a DOI. They
+   are still listed, marked "accepted", but do not count toward the warning.
+   If the service cannot be reached or refuses (a wrong key, no credits left),
+   the check is reported as not checked. Not available with ``--web``.
 
 ``--cover-letter-max-age DAYS``
    Warn when the date at the top of the cover letter is more than DAYS days

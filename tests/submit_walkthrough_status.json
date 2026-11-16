@@ -3,6 +3,7 @@
   "bioinformatics": "2026-11-03",
   "biorxiv": "2026-11-03",
   "bmc_bioinformatics": "2026-11-03",
+  "caltechdata": "2026-11-15",
   "cell": "2026-11-03",
   "cell_genomics": "2026-11-03",
   "cell_systems": "2026-11-03",
@@ -19,5 +20,6 @@
   "plos_compbio": "2026-11-03",
   "science": "2026-11-03",
   "science_robotics": "2026-11-03",
-  "science_signaling": "2026-11-03"
+  "science_signaling": "2026-11-03",
+  "zenodo": "2026-11-15"
 }

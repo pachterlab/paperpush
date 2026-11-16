@@ -185,6 +185,38 @@ def test_email_deferred_to_title_page_rule(tmp_path, rules):
     assert status == report.NOT_APPLICABLE and "guidelines.title_page" in detail
 
 
+def test_personal_email_domains():
+    for address in ("jane@gmail.com", "x@yahoo.co.uk", "x@hotmail.fr", "x@QQ.com", "x@proton.me"):
+        assert fm.is_personal_email(address), address
+    for address in ("jane@uni.edu", "x@caltech.edu", "x@ox.ac.uk", "x@mail.harvard.edu", "x@livestock.org"):
+        assert not fm.is_personal_email(address), address
+
+
+def test_personal_email_suggested_in_sub_and_title_page(tmp_path):
+    ms = _docx(tmp_path, ["Title", "Jane Doe", "Correspondence: jane.doe@gmail.com", "Abstract", "Text."])
+    authors = Field(id="authors", label="Authors", type="authorlist")
+    venue = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT, authors])
+    values = {"manuscript_file": ms, "authors": "Jane Doe | jane.doe@gmail.com | Uni | | yes\nJohn Roe | john@uni.edu | Uni | | no"}
+    status, message, _ = _run(values, venue)["front_matter.institutional_email"]
+    assert status == report.SUGGESTION
+    assert "the .sub's author list gives personal e-mail address(es): jane.doe@gmail.com" in message
+    assert "the title page of ms.docx gives personal e-mail address(es): jane.doe@gmail.com" in message
+    assert "john@uni.edu" not in message
+
+
+def test_institutional_email_passes(tmp_path):
+    ms = _docx(tmp_path, ["Title", "Jane Doe", "Correspondence: jane@uni.edu", "Abstract", "Text."])
+    status, _, detail = _run({"manuscript_file": ms})["front_matter.institutional_email"]
+    assert status == report.PASSED and "1 e-mail address, all institutional" in detail
+
+
+def test_institutional_email_double_blind_reads_only_sub(tmp_path):
+    ms = _docx(tmp_path, ["Title", "Contact: anon@gmail.com", "Abstract", "Text."])
+    venue = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT], anonymous=True)
+    status, _, _ = _run({"manuscript_file": ms}, venue)["front_matter.institutional_email"]
+    assert status == report.NOT_APPLICABLE
+
+
 # --- keywords -----------------------------------------------------------------------------------
 
 KEYWORDS = Field(id="keywords", label="Keywords", type="text")
@@ -199,7 +231,7 @@ def _text(tmp_path: Path, content: str, name: str = "ms.txt") -> str:
 
 def test_keywords_warned_when_absent_even_without_venue_rules(tmp_path):
     status, message, _ = _run({"manuscript_file": _text(tmp_path, "A title\n\nAbstract\n\nWe did it.\n")}, KEYWORD_VENUE)["front_matter.keywords"]
-    assert status == report.WARNING and "no keywords" in message and "ms.txt" in message
+    assert status == report.SUGGESTION and "no keywords" in message and "ms.txt" in message
 
 
 def test_keywords_in_the_sub_pass(tmp_path):
@@ -227,11 +259,74 @@ def test_keywords_in_the_manuscript_pass(tmp_path, name, content):
 
 def test_the_word_keywords_in_prose_does_not_count(tmp_path):
     status, _, _ = _run({"manuscript_file": _text(tmp_path, "A title\n\nWe searched the keywords in the corpus.\n")}, KEYWORD_VENUE)["front_matter.keywords"]
-    assert status == report.WARNING
+    assert status == report.SUGGESTION
 
 
 def test_keywords_not_applicable_without_a_file():
     assert _run({}, KEYWORD_VENUE)["front_matter.keywords"][0] == report.NOT_APPLICABLE
+
+
+# --- ORCID iDs -----------------------------------------------------------------------------------
+
+AUTHORS = Field(id="authors", label="Authors", type="authorlist")
+ORCID_VENUE = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT, AUTHORS])
+
+
+def test_orcid_suggested_when_none_anywhere(tmp_path):
+    values = {"manuscript_file": _text(tmp_path, "A title\n\nJane Doe\n\nAbstract\n"), "authors": "Jane Doe | jane@uni.edu | Uni | | yes"}
+    status, message, _ = _run(values, ORCID_VENUE)["front_matter.orcid"]
+    assert status == report.SUGGESTION
+    assert "no ORCID iDs in the .sub or ms.txt" in message and "ORCID column" in message and "title page" in message
+
+
+def test_orcid_in_the_sub_passes(tmp_path):
+    values = {"manuscript_file": _text(tmp_path, "A title\n"), "authors": "Jane Doe | jane@uni.edu | Uni | 0000-0002-1825-0097 | yes"}
+    status, _, detail = _run(values, ORCID_VENUE)["front_matter.orcid"]
+    assert status == report.PASSED and "the .sub" in detail
+
+
+@pytest.mark.parametrize(
+    "name, content",
+    [
+        ("ms.txt", "A title\nJane Doe (ORCID 0000-0001-5109-370X)\n"),
+        ("ms.txt", "A title\nJane Doe https://orcid.org/0000-0002-1825-0097\n"),
+        ("ms.tex", "\\documentclass{article}\n\\author{Jane Doe\\orcidlink{0000-0002-1825-0097}}\n\\begin{document}\nText.\n\\end{document}\n"),
+    ],
+)
+def test_orcid_in_the_manuscript_passes(tmp_path, name, content):
+    status, _, detail = _run({"manuscript_file": _text(tmp_path, content, name)}, ORCID_VENUE)["front_matter.orcid"]
+    assert status == report.PASSED and name in detail
+
+
+def test_orcid_lookalikes_do_not_count():
+    assert not fm.ORCID.search("phone 0123-4567-8901-2345-6789 and 12345-6789-0123-4567")
+    assert fm.ORCID.search("ORCID: 0000-0002-1825-0097.")
+
+
+def test_orcid_double_blind_points_at_the_form(tmp_path):
+    venue = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT, AUTHORS], anonymous=True)
+    values = {"manuscript_file": _text(tmp_path, "A title\n"), "authors": "Jane Doe | jane@uni.edu | Uni | | yes"}
+    status, message, _ = _run(values, venue)["front_matter.orcid"]
+    assert status == report.SUGGESTION and "title page" not in message and "must stay anonymous" in message
+
+
+def test_orcid_not_applicable_when_required(tmp_path, rules):
+    ms = _text(tmp_path, "A title\n")
+    required = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT, Field(id="authors", label="Authors", type="authorlist", fields=["name", "email", "orcid", "corresponding"])])
+    assert _run({"manuscript_file": ms}, required)["front_matter.orcid"][0] == report.NOT_APPLICABLE
+    rules({"title_page": {"required_items": ["orcid"]}})
+    status, _, detail = _run({"manuscript_file": ms}, ORCID_VENUE)["front_matter.orcid"]
+    assert status == report.NOT_APPLICABLE and "guidelines.title_page" in detail
+
+
+def test_orcid_not_applicable_with_nothing_to_read():
+    assert _run({}, ORCID_VENUE)["front_matter.orcid"][0] == report.NOT_APPLICABLE
+
+
+def test_orcid_without_a_form_column_points_at_the_portal(tmp_path):
+    venue = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT, Field(id="authors", label="Authors", type="authorlist", fields=["name", "email?", "corresponding"])])
+    status, message, _ = _run({"manuscript_file": _text(tmp_path, "A title\n"), "authors": "Jane Doe | j@u.edu | yes"}, venue)["front_matter.orcid"]
+    assert status == report.SUGGESTION and "submission portal" in message
 
 
 # --- where the abstract ends when there is no Introduction --------------------------------------

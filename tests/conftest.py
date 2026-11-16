@@ -136,6 +136,23 @@ def _no_network_conference_feeds(monkeypatch, tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
+def _no_network_biosample_packages(monkeypatch, tmp_path_factory):
+    """Keep the suite offline: NCBI's BioSample package definitions are "unreachable".
+
+    The cache is pointed at an empty per-test directory. A test of the package
+    rules patches ``biosample.fetch_package`` (or ``_download``) itself.
+    """
+    import paperpush.biosample as biosample
+
+    def offline(url):
+        raise OSError("offline (test suite)")
+
+    cache = tmp_path_factory.mktemp("biosample-cache")
+    monkeypatch.setattr(biosample, "_download", offline)
+    monkeypatch.setattr(biosample, "cache_dir", lambda: cache)
+
+
+@pytest.fixture(autouse=True)
 def _no_network_doi_checks(monkeypatch):
     """Keep the suite offline: stub DOI resolution to "unknown".
 
@@ -777,6 +794,41 @@ class SampleFiles:
         members = _latex_sources(title=title, authors=authors, abstract=abstract, figures=figures)
         path = self.root / f"{name}{ext}"
         path.write_bytes(_build_zip(members))
+        return path
+
+    # --- sequencing-archive deposits (SRA) ---------------------------------
+    # Two synthetic mouse samples, each with one paired-end RNA-Seq run. The
+    # three files agree with each other: the attributes name the samples the
+    # metadata rows cite, and the metadata names the FASTQ files.
+
+    def fastq(self, name: str, ext: str = ".gz", *, reads: int = 50, length: int = 150) -> Path:
+        """A small, valid gzip-compressed FASTQ file (``<name>`` ends in ``.fastq``)."""
+        import gzip
+        import random
+
+        rng = random.Random(name)  # deterministic per file name
+        mate = 2 if "_R2" in name else 1
+        lines = []
+        for i in range(reads):
+            lines += [f"@paperpush_read{i}/{mate}", "".join(rng.choice("ACGT") for _ in range(length)), "+", "I" * length]
+        path = self.root / f"{name}{ext}"
+        path.write_bytes(gzip.compress(("\n".join(lines) + "\n").encode(), mtime=0))
+        return path
+
+    def sra_biosample_attributes(self, name: str = "biosample_attributes", ext: str = ".tsv") -> Path:
+        """The NCBI 'Model organism or animal; version 1.0' attributes template, filled in for two samples."""
+        header = ["*sample_name", "sample_title", "bioproject_accession", "*organism", "strain", "isolate", "breed", "cultivar", "ecotype", "age", "dev_stage", "*collection_date", "*geo_loc_name", "*sex", "*tissue", "description"]
+        rows = [[f"pp_test_sample_{i}", f"PAPERPUSH TEST sample {i}", "", "Mus musculus", "C57BL/6J", "", "", "", "", "8 weeks", "", f"2025-01-1{i}", "USA: California", sex, tissue, "Synthetic paperpush test sample"] for i, sex, tissue in ((1, "male", "liver"), (2, "female", "brain"))]
+        path = self.root / f"{name}{ext}"
+        path.write_text("\n".join("\t".join(row) for row in [header, *rows]) + "\n", encoding="utf-8")
+        return path
+
+    def sra_metadata(self, name: str = "sra_metadata", ext: str = ".tsv") -> Path:
+        """The SRA_data sheet of NCBI's SRA metadata template: one paired-end run per sample."""
+        header = ["sample_name", "library_ID", "title", "library_strategy", "library_source", "library_selection", "library_layout", "platform", "instrument_model", "design_description", "filetype", "filename", "filename2", "filename3", "filename4", "assembly", "fasta_file"]
+        rows = [[f"pp_test_sample_{i}", f"pp_lib_{i}", f"PAPERPUSH TEST RNA-Seq of Mus musculus sample {i}", "RNA-Seq", "TRANSCRIPTOMIC", "cDNA", "paired", "ILLUMINA", "Illumina NovaSeq 6000", "PAPERPUSH TEST: poly-A selected RNA, stranded library prep, 2x150 bp.", "fastq", f"pp_test_{i}_R1.fastq.gz", f"pp_test_{i}_R2.fastq.gz", "", "", "", ""] for i in (1, 2)]
+        path = self.root / f"{name}{ext}"
+        path.write_text("\n".join("\t".join(row) for row in [header, *rows]) + "\n", encoding="utf-8")
         return path
 
 

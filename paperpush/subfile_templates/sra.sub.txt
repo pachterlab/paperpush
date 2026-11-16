@@ -3,6 +3,7 @@
 #
 # Edit the values below, then:
 #   - to validate against venue guidelines: `paperpush validate sra.sub.txt`
+#   - to fill out submission portal: `paperpush submit sra.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
 # To fill this in through a form instead, open it in the paperpush web page:
@@ -21,15 +22,24 @@
 # ----------------------------------------------------------------------
 
 # BioSample attributes file (file, optional)
-#   Wizard step 5 (BioSample attributes), for new BioSamples: the package's attributes template, filled in (one row per sample) and saved as a tab-delimited text file. Each sample name must be unique within your account, and samples must not have identical attributes (sample name, title and description are not counted).
+#   Wizard step 5 (BioSample attributes), for new BioSamples: the biosample_package's attributes template, one row per sample, as tab-delimited text or Excel (.xlsx; paperpush uploads it as TSV). Templates: https://submit.ncbi.nlm.nih.gov/biosample/template/?package-0=<package>&action=download_tsv (TSV) or https://www.ncbi.nlm.nih.gov/biosample/docs/templates/packages/<package>.xlsx (Excel), e.g. <package> = Model.organism.animal.1.0; what each attribute means and the value it takes: https://submit.ncbi.nlm.nih.gov/biosample/template/?package-0=<package>&action=definition. Mandatory columns are marked '*', and of attributes marked '**' (a group, such as strain/isolate/breed/cultivar/ecotype) each sample needs at least one; write 'not collected', 'not applicable' or 'missing' when a mandatory value is unknown. Fixed-choice attributes (sex) take one of their listed values; collection_date is a date such as 2024-03-15 (format the column as Text in Excel so it stays one); geo_loc_name starts with a country or ocean from https://www.insdc.org/submitting-standards/geo_loc_name-qualifier-vocabulary/, e.g. 'USA: California'; lat_lon is like '38.98 N 77.11 W'. Sample names must be unique within your account, and no two samples may have identical attributes (sample_title and description do not count): add a column, such as replicate, that tells them apart. paperpush validate checks the file against the package's definitions. Leave blank, with biosample_package, when the samples are already registered.
 biosample_attributes_file: 
 
-# SRA metadata file (file, optional)
-#   Wizard step 6 (SRA Metadata): the SRA_data sheet of NCBI's SRA metadata template saved as a tab-delimited (TSV) file; the wizard's built-in editor is the alternative. One row per experiment (sample + library + strategy + layout + instrument model) with a unique library_ID; columns sample_name (or sample_accession SAMN#), library_ID, title, library_strategy, library_source, library_selection, library_layout, platform, instrument_model, design_description, filetype and filename are required for all data, plus assembly (and fasta_file for a non-NCBI reference) for aligned data. Paired files go in the same row; exact, unique file names with extensions.
+# SRA metadata file (file, REQUIRED)
+#   Wizard step 6 (SRA Metadata): NCBI's template (https://ftp-trace.ncbi.nlm.nih.gov/sra/metadata_table/SRA_metadata.xlsx) filled in: the .xlsx itself (paperpush reads and uploads its SRA_data sheet as TSV) or that sheet saved as tab-delimited text. One row per experiment (sample + library + strategy + layout + instrument model) with a unique library_ID; columns sample_name (or biosample_accession SAMN# for registered samples), library_ID, title, library_strategy, library_source, library_selection, library_layout, platform, instrument_model, design_description, filetype and filename (filename2... for paired and further files), plus assembly (and fasta_file for a non-NCBI reference) for aligned data. Paired files go in the same row; file names must exactly match the uploaded files.
 sra_metadata_file: 
 
-# Sequence data files (filelist, REQUIRED)
-#   Wizard step 7 (Files): the sequence data files named in the SRA metadata, one path per line, uploaded to a preload folder (FTP or Aspera; best for all submissions) or through HTTP/Aspera in the browser (for a few small files). Raw reads with per-base quality scores only; no assemblies, contigs or consensus sequences. Files may be gzip- or bzip2-compressed and packaged in a tarball, but not zipped; each fastq file must be under 100 GB. Upload only files that contain sequence data.
+# Upload method (choice, optional)
+#   Wizard step 7 (Files). 'Web browser upload' sends data_files through the browser over HTTP and suits a few small files (each under 2 GB). For larger data, upload the files yourself by FTP or Aspera command line into a dedicated preload folder (see the portal's instructions), wait at least 10 minutes, and choose 'FTP or Aspera preload' with preload_folder. Cloud-bucket transfers are left to you in the portal.
+#   options: Web browser upload | FTP or Aspera preload
+upload_method: 
+
+# Preload folder (text, optional)
+#   Wizard step 7, with upload_method 'FTP or Aspera preload': the name of the preload folder that holds this submission's files (one folder per submission, not your root directory).
+preload_folder: 
+
+# Sequence data files (filelist, optional)
+#   Wizard step 7 (Files), with 'Web browser upload': the sequence data files named in the SRA metadata, one path per line; each file name must exactly match a filename column there and be unique. Raw reads with per-base quality scores only; no assemblies, contigs or consensus sequences. Compress with gzip or bzip2 (never zip); a tarball is allowed. Each fastq file must be under 100 GB. File names appear publicly, so they must not contain sensitive information. Leave blank with 'FTP or Aspera preload'.
 #   each file at most 100000 MB
 data_files: |
   
@@ -39,73 +49,135 @@ data_files: |
 # ----------------------------------------------------------------------
 
 # Project title (text, optional)
-#   Wizard step 3 (Project Info), for a new BioProject: the title of the study. It appears in the public record, so it must not contain sensitive or personally identifying information.
+#   Wizard step 3 (Project Info), for a new BioProject (ignored when bioproject is given): a brief title, as a phrase or short sentence, for public display, e.g. 'Global studies of microbial diversity on human skin'. 20-250 characters. It is public, so it must not contain sensitive or personally identifying information.
+#   at most 250 characters
+#   at least 20 characters
 title: 
 
-# Description (textarea, optional)
-#   Wizard step 3 (Project Info), for a new BioProject: the project description, which BioProject requires. Give enough information for users to fully understand the research study and include all of its goals.
+# Public description (textarea, optional)
+#   Wizard step 3 (Project Info), for a new BioProject: a paragraph describing the study goals and relevance, enough for users to understand the research study. 20-4000 characters.
+#   at most 4000 characters
+#   at least 20 characters
 abstract: |
   
 
 # BioProject accession (text, optional)
-#   Wizard step 2 (General Info). The accession (PRJNA#) of a BioProject you already registered, so the wizard skips creating one; leave blank to register a new BioProject in the wizard (its accession is assigned after the SRA submission is finished). The project must exist and must not be an umbrella or RefSeq project. To add data to an existing study, give its PRJNA# here rather than creating a duplicate project.
+#   Wizard step 2 (General Info). The accession (PRJNA#) of a BioProject you already registered; the wizard then skips the Project Info step. Leave blank to register a new BioProject in this submission (its accession is assigned after the submission is processed). The project must exist and must not be an umbrella or RefSeq project. To add data to an existing study, give its PRJNA# rather than creating a duplicate project.
 bioproject: 
 
+# Release date (text, optional)
+#   Wizard step 2 (General Info). Leave blank (or write 'immediately') to release immediately following processing, or give a date as YYYY-MM-DD to release on that date or upon publication, whichever is first. The portal accepts dates from one week to four years ahead. It can be changed later in the Submission Portal; it also sets the release of the BioProject and BioSamples.
+release_date: 
+
+# Relevance (choice, optional)
+#   Wizard step 3 (Project Info), for a new BioProject: the primary general relevance of the study. 'Other' needs relevance_description.
+#   options: Agricultural | Medical | Industrial | Environmental | Evolution | Model organism | Other
+relevance: 
+
+# Relevance description (text, optional)
+#   Wizard step 3, required by the portal when relevance is 'Other': a few words on the study's relevance.
+relevance_description: 
+
 # BioSample package (choice, optional)
-#   Wizard step 4 (BioSample type), for new BioSamples: the package that best describes your samples (NCBI's BioSample packages, by display name). Human data that needs controlled access goes to dbGaP, not SRA.
-#   options: Generic | SARS-CoV-2: clinical or host-associated; version 1.0 | SARS-CoV-2: wastewater surveillance; version 1.0 | Pathogen: clinical or host-associated; version 1.0 | Pathogen: environmental/food/other; version 1.0 | One Health Enteric; version 1.0 | PHA4GE: wastewater surveillance; version 1.0 | Microbe; version 1.0 | Model organism or animal; version 1.0 | Metagenome or environmental; version 1.0 | Invertebrate; version 1.0 | Human; version 1.0 | Plant; version 1.0 | Virus; version 1.0 | Beta-lactamase; version 1.0 | MIGS: cultured bacteria/archaea; version 6.0 | MIGS: cultured bacteria/archaea, agriculture; version 6.0 | MIGS: cultured bacteria/archaea, air; version 6.0 | MIGS: cultured bacteria/archaea, built; version 6.0 | MIGS: cultured bacteria/archaea, food-animal and animal feed; version 6.0 | MIGS: cultured bacteria/archaea, food-farm environment; version 6.0 | MIGS: cultured bacteria/archaea, food-food production facility; version 6.0 | MIGS: cultured bacteria/archaea, food-human foods; version 6.0 | MIGS: cultured bacteria/archaea, host-associated; version 6.0 | MIGS: cultured bacteria/archaea, human-associated; version 6.0 | MIGS: cultured bacteria/archaea, human-gut; version 6.0 | MIGS: cultured bacteria/archaea, human-oral; version 6.0 | MIGS: cultured bacteria/archaea, human-skin; version 6.0 | MIGS: cultured bacteria/archaea, human-vaginal; version 6.0 | MIGS: cultured bacteria/archaea, hydrocarbon resources-cores; version 6.0 | MIGS: cultured bacteria/archaea, hydrocarbon resources-fluids/swabs; version 6.0 | MIGS: cultured bacteria/archaea, microbial; version 6.0 | MIGS: cultured bacteria/archaea, miscellaneous; version 6.0 | MIGS: cultured bacteria/archaea, plant-associated; version 6.0 | MIGS: cultured bacteria/archaea, sediment; version 6.0 | MIGS: cultured bacteria/archaea, soil; version 6.0 | MIGS: cultured bacteria/archaea, symbiont-associated; version 6.0 | MIGS: cultured bacteria/archaea, wastewater; version 6.0 | MIGS: cultured bacteria/archaea, water; version 6.0 | MIGS: eukaryote; version 6.0 | MIGS: eukaryote, agriculture; version 6.0 | MIGS: eukaryote, air; version 6.0 | MIGS: eukaryote, built; version 6.0 | MIGS: eukaryote, food-animal and animal feed; version 6.0 | MIGS: eukaryote, food-farm environment; version 6.0 | MIGS: eukaryote, food-food production facility; version 6.0 | MIGS: eukaryote, food-human foods; version 6.0 | MIGS: eukaryote, host-associated; version 6.0 | MIGS: eukaryote, human-associated; version 6.0 | MIGS: eukaryote, human-gut; version 6.0 | MIGS: eukaryote, human-oral; version 6.0 | MIGS: eukaryote, human-skin; version 6.0 | MIGS: eukaryote, human-vaginal; version 6.0 | MIGS: eukaryote, hydrocarbon resources-cores; version 6.0 | MIGS: eukaryote, hydrocarbon resources-fluids/swabs; version 6.0 | MIGS: eukaryote, microbial; version 6.0 | MIGS: eukaryote, miscellaneous; version 6.0 | MIGS: eukaryote, plant-associated; version 6.0 | MIGS: eukaryote, sediment; version 6.0 | MIGS: eukaryote, soil; version 6.0 | MIGS: eukaryote, symbiont-associated; version 6.0 | MIGS: eukaryote, wastewater; version 6.0 | MIGS: eukaryote, water; version 6.0 | MIGS: virus; version 6.0 | MIGS: virus, agriculture; version 6.0 | MIGS: virus, air; version 6.0 | MIGS: virus, built; version 6.0 | MIGS: virus, food-animal and animal feed; version 6.0 | MIGS: virus, food-farm environment; version 6.0 | MIGS: virus, food-food production facility; version 6.0 | MIGS: virus, food-human foods; version 6.0 | MIGS: virus, host-associated; version 6.0 | MIGS: virus, human-associated; version 6.0 | MIGS: virus, human-gut; version 6.0 | MIGS: virus, human-oral; version 6.0 | MIGS: virus, human-skin; version 6.0 | MIGS: virus, human-vaginal; version 6.0 | MIGS: virus, hydrocarbon resources-cores; version 6.0 | MIGS: virus, hydrocarbon resources-fluids/swabs; version 6.0 | MIGS: virus, microbial; version 6.0 | MIGS: virus, miscellaneous; version 6.0 | MIGS: virus, plant-associated; version 6.0 | MIGS: virus, sediment; version 6.0 | MIGS: virus, soil; version 6.0 | MIGS: virus, symbiont-associated; version 6.0 | MIGS: virus, wastewater; version 6.0 | MIGS: virus, water; version 6.0 | MIMAG: metagenome-assembled genome; version 6.0 | MIMAG: metagenome-assembled genome, agriculture; version 6.0 | MIMAG: metagenome-assembled genome, air; version 6.0 | MIMAG: metagenome-assembled genome, built; version 6.0 | MIMAG: metagenome-assembled genome, food-animal and animal feed; version 6.0 | MIMAG: metagenome-assembled genome, food-farm environment; version 6.0 | MIMAG: metagenome-assembled genome, food-food production facility; version 6.0 | MIMAG: metagenome-assembled genome, food-human foods; version 6.0 | MIMAG: metagenome-assembled genome, host-associated; version 6.0 | MIMAG: metagenome-assembled genome, human-associated; version 6.0 | MIMAG: metagenome-assembled genome, human-gut; version 6.0 | MIMAG: metagenome-assembled genome, human-oral; version 6.0 | MIMAG: metagenome-assembled genome, human-skin; version 6.0 | MIMAG: metagenome-assembled genome, human-vaginal; version 6.0 | MIMAG: metagenome-assembled genome, hydrocarbon resources-cores; version 6.0 | MIMAG: metagenome-assembled genome, hydrocarbon resources-fluids/swabs; version 6.0 | MIMAG: metagenome-assembled genome, microbial; version 6.0 | MIMAG: metagenome-assembled genome, miscellaneous; version 6.0 | MIMAG: metagenome-assembled genome, plant-associated; version 6.0 | MIMAG: metagenome-assembled genome, sediment; version 6.0 | MIMAG: metagenome-assembled genome, soil; version 6.0 | MIMAG: metagenome-assembled genome, symbiont-associated; version 6.0 | MIMAG: metagenome-assembled genome, wastewater; version 6.0 | MIMAG: metagenome-assembled genome, water; version 6.0 | MIMARKS: specimen; version 6.0 | MIMARKS: specimen, agriculture; version 6.0 | MIMARKS: specimen, air; version 6.0 | MIMARKS: specimen, built; version 6.0 | MIMARKS: specimen, food-animal and animal feed; version 6.0 | MIMARKS: specimen, food-farm environment; version 6.0 | MIMARKS: specimen, food-food production facility; version 6.0 | MIMARKS: specimen, food-human foods; version 6.0 | MIMARKS: specimen, host-associated; version 6.0 | MIMARKS: specimen, human-associated; version 6.0 | MIMARKS: specimen, human-gut; version 6.0 | MIMARKS: specimen, human-oral; version 6.0 | MIMARKS: specimen, human-skin; version 6.0 | MIMARKS: specimen, human-vaginal; version 6.0 | MIMARKS: specimen, hydrocarbon resources-cores; version 6.0 | MIMARKS: specimen, hydrocarbon resources-fluids/swabs; version 6.0 | MIMARKS: specimen, microbial; version 6.0 | MIMARKS: specimen, miscellaneous; version 6.0 | MIMARKS: specimen, plant-associated; version 6.0 | MIMARKS: specimen, sediment; version 6.0 | MIMARKS: specimen, soil; version 6.0 | MIMARKS: specimen, symbiont-associated; version 6.0 | MIMARKS: specimen, wastewater; version 6.0 | MIMARKS: specimen, water; version 6.0 | MIMARKS: survey, agriculture; version 6.0 | MIMARKS: survey, air; version 6.0 | MIMARKS: survey, built; version 6.0 | MIMARKS: survey, food-animal and animal feed; version 6.0 | MIMARKS: survey, food-farm environment; version 6.0 | MIMARKS: survey, food-food production facility; version 6.0 | MIMARKS: survey, food-human foods; version 6.0 | MIMARKS: survey, host-associated; version 6.0 | MIMARKS: survey, human-associated; version 6.0 | MIMARKS: survey, human-gut; version 6.0 | MIMARKS: survey, human-oral; version 6.0 | MIMARKS: survey, human-skin; version 6.0 | MIMARKS: survey, human-vaginal; version 6.0 | MIMARKS: survey, hydrocarbon resources-cores; version 6.0 | MIMARKS: survey, hydrocarbon resources-fluids/swabs; version 6.0 | MIMARKS: survey, microbial; version 6.0 | MIMARKS: survey, miscellaneous; version 6.0 | MIMARKS: survey, plant-associated; version 6.0 | MIMARKS: survey, sediment; version 6.0 | MIMARKS: survey, soil; version 6.0 | MIMARKS: survey, symbiont-associated; version 6.0 | MIMARKS: survey, wastewater; version 6.0 | MIMARKS: survey, water; version 6.0 | MIMS: metagenome/environmental, agriculture; version 6.0 | MIMS: metagenome/environmental, air; version 6.0 | MIMS: metagenome/environmental, built; version 6.0 | MIMS: metagenome/environmental, food-animal and animal feed; version 6.0 | MIMS: metagenome/environmental, food-farm environment; version 6.0 | MIMS: metagenome/environmental, food-food production facility; version 6.0 | MIMS: metagenome/environmental, food-human foods; version 6.0 | MIMS: metagenome/environmental, host-associated; version 6.0 | MIMS: metagenome/environmental, human-associated; version 6.0 | MIMS: metagenome/environmental, human-gut; version 6.0 | MIMS: metagenome/environmental, human-oral; version 6.0 | MIMS: metagenome/environmental, human-skin; version 6.0 | MIMS: metagenome/environmental, human-vaginal; version 6.0 | MIMS: metagenome/environmental, hydrocarbon resources-cores; version 6.0 | MIMS: metagenome/environmental, hydrocarbon resources-fluids/swabs; version 6.0 | MIMS: metagenome/environmental, microbial; version 6.0 | MIMS: metagenome/environmental, miscellaneous; version 6.0 | MIMS: metagenome/environmental, plant-associated; version 6.0 | MIMS: metagenome/environmental, sediment; version 6.0 | MIMS: metagenome/environmental, soil; version 6.0 | MIMS: metagenome/environmental, symbiont-associated; version 6.0 | MIMS: metagenome/environmental, wastewater; version 6.0 | MIMS: metagenome/environmental, water; version 6.0 | MISAG: single amplified genome; version 6.0 | MISAG: single amplified genome, agriculture; version 6.0 | MISAG: single amplified genome, air; version 6.0 | MISAG: single amplified genome, built; version 6.0 | MISAG: single amplified genome, food-animal and animal feed; version 6.0 | MISAG: single amplified genome, food-farm environment; version 6.0 | MISAG: single amplified genome, food-food production facility; version 6.0 | MISAG: single amplified genome, food-human foods; version 6.0 | MISAG: single amplified genome, host-associated; version 6.0 | MISAG: single amplified genome, human-associated; version 6.0 | MISAG: single amplified genome, human-gut; version 6.0 | MISAG: single amplified genome, human-oral; version 6.0 | MISAG: single amplified genome, human-skin; version 6.0 | MISAG: single amplified genome, human-vaginal; version 6.0 | MISAG: single amplified genome, hydrocarbon resources-cores; version 6.0 | MISAG: single amplified genome, hydrocarbon resources-fluids/swabs; version 6.0 | MISAG: single amplified genome, microbial; version 6.0 | MISAG: single amplified genome, miscellaneous; version 6.0 | MISAG: single amplified genome, plant-associated; version 6.0 | MISAG: single amplified genome, sediment; version 6.0 | MISAG: single amplified genome, soil; version 6.0 | MISAG: single amplified genome, symbiont-associated; version 6.0 | MISAG: single amplified genome, wastewater; version 6.0 | MISAG: single amplified genome, water; version 6.0 | MIUVIG: uncultivated virus genome; version 6.0 | MIUVIG: uncultivated virus genome, agriculture; version 6.0 | MIUVIG: uncultivated virus genome, air; version 6.0 | MIUVIG: uncultivated virus genome, built; version 6.0 | MIUVIG: uncultivated virus genome, food-animal and animal feed; version 6.0 | MIUVIG: uncultivated virus genome, food-farm environment; version 6.0 | MIUVIG: uncultivated virus genome, food-food production facility; version 6.0 | MIUVIG: uncultivated virus genome, food-human foods; version 6.0 | MIUVIG: uncultivated virus genome, host-associated; version 6.0 | MIUVIG: uncultivated virus genome, human-associated; version 6.0 | MIUVIG: uncultivated virus genome, human-gut; version 6.0 | MIUVIG: uncultivated virus genome, human-oral; version 6.0 | MIUVIG: uncultivated virus genome, human-skin; version 6.0 | MIUVIG: uncultivated virus genome, human-vaginal; version 6.0 | MIUVIG: uncultivated virus genome, hydrocarbon resources-cores; version 6.0 | MIUVIG: uncultivated virus genome, hydrocarbon resources-fluids/swabs; version 6.0 | MIUVIG: uncultivated virus genome, microbial; version 6.0 | MIUVIG: uncultivated virus genome, miscellaneous; version 6.0 | MIUVIG: uncultivated virus genome, plant-associated; version 6.0 | MIUVIG: uncultivated virus genome, sediment; version 6.0 | MIUVIG: uncultivated virus genome, soil; version 6.0 | MIUVIG: uncultivated virus genome, symbiont-associated; version 6.0 | MIUVIG: uncultivated virus genome, wastewater; version 6.0 | MIUVIG: uncultivated virus genome, water; version 6.0
+#   Wizard step 4 (Sample Type), for new BioSamples: the NCBI BioSample package id that best describes the samples, e.g. 'Model.organism.animal.1.0', 'Human.1.0', 'Microbe.1.0', 'Metagenome.environmental.1.0', or a MIxS package with its environment such as 'MIMS.me.soil.6.0'. The id is the name of the package's template; all packages are listed at https://www.ncbi.nlm.nih.gov/biosample/docs/packages/, and a package's attributes (what each means, which are mandatory, the value each takes) at https://submit.ncbi.nlm.nih.gov/biosample/template/?package-0=<package>&action=definition. Leave blank, together with biosample_attributes_file, when the samples are already registered (the SRA metadata then gives their SAMN# accessions). Human data that needs controlled access goes to dbGaP, not SRA.
+#   options: SARS-CoV-2.cl.1.0 | SARS-CoV-2.wwsurv.1.0 | Pathogen.cl.1.0 | Pathogen.env.1.0 | Pathogen.combined.1.0 | OneHealthEnteric.1.0 | PHA4GE.wwsurv.1.0 | Microbe.1.0 | Model.organism.animal.1.0 | Metagenome.environmental.1.0 | Invertebrate.1.0 | Human.1.0 | Plant.1.0 | Virus.1.0 | Beta-lactamase.1.0 | MIGS.ba.6.0 | MIGS.ba.agriculture.6.0 | MIGS.ba.air.6.0 | MIGS.ba.built.6.0 | MIGS.ba.food-animal.6.0 | MIGS.ba.food-farm_env.6.0 | MIGS.ba.food-prod_facility.6.0 | MIGS.ba.food-human_foods.6.0 | MIGS.ba.host-associated.6.0 | MIGS.ba.human-associated.6.0 | MIGS.ba.human-gut.6.0 | MIGS.ba.human-oral.6.0 | MIGS.ba.human-skin.6.0 | MIGS.ba.human-vaginal.6.0 | MIGS.ba.hydrocarbon-cores.6.0 | MIGS.ba.hydrocarbon-fluids_swabs.6.0 | MIGS.ba.microbial.6.0 | MIGS.ba.miscellaneous.6.0 | MIGS.ba.plant-associated.6.0 | MIGS.ba.sediment.6.0 | MIGS.ba.soil.6.0 | MIGS.ba.symbiont-associated.6.0 | MIGS.ba.wastewater.6.0 | MIGS.ba.water.6.0 | MIGS.eu.6.0 | MIGS.eu.agriculture.6.0 | MIGS.eu.air.6.0 | MIGS.eu.built.6.0 | MIGS.eu.food-animal.6.0 | MIGS.eu.food-farm_env.6.0 | MIGS.eu.food-prod_facility.6.0 | MIGS.eu.food-human_foods.6.0 | MIGS.eu.host-associated.6.0 | MIGS.eu.human-associated.6.0 | MIGS.eu.human-gut.6.0 | MIGS.eu.human-oral.6.0 | MIGS.eu.human-skin.6.0 | MIGS.eu.human-vaginal.6.0 | MIGS.eu.hydrocarbon-cores.6.0 | MIGS.eu.hydrocarbon-fluids_swabs.6.0 | MIGS.eu.microbial.6.0 | MIGS.eu.miscellaneous.6.0 | MIGS.eu.plant-associated.6.0 | MIGS.eu.sediment.6.0 | MIGS.eu.soil.6.0 | MIGS.eu.symbiont-associated.6.0 | MIGS.eu.wastewater.6.0 | MIGS.eu.water.6.0 | MIGS.vi.6.0 | MIGS.vi.agriculture.6.0 | MIGS.vi.air.6.0 | MIGS.vi.built.6.0 | MIGS.vi.food-animal.6.0 | MIGS.vi.food-farm_env.6.0 | MIGS.vi.food-prod_facility.6.0 | MIGS.vi.food-human_foods.6.0 | MIGS.vi.host-associated.6.0 | MIGS.vi.human-associated.6.0 | MIGS.vi.human-gut.6.0 | MIGS.vi.human-oral.6.0 | MIGS.vi.human-skin.6.0 | MIGS.vi.human-vaginal.6.0 | MIGS.vi.hydrocarbon-cores.6.0 | MIGS.vi.hydrocarbon-fluids_swabs.6.0 | MIGS.vi.microbial.6.0 | MIGS.vi.miscellaneous.6.0 | MIGS.vi.plant-associated.6.0 | MIGS.vi.sediment.6.0 | MIGS.vi.soil.6.0 | MIGS.vi.symbiont-associated.6.0 | MIGS.vi.wastewater.6.0 | MIGS.vi.water.6.0 | MIMAG.6.0 | MIMAG.agriculture.6.0 | MIMAG.air.6.0 | MIMAG.built.6.0 | MIMAG.food-animal.6.0 | MIMAG.food-farm_env.6.0 | MIMAG.food-prod_facility.6.0 | MIMAG.food-human_foods.6.0 | MIMAG.host-associated.6.0 | MIMAG.human-associated.6.0 | MIMAG.human-gut.6.0 | MIMAG.human-oral.6.0 | MIMAG.human-skin.6.0 | MIMAG.human-vaginal.6.0 | MIMAG.hydrocarbon-cores.6.0 | MIMAG.hydrocarbon-fluids_swabs.6.0 | MIMAG.microbial.6.0 | MIMAG.miscellaneous.6.0 | MIMAG.plant-associated.6.0 | MIMAG.sediment.6.0 | MIMAG.soil.6.0 | MIMAG.symbiont-associated.6.0 | MIMAG.wastewater.6.0 | MIMAG.water.6.0 | MIMARKS.specimen.6.0 | MIMARKS.specimen.agriculture.6.0 | MIMARKS.specimen.air.6.0 | MIMARKS.specimen.built.6.0 | MIMARKS.specimen.food-animal.6.0 | MIMARKS.specimen.food-farm_env.6.0 | MIMARKS.specimen.food-prod_facility.6.0 | MIMARKS.specimen.food-human_foods.6.0 | MIMARKS.specimen.host-associated.6.0 | MIMARKS.specimen.human-associated.6.0 | MIMARKS.specimen.human-gut.6.0 | MIMARKS.specimen.human-oral.6.0 | MIMARKS.specimen.human-skin.6.0 | MIMARKS.specimen.human-vaginal.6.0 | MIMARKS.specimen.hydrocarbon-cores.6.0 | MIMARKS.specimen.hydrocarbon-fluids_swabs.6.0 | MIMARKS.specimen.microbial.6.0 | MIMARKS.specimen.miscellaneous.6.0 | MIMARKS.specimen.plant-associated.6.0 | MIMARKS.specimen.sediment.6.0 | MIMARKS.specimen.soil.6.0 | MIMARKS.specimen.symbiont-associated.6.0 | MIMARKS.specimen.wastewater.6.0 | MIMARKS.specimen.water.6.0 | MIMARKS.survey.agriculture.6.0 | MIMARKS.survey.air.6.0 | MIMARKS.survey.built.6.0 | MIMARKS.survey.food-animal.6.0 | MIMARKS.survey.food-farm_env.6.0 | MIMARKS.survey.food-prod_facility.6.0 | MIMARKS.survey.food-human_foods.6.0 | MIMARKS.survey.host-associated.6.0 | MIMARKS.survey.human-associated.6.0 | MIMARKS.survey.human-gut.6.0 | MIMARKS.survey.human-oral.6.0 | MIMARKS.survey.human-skin.6.0 | MIMARKS.survey.human-vaginal.6.0 | MIMARKS.survey.hydrocarbon-cores.6.0 | MIMARKS.survey.hydrocarbon-fluids_swabs.6.0 | MIMARKS.survey.microbial.6.0 | MIMARKS.survey.miscellaneous.6.0 | MIMARKS.survey.plant-associated.6.0 | MIMARKS.survey.sediment.6.0 | MIMARKS.survey.soil.6.0 | MIMARKS.survey.symbiont-associated.6.0 | MIMARKS.survey.wastewater.6.0 | MIMARKS.survey.water.6.0 | MIMS.me.agriculture.6.0 | MIMS.me.air.6.0 | MIMS.me.built.6.0 | MIMS.me.food-animal.6.0 | MIMS.me.food-farm_env.6.0 | MIMS.me.food-prod_facility.6.0 | MIMS.me.food-human_foods.6.0 | MIMS.me.host-associated.6.0 | MIMS.me.human-associated.6.0 | MIMS.me.human-gut.6.0 | MIMS.me.human-oral.6.0 | MIMS.me.human-skin.6.0 | MIMS.me.human-vaginal.6.0 | MIMS.me.hydrocarbon-cores.6.0 | MIMS.me.hydrocarbon-fluids_swabs.6.0 | MIMS.me.microbial.6.0 | MIMS.me.miscellaneous.6.0 | MIMS.me.plant-associated.6.0 | MIMS.me.sediment.6.0 | MIMS.me.soil.6.0 | MIMS.me.symbiont-associated.6.0 | MIMS.me.wastewater.6.0 | MIMS.me.water.6.0 | MISAG.6.0 | MISAG.agriculture.6.0 | MISAG.air.6.0 | MISAG.built.6.0 | MISAG.food-animal.6.0 | MISAG.food-farm_env.6.0 | MISAG.food-prod_facility.6.0 | MISAG.food-human_foods.6.0 | MISAG.host-associated.6.0 | MISAG.human-associated.6.0 | MISAG.human-gut.6.0 | MISAG.human-oral.6.0 | MISAG.human-skin.6.0 | MISAG.human-vaginal.6.0 | MISAG.hydrocarbon-cores.6.0 | MISAG.hydrocarbon-fluids_swabs.6.0 | MISAG.microbial.6.0 | MISAG.miscellaneous.6.0 | MISAG.plant-associated.6.0 | MISAG.sediment.6.0 | MISAG.soil.6.0 | MISAG.symbiont-associated.6.0 | MISAG.wastewater.6.0 | MISAG.water.6.0 | MIUVIG.6.0 | MIUVIG.agriculture.6.0 | MIUVIG.air.6.0 | MIUVIG.built.6.0 | MIUVIG.food-animal.6.0 | MIUVIG.food-farm_env.6.0 | MIUVIG.food-prod_facility.6.0 | MIUVIG.food-human_foods.6.0 | MIUVIG.host-associated.6.0 | MIUVIG.human-associated.6.0 | MIUVIG.human-gut.6.0 | MIUVIG.human-oral.6.0 | MIUVIG.human-skin.6.0 | MIUVIG.human-vaginal.6.0 | MIUVIG.hydrocarbon-cores.6.0 | MIUVIG.hydrocarbon-fluids_swabs.6.0 | MIUVIG.microbial.6.0 | MIUVIG.miscellaneous.6.0 | MIUVIG.plant-associated.6.0 | MIUVIG.sediment.6.0 | MIUVIG.soil.6.0 | MIUVIG.symbiont-associated.6.0 | MIUVIG.wastewater.6.0 | MIUVIG.water.6.0
 biosample_package: 
-
-# Library strategy (choice, optional)
-#   The sequencing technique for the library (SRA metadata column library_strategy; one value per experiment row).
-#   options: WGA | WGS | WXS | RNA-Seq | miRNA-Seq | WCS | CLONE | POOLCLONE | AMPLICON | CLONEEND | FINISHING | ChIP-Seq | MNase-Seq | DNase-Hypersensitivity | Bisulfite-Seq | Tn-Seq | EST | FL-cDNA | CTS | MRE-Seq | MeDIP-Seq | MBD-Seq | Synthetic-Long-Read | ATAC-seq | ChIA-PET | FAIRE-seq | Hi-C | ncRNA-Seq | RAD-Seq | RIP-Seq | SELEX | ssRNA-seq | Targeted-Capture | Tethered Chromatin Conformation Capture | DIP-Seq | GBS | Inverse rRNA | NOMe-Seq | Ribo-seq | VALIDATION | Spatial Transcriptomics | CITE-Seq | TCR-Seq | CRISPR screen | BCR-Seq | EM-Seq | 16S rRNA-seq | HiChIP | Capture-C | 4C-Seq | DamID-Seq | ChIRP-Seq | ChEC-Seq | GRO-Seq | PRO-Seq | Bru-Seq | OTHER | CUT&Run | CUT&Tag
-library_strategy: 
-
-# Library source (choice, optional)
-#   The type of source material sequenced (SRA metadata column library_source).
-#   options: GENOMIC | TRANSCRIPTOMIC | METAGENOMIC | METATRANSCRIPTOMIC | SYNTHETIC | VIRAL RNA | GENOMIC SINGLE CELL | TRANSCRIPTOMIC SINGLE CELL | OTHER
-library_source: 
-
-# Library selection (choice, optional)
-#   The method used to select or enrich the material sequenced (SRA metadata column library_selection).
-#   options: RANDOM | PCR | RANDOM PCR | RT-PCR | HMPR | MF | MDA | MSLL | cDNA | ChIP | MNase | DNase | Hybrid Selection | Reduced Representation | Restriction Digest | 5-methylcytidine antibody | MBD2 protein methyl-CpG binding domain | CAGE | RACE | size fractionation | padlock probes capture method | other | unspecified | cDNA_oligo_dT | cDNA_randomPriming | Inverse rRNA | Oligo-dT | PolyA | repeat fractionation
-library_selection: 
-
-# Library layout (choice, optional)
-#   Single or paired-end sequencing (SRA metadata column library_layout). Paired files must be listed together in the same row.
-#   options: single | paired
-library_layout: 
-
-# Platform (choice, optional)
-#   The sequencing platform (SRA metadata column platform); select it before the instrument model.
-#   options: _LS454 | ABI_SOLID | AMCARE | BGISEQ | CAPILLARY | CAPITAL_BIOTECH | COMPLETE_GENOMICS | DAAN_GENE | DNBSEQ | ELEMENT | GENAPSYS | GENEMIND | GENEPLUS | GENEUS_TECH | HELICOS | HYK_GENE | ILLUMINA | ION_TORRENT | OXFORD_NANOPORE | PACBIO_SMRT | QITAN_TECH | SALUS | SINGULAR_GENOMICS | TAPESTRI | ULTIMA | VELA_DIAGNOSTICS
-platform: 
-
-# Instrument model (choice, optional)
-#   The sequencing instrument (SRA metadata column instrument_model); it must belong to the selected platform.
-#   options: 454 GS | 454 GS 20 | 454 GS FLX | 454 GS FLX+ | 454 GS FLX Titanium | 454 GS Junior | HiSeq X Five | HiSeq X Ten | Illumina Genome Analyzer | Illumina Genome Analyzer II | Illumina Genome Analyzer IIx | Illumina HiScanSQ | Illumina HiSeq 1000 | Illumina HiSeq 1500 | Illumina HiSeq 2000 | Illumina HiSeq 2500 | Illumina HiSeq 3000 | Illumina HiSeq 4000 | Illumina HiSeq X | Illumina MiSeq | MiSeq i100 | Illumina MiniSeq | Illumina NovaSeq 5000 | Illumina NovaSeq 6000 | Illumina NovaSeq X | Illumina NovaSeq X Plus | Illumina iSeq 100 | MiSeq i100 Plus | NextSeq 1000 | NextSeq 2000 | NextSeq 500 | NextSeq 550 | Helicos HeliScope | AB 5500 Genetic Analyzer | AB 5500xl Genetic Analyzer | AB 5500xl-W Genetic Analysis System | AB SOLiD 3 Plus System | AB SOLiD 4 System | AB SOLiD 4hq System | AB SOLiD PI System | AB SOLiD System | AB SOLiD System 2.0 | AB SOLiD System 3.0 | Complete Genomics | PacBio RS | PacBio RS II | Revio | Sequel | Sequel II | Sequel IIe | Onso | Ion Torrent PGM | Ion Torrent Proton | Ion Torrent S5 XL | Ion Torrent S5 | Ion Torrent Genexus | Ion GeneStudio S5 | Ion GeneStudio S5 Plus | Ion GeneStudio S5 Prime | AB 310 Genetic Analyzer | AB 3130 Genetic Analyzer | AB 3130xL Genetic Analyzer | AB 3500 Genetic Analyzer | AB 3500xL Genetic Analyzer | AB 3730 Genetic Analyzer | AB 3730xL Genetic Analyzer | GridION | MinION | PromethION | BGISEQ-50 | BGISEQ-500 | MGISEQ-200 | MGISEQ-2000 | MGISEQ-2000RS | BGISEQ-100 | BGISEQ-1000 | BGISEQ-2000 | CycloneSEQ | DNBSEQ-G400 | DNBSEQ-G50 | DNBSEQ-T7 | DNBSEQ-G400 FAST | DNBSEQ-E25 | DNBSEQ-G100 | DNBSEQ-G99 | DNBSEQ-T1+ | DNBSEQ-T10x4 | DNBSEQ-T10x4RS | DNBSEQ-T20x2 | DNBSEQ-T7+ | Element AVITI | Element AVITI24 | Element VITARI | GS111 | FASTASeq 300 | GenoCare 1600 | GenoLab M | FASTASeq S | SURFSeq 5000 | SURFSeq Q | QNome-3841 | QNome-3841hex | QPinnacle2 | QPursue-6k | QPursue-6khex | Salus EVO | Salus Pro | Saluseq Nimbo | G4 | Tapestri | UG 100 | UG 200 | HYK-PSTAR-IIA | G-seq500 | Gene+Seq-2000 | DA8600 | BioelectronSeq 4000 | AmCareSeq-2000 | Sentosa SQ301
-instrument_model: 
-
-# File type (choice, optional)
-#   The type of the sequence data files (SRA metadata column filetype).
-#   options: bam | cram | fastq | sff | PacBio_HDF5 | OxfordNanopore_native | 454_native | Helicos_native | SOLiD_native | CompleteGenomics_native | srf
-filetype: 
 
 # ----------------------------------------------------------------------
 # Authors
 # ----------------------------------------------------------------------
 
-# Submitter (textarea, optional)
-#   Wizard step 1 (Submitter): the contact information of the NCBI account that makes the submission, as 'Name | email | organization'. Check that it is accurate and use your primary email address; a group of collaborators can be added in the portal.
-submitter: |
-  
+# First (given) name (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+submitter_first_name: 
+
+# Middle name (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+submitter_middle_name: 
+
+# Last (family) name (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+submitter_last_name: 
+
+# Email (primary) (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile. Use your primary email address; NCBI sends processing messages there.
+submitter_email: 
+
+# Email (secondary) (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+submitter_secondary_email: 
+
+# Submitting organization (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+submitting_organization: 
+
+# Submitting organization URL (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+#   each non-blank line must be a valid http/https URL
+submitting_organization_url: 
+
+# Department (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+department: 
+
+# Phone (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+phone: 
+
+# Fax (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+fax: 
+
+# Street (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+street: 
+
+# City (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+city: 
+
+# State/Province (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile. Required by the portal for addresses in the USA.
+state: 
+
+# Postal code (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+postal_code: 
+
+# Country (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile. Type the country as NCBI lists it, e.g. 'United States of America (USA)' or 'Germany'; the runner picks the matching entry from the portal's suggestions.
+country: 
+
+# Update my contact information in profile (boolean, optional)
+#   Wizard step 1. yes = also save the submitter details above to your NCBI profile (the portal ticks this by default; paperpush leaves the profile unchanged unless you say yes).
+update_profile: 
 
 # ----------------------------------------------------------------------
 # Additional information
 # ----------------------------------------------------------------------
 
-# Release date (text, optional)
-#   Wizard step 2 (General Info). 'Release immediately following processing' (the default) or a date (YYYY-MM-DD) to hold the data until. It can be changed later in the Submission Portal's SRA data interface; changing it changes the release date of the BioProject, its BioSamples and all its SRA data.
-release_date: 
+# External links (textarea, optional)
+#   Wizard step 3 (Project Info), for a new BioProject: websites related to the study, one per line as 'display name | URL'.
+external_links: |
+  
+
+# Grants (textarea, optional)
+#   Wizard step 3 (Project Info), for a new BioProject: the study's grants, one per line as 'grant ID | grant title | agency | agency abbreviation', e.g. 'R01HG012345 | Single-cell atlas | National Human Genome Research Institute | NHGRI'. The runner enters them through the portal's 'Enter grants manually' table.
+grants: |
+  
+
+# Consortium name (text, optional)
+#   Wizard step 3, optional: the consortium the study was carried out in.
+consortium_name: 
+
+# Consortium URL (text, optional)
+#   Wizard step 3, optional: the consortium's website.
+#   each non-blank line must be a valid http/https URL
+consortium_url: 
+
+# Data providers (textarea, optional)
+#   Wizard step 3, optional: the data provider (data submitter) if it is someone other than the submitting organization or consortium, e.g. a sequencing center; one per line as 'name | URL'.
+data_providers: |
+  
 
 # vim: set filetype=yaml :

@@ -27,7 +27,7 @@
     ],
     "portal_filling": [
       "yes",
-      "26 venues"
+      "29 venues"
     ],
     "respond_reviewers": [
       "yes",
@@ -39,16 +39,16 @@
     ],
     "num_checks": [
       "yes",
-      "160"
+      "170"
     ],
     "tailored_checks": [
       "yes",
-      "78 venues",
+      "82 venues",
       "(+ any venue, via online guideline scraping)"
     ],
     "non_ai_checks": [
       "yes",
-      "118"
+      "128"
     ],
     "chk_references": [
       "yes",
@@ -84,11 +84,11 @@
     ],
     "requirement_db": [
       "yes",
-      "78 venues, open JSON"
+      "82 venues, open JSON"
     ],
     "portal_db": [
       "yes",
-      "26 venues, open JSON"
+      "29 venues, open JSON"
     ],
     "metadata_file": [
       "yes",
@@ -121,7 +121,7 @@
   {
     "name": "Paperpal",
     "price": [
-      "no",
+      "partial",
       "Free tier; $25/mo"
     ],
     "open_source": [
@@ -141,8 +141,8 @@
       "Hallucinated refs"
     ],
     "chk_figures": [
-      "no",
-      ""
+      "partial",
+      "Citations, legends, captions"
     ],
     "chk_limits": [
       "yes",
@@ -158,7 +158,7 @@
     ],
     "chk_rigor": [
       "partial",
-      "Ethics statements"
+      "Ethics, COI, funding statements"
     ],
     "chk_language": [
       "yes",
@@ -242,7 +242,7 @@
     "name": "Penelope.ai",
     "price": [
       "no",
-      "Journals pay (from $750/mo)"
+      "£750+/yr (publisher) or $9.50/report (author)"
     ],
     "open_source": [
       "no",
@@ -321,8 +321,8 @@
       ""
     ],
     "privacy": [
-      "unknown",
-      "?"
+      "partial",
+      "Retained; metadata used for research"
     ],
     "venue_picking": [
       "no",
@@ -361,7 +361,7 @@
   {
     "name": "Trinka AI",
     "price": [
-      "no",
+      "partial",
       "Free tier; $80/yr"
     ],
     "open_source": [
@@ -381,24 +381,24 @@
       "Retracted, hallucinated"
     ],
     "chk_figures": [
-      "unknown",
-      "?"
+      "partial",
+      "Captions, citations"
     ],
     "chk_limits": [
-      "unknown",
-      "?"
+      "partial",
+      "Manuscript length"
     ],
     "chk_layout": [
-      "unknown",
-      "?"
+      "partial",
+      "Headings, format"
     ],
     "chk_anonymity": [
-      "unknown",
-      "?"
+      "no",
+      ""
     ],
     "chk_rigor": [
-      "unknown",
-      "?"
+      "partial",
+      "Ethics, consent, trial IDs"
     ],
     "chk_language": [
       "yes",
@@ -475,7 +475,8 @@
     "sources": [
       "https://trinka.ai/features",
       "https://trinka.ai/pricing",
-      "https://www.trinka.ai/features"
+      "https://www.trinka.ai/features",
+      "https://www.trinka.ai/features/technical-checks"
     ]
   },
   {
@@ -510,16 +511,16 @@
       "Word limits"
     ],
     "chk_layout": [
-      "unknown",
-      "?"
+      "yes",
+      ""
     ],
     "chk_anonymity": [
-      "unknown",
-      "?"
+      "yes",
+      ""
     ],
     "chk_rigor": [
-      "unknown",
-      "?"
+      "partial",
+      "COI, data, funding statements"
     ],
     "chk_language": [
       "no",
@@ -596,7 +597,8 @@
     "sources": [
       "https://researcheagle.org/",
       "https://researcheagle.org/pricing",
-      "https://researcheagle.org/privacy-policy/"
+      "https://researcheagle.org/privacy-policy/",
+      "https://researcheagle.org/check-my-manuscript/?sample=1"
     ]
   },
   {
@@ -618,32 +620,32 @@
       "Formatting checklist"
     ],
     "chk_references": [
-      "no",
-      ""
+      "partial",
+      "Citation matching"
     ],
     "chk_figures": [
       "unknown",
       "?"
     ],
     "chk_limits": [
-      "unknown",
-      "?"
+      "partial",
+      "Abstract length"
     ],
     "chk_layout": [
       "yes",
-      "Applies journal layout"
+      "Margins, fonts, spacing, line nos."
     ],
     "chk_anonymity": [
-      "no",
-      ""
+      "partial",
+      "Strips author metadata"
     ],
     "chk_rigor": [
-      "unknown",
-      "?"
+      "partial",
+      "Ethics, competing interests"
     ],
     "chk_language": [
-      "no",
-      ""
+      "partial",
+      "Journal language checklist"
     ],
     "reformat": [
       "yes",
@@ -715,7 +717,8 @@
     ],
     "sources": [
       "https://getarticlo.com/",
-      "https://getarticlo.com/journals"
+      "https://getarticlo.com/journals",
+      "https://getarticlo.com/journals/academy-of-management-journal"
     ]
   },
   {
@@ -749,8 +752,8 @@
       "Word limits"
     ],
     "chk_layout": [
-      "unknown",
-      "?"
+      "yes",
+      ""
     ],
     "chk_anonymity": [
       "no",
@@ -821,8 +824,8 @@
       ""
     ],
     "non_ai_checks": [
-      "unknown",
-      "?"
+      "no",
+      "Described as AI"
     ],
     "portal_db": [
       "no",
@@ -841,7 +844,7 @@
     "name": "SciScore",
     "price": [
       "no",
-      "Paid; free via some journals"
+      "$39.99 for 3 reports"
     ],
     "open_source": [
       "no",
@@ -920,8 +923,8 @@
       ""
     ],
     "privacy": [
-      "unknown",
-      "?"
+      "partial",
+      "Not shared with third parties"
     ],
     "venue_picking": [
       "no",
@@ -954,6 +957,7 @@
     "sources": [
       "https://jmir.org/2022/6/e37324",
       "https://sciscore.com/",
+      "https://www.scicrunch.com/privacy-statement",
       "https://pmc.ncbi.nlm.nih.gov/articles/PMC7644557/"
     ]
   }

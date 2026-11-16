@@ -511,11 +511,11 @@ def _spelling_variant_check(venue: Venue, values: dict[str, str]) -> Outcome:
         british = uk + ise
         n_us, n_uk = sum(us.values()), sum(british.values())
         if us and british:
-            issues.append(Issue(WARNING, fld.id, f"{path.name} mixes American ({sample(us)}) and British ({sample(british)}) spellings; use one variant throughout"))
+            issues.append(Issue(SUGGESTION, fld.id, f"{path.name} mixes American ({sample(us)}) and British ({sample(british)}) spellings; use one variant throughout"))
         elif expected == "American" and n_uk >= 2:
-            issues.append(Issue(WARNING, fld.id, f"{path.name} uses British spellings ({sample(british)}), but {who}'s affiliation is in the US; the guidelines name no variant, so confirm the venue accepts British English or switch to American spelling"))
+            issues.append(Issue(SUGGESTION, fld.id, f"{path.name} uses British spellings ({sample(british)}), but {who}'s affiliation is in the US; the guidelines name no variant, so British English may be kept; use one variant consistently"))
         elif expected == "British" and n_us >= 2:
-            issues.append(Issue(WARNING, fld.id, f"{path.name} uses American spellings ({sample(us)}), but {who}'s affiliation uses British English; the guidelines name no variant, so confirm the venue accepts American English or switch to British spelling"))
+            issues.append(Issue(SUGGESTION, fld.id, f"{path.name} uses American spellings ({sample(us)}), but {who}'s affiliation uses British English; the guidelines name no variant, so American English may be kept; use one variant consistently"))
         else:
             variant = "American" if n_us > n_uk else "British" if n_uk else "no variant-specific"
             note = f"; {who} is in a{'n' if expected == 'American' else ''} {expected} English region" if expected else ""

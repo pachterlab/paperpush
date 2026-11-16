@@ -19,11 +19,12 @@ def _refs(*surnames: str) -> list[str]:
     return [f"{name}, A. (2020). A sufficiently long reference title. Journal 1, 2." for name in surnames]
 
 
-def test_reference_order_warns_when_neither_order_holds(tmp_path):
+def test_reference_order_suggests_when_neither_order_holds(tmp_path):
     values = _manuscript(tmp_path, _refs("Meyer", "Zebra", "Apple"), ["Zebra (2020).", "Apple (2020).", "Meyer (2020)."])
     out = _reference_order(VENUE, values, False, False)
     assert len(out.issues) == 1
     assert "neither alphabetical nor ordered by first citation" in out.issues[0].message
+    assert out.issues[0].level == "suggestion"  # no venue rule asks for either order
 
 
 def test_reference_order_passes_when_citation_order_holds(tmp_path):
@@ -94,6 +95,7 @@ def test_affiliation_inline_number_in_word_is_flagged(tmp_path):
     body = _p(("A title", False)) + _p(("Joe Rich", False), ("1", True), (", Ann Lee2", False))
     out = _run(_docx(tmp_path / "paper.docx", body))
     assert [i.message for i in out.issues] == ["paper.docx: the affiliation number after 'Ann Lee' is not superscripted (e.g. 'Ann Lee1' should be 'Ann Lee¹')"]
+    assert out.issues[0].level == "suggestion"
 
 
 def test_affiliation_check_stops_at_the_abstract(tmp_path):

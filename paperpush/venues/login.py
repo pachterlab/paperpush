@@ -146,6 +146,37 @@ def login_orcid(
     page.goto(return_url)
 
 
+def login_options(venue, method: str = "password", provider: str = "") -> dict:
+    """Keyword arguments for ``venue.login`` for a credential's method and provider.
+
+    ``{}`` for the plain form; ``{"orcid": True}``, ``{"github": True}`` or
+    ``{"provider": name}`` otherwise. Each is returned only to a venue that
+    declares it (``supports_orcid_login``, ``supports_github_login``,
+    ``login_providers``), so a venue never has to accept an argument it would
+    ignore. Raises :class:`ValueError` for an unknown method or a provider the
+    venue does not list, and :class:`NotImplementedError` for a branch the venue
+    has not implemented.
+    """
+    slug = getattr(venue, "slug", "this venue")
+    if method not in {"password", "orcid", "github"}:
+        raise ValueError(f"unsupported sign-in method: {method}")
+    if method == "github":
+        if not getattr(venue, "supports_github_login", False):
+            raise NotImplementedError(f"GitHub sign-in is not implemented for {slug}; use 'paperpush login {slug}' instead")
+        return {"github": True}
+    if method == "orcid":
+        if not getattr(venue, "supports_orcid_login", False):
+            raise orcid_unsupported(venue)
+        return {"orcid": True}
+    if not provider:
+        return {}
+    offered = tuple(getattr(venue, "login_providers", ()))
+    if provider not in offered:
+        choices = ", ".join(offered) if offered else "none (it has a single sign-in form)"
+        raise ValueError(f"{slug} does not offer the sign-in provider {provider!r}; choose from: {choices}")
+    return {"provider": provider}
+
+
 def _login_supported(slug: str):
     """Return the venue object if it can verify a username/password sign-in.
 
@@ -168,6 +199,7 @@ def verify_login(
     password: str,
     *,
     method: str = "password",
+    provider: str = "",
     headless: bool = False,
     save_session: bool = True,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
@@ -176,7 +208,9 @@ def verify_login(
 
     Launches a browser, fills the sign-in form via the venue's ``login`` -- with
     ``orcid=True`` for ``method="orcid"``, taking the same sign-in page's "Sign in
-    with ORCID" branch -- and checks ``is_logged_in``. When the automated fill
+    with ORCID" branch (or ``github=True`` for ``method="github"``, or
+    ``provider=`` for a venue with several identity providers) -- and checks
+    ``is_logged_in``. When the automated fill
     fails in a headed browser -- which also covers a CAPTCHA or two-factor prompt
     that cannot be scripted -- the human is given a chance to finish signing in by
     hand in the open window before the check is repeated.
@@ -194,11 +228,10 @@ def verify_login(
         raise LoginVerificationError(f"{slug} has no automated sign-in to verify against")
 
     base_slug = submission_base(slug)
-    via_orcid = method == "orcid"
-    if via_orcid and not module.supports_orcid_login:
-        # Check before launching: a portal whose ORCID flow has not been recorded
-        # should say so in a line of output, not after a browser opens.
-        raise orcid_unsupported(module)
+    # Check before launching: a portal whose ORCID flow has not been recorded
+    # (or a provider it does not offer) should say so in a line of output, not
+    # after a browser opens.
+    options = login_options(module, method, provider)
 
     logger.info("Verifying %s %s credentials by signing in (headless=%s)", base_slug, method, headless)
     with sync_playwright() as pw:
@@ -208,9 +241,9 @@ def verify_login(
         page = context.new_page()
         try:
             try:
-                # orcid= is passed only when set: a venue with no ORCID branch
-                # never declares the parameter (see Venue.login).
-                module.login(page, username, password, **({"orcid": True} if via_orcid else {}))
+                # Only the declared branch is passed: a venue with no ORCID branch
+                # never declares the parameter (see Venue.login_options).
+                module.login(page, username, password, **options)
                 ok = module.is_logged_in(page)
             except NotImplementedError:
                 raise

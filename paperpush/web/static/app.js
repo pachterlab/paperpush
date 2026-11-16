@@ -34,13 +34,13 @@
   // they ask to remember it, then localStorage. Sent only with the autofill
   // and AI-validate requests, in headers (see paperpush/web/app.py:visitor_llm).
   const storageArea = (name) => { try { return window[name]; } catch { return null; } };
-  const llmKey = {
+  const keyStore = (prefix) => ({
     load() {
       for (const name of ["sessionStorage", "localStorage"]) {
         try {
           const area = storageArea(name);
-          const key = area && area.getItem("paperpush:llm-key");
-          if (key) return { key, provider: area.getItem("paperpush:llm-provider") || "", remember: name === "localStorage" };
+          const key = area && area.getItem(`paperpush:${prefix}-key`);
+          if (key) return { key, provider: area.getItem(`paperpush:${prefix}-provider`) || "", remember: name === "localStorage" };
         } catch { /* storage unavailable */ }
       }
       return { key: "", provider: "", remember: false };
@@ -49,23 +49,28 @@
       for (const name of ["sessionStorage", "localStorage"]) {
         try {
           const area = storageArea(name);
-          area.removeItem("paperpush:llm-key");
-          area.removeItem("paperpush:llm-provider");
+          area.removeItem(`paperpush:${prefix}-key`);
+          area.removeItem(`paperpush:${prefix}-provider`);
         } catch { /* storage unavailable */ }
       }
       if (!key) return;
       try {
         const area = storageArea(remember ? "localStorage" : "sessionStorage");
-        area.setItem("paperpush:llm-key", key);
-        area.setItem("paperpush:llm-provider", provider);
+        area.setItem(`paperpush:${prefix}-key`, key);
+        area.setItem(`paperpush:${prefix}-provider`, provider);
       } catch { /* storage unavailable: the key lives only in the page */ }
     },
-  };
+  });
+  const llmKey = keyStore("llm");
+  // The visitor's Originality.ai or Winston AI key for the plagiarism scan,
+  // kept the same way and sent only with that request (app.py:visitor_plagiarism).
+  const plagiarismKey = keyStore("plagiarism");
   const PROVIDER_LABELS = { anthropic: "Anthropic", openai: "OpenAI", google: "Gemini" };
   const guessProvider = (key) => (key.startsWith("sk-ant-") ? "anthropic" : key.startsWith("AIza") ? "google" : key.startsWith("sk-") ? "openai" : "");
 
   const state = {
     llm: { key: "", provider: "", remember: false },
+    plagiarism: null, // {provider, key, accept, threshold} while the plagiarism box is ticked
     info: null,
     venues: [],
     venue: null, // venue detail from /api/venues/<slug>
@@ -1973,23 +1978,33 @@
   }
   const schedulePlan = debounce(refreshPlan, 900);
 
+  // With the plagiarism box ticked (state.plagiarism), the scan runs too.
   async function runValidate(withAi) {
+    const plagiarism = state.plagiarism;
     const status = $("#validate-status");
     const buttons = [$("#validate-btn"), $("#validate-ai-btn")];
     buttons.forEach((b) => (b.disabled = true));
     status.className = "small";
     const bar = el("progress", { class: "validate-progress", max: "1", value: "0", "aria-label": "Validation progress" });
-    const label = el("span", { class: "validate-progress-label", text: withAi ? "Validating, with the AI checks (this can take a minute)…" : "Validating…" });
+    const slow = withAi || plagiarism;
+    const label = el("span", { class: "validate-progress-label", text: slow ? `Validating, with ${[withAi && "the AI checks", plagiarism && "the plagiarism scan"].filter(Boolean).join(" and ")} (this can take a minute)…` : "Validating…" });
     status.replaceChildren(bar, label);
     const onProgress = ({ done, total, label: stage }) => {
       bar.max = total || 1;
       bar.value = done;
       const pct = total ? Math.round((100 * done) / total) : 0;
-      label.textContent = stage === "done" ? "Finishing…" : `${pct}% · ${stage}${withAi && stage === "AI checks" ? " (this can take a minute)" : ""}…`;
+      label.textContent = stage === "done" ? "Finishing…" : `${pct}% · ${stage}${(withAi && stage === "AI checks") || (plagiarism && stage === "Plagiarism") ? " (this can take a minute)" : ""}…`;
     };
     state.showRequired = true;
     try {
-      const res = await postStream(`/api/workspaces/${state.ws}/validate`, { text: state.text, ai: withAi, initial_submission: state.initialSubmission }, withAi ? llmHeaders() : {}, onProgress);
+      const body = { text: state.text, ai: withAi, initial_submission: state.initialSubmission };
+      const headers = withAi ? llmHeaders() : {};
+      if (plagiarism) {
+        Object.assign(body, { plagiarism: true, plagiarism_accept: plagiarism.accept, plagiarism_threshold: plagiarism.threshold });
+        headers["X-Plagiarism-Provider"] = plagiarism.provider;
+        if (plagiarism.key) headers["X-Plagiarism-Key"] = plagiarism.key;
+      }
+      const res = await postStream(`/api/workspaces/${state.ws}/validate`, body, headers, onProgress);
       state.results = res;
       state.resultsStale = false;
       state.filesChanged = false;
@@ -1998,8 +2013,10 @@
       const notes = [];
       if (!res.network_checks) notes.push("link and DOI checks are switched off on this server");
       if (res.ai_error) notes.push(`AI checks failed: ${res.ai_error}`);
+      const plag = plagiarism && (res.checks || []).find((ch) => ch.id === "integrity.plagiarism");
+      if (plag && plag.status === "unchecked") notes.push(`plagiarism scan did not run: ${plag.detail}`);
       status.textContent = `${c.passed} passed, ${c.failed} failed, ${c.warning} with warnings${c.suggestion ? `, ${c.suggestion} with suggestions on style` : ""}${c.needs_ai ? `, ${c.needs_ai} need AI` : ""}.${notes.length ? ` (${notes.join("; ")})` : ""}`;
-      if (res.ai_error) status.className = "small err";
+      if (res.ai_error || (plag && plag.status === "unchecked")) status.className = "small err";
     } catch (err) {
       status.className = "small err";
       status.textContent = err.message;
@@ -2012,6 +2029,78 @@
       $("#checks-panel").open = true;
       $("#checks-panel").scrollIntoView({ behavior: "smooth", block: "start" });
     }
+  }
+
+  // ------------------------------------------------------- plagiarism scan
+
+  // The "plagiarism scan" box next to Validate: ticking it opens a dialog
+  // for the visitor's own Winston AI or Originality.ai key, the sources that
+  // may match, and the threshold. While it is ticked, both Validate buttons
+  // also run the scan (`paperpush validate --plagiarism`). It starts unticked
+  // on every page load, since each scan costs credits.
+  const plagiarismEnv = () => (state.info && state.info.plagiarism_provider) || "";
+
+  function openPlagiarism() {
+    const saved = plagiarismKey.load();
+    $("#plag-key").value = saved.key;
+    $("#plag-provider").value = saved.provider || plagiarismEnv() || "winston";
+    $("#plag-remember").checked = saved.remember;
+    $("#plag-accept").value = store.get("plagiarism-accept") || "";
+    $("#plag-threshold").value = store.get("plagiarism-threshold") || "";
+    $("#plag-status").textContent = "";
+    renderPlagiarismKeyNote();
+    $("#plagiarism-dialog").showModal();
+  }
+
+  function renderPlagiarismKeyNote() {
+    const env = plagiarismEnv();
+    $("#plag-key-note").textContent = env && !$("#plag-key").value.trim()
+      ? `Leave empty to use the ${env === "winston" ? "Winston AI" : "Originality.ai"} key set in your environment.`
+      : "Sent only with validate requests; never stored on the server.";
+  }
+
+  function savePlagiarism() {
+    const status = $("#plag-status");
+    const key = $("#plag-key").value.trim();
+    const provider = $("#plag-provider").value;
+    const remember = $("#plag-remember").checked;
+    const accept = $("#plag-accept").value.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    const rawThreshold = $("#plag-threshold").value.trim();
+    const threshold = rawThreshold === "" ? null : Number(rawThreshold);
+    status.className = "small err";
+    if (!key && !plagiarismEnv()) {
+      status.textContent = "Add your API key first.";
+      $("#plag-key").focus();
+      return;
+    }
+    if (threshold !== null && !(threshold >= 0 && threshold <= 100)) {
+      status.textContent = "The threshold is a percentage, 0 to 100.";
+      return;
+    }
+    plagiarismKey.save(key, provider, remember);
+    store.set("plagiarism-accept", accept.join("\n"));
+    if (threshold === null) store.del("plagiarism-threshold"); else store.set("plagiarism-threshold", String(threshold));
+    state.plagiarism = { provider, key, accept, threshold };
+    $("#plagiarism-dialog").close("saved");
+  }
+
+  function wirePlagiarism() {
+    const box = $("#plagiarism-check");
+    const dialog = $("#plagiarism-dialog");
+    box.checked = false;
+    box.addEventListener("change", () => {
+      if (box.checked) openPlagiarism();
+      else state.plagiarism = null;
+    });
+    // Cancel, Escape, or closing the dialog any way but saving leaves the box unticked.
+    dialog.addEventListener("close", () => {
+      if (dialog.returnValue !== "saved") { box.checked = false; state.plagiarism = null; }
+      dialog.returnValue = "";
+    });
+    $("#plag-run").addEventListener("click", savePlagiarism);
+    $("#plag-close").addEventListener("click", () => dialog.close());
+    $("#plag-key").addEventListener("input", renderPlagiarismKeyNote);
+    $("#plagiarism-form").addEventListener("submit", (e) => { e.preventDefault(); savePlagiarism(); });
   }
 
   function focusField(fid) {
@@ -2727,6 +2816,7 @@
     });
     $("#validate-btn").addEventListener("click", () => runValidate(false));
     $("#validate-ai-btn").addEventListener("click", () => runValidate(true));
+    wirePlagiarism();
     $("#initial-submission").addEventListener("change", (e) => setInitialSubmission(e.target.checked));
     $("#download-sub").addEventListener("click", downloadSub);
     $("#download-zip").addEventListener("click", downloadBundle);

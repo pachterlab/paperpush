@@ -1686,6 +1686,6 @@ class EditorialManagerVenue(Venue):
                 return False
 
             logger.info("Falling back to a manual %s sign-in", cfg.name)
-            wait_for_manual_sign_in(cfg.name, cfg.slug)
+            wait_for_manual_sign_in(cfg.name, cfg.slug, page, self._sign_in_detector())
             save_storage(context, session)
             return True

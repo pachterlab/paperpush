@@ -35,7 +35,7 @@ The keys of one venue entry. Each section key holds the object described in its 
 | `abstract` | [abstract](#abstract) or null | Abstract length and structure. |
 | `keywords` | [keywords](#keywords) or null | How many keywords the manuscript must list. |
 | `sections` | [sections](#sections) or null | Section headings the manuscript body must (or may) carry. |
-| `statements` | [statements](#statements) or null | Declarations that must appear in the manuscript text. |
+| `statements` | [statements](#statements) or null | Declarations the manuscript must contain, and those the submission system collects instead. |
 | `figures` | [figures](#figures) or null | Figure file format, resolution, dimensions, and count. |
 | `tables` | [tables](#tables) or null | Table file format, editability, count, and placement. |
 | `supplementary` | [supplementary](#supplementary) or null | Supplementary-file format, size, count, and bundling. |
@@ -96,6 +96,9 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `group_four_digit_numbers` | boolean or null | Whether four-digit numbers take the thousands separator too: yes for 1,000, no for 1000 (SI and some house styles). Empty when the guidelines do not say. |
 | `et_al_period` | boolean or null | Whether 'et al' takes a full stop: yes for 'et al.', no for 'et al' (AMA and RSNA house style). Empty when the guidelines do not say; `validate` then asks for 'et al.'. |
 | `serial_comma` | boolean or null | Whether lists take the serial (Oxford) comma: yes for 'A, B, and C', no for 'A, B and C'. Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent. |
+| `footnotes_allowed` | boolean or null | False when the guidelines forbid footnotes (and endnotes) in the manuscript text. Title-page author notes made with LaTeX's \thanks are not counted. |
+| `max_heading_levels` | integer or null | Deepest heading level the manuscript may use (3: sections, subsections, and sub-subsections). The title is not a level. |
+| `forbidden_fonts` | list of string or null | Fonts the manuscript must not use anywhere (e.g. Symbol), matched by family name. |
 | `initial_submission_any_format` | string or null | Set only when the venue lets the initial submission be in any format (formatting rules apply from revision or acceptance): the venue's rule, in one sentence. `validate` prints it at the top of the report and `--initial-submission` turns errors into warnings. |
 | `notes` | list of string or null | Rules with no structured key, one per string. |
 
@@ -105,6 +108,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 |---|---|---|
 | `required_items` | list of `title` \| `authors` \| `affiliations` \| `corresponding_author` \| `corresponding_email` \| `orcid` \| `keywords` \| `running_title` \| `word_count` \| `figure_count` \| `table_count` \| `author_contributions` \| `funding` \| `competing_interests` \| `abstract` \| `postal_address` \| `phone` \| `one_sentence_summary` \| `classification` \| `author_footnotes` or null | Canonical ids of the items the title page must carry. |
 | `separate_file` | boolean or null | Title page is uploaded as its own file (double-blind venues). |
+| `own_page` | boolean or null | When the title page is part of the manuscript file, it is a page of its own: the abstract (or the main text) starts on a new page. |
 | `title_max_characters` | integer or null | Maximum title length in characters (spaces included). |
 | `title_max_words` | integer or null | Maximum title length in words. |
 | `running_title_max_characters` | integer or null | Maximum running/short title length in characters. |
@@ -148,6 +152,8 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 |---|---|---|
 | `required` | list of `data_availability` \| `code_availability` \| `competing_interests` \| `author_contributions` \| `funding` \| `acknowledgements` \| `ethics_approval` \| `consent_to_participate` \| `consent_to_publish` \| `materials_availability` \| `lead_contact` \| `inclusion_and_diversity` \| `ai_use` \| `reproducibility` \| `ethics_statement` \| `clinical_trial_registration` \| `reporting_guidelines` or null | Canonical ids of the declarations the manuscript must contain (matched via $aliases). |
 | `optional` | list of `data_availability` \| `code_availability` \| `competing_interests` \| `author_contributions` \| `funding` \| `acknowledgements` \| `ethics_approval` \| `consent_to_participate` \| `consent_to_publish` \| `materials_availability` \| `lead_contact` \| `inclusion_and_diversity` \| `ai_use` \| `reproducibility` \| `ethics_statement` \| `clinical_trial_registration` \| `reporting_guidelines` or null | Declarations the venue accepts but does not require. |
+| `in_submission_form` | list of `data_availability` \| `code_availability` \| `competing_interests` \| `author_contributions` \| `funding` \| `acknowledgements` \| `ethics_approval` \| `consent_to_participate` \| `consent_to_publish` \| `materials_availability` \| `lead_contact` \| `inclusion_and_diversity` \| `ai_use` \| `reproducibility` \| `ethics_statement` \| `clinical_trial_registration` \| `reporting_guidelines` or null | Declarations the venue collects through its submission system (a form, a declarations tool, or a file uploaded with the manuscript) rather than in the manuscript text. They are not looked for in the manuscript, even when a publisher's house rules list them in required; the author is reminded to have them ready at submission. |
+| `not_in_manuscript` | list of `data_availability` \| `code_availability` \| `competing_interests` \| `author_contributions` \| `funding` \| `acknowledgements` \| `ethics_approval` \| `consent_to_participate` \| `consent_to_publish` \| `materials_availability` \| `lead_contact` \| `inclusion_and_diversity` \| `ai_use` \| `reproducibility` \| `ethics_statement` \| `clinical_trial_registration` \| `reporting_guidelines` or null | Declarations the guidelines forbid in the manuscript file (they go only in the submission system); a heading for one in the manuscript is reported. |
 | `ai_use_if_used` | boolean or null | Use of generative AI (LLMs, image generators) must be disclosed when there was any. To require a statement whether or not AI was used, list ai_use in required instead. |
 | `ai_use_locations` | list of `methods` \| `acknowledgements` \| `statement` \| `supplementary` \| `figure_captions` or null | Where in the manuscript the AI-use disclosure may go; any one of them will do: methods, acknowledgements, statement (a section of its own), supplementary (the supplementary material), figure_captions (the legend of each AI-touched figure). Unset: anywhere. |
 | `ai_use_cover_letter` | boolean or null | The AI-use disclosure must also be made in the cover letter. |
@@ -180,6 +186,8 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `color_charge` | boolean or null | Color figures carry a charge. |
 | `print_grayscale` | boolean or null | The print edition shows figures in grayscale, so colors that differ only in hue merge (figures.grayscale checks this; color_charge implies it). |
 | `placement` | `separate_files` \| `end_of_manuscript` \| `inline` \| `end_or_inline` \| `combined_file` or null | Where figures go for the initial submission. combined_file: every figure in one document (Word or PDF), in citation order, each legend after its figure. |
+| `embedded_forbidden` | boolean or null | True when the guidelines forbid figures inside the manuscript file, even when each figure is also uploaded separately. |
+| `caption_label` | string or null | The word figure captions must start with, as the guidelines spell it (e.g. 'Fig' for 'Fig 1', 'Fig.' for 'Fig. 1', 'Figure'). |
 | `notes` | list of string or null | Rules with no structured key. |
 
 ## tables

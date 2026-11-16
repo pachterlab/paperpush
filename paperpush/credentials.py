@@ -45,9 +45,17 @@ class Credential:
     (empty when the author signed in by email). ``display_name`` is the author's
     name when a public ORCID record supplied it.
 
-    The two methods therefore round-trip through the same storage; all that
+    For ``"github"``, the pair belongs to GitHub and the venue takes its
+    "Sign in with GitHub" branch.
+
+    These methods round-trip through the same storage; all that
     differs is which branch of :meth:`~paperpush.venues.base.Venue.login` the
     venue takes (its ``orcid`` argument).
+
+    ``provider`` names the identity provider for a venue whose sign-in page
+    offers several (NCBI: ``ncbi``, ``era``, ``google``, ...; see
+    :attr:`~paperpush.venues.base.Venue.login_providers`), and is empty for the
+    venue's default.
     """
 
     venue: str
@@ -56,6 +64,7 @@ class Credential:
     method: str = "password"
     orcid: str = ""
     display_name: str = ""
+    provider: str = ""
 
     @property
     def identity(self) -> str:
@@ -151,14 +160,15 @@ def using_keyring() -> bool:
     return _get_keyring() is not None
 
 
-def save_credential(slug: str, username: str, password: str, *, method: str = "password", orcid: str = "", name: str = "") -> bool:
+def save_credential(slug: str, username: str, password: str, *, method: str = "password", orcid: str = "", name: str = "", provider: str = "") -> bool:
     """Store ``username``/``password`` for ``slug``.
 
     ``method`` records which sign-in form the pair belongs to -- ``"password"``
     for the venue's own account, ``"orcid"`` for an ORCID sign-in (see
-    :func:`save_orcid_credential`). The ORCID iD and author name are public
-    identifiers and are kept in the file store either way; only the password ever
-    goes to the secret store.
+    :func:`save_orcid_credential`). ``provider`` records which identity provider
+    the pair belongs to on a venue that offers several. The ORCID iD, author name
+    and provider are public and are kept in the file store either way; only the
+    password ever goes to the secret store.
 
     Returns True if the OS keyring was used, False if the file fallback was.
     A keyring backend that is advertised but unusable at runtime (for example a
@@ -173,6 +183,8 @@ def save_credential(slug: str, username: str, password: str, *, method: str = "p
         entry["orcid"] = orcid
     if name:
         entry["name"] = name
+    if provider:
+        entry["provider"] = provider
 
     kr = _get_keyring()
     if kr is not None:
@@ -234,6 +246,7 @@ def get_credential(slug: str) -> Credential | None:
     method = entry.get("method", "password")
     orcid_id = entry.get("orcid", "")
     display_name = entry.get("name", "")
+    provider = entry.get("provider", "")
 
     kr = _get_keyring()
     if kr is not None and entry.get("username"):
@@ -245,11 +258,11 @@ def get_credential(slug: str) -> Credential | None:
             password = None
         if password is not None:
             logger.debug("Loaded %s credential for %s from the keyring", method, slug)
-            return Credential(venue=slug, username=username, password=password, method=method, orcid=orcid_id, display_name=display_name)
+            return Credential(venue=slug, username=username, password=password, method=method, orcid=orcid_id, display_name=display_name, provider=provider)
 
     if "password" in entry and "username" in entry:
         logger.debug("Loaded %s credential for %s from the file store", method, slug)
-        return Credential(venue=slug, username=entry["username"], password=entry["password"], method=method, orcid=orcid_id, display_name=display_name)
+        return Credential(venue=slug, username=entry["username"], password=entry["password"], method=method, orcid=orcid_id, display_name=display_name, provider=provider)
     logger.debug("Credential entry for %s is incomplete; treating as absent", slug)
     return None
 

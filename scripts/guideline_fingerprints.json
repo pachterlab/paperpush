@@ -49,6 +49,11 @@
     "recorded": "2026-11-04",
     "sha256": "2302afab3100fa5dce11ba6cd9d5b0a8e2dc0f8ac0d20d9172ac64883c64fb1d"
   },
+  "https://caltechlibrary.github.io/RDMworkbook/data-sharing.html": {
+    "chars": 18306,
+    "recorded": "2026-11-15",
+    "sha256": "508109cdc9c53e7735a674de9d4771d453afa09d86588886172f066f74840131"
+  },
   "https://cis.ieee.org/publications/t-neural-networks-and-learning-systems": {
     "chars": 1103,
     "recorded": "2026-10-23",
@@ -71,8 +76,8 @@
   },
   "https://data.caltech.edu/terms": {
     "chars": 8592,
-    "recorded": "2026-11-14",
-    "sha256": "b0b2a7a4e6d5aecfc4a106b22900f9b093e9d6f6751762026f1c14996ac30b1c"
+    "recorded": "2026-11-15",
+    "sha256": "e6f9307bd98524144a05e43c970c281146948c6aa271f62a0efbf5d6739cdbd3"
   },
   "https://developers.zenodo.org/": {
     "chars": 57101,
@@ -466,63 +471,83 @@
   },
   "https://libanswers.caltech.edu/faq/146996": {
     "chars": 1247,
-    "recorded": "2026-11-14",
-    "sha256": "5d51579eb09892f5ad7fc3e83a270934ab09141a7b4dada5db095da07a3b5a67"
+    "recorded": "2026-11-15",
+    "sha256": "4fcadceadf31b4a3fbfded3176bc68610686c5d4f23c4e100a940a4ebfe96835"
   },
   "https://libanswers.caltech.edu/faq/163208": {
     "chars": 851,
-    "recorded": "2026-11-14",
-    "sha256": "b543ec821e3cc07b0d34920f44a623c90ba7ac8355ab661d59e9705f174a148c"
+    "recorded": "2026-11-15",
+    "sha256": "3a24d1324f5e7e1970aead1ea55d8f06ae9fc355786ddeb81787d997244b8b43"
   },
   "https://libanswers.caltech.edu/faq/163209": {
     "chars": 648,
-    "recorded": "2026-11-14",
-    "sha256": "d30854a0f51b47b2419b9892150aa8e02f08c19ff06836c566336eb0db2424b3"
+    "recorded": "2026-11-15",
+    "sha256": "1e86a0d9785d123fd1b3859f63c4c0bcaceef82a875681885860479cfdfde60c"
   },
   "https://libanswers.caltech.edu/faq/163211": {
     "chars": 835,
-    "recorded": "2026-11-14",
-    "sha256": "609844ca4c103f96ffc09720496dc140e8404059d5311387234c767ed338bc3e"
+    "recorded": "2026-11-15",
+    "sha256": "00d63659e21494d401e1f00b15cbe81db9e7cd7b2cc4497db8369ada9ae2d1ef"
   },
   "https://libanswers.caltech.edu/faq/163212": {
     "chars": 1012,
-    "recorded": "2026-11-14",
-    "sha256": "16bc04cabe50cd683a68e8b15839467d70029d39f0aab263971af934d869ed0d"
+    "recorded": "2026-11-15",
+    "sha256": "58827344b1b4f3b8134a6d2e1ae987cf41ea34a369295ba7b7381deb2b92aefb"
   },
   "https://libanswers.caltech.edu/faq/163214": {
     "chars": 791,
-    "recorded": "2026-11-14",
-    "sha256": "1ac7d0c4b3803246adc12a40ef83296517d05ecaa29188bbbf02b5491dcd2462"
+    "recorded": "2026-11-15",
+    "sha256": "5d0456c2b07431241892c1bfb9f4261f5e5817c8e1e93f8a1a97aa36b650474d"
   },
   "https://libanswers.caltech.edu/faq/163215": {
     "chars": 713,
-    "recorded": "2026-11-14",
-    "sha256": "210a96f985d18a51c9d58a25a64fb6ea06ae32ef9124d24764ba565f4e3f93e2"
+    "recorded": "2026-11-15",
+    "sha256": "e61c716ddce61e5aa259df8cfd3ae5dfaafe9109cf9897860dc536b6929b4226"
   },
   "https://libanswers.caltech.edu/faq/163217": {
     "chars": 749,
-    "recorded": "2026-11-14",
-    "sha256": "e175937877f78bf1ba374026dba2118aa9b4496eab52a0e83a7848a26350a69e"
+    "recorded": "2026-11-15",
+    "sha256": "fcf5179fa260c4dacd01c5ee9edad8cda5ca2c7f680252d38652001471ae172a"
+  },
+  "https://libanswers.caltech.edu/faq/163218": {
+    "chars": 1058,
+    "recorded": "2026-11-15",
+    "sha256": "f0e518dd9c278e524aade0e1a69316d2228eb085e1554abfa0f5f353cfff5e58"
   },
   "https://libanswers.caltech.edu/faq/192438": {
     "chars": 864,
-    "recorded": "2026-11-14",
-    "sha256": "41607d48e98e07c7ef92c615ca198e4638bea01ff34db4919d443b8a3d24f347"
+    "recorded": "2026-11-15",
+    "sha256": "5b40ce4bc5b828e9d23fe0a945ffa6fabc953fb7f837d349b11ca2cbaa0a9485"
+  },
+  "https://libanswers.caltech.edu/faq/206864": {
+    "chars": 1127,
+    "recorded": "2026-11-15",
+    "sha256": "a5ff29ddc628f2c89e63dbd0176788c80e4f5e02a9476749fea23a3d10e314b5"
   },
   "https://libanswers.caltech.edu/faq/240347": {
     "chars": 825,
-    "recorded": "2026-11-14",
-    "sha256": "164e68b8f01bb415207193a60032cb731d727d79706120aff032810b0ab01122"
+    "recorded": "2026-11-15",
+    "sha256": "691d806f2bdcd9320556c48b05d9c96af718c3ad71b64299bec632bc4e13fb24"
+  },
+  "https://libanswers.caltech.edu/faq/246167": {
+    "chars": 809,
+    "recorded": "2026-11-15",
+    "sha256": "2b3615a8729b0d9ceaab8d28f17ce244c50d3b71212adc864e75f3cf833bd48c"
   },
   "https://libanswers.caltech.edu/faq/262131": {
     "chars": 1048,
-    "recorded": "2026-11-14",
-    "sha256": "d2cdf515154ac1c8bffcadbb05b7cd7a3aaccbcd5043c6c422c84f1ee6d3f419"
+    "recorded": "2026-11-15",
+    "sha256": "cb2bfac74f04ca3017df0e54a896c90fd093056b174c882faacbb51d86c40fb3"
   },
   "https://libanswers.caltech.edu/faq/271978": {
     "chars": 1950,
-    "recorded": "2026-11-14",
-    "sha256": "e9b34c728ad65df5921d146fdc7fac9ce23c9f3be1ccd4628e10b9693bb3e5f1"
+    "recorded": "2026-11-15",
+    "sha256": "401cab527c448e0405dadf50f0bbd4b7050c3739183c3612df6cf622f93bc3e5"
+  },
+  "https://libanswers.caltech.edu/faq/446288": {
+    "chars": 875,
+    "recorded": "2026-11-15",
+    "sha256": "4c31bc3439dfe769d57c500daed0f35b394431bf772448855c0d0d998fd5e6b3"
   },
   "https://library.caltech.edu/c.php?g=1237965&p=9059086": {
     "chars": 3970,
@@ -536,8 +561,8 @@
   },
   "https://library.caltech.edu/search/caltechdata": {
     "chars": 8592,
-    "recorded": "2026-11-14",
-    "sha256": "b0b2a7a4e6d5aecfc4a106b22900f9b093e9d6f6751762026f1c14996ac30b1c"
+    "recorded": "2026-11-15",
+    "sha256": "e6f9307bd98524144a05e43c970c281146948c6aa271f62a0efbf5d6739cdbd3"
   },
   "https://link.springer.com/journal/10278/submission-guidelines": {
     "chars": 59863,

@@ -1,0 +1,186 @@
+# paperpush submission file for sra  -*- mode: yaml -*-
+# Sequence Read Archive
+#
+# Edit the values below, then:
+#   - to validate against venue guidelines: `paperpush validate sra.sub.txt`
+#   - to fill out submission portal: `paperpush submit sra.sub.txt`
+# Lines starting with '#' are comments and are ignored.
+#
+# To fill this in through a form instead, open it in the paperpush web page:
+#   - run:  paperpush web sra.sub.txt   (use this file's path)
+#   - or visit https://paperpush.onrender.com and drag this file onto the page
+#
+# To fill this out with AI from your manuscript files:
+#   - run this prompt in an AI agent (e.g. Claude Code):  /paperpush-autofill sra.sub.txt
+#   - or run:  paperpush autofill --engine api -p MANUSCRIPT_DIR sra.sub.txt
+
+@venue: sra
+# submission guide: https://www.ncbi.nlm.nih.gov/sra/docs/submit/
+
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
+
+# BioSample attributes file (file, optional)
+#   Wizard step 5 (BioSample attributes), for new BioSamples: the biosample_package's attributes template, one row per sample, as tab-delimited text or Excel (.xlsx; paperpush uploads it as TSV). Templates: https://submit.ncbi.nlm.nih.gov/biosample/template/?package-0=<package>&action=download_tsv (TSV) or https://www.ncbi.nlm.nih.gov/biosample/docs/templates/packages/<package>.xlsx (Excel), e.g. <package> = Model.organism.animal.1.0; what each attribute means and the value it takes: https://submit.ncbi.nlm.nih.gov/biosample/template/?package-0=<package>&action=definition. Mandatory columns are marked '*', and of attributes marked '**' (a group, such as strain/isolate/breed/cultivar/ecotype) each sample needs at least one; write 'not collected', 'not applicable' or 'missing' when a mandatory value is unknown. Fixed-choice attributes (sex) take one of their listed values; collection_date is a date such as 2024-03-15 (format the column as Text in Excel so it stays one); geo_loc_name starts with a country or ocean from https://www.insdc.org/submitting-standards/geo_loc_name-qualifier-vocabulary/, e.g. 'USA: California'; lat_lon is like '38.98 N 77.11 W'. Sample names must be unique within your account, and no two samples may have identical attributes (sample_title and description do not count): add a column, such as replicate, that tells them apart. paperpush validate checks the file against the package's definitions. Leave blank, with biosample_package, when the samples are already registered.
+biosample_attributes_file: tests/manuscript_files/sra/biosample_attributes.tsv
+
+# SRA metadata file (file, REQUIRED)
+#   Wizard step 6 (SRA Metadata): NCBI's template (https://ftp-trace.ncbi.nlm.nih.gov/sra/metadata_table/SRA_metadata.xlsx) filled in: the .xlsx itself (paperpush reads and uploads its SRA_data sheet as TSV) or that sheet saved as tab-delimited text. One row per experiment (sample + library + strategy + layout + instrument model) with a unique library_ID; columns sample_name (or biosample_accession SAMN# for registered samples), library_ID, title, library_strategy, library_source, library_selection, library_layout, platform, instrument_model, design_description, filetype and filename (filename2... for paired and further files), plus assembly (and fasta_file for a non-NCBI reference) for aligned data. Paired files go in the same row; file names must exactly match the uploaded files.
+sra_metadata_file: tests/manuscript_files/sra/sra_metadata.tsv
+
+# Upload method (choice, optional)
+#   Wizard step 7 (Files). 'Web browser upload' sends data_files through the browser over HTTP and suits a few small files (each under 2 GB). For larger data, upload the files yourself by FTP or Aspera command line into a dedicated preload folder (see the portal's instructions), wait at least 10 minutes, and choose 'FTP or Aspera preload' with preload_folder. Cloud-bucket transfers are left to you in the portal.
+#   options: Web browser upload | FTP or Aspera preload
+upload_method: 
+
+# Preload folder (text, optional)
+#   Wizard step 7, with upload_method 'FTP or Aspera preload': the name of the preload folder that holds this submission's files (one folder per submission, not your root directory).
+preload_folder: 
+
+# Sequence data files (filelist, optional)
+#   Wizard step 7 (Files), with 'Web browser upload': the sequence data files named in the SRA metadata, one path per line; each file name must exactly match a filename column there and be unique. Raw reads with per-base quality scores only; no assemblies, contigs or consensus sequences. Compress with gzip or bzip2 (never zip); a tarball is allowed. Each fastq file must be under 100 GB. File names appear publicly, so they must not contain sensitive information. Leave blank with 'FTP or Aspera preload'.
+#   each file at most 100000 MB
+data_files: |
+  tests/manuscript_files/sra/pp_test_1_R1.fastq.gz
+  tests/manuscript_files/sra/pp_test_1_R2.fastq.gz
+  tests/manuscript_files/sra/pp_test_2_R1.fastq.gz
+  tests/manuscript_files/sra/pp_test_2_R2.fastq.gz
+
+# ----------------------------------------------------------------------
+# Deposit details
+# ----------------------------------------------------------------------
+
+# Project title (text, optional)
+#   Wizard step 3 (Project Info), for a new BioProject (ignored when bioproject is given): a brief title, as a phrase or short sentence, for public display, e.g. 'Global studies of microbial diversity on human skin'. 20-250 characters. It is public, so it must not contain sensitive or personally identifying information.
+#   at most 250 characters
+#   at least 20 characters
+title: PAPERPUSH TEST - DO NOT REVIEW (immediate release)
+
+# Public description (textarea, optional)
+#   Wizard step 3 (Project Info), for a new BioProject: a paragraph describing the study goals and relevance, enough for users to understand the research study. 20-4000 characters.
+#   at most 4000 characters
+#   at least 20 characters
+abstract: |
+  PAPERPUSH TEST - DO NOT REVIEW. Synthetic paired-end RNA-Seq reads generated by the paperpush test fixture factory; this draft must never be submitted.
+
+# BioProject accession (text, optional)
+#   Wizard step 2 (General Info). The accession (PRJNA#) of a BioProject you already registered; the wizard then skips the Project Info step. Leave blank to register a new BioProject in this submission (its accession is assigned after the submission is processed). The project must exist and must not be an umbrella or RefSeq project. To add data to an existing study, give its PRJNA# rather than creating a duplicate project.
+bioproject: 
+
+# Release date (text, optional)
+#   Wizard step 2 (General Info). Leave blank (or write 'immediately') to release immediately following processing, or give a date as YYYY-MM-DD to release on that date or upon publication, whichever is first. The portal accepts dates from one week to four years ahead. It can be changed later in the Submission Portal; it also sets the release of the BioProject and BioSamples.
+release_date: 
+
+# Relevance (choice, optional)
+#   Wizard step 3 (Project Info), for a new BioProject: the primary general relevance of the study. 'Other' needs relevance_description.
+#   options: Agricultural | Medical | Industrial | Environmental | Evolution | Model organism | Other
+relevance: Model organism
+
+# Relevance description (text, optional)
+#   Wizard step 3, required by the portal when relevance is 'Other': a few words on the study's relevance.
+relevance_description: 
+
+# BioSample package (choice, optional)
+#   Wizard step 4 (Sample Type), for new BioSamples: the NCBI BioSample package id that best describes the samples, e.g. 'Model.organism.animal.1.0', 'Human.1.0', 'Microbe.1.0', 'Metagenome.environmental.1.0', or a MIxS package with its environment such as 'MIMS.me.soil.6.0'. The id is the name of the package's template; all packages are listed at https://www.ncbi.nlm.nih.gov/biosample/docs/packages/, and a package's attributes (what each means, which are mandatory, the value each takes) at https://submit.ncbi.nlm.nih.gov/biosample/template/?package-0=<package>&action=definition. Leave blank, together with biosample_attributes_file, when the samples are already registered (the SRA metadata then gives their SAMN# accessions). Human data that needs controlled access goes to dbGaP, not SRA.
+#   options: SARS-CoV-2.cl.1.0 | SARS-CoV-2.wwsurv.1.0 | Pathogen.cl.1.0 | Pathogen.env.1.0 | Pathogen.combined.1.0 | OneHealthEnteric.1.0 | PHA4GE.wwsurv.1.0 | Microbe.1.0 | Model.organism.animal.1.0 | Metagenome.environmental.1.0 | Invertebrate.1.0 | Human.1.0 | Plant.1.0 | Virus.1.0 | Beta-lactamase.1.0 | MIGS.ba.6.0 | MIGS.ba.agriculture.6.0 | MIGS.ba.air.6.0 | MIGS.ba.built.6.0 | MIGS.ba.food-animal.6.0 | MIGS.ba.food-farm_env.6.0 | MIGS.ba.food-prod_facility.6.0 | MIGS.ba.food-human_foods.6.0 | MIGS.ba.host-associated.6.0 | MIGS.ba.human-associated.6.0 | MIGS.ba.human-gut.6.0 | MIGS.ba.human-oral.6.0 | MIGS.ba.human-skin.6.0 | MIGS.ba.human-vaginal.6.0 | MIGS.ba.hydrocarbon-cores.6.0 | MIGS.ba.hydrocarbon-fluids_swabs.6.0 | MIGS.ba.microbial.6.0 | MIGS.ba.miscellaneous.6.0 | MIGS.ba.plant-associated.6.0 | MIGS.ba.sediment.6.0 | MIGS.ba.soil.6.0 | MIGS.ba.symbiont-associated.6.0 | MIGS.ba.wastewater.6.0 | MIGS.ba.water.6.0 | MIGS.eu.6.0 | MIGS.eu.agriculture.6.0 | MIGS.eu.air.6.0 | MIGS.eu.built.6.0 | MIGS.eu.food-animal.6.0 | MIGS.eu.food-farm_env.6.0 | MIGS.eu.food-prod_facility.6.0 | MIGS.eu.food-human_foods.6.0 | MIGS.eu.host-associated.6.0 | MIGS.eu.human-associated.6.0 | MIGS.eu.human-gut.6.0 | MIGS.eu.human-oral.6.0 | MIGS.eu.human-skin.6.0 | MIGS.eu.human-vaginal.6.0 | MIGS.eu.hydrocarbon-cores.6.0 | MIGS.eu.hydrocarbon-fluids_swabs.6.0 | MIGS.eu.microbial.6.0 | MIGS.eu.miscellaneous.6.0 | MIGS.eu.plant-associated.6.0 | MIGS.eu.sediment.6.0 | MIGS.eu.soil.6.0 | MIGS.eu.symbiont-associated.6.0 | MIGS.eu.wastewater.6.0 | MIGS.eu.water.6.0 | MIGS.vi.6.0 | MIGS.vi.agriculture.6.0 | MIGS.vi.air.6.0 | MIGS.vi.built.6.0 | MIGS.vi.food-animal.6.0 | MIGS.vi.food-farm_env.6.0 | MIGS.vi.food-prod_facility.6.0 | MIGS.vi.food-human_foods.6.0 | MIGS.vi.host-associated.6.0 | MIGS.vi.human-associated.6.0 | MIGS.vi.human-gut.6.0 | MIGS.vi.human-oral.6.0 | MIGS.vi.human-skin.6.0 | MIGS.vi.human-vaginal.6.0 | MIGS.vi.hydrocarbon-cores.6.0 | MIGS.vi.hydrocarbon-fluids_swabs.6.0 | MIGS.vi.microbial.6.0 | MIGS.vi.miscellaneous.6.0 | MIGS.vi.plant-associated.6.0 | MIGS.vi.sediment.6.0 | MIGS.vi.soil.6.0 | MIGS.vi.symbiont-associated.6.0 | MIGS.vi.wastewater.6.0 | MIGS.vi.water.6.0 | MIMAG.6.0 | MIMAG.agriculture.6.0 | MIMAG.air.6.0 | MIMAG.built.6.0 | MIMAG.food-animal.6.0 | MIMAG.food-farm_env.6.0 | MIMAG.food-prod_facility.6.0 | MIMAG.food-human_foods.6.0 | MIMAG.host-associated.6.0 | MIMAG.human-associated.6.0 | MIMAG.human-gut.6.0 | MIMAG.human-oral.6.0 | MIMAG.human-skin.6.0 | MIMAG.human-vaginal.6.0 | MIMAG.hydrocarbon-cores.6.0 | MIMAG.hydrocarbon-fluids_swabs.6.0 | MIMAG.microbial.6.0 | MIMAG.miscellaneous.6.0 | MIMAG.plant-associated.6.0 | MIMAG.sediment.6.0 | MIMAG.soil.6.0 | MIMAG.symbiont-associated.6.0 | MIMAG.wastewater.6.0 | MIMAG.water.6.0 | MIMARKS.specimen.6.0 | MIMARKS.specimen.agriculture.6.0 | MIMARKS.specimen.air.6.0 | MIMARKS.specimen.built.6.0 | MIMARKS.specimen.food-animal.6.0 | MIMARKS.specimen.food-farm_env.6.0 | MIMARKS.specimen.food-prod_facility.6.0 | MIMARKS.specimen.food-human_foods.6.0 | MIMARKS.specimen.host-associated.6.0 | MIMARKS.specimen.human-associated.6.0 | MIMARKS.specimen.human-gut.6.0 | MIMARKS.specimen.human-oral.6.0 | MIMARKS.specimen.human-skin.6.0 | MIMARKS.specimen.human-vaginal.6.0 | MIMARKS.specimen.hydrocarbon-cores.6.0 | MIMARKS.specimen.hydrocarbon-fluids_swabs.6.0 | MIMARKS.specimen.microbial.6.0 | MIMARKS.specimen.miscellaneous.6.0 | MIMARKS.specimen.plant-associated.6.0 | MIMARKS.specimen.sediment.6.0 | MIMARKS.specimen.soil.6.0 | MIMARKS.specimen.symbiont-associated.6.0 | MIMARKS.specimen.wastewater.6.0 | MIMARKS.specimen.water.6.0 | MIMARKS.survey.agriculture.6.0 | MIMARKS.survey.air.6.0 | MIMARKS.survey.built.6.0 | MIMARKS.survey.food-animal.6.0 | MIMARKS.survey.food-farm_env.6.0 | MIMARKS.survey.food-prod_facility.6.0 | MIMARKS.survey.food-human_foods.6.0 | MIMARKS.survey.host-associated.6.0 | MIMARKS.survey.human-associated.6.0 | MIMARKS.survey.human-gut.6.0 | MIMARKS.survey.human-oral.6.0 | MIMARKS.survey.human-skin.6.0 | MIMARKS.survey.human-vaginal.6.0 | MIMARKS.survey.hydrocarbon-cores.6.0 | MIMARKS.survey.hydrocarbon-fluids_swabs.6.0 | MIMARKS.survey.microbial.6.0 | MIMARKS.survey.miscellaneous.6.0 | MIMARKS.survey.plant-associated.6.0 | MIMARKS.survey.sediment.6.0 | MIMARKS.survey.soil.6.0 | MIMARKS.survey.symbiont-associated.6.0 | MIMARKS.survey.wastewater.6.0 | MIMARKS.survey.water.6.0 | MIMS.me.agriculture.6.0 | MIMS.me.air.6.0 | MIMS.me.built.6.0 | MIMS.me.food-animal.6.0 | MIMS.me.food-farm_env.6.0 | MIMS.me.food-prod_facility.6.0 | MIMS.me.food-human_foods.6.0 | MIMS.me.host-associated.6.0 | MIMS.me.human-associated.6.0 | MIMS.me.human-gut.6.0 | MIMS.me.human-oral.6.0 | MIMS.me.human-skin.6.0 | MIMS.me.human-vaginal.6.0 | MIMS.me.hydrocarbon-cores.6.0 | MIMS.me.hydrocarbon-fluids_swabs.6.0 | MIMS.me.microbial.6.0 | MIMS.me.miscellaneous.6.0 | MIMS.me.plant-associated.6.0 | MIMS.me.sediment.6.0 | MIMS.me.soil.6.0 | MIMS.me.symbiont-associated.6.0 | MIMS.me.wastewater.6.0 | MIMS.me.water.6.0 | MISAG.6.0 | MISAG.agriculture.6.0 | MISAG.air.6.0 | MISAG.built.6.0 | MISAG.food-animal.6.0 | MISAG.food-farm_env.6.0 | MISAG.food-prod_facility.6.0 | MISAG.food-human_foods.6.0 | MISAG.host-associated.6.0 | MISAG.human-associated.6.0 | MISAG.human-gut.6.0 | MISAG.human-oral.6.0 | MISAG.human-skin.6.0 | MISAG.human-vaginal.6.0 | MISAG.hydrocarbon-cores.6.0 | MISAG.hydrocarbon-fluids_swabs.6.0 | MISAG.microbial.6.0 | MISAG.miscellaneous.6.0 | MISAG.plant-associated.6.0 | MISAG.sediment.6.0 | MISAG.soil.6.0 | MISAG.symbiont-associated.6.0 | MISAG.wastewater.6.0 | MISAG.water.6.0 | MIUVIG.6.0 | MIUVIG.agriculture.6.0 | MIUVIG.air.6.0 | MIUVIG.built.6.0 | MIUVIG.food-animal.6.0 | MIUVIG.food-farm_env.6.0 | MIUVIG.food-prod_facility.6.0 | MIUVIG.food-human_foods.6.0 | MIUVIG.host-associated.6.0 | MIUVIG.human-associated.6.0 | MIUVIG.human-gut.6.0 | MIUVIG.human-oral.6.0 | MIUVIG.human-skin.6.0 | MIUVIG.human-vaginal.6.0 | MIUVIG.hydrocarbon-cores.6.0 | MIUVIG.hydrocarbon-fluids_swabs.6.0 | MIUVIG.microbial.6.0 | MIUVIG.miscellaneous.6.0 | MIUVIG.plant-associated.6.0 | MIUVIG.sediment.6.0 | MIUVIG.soil.6.0 | MIUVIG.symbiont-associated.6.0 | MIUVIG.wastewater.6.0 | MIUVIG.water.6.0
+biosample_package: Model.organism.animal.1.0
+
+# ----------------------------------------------------------------------
+# Authors
+# ----------------------------------------------------------------------
+
+# First (given) name (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+submitter_first_name: 
+
+# Middle name (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+submitter_middle_name: 
+
+# Last (family) name (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+submitter_last_name: 
+
+# Email (primary) (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile. Use your primary email address; NCBI sends processing messages there.
+submitter_email: 
+
+# Email (secondary) (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+submitter_secondary_email: 
+
+# Submitting organization (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+submitting_organization: 
+
+# Submitting organization URL (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+#   each non-blank line must be a valid http/https URL
+submitting_organization_url: 
+
+# Department (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+department: 
+
+# Phone (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+phone: 
+
+# Fax (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+fax: 
+
+# Street (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+street: 
+
+# City (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+city: 
+
+# State/Province (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile. Required by the portal for addresses in the USA.
+state: 
+
+# Postal code (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile.
+postal_code: 
+
+# Country (text, optional)
+#   Wizard step 1 (Submitter). Leave blank to keep the value the portal pre-fills from your NCBI profile. Type the country as NCBI lists it, e.g. 'United States of America (USA)' or 'Germany'; the runner picks the matching entry from the portal's suggestions.
+country: 
+
+# Update my contact information in profile (boolean, optional)
+#   Wizard step 1. yes = also save the submitter details above to your NCBI profile (the portal ticks this by default; paperpush leaves the profile unchanged unless you say yes).
+update_profile: no
+
+# ----------------------------------------------------------------------
+# Additional information
+# ----------------------------------------------------------------------
+
+# External links (textarea, optional)
+#   Wizard step 3 (Project Info), for a new BioProject: websites related to the study, one per line as 'display name | URL'.
+external_links: |
+  
+
+# Grants (textarea, optional)
+#   Wizard step 3 (Project Info), for a new BioProject: the study's grants, one per line as 'grant ID | grant title | agency | agency abbreviation', e.g. 'R01HG012345 | Single-cell atlas | National Human Genome Research Institute | NHGRI'. The runner enters them through the portal's 'Enter grants manually' table.
+grants: |
+  
+
+# Consortium name (text, optional)
+#   Wizard step 3, optional: the consortium the study was carried out in.
+consortium_name: 
+
+# Consortium URL (text, optional)
+#   Wizard step 3, optional: the consortium's website.
+#   each non-blank line must be a valid http/https URL
+consortium_url: 
+
+# Data providers (textarea, optional)
+#   Wizard step 3, optional: the data provider (data submitter) if it is someone other than the submitting organization or consortium, e.g. a sequencing center; one per line as 'name | URL'.
+data_providers: |
+  
+
+# vim: set filetype=yaml :

@@ -47,6 +47,7 @@
   ],
   "declarations": [
     "funding",
+    "funding_statement",
     "research_funding",
     "funders",
     "competing_interests",

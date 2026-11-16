@@ -5,9 +5,9 @@ next, so the two slips editors see most often are an old date and the name of
 the journal it was last sent to. This module checks both:
 
 * **date** -- the first date in the letterhead (the text before the
-  salutation) must be no more than ``cover_letter_max_age_days`` old (7 by
-  default; ``paperpush validate --cover-letter-max-age``) and not in the
-  future. A numeric date that reads two ways (03/11/2026) is reported only when
+  salutation) prompts a suggestion when more than ``cover_letter_max_age_days``
+  old (7 by default; ``paperpush validate --cover-letter-max-age``), and a
+  warning when in the future. A numeric date that reads two ways (03/11/2026) is reported only when
   both readings are stale. A LaTeX letter dated ``\\today`` always passes. A
   letter with no date is reported as not checked.
 * **venue** -- the letter must not name another venue in a sentence about the
@@ -28,7 +28,7 @@ from pathlib import Path
 
 from . import document
 from .database import Field, Venue
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, unchecked
+from .validate import SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -153,9 +153,9 @@ def date_issue(
         either = " (either way it is read)" if len(readings) > 1 else ""
         return [
             Issue(
-                WARNING,
+                SUGGESTION,
                 field_id,
-                f"{name} is dated {written}, {age} days ago{either}; cover letters should be dated within {max_age_days} days of submission -- update the date",
+                f"{name} is dated {written}, {age} days ago{either}; consider updating the date (the freshness threshold is {max_age_days} days)",
             )
         ], ""
     if all(age < -_FUTURE_GRACE_DAYS for age in ages):

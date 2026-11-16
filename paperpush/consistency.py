@@ -411,10 +411,24 @@ def _keywords_check(venue: Venue, values: dict[str, str], by_id: dict[str, Field
     return Outcome(issues, f"{len(sub)} keywords match")
 
 
+def _form_statements(venue: Venue, values: dict[str, str]) -> tuple[set[str], set[str]]:
+    """The .sub field ids of the declarations the venue keeps out of the manuscript, and of those its submission system collects."""
+    from .database import FORM_STATEMENT_FIELDS
+    from .requirements import get_requirements, resolve
+
+    base = get_requirements(venue.slug)
+    if base is None:
+        return set(), set()
+    rules = resolve(base, values).statements
+    ids = lambda names: {FORM_STATEMENT_FIELDS[n][0] for n in names or [] if n in FORM_STATEMENT_FIELDS}  # noqa: E731
+    return ids(rules.not_in_manuscript), ids(rules.in_submission_form)
+
+
 def _statements_check(venue: Venue, values: dict[str, str]) -> Outcome:
-    fields = [f for f in venue.fields if f.type in ("text", "textarea") and not f.fields and _STATEMENT_FIELDS.search(f.id) and len(values.get(f.id, "").split()) >= MIN_STATEMENT_WORDS]
+    kept_out, in_form = _form_statements(venue, values)
+    fields = [f for f in venue.fields if f.type in ("text", "textarea") and not f.fields and _STATEMENT_FIELDS.search(f.id) and f.id not in kept_out and len(values.get(f.id, "").split()) >= MIN_STATEMENT_WORDS]
     if not fields:
-        raise NotApplicable("no statement in the .sub long enough to compare")
+        raise NotApplicable("no statement in the .sub long enough to compare" + (" (the guidelines keep the others out of the manuscript)" if kept_out & set(values) else ""))
     _, path, doc = _manuscript(venue, values)
     text = _text(doc)
     if doc.is_tex and doc.pdf is None and doc.tex_source:
@@ -426,6 +440,11 @@ def _statements_check(venue: Venue, values: dict[str, str]) -> Outcome:
     issues: list[Issue] = []
     matched = []
     for f in fields:
+        if f.id in in_form:
+            # The submission system collects it; the manuscript need not repeat it.
+            ratio, start, _ = locate(document.tokens(values[f.id]), hay)
+            if start is None or ratio < MIN_SIMILARITY:
+                continue
         found, detail = compare_passage(f.label, f.id, values[f.id], hay, path.name)
         issues.extend(found)
         if detail:

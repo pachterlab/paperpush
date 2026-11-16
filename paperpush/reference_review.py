@@ -15,7 +15,7 @@ from . import document
 from .ai_validate import AiTask
 from .bibliography_check import _YEAR, _numbers, _split, _unwrap, citation_groups, read_bibliography
 from .database import Venue
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .validate import SUGGESTION, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 
 # Half or more of a reference list being old is worth a look; a few old sources are not.
@@ -78,7 +78,7 @@ def _age(venue: Venue, values: dict[str, str]) -> Outcome:
     examples = ", ".join(f"{ref.label} ({years} years)" for ref, years in older_10[:8])
     if len(older_10) > 8:
         examples += f", and {len(older_10) - 8} more"
-    return Outcome([Issue(WARNING, field.id, f"{detail}: {examples}; check whether newer work should also be cited (age alone does not make a source unsuitable)")])
+    return Outcome([Issue(SUGGESTION, field.id, f"{detail}: {examples}; check whether newer work should also be cited (age alone does not make a source unsuitable)")])
 
 
 def _density(venue: Venue, values: dict[str, str]) -> Outcome:
