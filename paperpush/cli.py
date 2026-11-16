@@ -1530,11 +1530,15 @@ def _report_validation(subfile, venue_def, subfile_path: str, *, network: bool =
     skipped = "the sensitive-data scan" if network else "the link, reference, and OpenReview lookups and the sensitive-data scan"
     print(f"note: submit skipped {skipped}; 'paperpush validate' runs them" + ("." if network else ", or add --enable-network-checks for the lookups."), file=sys.stderr)
     errors = [i for i in issues if i.is_error]
-    warnings = [i for i in issues if not i.is_error and not i.is_suggestion]
+    likely = [i for i in issues if i.is_likely_error and not i.unchecked]
+    warnings = [i for i in issues if not i.is_error and not i.is_suggestion and i not in likely]
     suggestions = [i for i in issues if i.is_suggestion]
-    for issue in warnings:
-        where = f"[{issue.field}] " if issue.field else ""
-        print(f"warning: {where}{issue.message}", file=sys.stderr)
+    for label, group in (("likely error", likely), ("warning", warnings)):
+        for issue in group:
+            where = f"[{issue.field}] " if issue.field else ""
+            print(f"{label}: {where}{issue.message}", file=sys.stderr)
+    if likely:
+        print(f"note: {len(likely)} likely error(s) above would each be serious if real; confirm them before the final submit.", file=sys.stderr)
     if suggestions:
         print(f"note: {len(suggestions)} suggestion(s) on style; 'paperpush validate --suggestions' lists them.", file=sys.stderr)
     if errors:
@@ -1836,10 +1840,18 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             action += "+initial"
         return _open_web(Path(args.subfile), action=action, colorblind=getattr(args, "alt_color", False))
 
+    # The report is saved by default (no -o, or a bare -o) as
+    # <label stem>_validation.pdf next to the .sub (or the first file named),
+    # replacing the one an earlier run saved there. A path given with -o is not
+    # replaced without --overwrite. -o none, -o "" or --no-report saves nothing.
     report_out = None
-    if getattr(args, "output", None) is not None:
-        report_out = report_mod.output_path(args.output, label)
-        if report_out.exists() and not getattr(args, "overwrite", False):
+    requested = getattr(args, "output", None)
+    explicit_report = requested is not None and requested.strip().lower() not in ("", "none")
+    if getattr(args, "no_report", False) or (requested is not None and not explicit_report):
+        report_out = None
+    else:
+        report_out = report_mod.output_path(requested if explicit_report else "", label)
+        if explicit_report and report_out.exists() and not getattr(args, "overwrite", False):
             print(f"error: {report_out} already exists (use --overwrite to replace it)", file=sys.stderr)
             return 1
 
@@ -1884,7 +1896,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         hide_suggestions=getattr(args, "hide_suggestions", False),
     )
     # The terminal shows only how many suggestions there are, unless asked;
-    # the report saved with -o lists them.
+    # the saved report lists them.
     terminal_hide = hide if getattr(args, "suggestions", False) else hide | {report_mod.SUGGESTION}
     json_out = getattr(args, "json_out", None)
     # With the JSON on stdout, the notes below go to stderr so stdout stays parseable.
@@ -1915,9 +1927,14 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         try:
             report_mod.save(result, out, alt_color=alt, hide=hide)
         except OSError as exc:
-            print(f"error: could not save the report to {out}: {exc}", file=sys.stderr)
-            return 1
-        print(f"\nSaved the report to {out}", file=note_stream)
+            if explicit_report:
+                print(f"error: could not save the report to {out}: {exc}", file=sys.stderr)
+                return 1
+            # The default save is a convenience; a read-only directory should
+            # not turn a passing validation into a failure.
+            print(f"warning: could not save the report to {out}: {exc} (use -o PATH to save it elsewhere, or --no-report)", file=sys.stderr)
+        else:
+            print(f"\nSaved the report to {out}", file=note_stream)
 
     if result.errors:
         print("\nFix the errors above, then run 'paperpush validate' again.", file=sys.stderr)
@@ -2306,6 +2323,11 @@ def _cmd_prepare_submission(args: argparse.Namespace) -> int:
     if not submit_too:
         print(f"\n{sub_path} passed validation for {venue.slug}.")
         return 0
+    if result.likely_errors and not args.yes:
+        print(f"\n{len(result.likely_errors)} likely error(s) (orange in the report): each would be serious if real, such as an identity leak or a fabricated reference.")
+        if not interactive or not _ask("Have you checked every likely error? Go on to the portal?"):
+            print("Stopped before the portal." + ("" if interactive else " Pass --yes to go on once you have checked them."))
+            return 1
     if len(result.warnings) > _PREPARE_MAX_WARNINGS and not args.yes:
         print(f"\n{len(result.warnings)} warnings. {fix_hint}")
         if not interactive or not _ask("Go on to the portal anyway?"):
@@ -2781,11 +2803,12 @@ def _print_autofill_summary(result, extraction, venue, out_path, dry_run: bool) 
     for o in unknown:
         print(f"\nignored proposed field '{o.id}': {o.note}")
 
-    if result.warnings:
-        print(f"\n{len(result.warnings)} validation warning(s):")
-        for issue in result.warnings:
-            where = f"[{issue.field}] " if issue.field else ""
-            print(f"  {where}{issue.message}")
+    for title, group in (("likely error(s), each serious if real: confirm them", result.likely_errors), ("validation warning(s)", result.warnings)):
+        if group:
+            print(f"\n{len(group)} {title}:")
+            for issue in group:
+                where = f"[{issue.field}] " if issue.field else ""
+                print(f"  {where}{issue.message}")
 
     # Residual errors are expected (policy fields are intentionally left), so
     # they are guidance on what remains, printed to stdout to keep ordering.
@@ -3080,7 +3103,7 @@ def _cmd_format(args: argparse.Namespace) -> int:
         print(f"  + {change}")
     for todo in result.left_to_author:
         print(f"  ! {todo}")
-    failing = [(cid, msgs) for cid, _, status, msgs in result.checks if status in ("failed", "warning")]
+    failing = [(cid, msgs) for cid, _, status, msgs in result.checks if status in ("failed", "likely_error", "warning")]
     for cid, msgs in failing:
         for msg in msgs or [""]:
             print(f"  layout check {cid}: {msg}")
@@ -3362,7 +3385,7 @@ def _add_check_options(parser: argparse.ArgumentParser, *, documented: bool = Tr
         "--initial-submission",
         dest="initial_submission",
         action="store_true",
-        help="validate this as an initial submission: every error is reported as a warning, so nothing blocks it. Meant for venues whose guidelines let the initial submission be in any format (the report names the rule at the top when the venue has one; see 'paperpush requirements VENUE').",
+        help="validate this as an initial submission: formatting errors and formatting likely errors (a modified template) are reported as warnings; checks that are not about format (identity leaks, hidden prompts, fabricated references, plagiarism, an AI tool as author, a missing supplement, trial registration, ethics approval) keep their level. Meant for venues whose guidelines let the initial submission be in any format (the report names the rule at the top when the venue has one; see 'paperpush requirements VENUE').",
     )
     add(
         "--strict-style",
@@ -3557,18 +3580,19 @@ def build_parser() -> argparse.ArgumentParser:
         "-o",
         "--output",
         nargs="?",
-        const="",
+        const=None,
         metavar="OUT",
-        help="also save the report. Give a path ending in .pdf, .html, .md, or .txt. Default: <subfile>_validation.pdf next to the .sub.",
+        help="where to save the report: a path ending in .pdf, .html, .md, or .txt, or a directory. The report is saved by default as <subfile>_validation.pdf next to the .sub (or next to the first file named, without a .sub), replacing the one an earlier run saved there. '-o none' or -o \"\" saves nothing (same as --no-report).",
     )
-    p_validate.add_argument("--overwrite", action="store_true", help="replace the report saved with -o if the file already exists")
+    p_validate.add_argument("--no-report", dest="no_report", action="store_true", help="do not save the report; only print it")
+    p_validate.add_argument("--overwrite", action="store_true", help="replace the file named with -o if it already exists (the default report path is always replaced)")
     p_validate.add_argument("--force", dest="overwrite", action="store_true", help=argparse.SUPPRESS)
-    display_group = p_validate.add_argument_group("display", "Leave sections out of the report shown in the terminal and saved with -o (not --web). The summary line still counts every check, and the report says what was left out. The exit status is unchanged.")
+    display_group = p_validate.add_argument_group("display", "Leave sections out of the report shown in the terminal and saved to file (not --web). The summary line still counts every check, and the report says what was left out. The exit status is unchanged.")
     display_group.add_argument("--show-errors-only", dest="errors_only", action="store_true", help="show only the failed checks and their errors; overrides --hide-warnings and --hide-unchecked")
     display_group.add_argument("--hide-warnings", dest="hide_warnings", action="store_true", help="leave out the warnings section, and the warnings listed under failed checks")
     display_group.add_argument("--hide-unchecked", dest="hide_unchecked", action="store_true", help="leave out the checks that were not run: could not run, needs AI, and not implemented")
-    display_group.add_argument("--suggestions", dest="suggestions", action="store_true", help="list the suggestions on style (repetitive word choice, spelled-out numbers, ...) in the terminal too; by default the terminal shows only how many there are, and the report saved with -o lists them")
-    display_group.add_argument("--hide-suggestions", dest="hide_suggestions", action="store_true", help="leave the suggestions on style out of the report saved with -o as well")
+    display_group.add_argument("--suggestions", dest="suggestions", action="store_true", help="list the suggestions on style (repetitive word choice, spelled-out numbers, ...) in the terminal too; by default the terminal shows only how many there are, and the saved report lists them")
+    display_group.add_argument("--hide-suggestions", dest="hide_suggestions", action="store_true", help="leave the suggestions on style out of the saved report as well")
     p_validate.add_argument("--colorblind", "--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours in the terminal and saved report: blue for passed, vermillion for failed, dark yellow for warnings, bluish green for suggestions, reddish purple for needs AI, grey for could not run / not implemented (the same palette as the web app's \"Colorblind-friendly colors\" setting). --alt-color is an older name for it")
     p_validate.add_argument(
         "--ai",

@@ -65,8 +65,15 @@ def fold(text: str) -> str:
 
 
 def tokens(text: str) -> list[str]:
-    """The words of ``text``, folded, with punctuation dropped."""
-    return re.findall(r"[a-z0-9]+", fold(text))
+    """The words of ``text``, folded, with punctuation dropped.
+
+    A times sign after a number goes too: "55x" in a portal's plain text is ``55$\\times$`` in
+    LaTeX, whose math the text drops.
+    """
+    return re.findall(r"[a-z0-9]+", _TIMES_AFTER_NUMBER.sub(r"\1", fold(text)))
+
+
+_TIMES_AFTER_NUMBER = re.compile(r"(\d)\s?[x\u00d7](?![a-z0-9])")
 
 
 class Document:

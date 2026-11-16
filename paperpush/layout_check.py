@@ -33,7 +33,7 @@ from pathlib import Path
 from . import document
 from .database import Field, Venue
 from .requirements import ManuscriptRequirements, get_requirements, resolve
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .validate import LIKELY_ERROR, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -880,7 +880,8 @@ def _template(checks: Checks, field: Field, m: _Measured, reqs: ManuscriptRequir
         wanted = rules.latex_class
         if wanted in names or any(n.startswith(wanted) for n in names):
             return [], f"uses {wanted}"
-        return [_issue(field, f"{m.path.name} does not load the '{wanted}' class or style (it uses \\documentclass{{{', '.join(m.tex.classes) or '?'}}}); the author guidelines require the venue's template{url}")], ""
+        # A likely error: a venue that mandates its class desk-rejects papers set in another one.
+        return [Issue(LIKELY_ERROR, field.id, f"{m.path.name} does not load the '{wanted}' class or style (it uses \\documentclass{{{', '.join(m.tex.classes) or '?'}}}); the author guidelines require the venue's template{url}")], ""
     if m.docx is not None:
         task = AiTask(id="ai.template", title="Looks prepared with the venue's template (judged from the layout when the file can't tell)", category=LAYOUT, instructions=f"The author guidelines require the venue's template{url}. Judge from the manuscript's layout, styles, and front matter whether it was prepared with that template. 'fail' if it plainly was not.", files=[str(m.path)])
         checks.needs_ai(task)

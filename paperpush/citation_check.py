@@ -26,8 +26,11 @@ The legends are checked against ``figures.legend_max_words`` and
 ``figures.legends_location`` (at the end of the manuscript, after the
 references, or with each figure).
 
-``citations.supplementary_attachments`` warns when the manuscript references
-supplementary material but the submission lists no supplementary uploads.
+``citations.supplementary_attachments`` reports a likely error when the manuscript
+references supplementary material, the submission lists no supplementary uploads,
+and the manuscript does not carry the supplement itself (captioned supplementary
+items in the same file). A reviewer missing the supplement is serious, but the
+material may be hosted elsewhere, so it is not a certain error.
 
 ``citations.cross_references`` looks for cross-references that point at
 nothing, in the manuscript and the supplementary files:
@@ -54,7 +57,7 @@ from pathlib import Path
 from . import document
 from .database import Venue
 from .requirements import get_requirements, resolve
-from .validate import WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .validate import LIKELY_ERROR, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +78,7 @@ PANEL_TITLE = "Figure and table panels cited in order"
 # An item, with the panels that can follow its letter ("1a-c", "1a, b and d").
 _ITEM = r"(?:S?\d{1,3}[a-zA-Z](?:\s*(?:,|and\b|&|[\u2013-])\s*[a-zA-Z](?![\w]))*|S?\d{1,3})"
 _MENTION = re.compile(
-    r"(?P<prefix>\b(?:Supplementary|Supplemental|Suppl\.?|Supp\.?|Extended\s+Data|Appendix)\s+(?:Information\s+)?)?" r"\b(?P<word>Fig(?:ure)?s?\.?|Tables?|Tabs?\.)\s*" rf"(?P<list>{_ITEM}(?:\s*(?:,|;|and|&|[\u2013-]|to)\s*{_ITEM}(?![\w]))*)",
+    r"(?P<prefix>\b(?:Supplementary|Supplemental|Suppl\.?|Supp\.?|Extended\s+Data|Appendix)\s+(?:Information\s+)?)?" r"\b(?P<word>Fig(?:ure)?s?\.?|T ?ables?|Tabs?\.)\s*" rf"(?P<list>{_ITEM}(?:\s*(?:,|;|and|&|[\u2013-]|to)\s*{_ITEM}(?![\w]))*)",
     re.IGNORECASE,
 )
 # A caption: at the start of a line, the item number then '.', ':', '|', two
@@ -101,7 +104,7 @@ class Mention:
 
 
 def _series(prefix: str, word: str, item: str) -> str | None:
-    table = word.lower().startswith("tab")
+    table = word.lower().replace(" ", "").startswith("tab")  # "T able 1": kerned apart in a PDF
     prefix = (prefix or "").lower()
     if "extended" in prefix:
         return "ed_table" if table else "ed_figure"
@@ -138,6 +141,14 @@ def _short_line_limit(text: str) -> float:
     return min(50, 0.75 * lengths[len(lengths) // 2]) if lengths else 50
 
 
+def _repeated_lines(text: str) -> set[str]:
+    """Lines printed three or more times word for word: a PDF's running heads."""
+    from collections import Counter
+
+    counts = Counter(line.strip() for line in text.split("\n") if len(line.strip()) > 10)
+    return {line for line, n in counts.items() if n >= 3}
+
+
 def mentions(text: str) -> list[Mention]:
     """Every figure/table citation and caption in ``text``, in order.
 
@@ -146,6 +157,7 @@ def mentions(text: str) -> list[Mention]:
     """
     out: list[Mention] = []
     short_line = None
+    running_heads: set[str] | None = None
     for m in _MENTION.finditer(text):
         line_start = text.rfind("\n", 0, m.start()) + 1
         at_line_start = not text[line_start : m.start()].strip(" \t(")
@@ -169,12 +181,21 @@ def mentions(text: str) -> list[Mention]:
             # "Table 1:Deep-prefill robustness ...": a colon right after the number opens a caption,
             # whatever the line above is (often text drawn inside the figure).
             caption = caption or (text[m.end(): m.end() + 1] == ":" and not re.search(r"\b(?:in|see|of|from|to|and)\s*$", before))
+            # "Table 1.Main results ...": a full stop and a capital with no space between is a caption's
+            # label (prose would have a space), whatever line the other column left above it.
+            caption = caption or bool(re.match(r"\.[A-Z][a-z]", text[m.end(): m.end() + 3]))
+            # A caption at the top of a page follows the running head, a line the PDF repeats on every page.
+            if not caption and _CAPTION_TAIL.match(text, m.end()) and len(previous.strip()) > 10:
+                if running_heads is None:
+                    running_heads = _repeated_lines(text)
+                caption = previous.strip() in running_heads
         if not caption and _OTHER_AFTER.match(text, m.end()) and not _COUNT_NOT_REFERENCE.match(text, m.end()):
             continue  # another paper's figure: "Fig. 3 of ref. 12"
         for item in _expand(listing):
             series = _series(m.group("prefix") or "", m.group("word"), item)
             if series is not None and not (caption and series.startswith("appendix_")):
                 out.append(Mention(series, int(re.sub(r"\D", "", item)), m.start(), caption, m.group(0)))
+    out = _label_captions(text, out)
     span = _reference_span(text, out)
     if span:
         out = [x for x in out if x.caption or not span[0] <= x.pos < span[1]]
@@ -183,6 +204,25 @@ def mentions(text: str) -> list[Mention]:
             sides = {x.pos > span[0] for x in out if x.series == series and x.caption}
             if sides == {True, False}:
                 out = [replace(x, appendix=x.pos > span[0]) if x.series == series else x for x in out]
+    return out
+
+
+def _label_captions(text: str, found: list[Mention]) -> list[Mention]:
+    """Take "Fig. 2. Test accuracy ..." opening a line as the caption of a figure that has none.
+
+    A figure's own lettering (a legend's "Model annealing Cross-entropy SGDR") can sit on the
+    line above its caption and read as a sentence running on. Only for an item no other line
+    captions: in prose a sentence can end at "in Fig. 2." and the next one start.
+    """
+    captioned = {(x.series, x.number) for x in found if x.caption}
+    out = []
+    for x in found:
+        if not x.caption and (x.series, x.number) not in captioned and x.series in ("figure", "table"):
+            line_start = text.rfind("\n", 0, x.pos) + 1
+            if not text[line_start: x.pos].strip() and re.match(r"\.[ \t]+[A-Z][a-z]", text[x.pos + len(x.text): x.pos + len(x.text) + 4]) and not re.search(r"\b(?:in|see|of|from|to|and|as|with|by)\s*$", text[:line_start].rstrip()):
+                x = replace(x, caption=True)
+                captioned.add((x.series, x.number))
+        out.append(x)
     return out
 
 
@@ -204,8 +244,8 @@ _PANEL_START = re.compile(
     re.IGNORECASE,
 )
 _DASH = r"\s*[\u2013\u2014-]\s*"
-# "2", "2a", "2a-c", "2a-2c", "S2b"
-_PANEL_ITEM = re.compile(rf"(S?)(\d{{1,3}})(?:([a-zA-Z])(?:{_DASH}(?:\1\2)?([a-zA-Z]))?)?(?![\w])")
+# "2", "2a", "2a-c", "2a-2c", "S2b", "3(b)", "3(a-c)"
+_PANEL_ITEM = re.compile(rf"(S?)(\d{{1,3}})(?:([a-zA-Z])(?:{_DASH}(?:\1\2)?([a-zA-Z]))?|\(([a-zA-Z])(?:{_DASH}([a-zA-Z]))?\))?(?![\w])")
 # A bare letter (or range) continuing the previous item: the ", b" of "Fig. 2a, b".
 _PANEL_LETTER = re.compile(rf"([a-zA-Z])(?:{_DASH}([a-zA-Z]))?(?![\w])")
 _PANEL_SEP = re.compile(r"\s*(,\s*(?:and\b|&)|,|;|and\b|&)\s*")
@@ -256,9 +296,10 @@ def panel_mentions(text: str, series: str | None = None) -> list[PanelCite]:
                 kind = _series(prefix, word, item.group(1) + item.group(2))
                 if kind and kind.startswith("appendix_"):
                     kind = None  # panel order is checked within the main series only
-                current, lettered = (kind, int(item.group(2))), bool(item.group(3))
-                if kind and item.group(3):
-                    found += [PanelCite(kind, current[1], c, item.start()) for c in _letters(item.group(3), item.group(4))]
+                first, last = (item.group(3), item.group(4)) if item.group(3) else (item.group(5), item.group(6))
+                current, lettered = (kind, int(item.group(2))), bool(first)
+                if kind and first:
+                    found += [PanelCite(kind, current[1], c, item.start()) for c in _letters(first, last)]
                 pos = item.end()
             elif current is not None and current[0] and lettered and (letter := _PANEL_LETTER.match(text, pos)):
                 # After "and", a bare letter must close the list ("Fig. 2a and b)") or be the
@@ -644,12 +685,16 @@ def _supplementary_attachment_check(venue: Venue, values: dict[str, str]) -> Out
         if text is None:
             raise Unchecked(f"could not read {path.name} as text")
         text = without_reference_list(text)
-        references = [m.text for m in mentions(text) if not m.caption and m.series.startswith(("supp_", "ed_"))]
+        found = mentions(text)
+        # Supplementary items captioned in the manuscript itself: the supplement is in this file.
+        if any(m.caption and m.series.startswith(("supp_", "ed_")) for m in found):
+            continue
+        references = [m.text for m in found if not m.caption and m.series.startswith(("supp_", "ed_"))]
         references += [m.group() for m in _SUPPLEMENT_REFERENCE.finditer(text)]
         examples = list(dict.fromkeys(" ".join(ref.split()) for ref in references))[:5]
         if examples:
             quoted = ", ".join(f"“{ref}”" for ref in examples)
-            issues.append(Issue(WARNING, field.id, f"{path.name}: manuscript references supplementary material ({quoted}), but no supplementary files are attached; add the referenced supplement to the submission's supplementary-file field"))
+            issues.append(Issue(LIKELY_ERROR, field.id, f"{path.name}: manuscript references supplementary material ({quoted}), but no supplementary files are attached; add the referenced supplement to the submission's supplementary-file field (ignore this if it is hosted elsewhere and linked)"))
     if not issues:
         raise NotApplicable("no supplementary material referenced in the manuscript")
     return Outcome(issues)

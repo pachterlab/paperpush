@@ -114,7 +114,8 @@ def test_winston_warns_over_threshold_and_lists_every_source(calls):
     issues, detail = pc.check_text(TEXT, pc.options("winston", "k"))
     url, body, headers = seen[0]
     assert url == pc.URLS["winston"] and headers["Authorization"] == "Bearer k" and "excluded_sources" not in body
-    assert [i.level for i in issues] == ["warning"] * 3
+    # The score over the threshold is a likely error; each matching source under it is a warning.
+    assert [i.level for i in issues] == ["likely_error", "warning", "warning"]
     assert "35% of the text" in issues[0].message and PREPRINT in issues[1].message
     assert PREPRINT in detail and "example.org/other-paper" in detail and "960 credits" in detail
 
@@ -185,7 +186,7 @@ def test_validate_scans_the_manuscript_without_its_references(calls, tmp_path):
     sub = SubFile(venue="test_plag", values={"title": "T", "manuscript_file": str(manuscript)})
     report = validate_mod.validate_report(sub, _venue(), plagiarism=pc.options("winston", "k"), **OFFLINE)
     result = _check(report)
-    assert result.status == "warning" and PREPRINT in result.detail
+    assert result.status == "likely_error" and PREPRINT in result.detail
     assert "would always match" not in seen[0][1]["text"]
 
 

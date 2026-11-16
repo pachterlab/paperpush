@@ -381,3 +381,95 @@ def test_scan_references_returns_the_records_that_check_out(tmp_path, monkeypatc
     resolved: dict = {}
     references.scan_references([bib], resolved_out=resolved)
     assert list(resolved) == ["10.1038/nbt.3519"]  # the mismatched one is not handed on
+
+
+# The real request method, captured at import: conftest stubs it out for every test.
+_REAL_GET = rs._Service.get
+
+
+@pytest.fixture
+def real_get(monkeypatch):
+    monkeypatch.setattr(rs._Service, "get", _REAL_GET)
+
+
+class _Resp:
+    def __init__(self, body: bytes):
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self, n=-1):
+        return self.body
+
+
+def _http_429(retry_after: str = ""):
+    import email.message
+    import urllib.error
+
+    headers = email.message.Message()
+    if retry_after:
+        headers["Retry-After"] = retry_after
+    return urllib.error.HTTPError("https://api.example.org", 429, "Too Many Requests", headers, None)
+
+
+def test_the_lookup_cache_answers_a_repeated_query_without_the_network(tmp_path, monkeypatch, real_get):
+    calls = []
+
+    def urlopen(req, timeout):
+        calls.append(req.full_url)
+        return _Resp(b'{"ok": 1}')
+
+    monkeypatch.setattr(rs.urllib.request, "urlopen", urlopen)
+    monkeypatch.setenv("PAPERPUSH_LOOKUP_CACHE", str(tmp_path))
+    url = "https://api.openalex.org/works?filter=x&api_key=SECRET"
+    assert rs._Service("OpenAlex", 5).get_json(url) == {"ok": 1}
+    # a new process (a new service) with the same query, under another key, reads the cache
+    assert rs._Service("OpenAlex", 5).get_json(url.replace("SECRET", "OTHER")) == {"ok": 1}
+    assert len(calls) == 1
+    assert "SECRET" not in "".join(p.read_text() + p.name for p in tmp_path.rglob("*") if p.is_file())
+
+
+def test_without_the_cache_variable_nothing_is_written(tmp_path, monkeypatch, real_get):
+    monkeypatch.setattr(rs.urllib.request, "urlopen", lambda req, timeout: _Resp(b"{}"))
+    monkeypatch.delenv("PAPERPUSH_LOOKUP_CACHE", raising=False)
+    monkeypatch.chdir(tmp_path)
+    rs._Service("Crossref", 5).get("https://api.crossref.org/works?q=1")
+    assert not any(tmp_path.iterdir())
+
+
+def test_a_429_asking_to_come_back_much_later_gives_up_on_the_service_at_once(monkeypatch, real_get):
+    calls, sleeps = [], []
+
+    def urlopen(req, timeout):
+        calls.append(1)
+        raise _http_429(retry_after="3600")
+
+    monkeypatch.setattr(rs.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(rs.time, "sleep", sleeps.append)
+    svc = rs._Service("OpenAlex", 5)
+    assert svc.get("https://api.openalex.org/works?q=1") is None
+    assert svc.down and len(calls) == 1 and not sleeps
+    assert svc.get("https://api.openalex.org/works?q=2") is None and len(calls) == 1
+
+
+def test_a_service_still_throttled_after_every_wait_twice_is_given_up(monkeypatch, real_get):
+    calls = []
+
+    def urlopen(req, timeout):
+        calls.append(1)
+        raise _http_429()
+
+    monkeypatch.setattr(rs.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(rs.time, "sleep", lambda s: None)
+    svc = rs._Service("Crossref", 10)
+    svc.get("https://api.crossref.org/works?q=1")
+    assert not svc.down  # one throttled-out request may be a burst limit
+    svc.get("https://api.crossref.org/works?q=2")
+    assert svc.down
+    n = len(calls)
+    svc.get("https://api.crossref.org/works?q=3")
+    assert len(calls) == n

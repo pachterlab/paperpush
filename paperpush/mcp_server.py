@@ -856,9 +856,12 @@ def validate_subfile(
     author's preprint: a domain, page URL, or DOI); they are still listed but
     do not count toward the warning.
 
-    `checks` lists every check with its status: passed, failed, warning,
-    suggestion, unchecked (could not run here), needs_ai, not_implemented, or
-    not_applicable. `errors` block submission; `warnings` are advisory;
+    `checks` lists every check with its status: passed, failed, likely_error,
+    warning, suggestion, unchecked (could not run here), needs_ai,
+    not_implemented, or not_applicable. `errors` block submission;
+    `likely_errors` would be critical if real (an identity leak, a fabricated
+    reference) but are not certain: they do not block, but ask the author to
+    confirm each before submitting; `warnings` are advisory;
     `suggestions` are points of style (repetitive word choice, spelled-out
     numbers, abbreviations or headings written more than one way, double
     spaces) an editor could leave as they are: mention them to the author,
@@ -895,6 +898,8 @@ def validate_subfile(
         "downgraded": result.downgraded,
         "ai_only": result.ai_only,
         "errors": _issue_dicts(result.errors),
+        # Serious if real but not certain: confirm each before submitting.
+        "likely_errors": _issue_dicts(result.likely_errors),
         "warnings": _issue_dicts(result.warnings),
         "suggestions": _issue_dicts(result.suggestions),
         "strict_style": result.strict_style,
@@ -1071,6 +1076,7 @@ def autofill_subfile(
         # fields empty on purpose, so leftover errors here are expected. Run
         # validate_subfile once a human has filled those in.
         "errors": _issue_dicts(result.errors),
+        "likely_errors": _issue_dicts(result.likely_errors),
         "warnings": _issue_dicts(result.warnings),
         "suggestions": _issue_dicts(result.suggestions),
     }

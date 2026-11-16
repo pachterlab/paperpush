@@ -34,6 +34,7 @@ import html
 import io
 import logging
 import lzma
+import os
 import re
 import tarfile
 import tempfile
@@ -101,6 +102,12 @@ _JUNK_NAMES = {".ds_store", "thumbs.db"}
 _JUNK_DIR_MARKERS = ("/.git/", "/.svn/", "/.hg/", "/__macosx/", "/.ipynb_checkpoints/")
 
 
+# Finding levels; validate maps them to Issue levels (ERROR, LIKELY_ERROR, WARNING).
+LEVEL_ERROR = "error"
+LEVEL_LIKELY = "likely_error"
+LEVEL_WARNING = "warning"
+
+
 @dataclass(frozen=True)
 class Finding:
     """One problem found in a submission file.
@@ -119,6 +126,10 @@ class Finding:
     where: str
     category: str
     detail: str
+    # How validate reports it: "error" (certain, blocks), "likely_error" (serious,
+    # confirm before submitting), or "warning" (worth a second look). Plain
+    # strings here, so this module does not import validate.
+    level: str = LEVEL_WARNING
 
 
 # --- secret / credential patterns -----------------------------------------
@@ -249,7 +260,7 @@ def _iter_personal_findings(where: str, text: str) -> Iterator[Finding]:
             if raw in seen:
                 continue
             seen.add(raw)
-            yield Finding(where, "personal data", f"possible personal data: {label} ({_mask(raw)}); remove identifying details of study participants before submitting")
+            yield Finding(where, "personal data", f"possible personal data: {label} ({_mask(raw)}); remove identifying details of study participants before submitting", LEVEL_LIKELY)
 
 
 def _iter_secret_findings(where: str, text: str) -> Iterator[Finding]:
@@ -265,7 +276,7 @@ def _iter_secret_findings(where: str, text: str) -> Iterator[Finding]:
             if key in seen:
                 continue
             seen.add(key)
-            yield Finding(where, label, f"looks like {label} ({_mask(raw)})")
+            yield Finding(where, label, f"looks like {label} ({_mask(raw)})", LEVEL_LIKELY)
     for match in _EDITABLE_LINK.finditer(text):
         link = match.group(0)
         # An /edit or default sharing link grants access; a /d/ID without a mode
@@ -464,8 +475,26 @@ class PdfRead(NamedTuple):
     pages: int
 
 
+# Parsed text by (path, mtime, size): the secret scan, GitHub-link scan, and anonymity check
+# each read the same PDF in one validate run, and pypdf extraction is the slow part.
+_READ_PDF_CACHE: dict[tuple[str, int, int], PdfRead] = {}
+
+
 def _read_pdf(path: Path) -> PdfRead:
     """Extract the concatenated text layer of a PDF, saying so when it cannot be read."""
+    try:
+        st = os.stat(path)
+        key = (str(Path(path).resolve()), st.st_mtime_ns, st.st_size)
+    except OSError:
+        return _read_pdf_uncached(path)
+    if key not in _READ_PDF_CACHE:
+        if len(_READ_PDF_CACHE) >= 16:
+            _READ_PDF_CACHE.clear()
+        _READ_PDF_CACHE[key] = _read_pdf_uncached(path)
+    return _READ_PDF_CACHE[key]
+
+
+def _read_pdf_uncached(path: Path) -> PdfRead:
     try:
         from pypdf import PdfReader
         from pypdf.errors import FileNotDecryptedError
@@ -899,7 +928,8 @@ def _find_urls(text: str) -> Iterator[str]:
     URL scheme cut at a line break) is not a link and is skipped.
     """
     for match in _URL_RE.finditer(text):
-        url = match.group(0).rstrip(_URL_TRAILING)
+        # LaTeX escapes in an \\href target ("Sinkhorn\\%27s_theorem\\#...") print without the backslash.
+        url = re.sub(r"\\([%#&_~$])", r"\1", match.group(0)).rstrip(_URL_TRAILING)
         host = re.sub(r"(?i)^https?://", "", url).split("/")[0]
         if url and re.search(r"[A-Za-z]", host) and "." in host:
             yield url

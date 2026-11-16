@@ -23,8 +23,10 @@
   --st-passed-bg: #e9f7ee;
   --st-failed: #cf222e;
   --st-failed-bg: #fdecee;
-  --st-warning: #b35900;
-  --st-warning-bg: #fff4e5;
+  --st-likely: #bc4c00;
+  --st-likely-bg: #fff1e5;
+  --st-warning: #9a6700;
+  --st-warning-bg: #fff8c5;
   --st-suggestion: #0969da;
   --st-suggestion-bg: #ebf3fd;
   --st-ai: #8250df;
@@ -63,8 +65,10 @@ html[data-theme="dark"] {
   --st-passed-bg: #14281e;
   --st-failed: #ff7b72;
   --st-failed-bg: #3a1c1c;
-  --st-warning: #f0a35e;
-  --st-warning-bg: #35250f;
+  --st-likely: #f0883e;
+  --st-likely-bg: #3a2210;
+  --st-warning: #d29922;
+  --st-warning-bg: #332b0f;
   --st-suggestion: #58a6ff;
   --st-suggestion-bg: #13233a;
   --st-ai: #a371f7;
@@ -96,6 +100,8 @@ html[data-palette="alt"] {
   --st-passed-bg: #e6f1f8;
   --st-failed: #d55e00;
   --st-failed-bg: #fbeee5;
+  --st-likely: #b26b00;
+  --st-likely-bg: #fbf0e0;
   --st-warning: #8a6d00;
   --st-warning-bg: #f7f1dc;
   --st-suggestion: #007a5c;
@@ -109,6 +115,8 @@ html[data-theme="dark"][data-palette="alt"] {
   --st-passed-bg: #13283a;
   --st-failed: #ff8c42;
   --st-failed-bg: #3a2414;
+  --st-likely: #f5a623;
+  --st-likely-bg: #352610;
   --st-warning: #e6c84a;
   --st-warning-bg: #2f2a12;
   --st-suggestion: #3ccf9e;
@@ -156,6 +164,7 @@ html { scroll-padding-top: calc(var(--topbar-h) + 64px); }
 .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--st-pending); }
 .st-ok > .dot { background: var(--st-passed); }
 .st-warn > .dot { background: var(--st-warning); }
+.st-likely > .dot { background: var(--st-likely); }
 .st-issue > .dot { background: var(--st-failed); }
 .st-review > .dot { background: var(--review); }
 .st-info > .dot { background: var(--accent); }
@@ -178,6 +187,7 @@ html { scroll-padding-top: calc(var(--topbar-h) + 64px); }
 .stat span { color: var(--muted); font-size: 13px; line-height: 1.3; }
 .stat.good b { color: var(--st-passed); }
 .stat.partial b { color: var(--st-warning); }
+.stat.likely b { color: var(--st-likely); }
 .stat.bad b { color: var(--st-failed); }
 .stat.ai b { color: var(--st-ai); }
 .stat.suggest b { color: var(--st-suggestion); }
@@ -378,10 +388,12 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .field-group > .group-head + .card, .field-group > .group-hint + .card { border-top-color: transparent; }
 .card.st-ok, #manuscript-panel.st-ok { border-left-color: var(--st-passed); }
 .card.st-warn, #manuscript-panel.st-warn { border-left-color: var(--st-warning); }
+.card.st-likely, #manuscript-panel.st-likely { border-left-color: var(--st-likely); }
 .card.st-issue, #manuscript-panel.st-issue { border-left-color: var(--st-failed); }
 .card.st-review { border-left-color: var(--review); background: var(--review-bg); }
 .field-group > .card.st-ok { border-left-color: var(--st-passed); }
 .field-group > .card.st-warn { border-left-color: var(--st-warning); }
+.field-group > .card.st-likely { border-left-color: var(--st-likely); }
 .field-group > .card.st-issue { border-left-color: var(--st-failed); }
 .field-group > .card.st-review { border-left-color: var(--review); }
 #manuscript-panel { border-left: 3px solid var(--border); }
@@ -413,6 +425,8 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .field-issues li { margin-top: 8px; padding: 5px 10px; border-radius: 0; }
 .field-issues li.error { color: var(--st-failed); background: var(--st-failed-bg); }
 .field-issues li.warning { color: var(--st-warning); background: var(--st-warning-bg); }
+.field-issues li.likely { color: var(--st-likely); background: var(--st-likely-bg); }
+.field-issues li.likely::before { content: "◆ "; }
 .field-issues li::before { content: "✖ "; }
 .field-issues li.warning::before { content: "▲ "; }
 .field-issues li.suggestion { color: var(--st-suggestion); background: var(--st-suggestion-bg); }
@@ -477,6 +491,7 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .mark.st-passed { color: var(--st-passed); }
 .mark.st-failed { color: var(--st-failed); }
 .mark.st-warning { color: var(--st-warning); }
+.mark.st-likely { color: var(--st-likely); }
 .mark.st-pending { color: var(--st-pending); }
 .mark.st-needs-ai { color: var(--st-ai); }
 .mark.st-suggestion { color: var(--st-suggestion); }
@@ -484,6 +499,7 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .check-group.st-passed { border-left-color: var(--st-passed); }
 .check-group.st-failed { border-left-color: var(--st-failed); }
 .check-group.st-warning { border-left-color: var(--st-warning); }
+.check-group.st-likely { border-left-color: var(--st-likely); }
 #check-stats { margin-bottom: 12px; }
 .check-group > h3 { display: flex; gap: 8px; align-items: baseline; }
 .check-group > h3 .count { font-family: var(--sans); font-weight: 400; color: var(--muted); font-size: 13px; }
@@ -510,6 +526,8 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .check.st-failed .mk { color: var(--st-failed); }
 .check.st-warning { border-left-color: var(--st-warning); background: color-mix(in srgb, var(--st-warning-bg) 60%, transparent); color: var(--text); }
 .check.st-warning .mk { color: var(--st-warning); }
+.check.st-likely { border-left-color: var(--st-likely); background: color-mix(in srgb, var(--st-likely-bg) 70%, transparent); color: var(--text); }
+.check.st-likely .mk { color: var(--st-likely); }
 .check.st-unchecked { border-left-color: var(--st-unchecked); color: var(--text); }
 .check.st-unchecked .mk { color: var(--st-unchecked); }
 .check.st-suggestion { border-left-color: var(--st-suggestion); background: color-mix(in srgb, var(--st-suggestion-bg) 60%, transparent); color: var(--text); }
@@ -538,6 +556,7 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .verdict.ok { background: var(--st-passed-bg); color: var(--st-passed); }
 .verdict.bad { background: var(--st-failed-bg); color: var(--st-failed); }
 .verdict.partial { background: var(--st-warning-bg); color: var(--st-warning); }
+.verdict.likely { background: var(--st-likely-bg); color: var(--st-likely); }
 .initial-check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; padding: 4px 2px; }
 .initial-check:has(input[disabled]) { opacity: 0.5; cursor: default; }
 .initial-notice { margin: 0 0 12px; padding: 8px 12px; border-left: 2px solid var(--st-warning); background: var(--st-warning-bg); color: var(--text); border-radius: 0; font-size: 15px; }

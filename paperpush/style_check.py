@@ -438,7 +438,7 @@ _KNOWN = frozenset(
     PET EEG ECG EKG FDA NIH NSF ERC WHO CDC MIT UCLA USC MD PHD PhD MS MSc BS BSc BA MA ET AL FIG EQ VS IE EG CF NB PS AND OR THE OF IN ON
     AT TO FOR BY WITH IS ARE NOT ABSTRACT INTRODUCTION METHODS RESULTS DISCUSSION CONCLUSION CONCLUSIONS REFERENCES ACKNOWLEDGMENTS
     ACKNOWLEDGEMENTS SUPPLEMENTARY APPENDIX BACKGROUND MATERIALS DATA CODE AVAILABILITY FUNDING TABLE FIGURE NY CA MA TX UK LLC INC
-    MATLAB ATP GTP NADH NADPH TEX LATEX BIBTEX API APIs HTTP HTTPS SQL IBM NASA""".split()
+    MATLAB ATP GTP NADH NADPH TEX LATEX BIBTEX API APIs HTTP HTTPS SQL IBM NASA NVIDIA AMD AWS""".split()
 )
 _ROMAN = re.compile(r"[IVXLC]+")
 # Words an acronym's letters skip ("Department of Energy (DE)").
@@ -623,9 +623,18 @@ class Acronyms:
 
 
 def _meaning_key(expansion: str) -> str:
-    """An expansion with case, hyphens, and plural endings set aside: "regions of interest" is "Region of Interest"."""
+    """An expansion with case, hyphens, plural endings, and linking words set aside: "regions of interest" is "Region of Interest".
+
+    The linking words go because a PDF line break can glue one to its neighbour ("signalto-noise"
+    for "signal-to-noise") or the expansion can skip it ("signal noise ratio" for QSNR).
+    """
     words = re.findall(r"[a-z0-9]+", expansion.lower())
+    words = [_LINK_GLUED.sub("", w) for w in words if w not in _ACRONYM_LINK_WORDS]
     return " ".join(w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w for w in words)
+
+
+# A linking word glued to the end of the word before it by a lost line-break hyphen.
+_LINK_GLUED = re.compile(r"(?<=[a-z]{4})(?:to|of|and|for)$")
 
 
 # A full term shorter than this ("time (T)") is too likely to be ordinary prose to look for elsewhere.

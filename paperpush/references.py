@@ -64,7 +64,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator
 
-from .sensitive import ARCHIVE_EXTS, MAX_ARCHIVE_MEMBERS, MAX_TEXT_BYTES, Finding, _decode, _dedup_paths, _iter_archive_members, _iter_text_blobs
+from .sensitive import ARCHIVE_EXTS, LEVEL_LIKELY, MAX_ARCHIVE_MEMBERS, MAX_TEXT_BYTES, Finding, _decode, _dedup_paths, _iter_archive_members, _iter_text_blobs
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +182,19 @@ _RETRACTED_PREFIX = re.compile(r"^\s*(?:retracted(?:\s+article)?|withdrawn)\s*[:
 # ``Pattern.match(text, pos)`` already anchors at pos, and \A would not (it
 # stays pinned to the real start of the string), so this carries no anchor.
 _DOI_CONTINUATION = re.compile(r"[ \t]*\r?\n[ \t]*([A-Za-z0-9._;()/:+-]+)")
+# A page break between the halves: the page number on a line of its own, and perhaps the next
+# page's running head ("10.1109/" / "4" / "Tabular Population Priors ..." / "TBDATA.2019.2921572.").
+# The rest of a DOI holds a digit or a dot; a running head's first word does not.
+_DOI_AFTER_PAGE_BREAK = re.compile(r"[ \t]*\r?\n[ \t]*\d{1,3}[ \t]*\r?\n(?:[^\n]*[ \t][^\n]*\r?\n)??[ \t]*([A-Za-z0-9_;()/:+-]*[\d.][A-Za-z0-9._;()/:+-]*)")
+
+
+def _doi_continuation(text: str, pos: int) -> re.Match[str] | None:
+    """The rest of a DOI broken at ``pos`` by a line wrap or a page break, or None."""
+    wrapped = _DOI_CONTINUATION.match(text, pos)
+    # Only right after the prefix's slash: "sdata.2016." / "18" is a suffix wrapped mid-way.
+    if wrapped and text[pos - 1: pos] == "/" and re.fullmatch(r"\d{1,3}", wrapped.group(1)) and text[wrapped.end(): wrapped.end() + 1] in ("\n", "\r"):
+        return _DOI_AFTER_PAGE_BREAK.match(text, pos) or wrapped
+    return wrapped
 # A hyphen the layout inserted at a line break, rejoined before the surrounding
 # reference text is compared against the registered record.
 _LINE_WRAP_HYPHEN = re.compile(r"-\s*\r?\n\s*")
@@ -686,7 +699,7 @@ def collect_citations(paths: Iterable[Path]) -> list[Citation]:
             last_in_list: dict[str, int] = {}
             for match in _DOI_IN_TEXT.finditer(text):
                 doi = normalize_doi(match.group(0))
-                wrapped = _DOI_CONTINUATION.match(text, match.end())
+                wrapped = _doi_continuation(text, match.end())
                 # Rebuilt from the raw match, not the normalized DOI: normalization
                 # trims the trailing punctuation that a break can fall right after,
                 # and that character is part of the DOI when the rest follows it.
@@ -907,7 +920,15 @@ def _title_of(record: dict) -> str:
     title = record.get("title") or record.get("container-title") or ""
     if isinstance(title, list):
         title = title[0] if title else ""
-    return html.unescape(_XML_TAG.sub("", title)) if isinstance(title, str) else ""
+    if not isinstance(title, str):
+        return ""
+    # Crossref can register "LEAP" as the title and the rest as its subtitle.
+    subtitle = record.get("subtitle") if record.get("title") else None
+    if isinstance(subtitle, list):
+        subtitle = subtitle[0] if subtitle else None
+    if isinstance(subtitle, str) and subtitle.strip() and subtitle.strip().lower() not in title.lower():
+        title = f"{title.rstrip(' :')}: {subtitle.strip()}"
+    return html.unescape(_XML_TAG.sub("", title))
 
 
 def _work_title(title: str) -> str:
@@ -917,6 +938,10 @@ def _work_title(title: str) -> str:
 
 def title_similarity(a: str, b: str) -> float:
     """How alike two titles are, 0..1; a title that is the other minus its subtitle counts as 1."""
+    # "LEAP" against "LEAP: Learning to Prescribe ...": the main title, cited without its subtitle.
+    for x, y in ((a, b), (b, a)):
+        if ":" in y and _normalize_text(_work_title(x)) and _normalize_text(_work_title(y.split(":", 1)[0])) == _normalize_text(_work_title(x)):
+            return 1.0
     a, b = _normalize_text(_work_title(a)), _normalize_text(_work_title(b))
     if not a or not b:
         return 0.0
@@ -1148,6 +1173,7 @@ def _retraction_finding(where: str, cited: str, doi: str, record: dict) -> list[
             where,
             RETRACTED,
             f"{cited} (DOI {doi}) {notice}; cite it only to discuss that, and check whether the claim it supports still stands",
+            LEVEL_LIKELY,
         )
     ]
 
@@ -1160,6 +1186,7 @@ def _entry_findings(entry: Entry, status: str, record: dict | None) -> list[Find
                 entry.where,
                 "unresolvable DOI",
                 f"{_cite(entry)} cites DOI {entry.doi}, which is not registered " "(doi.org returns 404); check the DOI against the published article",
+                LEVEL_LIKELY,
             )
         ]
     if status == DOI_FOUND and record is not None:
@@ -1170,6 +1197,7 @@ def _entry_findings(entry: Entry, status: str, record: dict | None) -> list[Find
                     entry.where,
                     "DOI metadata mismatch",
                     f"{_cite(entry)} does not match the work its DOI ({entry.doi}) " f"points to: {'; '.join(problems)}. Check whether the DOI belongs to " "a different reference",
+                    LEVEL_LIKELY,
                 )
             ]
         # Only once the DOI is known to be this entry's: a wrong DOI's
@@ -1194,6 +1222,7 @@ def _citation_findings(citation: Citation, status: str, record: dict | None, doi
                 citation.where,
                 "unresolvable DOI",
                 f"DOI {doi}, cited {where_in_text}, is not registered (doi.org " "returns 404); check the DOI against the published article",
+                LEVEL_LIKELY,
             )
         ]
     if status == DOI_FOUND and record is not None and citation.in_reference_list and not _context_supports(citation, record):
@@ -1202,6 +1231,7 @@ def _citation_findings(citation: Citation, status: str, record: dict | None, doi
                 citation.where,
                 "DOI metadata mismatch",
                 f"the reference citing DOI {doi} does not match the work it points " f"to: the DOI is registered to {_describe(record)}, which does not " "appear in the reference. Check whether the DOI belongs to a " "different reference",
+                LEVEL_LIKELY,
             )
         ]
     if status == DOI_FOUND and record is not None:

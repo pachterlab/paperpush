@@ -46,6 +46,8 @@ logger = logging.getLogger(__name__)
 
 # Below this size (points) text is unreadable when printed or on screen.
 MIN_VISIBLE_PT = 2.0
+# Inside an included figure, text from this size up is a figure label set small, not hidden text.
+MIN_FIGURE_PT = 1.0
 # Hidden text shorter than this many words is ignored unless it is an injection
 # (stray white glyphs, a hidden hyperlink anchor, a spacer).
 MIN_HIDDEN_WORDS = 4
@@ -64,6 +66,9 @@ INJECTION = re.compile(r"""(?ix)
     | \b(?:as|you\s+are)\s+an?\s+(?:ai|llm|language\s+model|large\s+language\s+model|automated|gpt|chatgpt|claude|gemini)\b[^.\n]{0,20}\breviewer\b
     | \b(?:for|to|attention)\s+(?:llm|ai|language[- ]model)\s+reviewers?\b
     | \b(?:llm|ai|language[- ]model)\s+reviewers?\s*[:,]
+    | \bif\s+you\s+are\s+an?\s+(?:ai|llm|language\s+model|large\s+language\s+model|chatbot|gpt|chatgpt|claude|gemini)\b
+    | \b(?:llms?|ai|(?:large\s+)?language\s+models?)\s+reading\s+this\b
+    | \bwhen\s+(?:reviewing|evaluating|assessing)\s+(?:this|the)\s+(?:paper|work|submission|manuscript)\s*,\s*(?:please\s+)?(?:hide|include|mention|insert|add|use|write|start|begin|end)\b
     """)
 
 HIDDEN_INJECTION = "hidden prompt injection"
@@ -75,7 +80,20 @@ NOT_SCANNED = "not scanned"
 WHITE_IN_FIGURE = "white (in an included figure)"
 WHITE_ON_SHADING = "white (on a shaded background)"
 OCR_LAYER = "invisible (over a scanned image)"
-_ONLY_IF_INJECTION = {WHITE_IN_FIGURE, WHITE_ON_SHADING, OCR_LAYER}
+# A figure's own tick labels and annotations set small ("0.0 0.2 0.4 ... Cosine similarity" at
+# 1.4pt in a grid of heatmaps): figures.text_size reports them as too small to read. Text from
+# MIN_FIGURE_PT to MIN_VISIBLE_PT is treated so anywhere, since a figure drawn inline (TikZ,
+# pgfplots, a code listing scaled down) is not marked in_figure ("ACC NMI Purity F1-score" at
+# 1.7pt on 7 of 300 accepted ICLR 2026 papers); the injections seen were set at 0.2-0.3pt.
+TINY_IN_FIGURE = "microscopic (in an included figure)"
+# Text outside the page box is almost always a figure's artwork running past the crop, and a
+# transparent run inside a figure is a hidden label layer; neither is reported unless it
+# instructs a reviewer.
+OFF_PAGE = "off-page"
+TRANSPARENT_IN_FIGURE = "transparent (in an included figure)"
+_ONLY_IF_INJECTION = {WHITE_IN_FIGURE, WHITE_ON_SHADING, OCR_LAYER, TINY_IN_FIGURE, OFF_PAGE, TRANSPARENT_IN_FIGURE}
+# LaTeXiT stores each equation's source as invisible text in the figure it exports.
+_LATEXIT = re.compile(r"^\s*<latexit\b")
 
 
 @dataclass(frozen=True)
@@ -102,7 +120,7 @@ def _classify(where: str, how: str, text: str) -> Finding | None:
     text = re.sub(r"\s+", " ", text).strip()
     if INJECTION.search(text):
         return Finding(where, HIDDEN_INJECTION, f"{how} text that instructs an AI reviewer: '{_snippet(text)}'; remove it -- hidden prompts are grounds for desk rejection")
-    if how not in _ONLY_IF_INJECTION and len(re.findall(r"[A-Za-z]{2,}", text)) >= MIN_HIDDEN_WORDS:
+    if how not in _ONLY_IF_INJECTION and not _LATEXIT.match(text) and len(re.findall(r"[A-Za-z]{2,}", text)) >= MIN_HIDDEN_WORDS:
         return Finding(where, HIDDEN_TEXT, f"{how} text a reader cannot see: '{_snippet(text)}'")
     return None
 
@@ -117,11 +135,11 @@ def _why_hidden(glyph: Glyph, page: Page) -> str | None:
             return OCR_LAYER
         return "invisible (render mode 3)"
     if glyph.alpha <= 0.05:
-        return "transparent (opacity 0)"
+        return TRANSPARENT_IN_FIGURE if glyph.in_figure else "transparent (opacity 0)"
     if glyph.size < MIN_VISIBLE_PT:
-        return f"microscopic ({glyph.size:.1f}pt)"
+        return TINY_IN_FIGURE if glyph.size >= MIN_FIGURE_PT else f"microscopic ({glyph.size:.1f}pt)"
     if glyph.x1 < page.x0 or glyph.x0 > page.x0 + page.width or glyph.y1 < page.y0 or glyph.y0 > page.y0 + page.height:
-        return "off-page"
+        return OFF_PAGE
     if is_near_white(glyph) and not page.on_background(glyph):
         return WHITE_IN_FIGURE if glyph.in_figure else "white"
     return None

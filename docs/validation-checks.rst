@@ -457,8 +457,12 @@ or ``.txt``.
 When the venue lets the initial submission be in any format, the report opens
 with a "Format for initial submission" note quoting the rule.
 ``--initial-submission`` (the "initial submission (any format)" checkbox on
-the web page) then reports every error as a warning, so the formatting rules
-that apply only from revision do not block the first submission.
+the web page) then reports every formatting error as a warning, so the
+formatting rules that apply only from revision do not block the first
+submission. Checks that are not about format keep their errors and likely
+errors: identity leaks, hidden prompts, fabricated references, plagiarism, an
+AI tool listed as an author, a cited supplement that is not attached, trial
+registration, and ethics approval.
 
 Each problem reads ``error: [field_id] message`` or ``warning: [field_id]
 message``. The field id in brackets tells you which line of the ``.sub`` to

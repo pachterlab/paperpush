@@ -535,10 +535,28 @@ def _strip_line_numbers(page: str) -> str:
     return "\n".join(lines)
 
 
+# Extracted page text by (path, mtime, size): one validate run reads the same PDF a dozen
+# times (word counts, sections, references, layout), and pypdf extraction is the slow part.
+_PDF_PAGES_CACHE: dict[tuple[str, int, int], list[str] | None] = {}
+
+
 def _pdf_pages(path: Path) -> list[str] | None:
     """Per-page text of a PDF, preferring pypdf and falling back to stdlib."""
+    try:
+        st = os.stat(path)
+        key = (str(Path(path).resolve()), st.st_mtime_ns, st.st_size)
+    except OSError:
+        key = None
+    if key is not None and key in _PDF_PAGES_CACHE:
+        cached = _PDF_PAGES_CACHE[key]
+        return None if cached is None else list(cached)
     pages = _pdf_pages_pypdf(path) or _pdf_pages_stdlib(path)
-    return None if pages is None else [_strip_line_numbers(page) for page in pages]
+    result = None if pages is None else [_strip_line_numbers(page) for page in pages]
+    if key is not None:
+        if len(_PDF_PAGES_CACHE) >= 16:
+            _PDF_PAGES_CACHE.clear()
+        _PDF_PAGES_CACHE[key] = None if result is None else list(result)
+    return result
 
 
 # --- Markdown --------------------------------------------------------------
@@ -1578,15 +1596,21 @@ _JOURNAL_VOLUME_LINE = re.compile(r"[A-Z][\w.&]*(?:[ \t]+[A-Z][\w.&]*){0,4}[ \t]
 # A wrapped line that opens with the previous entry's link or identifier ("URL https://...",
 # "S0895479803436652."): names hold no digits, so a first word with one is no author.
 _CONTINUATION_LINE = re.compile(r"(?:URL|https?://|doi\b|[A-Za-z]*\d\S*(?:\s|$)|[^\s/]*/)", re.IGNORECASE)
-_ENTRY_YEAR = re.compile(r"\b(?:19|20)\d{2}[a-z]?\b")
+# "n.d." (no date) stands where an undated entry's year would.
+_ENTRY_YEAR = re.compile(r"\b(?:19|20)\d{2}[a-z]?\b|\bn\.\s?d\.")
 # A URL broken after '/' or '-' runs on to the next line ("github.com/Farama-Foundation/" + "Gymnasium-Robotics.").
 _ENTRY_CLOSED = re.compile(r"(?:[.)\]]|\d|https?://\S*[^\s/-]|doi\S*[^\s/-])\s*$", re.IGNORECASE)
 # A line ending mid-phrase ("..., New York," / "Workshop on" / "ACM/IEEE Design"): the next line continues it.
 _ENTRY_OPEN_END = re.compile(r"[\w,;:&/-]\s*$")
 # A piece this short with no year ("Online.", a wrapped URL's last part) is the previous entry's tail.
 _STRAY_PIECE = 30
+# ... as is a longer one that reads as a venue or title running on, not an author list: it opens
+# with "In" ("InInternational Conference on ...") or has a lowercase word among its first three.
+_RUN_ON_PIECE = re.compile(r"In ?[A-Z]|\S+\s+(?:\S+\s+)?[a-z][a-z]*\b(?![.'’])")
 # A line opening with a name and a comma ("Eric Kolve, Roozbeh Mottaghi, ..."), as an author list does.
 _AUTHOR_LINE = re.compile(r"[A-Z][\w'.’-]*(?:[ \t]+[A-Z][\w'.’-]*){0,3},")
+# A line ending in the ACL/natbib author-year separator ("..., and Lili Qiu. 2023."): the title follows.
+_YEAR_AFTER_AUTHORS = re.compile(r"[^\W\d]\.\s+(?:19|20)\d{2}[a-z]?\.\s*$")
 
 
 def author_year_starts(tail: str) -> list[int]:
@@ -1599,7 +1623,7 @@ def author_year_starts(tail: str) -> list[int]:
     """
     starts: list[int] = []
     offset = 0
-    has_year = closed = open_end = False
+    has_year = closed = open_end = title_next = False
     piece = ""  # the text since the last start
     for line in tail.splitlines(keepends=True):
         stripped = line.strip()
@@ -1607,13 +1631,14 @@ def author_year_starts(tail: str) -> list[int]:
             upper = stripped[0].isupper() and not _JOURNAL_VOLUME_LINE.match(stripped) and not _CONTINUATION_LINE.match(stripped)
             # After a stray yearless line ("Online."), the next author line still starts an entry;
             # the stray piece is then folded back below.
-            stray = bool(starts) and not has_year and len(piece) <= _STRAY_PIECE and closed and bool(_AUTHOR_LINE.match(stripped))
-            if upper and (not starts or stray or (has_year and (closed or (not open_end and _AUTHOR_YEAR_REF.match(stripped))))):
+            stray = bool(starts) and not has_year and (len(piece) <= _STRAY_PIECE or bool(_RUN_ON_PIECE.match(piece))) and closed and bool(_AUTHOR_LINE.match(stripped))
+            if upper and not title_next and (not starts or stray or (has_year and (closed or (not open_end and _AUTHOR_YEAR_REF.match(stripped))))):
                 starts.append(offset + len(line) - len(line.lstrip()))
                 has_year = False
                 piece = ""
             has_year = has_year or bool(_ENTRY_YEAR.search(stripped))
             closed = bool(_ENTRY_CLOSED.search(stripped))
+            title_next = bool(_YEAR_AFTER_AUTHORS.search(stripped))
             open_end = not closed and bool(_ENTRY_OPEN_END.search(stripped))
             piece += stripped + " "
         offset += len(line)
@@ -1673,9 +1698,11 @@ def reference_count(path: Path) -> int | None:
 
 # Where a reference list ends in extracted text: a figure/table caption, a heading that
 # commonly follows it, or a lettered appendix heading in capitals ("A EXPERIMENTAL SETUP",
-# the ICLR/NeurIPS appendix after the bibliography). The space after the letter is required:
-# without it "REFERENCES" itself reads as one.
-_AFTER_REFERENCES = re.compile(r"^\s*" + _MD_HEADING_OPEN + r"(?:(?-i:[A-Z](?:\.\d+)?\.?[ \t]+[A-Z][A-Z0-9 \t&:,()-]{3,60}$(?<=[A-Z]))|(?-i:[A-Z]\.\d+[ \t]+[A-Z][^\n]{2,80}$)|(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?\.?|Table)\s+S?\d+\s*[.:|]|Figure\s+legends?\b|Tables?\s*$|Supplementary\s+(?:information|materials?)\b|Appendix\b|(?:Online\s+|Materials\s+and\s+)?Methods\s*$|(?:(?:Data|Code|Software|Materials?)(?:(?:\s*,\s*|\s+and\s+)\w+)*\s+availability|Acknowledge?ments?|Author\s+contributions?|Funding|Competing\s+interests?|Conflicts?\s+of\s+interest|(?:Clinical\s+)?Trial\s+registration)\b\s*(?:\*\*|__)?\s*(?:[:.](?:\s|$)|$)|(?:Ethics(?:\s+statement)?|Declarations?|Additional\s+information)\s*$)", re.IGNORECASE | re.MULTILINE)
+# the ICLR/NeurIPS appendix after the bibliography), or any heading of two or more words in
+# capitals ("AI USAGE DISCLOSURE"), or the first appendix in title case ("A. Population Prior
+# Implementation Details", ICML). The space after the letter is required: without it
+# "REFERENCES" itself reads as one.
+_AFTER_REFERENCES = re.compile(r"^\s*" + _MD_HEADING_OPEN + r"(?:(?-i:[A-Z](?:\.\d+)?\.?[ \t]+[A-Z][A-Z0-9 \t&:,()-]{3,60}$(?<=[A-Z]))|(?-i:[A-Z]\.\d+[ \t]+[A-Z][^\n]{2,80}$)|(?-i:A\.[ \t]+[A-Z][a-z]+(?:[ \t]+[A-Za-z][\w-]*){1,10}[ \t]*$)|(?:Supplementary\s+|Extended\s+Data\s+)?(?:Fig(?:ure)?\.?|Table)\s+S?\d+\s*[.:|]|Figure\s+legends?\b|Tables?\s*$|Supplementary\s+(?:information|materials?)\b|Appendix\b|(?:Online\s+|Materials\s+and\s+)?Methods\s*$|(?:(?:Data|Code|Software|Materials?)(?:(?:\s*,\s*|\s+and\s+)\w+)*\s+availability|Acknowledge?ments?|Author\s+contributions?|Funding|Competing\s+interests?|Conflicts?\s+of\s+interest|(?:Clinical\s+)?Trial\s+registration)\b\s*(?:\*\*|__)?\s*(?:[:.](?:\s|$)|$)|(?:Ethics(?:\s+statement)?|Declarations?|Additional\s+information|(?:Generative\s+)?(?:AI|LLM)\s+(?:usage|use)\s*(?:disclosure|statement)|(?:Broader\s+)?Impacts?\s+statement|Broader\s+impacts?|Ethical\s+considerations|Reproducibility\s+statement|Limitations)\s*$|(?-i:[A-Z]{2,}(?:[ \t]+(?:&[ \t]+)?[A-Z]{2,})+[ \t]*$))", re.IGNORECASE | re.MULTILINE)
 _BIB_ITEM = re.compile(r"\\bibitem\s*(?:\[[^\]]*\])?\s*\{[^}]*\}(.*?)(?=\\bibitem|\\end\s*\{\s*thebibliography|$)", re.DOTALL)
 
 

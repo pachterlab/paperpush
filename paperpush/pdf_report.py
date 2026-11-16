@@ -168,7 +168,7 @@ def render_pdf(lines, summary, palette, marks) -> bytes:
             w.space(2)
         elif line.role == "check":
             mark = marks.get(line.status, "")
-            style = "bold" if line.status in ("failed", "warning") else "regular"
+            style = "bold" if line.status in ("failed", "likely_error", "warning") else "regular"
             w.space(3)
             w.paragraph([(f"{mark} ", "bold", color), (line.text, style, color)], 10, indent=indent - INDENT, hanging=_width(mark + " ", "bold", 10))
         elif line.role == "item":

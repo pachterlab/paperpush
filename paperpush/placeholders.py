@@ -39,7 +39,8 @@ _XX_NOUN = re.compile(r"\s*(?:participants|patients|subjects|samples|cells|mice|
 _KARYOTYPE = re.compile(r"(?<![\w.])XY(?![\w.])|karyotyp|sex\s+chromosome|\b4[5-9],\s*X", re.IGNORECASE)
 _TEX_TODO = re.compile(r"\\(?:todo|fixme|missingfigure|TODO|FIXME)\b\s*(?:\[[^\]]*\])?\s*\{?")
 _TEX_HIGHLIGHT = re.compile(r"\\(?:hl|colorbox\s*\{\s*yellow\s*\})\s*\{")
-_TEX_TODO_PACKAGES = re.compile(r"\\usepackage\s*(?:\[[^\]]*\])?\s*\{[^}]*\b(?:todonotes|fixme)\b")
+# Not when loaded switched off for the final version: todonotes' [disable], fixme's [final].
+_TEX_TODO_PACKAGES = re.compile(r"\\usepackage\s*(?:\[(?![^\]]*\b(?:disable|final)\b)[^\]]*\])?\s*\{[^}]*\b(?:todonotes|fixme)\b")
 
 
 def _files(venue: Venue, values: dict[str, str]) -> list[tuple[str, Path]]:

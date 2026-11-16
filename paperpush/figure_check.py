@@ -438,7 +438,11 @@ def _embedded_pdf(doc: document.Document, field_id: str) -> list[Figure]:
             fig = Figure(f"{doc.path.name} page {page.number}, drawing {number}", doc.path, field_id, False, "vector", page=page.number)
             fig.print_width_mm = (box[2] - box[0]) / 72 * MM_PER_INCH
             fig.texts = _texts_from_glyphs(glyphs, 1.0)
-            images = [im for im in page.images if im.figure == number and im.dpi]
+            # An image inside the drawing that is listed as a figure of its own carries its own dpi
+            # finding; repeated here it would be reported twice (and with no pixel width).
+            reported = {f.pdf_image for f in figures if f.kind == "raster" and f.page == page.number}
+            # Nor does a strip too small to be a figure (a colour bar), which the image pass skips.
+            images = [im for im in page.images if im.figure == number and im.dpi and im.name not in reported and im.placed_width >= MIN_EMBEDDED_WIDTH_PT]
             if images:
                 fig.dpi = min(im.dpi for im in images)
             figures.append(fig)
@@ -1163,6 +1167,31 @@ def _raster_text_size_issues(venue: Venue | None, values: dict[str, str] | None,
     return issues, measured
 
 
+_DRAWING_ISSUE = re.compile(r"(?P<page>.+ page \d+), drawing (?P<n>\d+): (?P<rest>.*)", re.DOTALL)
+
+
+def _merge_drawings(issues: list[Issue]) -> list[Issue]:
+    """One issue for the drawings of a page that report the same thing (a grid of heatmaps set alike)."""
+    groups: dict[tuple, list[str]] = {}
+    order: list[tuple] = []
+    for issue in issues:
+        m = _DRAWING_ISSUE.fullmatch(issue.message)
+        key = (issue.level, issue.field, m.group("page"), m.group("rest")) if m else (id(issue),)
+        if key not in groups:
+            groups[key] = []
+            order.append((key, issue))
+        if m:
+            groups[key].append(m.group("n"))
+    out: list[Issue] = []
+    for key, issue in order:
+        numbers = groups[key]
+        if len(numbers) > 1:
+            out.append(Issue(issue.level, issue.field, f"{key[2]}, drawings {', '.join(numbers)}: {key[3]}"))
+        else:
+            out.append(issue)
+    return out
+
+
 def _text_size_check(checks: Checks, inv: _Inventory, rules: FigureRules, where: str, venue: Venue | None = None, values: dict[str, str] | None = None) -> Outcome:
     issues: list[Issue] = []
     smallest: list[float] = []
@@ -1192,6 +1221,7 @@ def _text_size_check(checks: Checks, inv: _Inventory, rules: FigureRules, where:
             if large:
                 examples = ", ".join(f"'{t.text[:20]}' {t.size:.1f} pt" for t in sorted(large, key=lambda t: -t.size)[:3])
                 issues.append(Issue(WARNING, fig.field_id, f"{fig.name}: {len(large)} text item(s) print larger than the {rules.max_font_size_pt:g} pt maximum (e.g. {examples})"))
+    issues = _merge_drawings(issues)
     raster_issues, raster_measured = _raster_text_size_issues(venue, values, inv)
     issues += raster_issues
     queued = _raster_ai_task(checks, inv, rules)

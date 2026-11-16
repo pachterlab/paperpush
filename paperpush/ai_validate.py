@@ -39,6 +39,12 @@ from .database import Venue
 
 logger = logging.getLogger(__name__)
 
+# AI tasks whose "fail" is reported as a likely error, not a warning: if the AI is
+# right, the submission has a critical problem (a fabricated reference, a modified
+# template, an unregistered clinical trial, human or animal research with no ethics
+# approval). Every other AI fail is a warning.
+CRITICAL_AI_TASKS = frozenset({"ai.unverified_references", "ai.template", "ai.rigor.trial_registration", "ai.details.ethics"})
+
 VERDICTS = ("pass", "fail", "suggest", "unclear", "not_applicable")
 
 _SYSTEM = "You are a meticulous pre-submission checker for academic manuscripts. You are given " "the files of one submission and a list of checks. For each check, read the files it " "names and decide: 'pass' if the submission meets it, 'fail' if it does not, " "'suggest' if nothing is wrong but you have points of style the author could defensibly leave as they are, " "'not_applicable' if the check does not apply to this submission, or 'unclear' if the " "files do not let you decide. Judge only from the files; do not assume. For 'fail', " "'details' must say exactly what is wrong and where (file, page, figure, panel) so the " "author can fix it; for 'pass', say briefly what you verified. Quote short evidence."
@@ -300,9 +306,13 @@ def resolve(checks, venue: Venue, values: dict[str, str], ai: Optional[AiOptions
         if status == "pass":
             checks.record(task.id, task.title, task.category, report.PASSED, detail=message, source="ai")
         elif status == "fail":
-            from .validate import WARNING, Issue
+            from .validate import LIKELY_ERROR, WARNING, Issue
 
-            checks.record(task.id, task.title, task.category, report.WARNING, issues=[Issue(WARNING, "", message or "the AI check failed (no details given)")], source="ai")
+            # An AI verdict is never certain, so it never blocks; on the tasks where a real
+            # failure is critical it is a likely error, and elsewhere a warning.
+            likely = task.id in CRITICAL_AI_TASKS
+            level, st = (LIKELY_ERROR, report.LIKELY_ERROR) if likely else (WARNING, report.WARNING)
+            checks.record(task.id, task.title, task.category, st, issues=[Issue(level, "", message or "the AI check failed (no details given)")], source="ai")
         elif status == "suggest":
             from .validate import SUGGESTION, Issue
 

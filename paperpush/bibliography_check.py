@@ -259,6 +259,22 @@ def _first_surname(entry: str) -> str:
     return ""
 
 
+def _sort_surname(entry: str) -> str:
+    """The surname a reference list is alphabetized by, for either name order.
+
+    "Smith, J., ..." gives Smith; "Noushin Ahmadpour, Meher Kantroo, ..." (given name first,
+    BibTeX's plain and IEEE styles) gives Ahmadpour, not Noushin.
+    """
+    names = _NUMBER_LABEL.sub("", entry, count=1).strip()
+    head = re.split(r",| and |\.\s+(?=[A-Z][a-z]+\b[^,]*$)", names, maxsplit=1)[0].split()
+    words = [w for w in head if not re.fullmatch(r"(?:[A-Z]\.)+|[A-Z]|Jr\.?|Sr\.?|I{2,3}|IV", w)]
+    if len(head) >= 2 and len(words) >= 1 and not names.split()[0].endswith(","):
+        last = words[-1].strip(".;:()[]")
+        if _SURNAME.match(last) and last[0].isupper():
+            return last
+    return _first_surname(entry)
+
+
 _AUTHOR_YEAR_HEAD = re.compile(r"^[^.]{0,250}?(?:\.[^.]{0,60}?){0,8}?[.,]\s*\(?(?:19|20)\d{2}[a-z]?\)?[.,:]")
 # The end of an entry's author list in the natbib author-year styles (ICLR, NeurIPS, ICML, *ACL):
 # "Jort F. Gemmeke, Daniel P. W. Ellis, and Marvin Ritter. Audioset: ..., 2017." The year
@@ -271,12 +287,21 @@ _TWO_NAMES = re.compile(rf"(?:[A-Z][\w'.\u2019-]*(?:\s+{_NAME_WORD}){{1,3}},\s+)
 _NAME_TOKEN_LOWER = frozenset({"and", "et", "al", "al.", "&", "van", "von", "de", "der", "den", "da", "di", "du", "le", "la", "del", "dos", "das", "ter", "ten", "bin", "ibn", "y"})
 
 
+# "Surname, I. I." names, as the ICML/APA-like styles print them: "Lewis, P., Yih, W.-t., and Kiela, D.".
+_SURNAME_INITIALS = r"[A-Z][\w'\u2019-]*(?:\s+(?:van|von|de|der|den|da|di|du|le|la|del)\s+[A-Z][\w'\u2019-]*)*,\s+[A-Z]\.(?:\s?-?[A-Za-z]\.)*"
+# A whole list of them, ended by the last author's initial and the title: an initial alone is no
+# end of an author list, so _AUTHOR_LIST_END runs past "Kiela, D." into the title.
+_INITIALS_LIST_HEAD = re.compile(rf"(?:{_SURNAME_INITIALS},\s+)*(?:(?:and|&)\s+)?{_SURNAME_INITIALS}(?:,?\s+et al\.)?\s*(?=[A-Z0-9\"\u201c])")
+
+
 def _author_list_head(entry: str) -> bool:
     """Whether ``entry`` opens with a bare list of author names ended by a period, as natbib's author-year styles print it.
 
     A run-on line ("Conference on Acoustics, Speech and Signal Processing ...") has
     lowercase words that are not name particles, so it stays with the entry before.
     """
+    if _INITIALS_LIST_HEAD.match(entry):
+        return True
     end = _AUTHOR_LIST_END.search(entry, 0, 2500)
     if end is None:
         return False
@@ -296,7 +321,7 @@ def _author_list_head(entry: str) -> bool:
 # PDF text often sets an accent as its own glyph beside the letter ("Schl \u00a8uter",
 # "Doll \u00b4ar"), which breaks the surname. The spacing accent goes onto the next letter.
 _SPACING_ACCENTS = {"\u00a8": "\u0308", "\u00b4": "\u0301", "`": "\u0300", "\u02c6": "\u0302", "\u02dc": "\u0303", "\u00b8": "\u0327",
-                    "\u02c7": "\u030c", "\u02d8": "\u0306", "\u02d9": "\u0307", "\u02da": "\u030a", "\u02dd": "\u030b"}
+                    "\u02c7": "\u030c", "\u02d8": "\u0306", "\u02d9": "\u0307", "\u02da": "\u030a", "\u02dd": "\u030b", "\u02db": "\u0328"}
 _SPLIT_ACCENT = re.compile(r"(?<=[A-Za-z]) ?([" + "".join(_SPACING_ACCENTS) + r"]) ?([A-Za-z\u0131])")
 
 
@@ -308,7 +333,7 @@ def join_split_accents(text: str) -> str:
 
 
 # Kerning can split an initial from its period ("Kathy Y . Wei") or a capital from its word ("Richard A V olz").
-_KERNED_INITIAL = re.compile(r"\b([A-Z]) \.(?=\s)")
+_KERNED_INITIAL = re.compile(r"\b([A-Z]) \.(?=[\s,;])")
 _KERNED_CAPITAL = re.compile(r"\b([VWY]) ([a-z]{2,})\b")
 
 
@@ -444,6 +469,8 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
     furniture = _page_furniture(doc)
     if furniture:
         tail = "".join(line for line in tail.splitlines(keepends=True) if line.strip() not in furniture)
+    # A page number on a line of its own breaks an entry ("doi: 10.1109/" / "4" / "TBDATA.2019...").
+    tail = "".join(line for line in tail.splitlines(keepends=True) if not re.fullmatch(r"\s*\d{1,3}\s*", line))
     # The text cites with the same broken accents and kerning, and a citation can run across a
     # page break ("Xue et al." / "7" / running head / "(2025)") or a hyphenated name ("Akhound-" / "Sadegh").
     body = unkern(join_split_accents(body))

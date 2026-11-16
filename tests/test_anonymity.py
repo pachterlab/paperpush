@@ -114,8 +114,9 @@ def test_github_link_to_author_account_reported():
     text = "Code: https://github.com/adalovelace/engine and https://github.com/pytorch/pytorch"
     details = _details(anonymity.scan_text("m.tex", text, TERMS))
     assert "github.com/adalovelace/engine contains an author's name or handle" in details
-    # Other owners are still reported, as possibly identifying.
-    assert "non-anonymized GitHub link github.com/pytorch/pytorch" in details
+    # Other owners are still reported, as possibly identifying (a suggestion when nothing
+    # presents the link as the authors' code; see test_iclr_false_alarms_anonymity_hidden).
+    assert "GitHub link github.com/pytorch/pytorch shows its owner" in details
 
 
 def test_github_link_to_lab_account_reported():

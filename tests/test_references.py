@@ -731,7 +731,7 @@ def test_validate_reports_retractions_as_their_own_check(tmp_path, monkeypatch):
         models.pop(venue.slug, None)
     results = {res.id: res for res in rep.results}
     assert results["integrity.dois"].status == report.PASSED
-    assert results["integrity.retractions"].status == report.WARNING
+    assert results["integrity.retractions"].status == report.LIKELY_ERROR
     assert "has been retracted" in results["integrity.retractions"].issues[0].message
     assert {res.id: res for res in off.results}["integrity.retractions"].status == report.UNCHECKED
 

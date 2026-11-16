@@ -426,13 +426,18 @@ never count them as warnings, stop on them, or rewrite the prose for them
 unasked. The terminal only counts them unless `--suggestions` is given; the
 JSON (`suggestions`) and a saved report list them. `--strict-style` (MCP:
 `strict_style=true`) reports them as warnings, for an author or venue that
-wants the house style enforced. `-o` saves the report (PDF by default; `.html`/`.md`/`.txt` by
-extension); `--colorblind` is the color-blind-friendly palette.
+wants the house style enforced. The report is saved by default as `<sub stem>_validation.pdf` next to the
+`.sub` (or the first file named); `-o PATH` saves it elsewhere
+(`.html`/`.md`/`.txt` by extension), and `-o none` or `--no-report` saves
+nothing; `--colorblind` is the color-blind-friendly palette.
 When the venue lets the initial submission be in any format
 (`manuscript.initial_submission_any_format`), the report opens with that rule
 (MCP: `initial_submission_rule`); `--initial-submission` (MCP:
-`initial_submission=true`) reports every error as a warning for a first
-submission. Use it only when the author says this is an initial submission.
+`initial_submission=true`) reports every formatting error and formatting
+likely error (a modified template) as a warning for a first submission; checks
+that are not about format (identity leaks, hidden prompts, fabricated
+references, plagiarism, an AI tool as author, a missing supplement, trial
+registration, ethics approval) keep their level. Use it only when the author says this is an initial submission.
 `--plagiarism` (MCP: `plagiarism=true`) scans the manuscript's text with
 Winston AI (the default) or Originality.ai (`WINSTON_API_KEY` / `ORIGINALITY_API_KEY`) and
 reports check `integrity.plagiarism`: the score and every matching source,
@@ -460,8 +465,18 @@ API key:
    `validate_subfile(ai_results=[...])`). Add `--ai-only` (MCP:
    `ai_only=True`) to report just the AI checks, e.g. when re-checking them.
 
-An AI `fail` is a warning, never a blocking error; do not mark a task `pass`
-you could not verify. With an API key, `paperpush validate --ai` does the same
+An AI `fail` never blocks: on the tasks where a real failure is critical
+(`ai.unverified_references`, `ai.template`, `ai.rigor.trial_registration`,
+`ai.details.ethics`) it is a likely error, and elsewhere a warning. Do not mark
+a task `pass` you could not verify.
+
+Validate reports three levels of problem. An **error** is certain and blocks
+(`ok` is false). A **likely error** (`likely_error`, shown in orange) would be
+critical if real but cannot be confirmed by the check: an author's name in the
+text of a double-blind submission, a reference that matches no registered work,
+a DOI registered to a different paper, a modified template, a credential in the
+files. It does not block, but relay each one as something the author must
+confirm before submitting. A **warning** is worth a second look. With an API key, `paperpush validate --ai` does the same
 through the provider's API. The Claude skill `paperpush-validate` walks
 through these steps.
 

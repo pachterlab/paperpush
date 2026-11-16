@@ -58,11 +58,14 @@ def _reference_order(venue: Venue, values: dict[str, str], alphabetical: bool, c
     if bib.mode == "numbered":
         if venue_other_order and not (rules and rules.numbered is True):
             raise NotApplicable("the venue specifies another reference ordering")
-        from .bibliography_check import _first_surname, _numbers, citation_groups
+        from .bibliography_check import _numbers, _sort_surname, citation_groups
 
         issues: list[Issue] = []
-        surnames = [_fold(_first_surname(ref.authors)) for ref in bib.refs]
-        alpha_ok = all(surnames) and surnames == sorted(surnames)
+        surnames = [_fold(_sort_surname(ref.authors)) for ref in bib.refs]
+        # As for author-year lists below: a few names misread from a PDF ("de Oliveira", an
+        # organization) leave a long alphabetical list with a handful of inversions.
+        inversions = sum(1 for a, b in zip(surnames, surnames[1:]) if a > b)
+        alpha_ok = all(surnames) and (inversions <= max(1, len(surnames) // 10) if len(surnames) >= 10 else surnames == sorted(surnames))
         if alphabetical:
             if not alpha_ok:
                 issues.append(Issue(WARNING, "", f"{path.name}: numbered references are not alphabetized by first author's surname"))

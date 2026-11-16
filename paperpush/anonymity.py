@@ -37,7 +37,11 @@ What counts as identifying:
   or surname (``pachterlab`` for Pachter) is worded more firmly.
 * in a linked anonymous repository, a LICENSE copyright line naming a holder.
 
-Every finding is advisory (the check is heuristic), reported through the same
+Findings never block on a guess: LaTeX in camera-ready mode and an author named in a
+file's metadata are errors; an author's name, email, ORCID or OpenReview ID in the text,
+a GitHub link carrying an author's handle, image/comment metadata naming someone, and a
+copyright holder in a linked repository are likely errors (serious if real, but the
+check is heuristic); the rest are warnings. All are reported through the same
 :class:`~paperpush.sensitive.Finding` shape as the other scans. A file that could
 not be read is reported too, so that a scan that did not happen is not a pass.
 Files only the editors see (a title page, a cover letter) are left out: they
@@ -60,6 +64,9 @@ from PIL import Image
 
 from . import document
 from .sensitive import (
+    LEVEL_ERROR,
+    LEVEL_LIKELY,
+    LEVEL_WARNING,
     ARCHIVE_EXTS,
     IMAGE_EXTS,
     LATEX_EXTS,
@@ -97,6 +104,8 @@ _IDENTITY_COLUMNS = {
     "affiliation": "affiliation",
     "institution": "affiliation",
 }
+# Hits on these identity terms are likely errors; the rest (affiliations) are warnings.
+_LIKELY_LABELS = {"author name", "email", "ORCID iD", "OpenReview ID"}
 # Shorter than this, an affiliation ("MIT", "UW") is too ambiguous to search for.
 MIN_AFFILIATION_CHARS = 5
 # Upload fields only the editors see, where the authors' names belong.
@@ -234,11 +243,39 @@ _GENERIC_USERS = {
     "runneradmin",
     "default",
 }
-# On a line of its own, or run into the paragraph ("Acknowledgments: We thank ...").
+# On a line of its own, or run into the paragraph ("Acknowledgments: We thank ...", or a
+# run-in bold heading with no punctuation: "Acknowledgments This work used ...").
 _ACK_HEADING = re.compile(
-    r"^\s*(?:\d+\.?\s+|[A-Z]\.?\s+)?acknowledge?ments?(?:\s+(?:and|&)\s+[a-z ]{3,40})?\s*(?:[:.\u2014\u2013]|$)",
+    r"^\s*(?:\d+\.?\s+|[A-Z]\.?\s+)?acknowledge?ments?(?:\s+(?:and|&)\s+[a-z ]{3,40})?\s*(?:[:.\u2014\u2013]|$|(?-i:\s+(?:This|We|The|Our|Funding|Research|Part|[A-Z][a-z]+\s+(?:was|is|were|are|thanks?|acknowledges?|gratefully))\b))",
     re.IGNORECASE | re.MULTILINE,
 )
+# A funding statement with no Acknowledgments heading ("This work was supported in part by
+# NSF grant 123"): it names the authors' funders, so it identifies them as surely as one.
+_FUNDING_STATEMENT = re.compile(
+    r"(?i)(?:(?:\b(?:was|is|were|are|been|being|and)|,)\s+(?:\w+ly\s+)?(?:supported|funded|sponsored|financed)\s+(?:in\s+part\s+|partly\s+|partially\s+)?by|\b(?:we|authors?)\s+(?:gratefully\s+)?acknowledge\s+(?:the\s+)?(?:support|funding|financial))"
+    r"(?:[^.]|(?<=\b[A-Z])\.){0,200}?\b(?:grants?|awards?|foundation|fellowships?|scholarships?|NSF|NIH|DARPA|ERC|NSFC|DFG|EPSRC|JSPS|NSERC|(?:research|science|funding)\s+(?:program(?:me)?|council|agency)|contract\s+(?:no|number)|project\s+(?:no|number|id))\b"
+)
+# The camera-ready (non-anonymous) running head of the ICLR/TMLR styles on a paper under review.
+_CAMERA_READY_HEAD = re.compile(r"(?i)^\s*published\s+as\s+a\s+conference\s+paper\s+at\b")
+# An e-mail address, as an author block prints it ("{a,b}@uni.edu" included).
+_EMAIL = re.compile(r"(?:\{[^}\n]{1,120}\}|[\w.+-]{1,64})\s?@\s?[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
+# A title-block line naming an institution (short, not a sentence).
+_AFFILIATION_LINE = re.compile(
+    r"\b(?:Universit(?:y|\u00e9|\u00e4|\u00e0|at|e|ies)|Institut(?:e|o)?|College|Laborator(?:y|ies)|School\s+of|Department\s+of|Dept\.|Faculty\s+of|Academy\s+of|Polytechnic|Politecnico|Inc\.|Ltd\.?|GmbH|Corporation|Google|DeepMind|Microsoft|NVIDIA|Amazon|Tencent|Alibaba|ByteDance|Huawei|Baidu|Meta\s+(?:AI|FAIR)|FAIR|Shanghai\s+AI\s+Lab(?:oratory)?|AI\s+Lab|Research\s+(?:Lab|Center|Centre))\b"
+)
+# A title-block line listing people ("Zulun Zhu, Haoyu Liu, Mengke He, Siqiang Luo"): two or
+# more given-family names separated by commas or "and" (a title in capitals does not fit).
+_PERSON = r"[A-Z][a-z\u00c0-\u017f]+(?:-[A-Za-z\u00c0-\u017f]+)?(?:\s+[A-Z]\.)?(?:\s+[A-Z][a-z\u00c0-\u017f'-]+){1,2}"
+_NAME_LIST_LINE = re.compile(rf"^{_PERSON}(?:\s*(?:,|,?\s+and|&)\s*{_PERSON})+\s*$")
+# The end of a paper's title block.
+_ABSTRACT_HEADING = re.compile(r"(?im)^\s*(?:a\s?bstract|abstract)\b")
+# Other code forges whose URLs name their owner, like github.com/<owner>/<repo>.
+_FORGE_RE = re.compile(r"(?i)\b(gitlab\.com|gitee\.com|bitbucket\.org|codeberg\.org)/([A-Za-z0-9][\w.-]{0,38})(?:/([\w.-]+))?")
+_FORGE_RESERVED = {"explore", "users", "groups", "help", "about", "docs", "dashboard", "blog", "login", "signup", "search"}
+# A GitHub Pages site, <owner>.github.io: a personal or lab page.
+_GITHUB_PAGES_RE = re.compile(r"(?i)\b([a-z0-9](?:[a-z0-9-]{0,38}))\.github\.io\b")
+# A URL broken across lines after the host ("https://github.com/" / "owner/repo").
+_WRAPPED_HOST = re.compile(r"(?i)((?:github\.com|gitlab\.com|gitee\.com|bitbucket\.org|codeberg\.org)/(?:[\w.-]+/)?)[ \t]*\n[ \t]*(?=[\w.-])")
 _TEX_ACK = re.compile(
     r"\\(?:(?:sub)*section|(?:sub)?paragraph)\*?\s*(?:\[[^\]]*\])?\s*\{\s*acknowledge?ments?(?:\s+(?:and|\\&)\s[^}]*)?\s*\.?\s*\}" r"|\\begin\s*\{\s*(?:acks?|acknowledge?ments?)\s*\}|\\acks\b|\\acknowledge?ments?\b",
     re.IGNORECASE,
@@ -358,7 +395,8 @@ def scan_text(
         hits = (m for m in pattern.finditer(searchable) if not (product_ok and _PRODUCT_NAME.match(searchable, m.end())))
         found = any(not (label == "author name" and any(a <= m.start() < b for a, b in searchable_refs)) for m in hits)
         if found or pattern.search(comments):
-            yield Finding(where, "identifying information", f"anonymity: {label} '{term}' appears")
+            level = LEVEL_LIKELY if label in _LIKELY_LABELS else LEVEL_WARNING
+            yield Finding(where, "identifying information", f"anonymity: {label} '{term}' appears", level)
     # Any github.com/<owner>/<repo> link shows its owner, and the owner is
     # often a lab or organization account, so every one is reported -- except
     # in the reference list, where (as with names) citing a repository is a
@@ -368,7 +406,10 @@ def scan_text(
     handles = _author_handles(terms)
     surnames = _author_surnames(terms)
     seen: set[tuple[str, str]] = set()
-    for match in _GITHUB_RE.finditer(text):
+    # Rejoin URLs broken after the host ("https://github.com/" / "owner/repo"). Joining only
+    # removes characters after each match's start, so positions shift by a few characters at most.
+    link_text = _WRAPPED_HOST.sub(r"\1", text)
+    for match in _GITHUB_RE.finditer(link_text):
         if any(a <= match.start() < b for a, b in ref_spans):
             continue
         link = next(_find_github_repos(match.group(0)), None)
@@ -378,15 +419,22 @@ def scan_text(
         owner, repo = link
         hit = _identifying_part(owner, repo, handles, surnames)
         if hit:
-            yield Finding(where, "identifying information", f"anonymity: GitHub link github.com/{owner}/{repo} contains an author's name or handle ('{hit}'); link an anonymous.4open.science mirror instead")
+            yield Finding(where, "identifying information", f"anonymity: GitHub link github.com/{owner}/{repo} contains an author's name or handle ('{hit}'); link an anonymous.4open.science mirror instead", LEVEL_LIKELY)
+        elif _presented_as_own(link_text, match.start(), match.end()):
+            yield Finding(
+                where,
+                "identifying information",
+                f"anonymity: non-anonymized GitHub link github.com/{owner}/{repo} shows its owner ('{owner}'), and the text presents it as your code; link an anonymous.4open.science mirror instead",
+            )
         else:
             yield Finding(
                 where,
                 "identifying information",
-                f"anonymity: non-anonymized GitHub link github.com/{owner}/{repo} shows its owner ('{owner}'); if it is your or your lab's code, link an anonymous.4open.science mirror instead (ignore this if it is third-party software you cite)",
+                f"anonymity: GitHub link github.com/{owner}/{repo} shows its owner ('{owner}'); nothing around it says it is your code, so it is probably third-party software you cite, but if it is yours or your lab's, link an anonymous.4open.science mirror instead",
+                _LEVEL_SUGGESTION,
             )
     # github.com/<owner> with no repository: a person's or lab's profile page.
-    for match in _GITHUB_PROFILE_RE.finditer(text):
+    for match in _GITHUB_PROFILE_RE.finditer(link_text):
         if any(a <= match.start() < b for a, b in ref_spans):
             continue
         owner = match.group(1)
@@ -394,6 +442,25 @@ def scan_text(
             continue
         seen.add((owner, ""))
         yield Finding(where, "identifying information", f"anonymity: link to the GitHub account github.com/{owner} identifies its owner; remove it for anonymous review or link an anonymous.4open.science mirror")
+    # GitLab, Gitee, Bitbucket, Codeberg: the same owner-in-the-URL problem as GitHub.
+    for match in _FORGE_RE.finditer(link_text):
+        if any(a <= match.start() < b for a, b in ref_spans):
+            continue
+        host, owner, repo = match.group(1).lower(), match.group(2), (match.group(3) or "").rstrip(".")
+        if owner.lower() in _FORGE_RESERVED or (host, owner.lower()) in seen:
+            continue
+        seen.add((host, owner.lower()))
+        url = f"{host}/{owner}" + (f"/{repo}" if repo else "")
+        yield Finding(where, "identifying information", f"anonymity: non-anonymized link {url} shows its owner ('{owner}'); if it is your or your lab's code, link an anonymous mirror instead (ignore this if it is third-party software you cite)")
+    # <owner>.github.io: a personal or lab web page (a project page usually lives there).
+    for match in _GITHUB_PAGES_RE.finditer(link_text):
+        if any(a <= match.start() < b for a, b in ref_spans):
+            continue
+        owner = match.group(1)
+        if ("pages", owner.lower()) in seen:
+            continue
+        seen.add(("pages", owner.lower()))
+        yield Finding(where, "identifying information", f"anonymity: link to the GitHub Pages site {owner}.github.io names its owner ('{owner}'); if it is your or your lab's page, remove it or use an anonymous host (ignore this if it is a third-party page)")
     yield from _home_path_findings(where, text)
     if not is_manuscript:
         return
@@ -405,18 +472,56 @@ def scan_text(
         snippet = " ".join(plain[match.start():match.end() + 60].split())
         yield Finding(where, "identifying information", f"anonymity: first-person reference to the authors' own earlier work ('{snippet}...'); refer to it in the third person for anonymous review")
         break
-    if (_TEX_ACK if is_latex else _ACK_HEADING).search(body):
+    has_ack = bool((_TEX_ACK if is_latex else _ACK_HEADING).search(body))
+    if has_ack:
         yield Finding(where, "identifying information", "anonymity: has an Acknowledgments section; remove it for anonymous review (it usually names funders, colleagues, and grants)")
+    else:
+        spans = _reference_spans(plain)
+        funding = next((m for m in _FUNDING_STATEMENT.finditer(plain) if not any(a <= m.start() < b for a, b in spans)), None)
+        if funding is not None:
+            snippet = " ".join(plain[funding.start():funding.end()].split())[:160]
+            yield Finding(where, "identifying information", f"anonymity: funding statement ('{snippet}'); funders and grant numbers identify the authors, so remove it for anonymous review", LEVEL_LIKELY)
     if is_latex:
         final = _TEX_FINAL.search(body)
         if final:
-            yield Finding(where, "identifying information", f"anonymity: LaTeX is in camera-ready mode ({final.group(0).strip()}), which prints the author names; use the submission/anonymous option")
+            yield Finding(where, "identifying information", f"anonymity: LaTeX is in camera-ready mode ({final.group(0).strip()}), which prints the author names; use the submission/anonymous option", LEVEL_ERROR)
+
+
+# A sentence that presents a linked repository as the authors' own ("Our code is available at",
+# "we release the benchmark at", "Code: github.com/..."). Without one, a github.com/<owner>/<repo>
+# link that names no author is most often third-party software being cited (github.com/
+# facebookresearch/moco, EleutherAI/lm-evaluation-harness): on ICLR 2026 papers that passed
+# review, such links were the main source of anonymity warnings, so they are suggestions.
+_OWN_CODE_RE = re.compile(
+    r"(?i)\bour\b[^.]{0,60}?\b(?:codes?|implementations?|repositor(?:y|ies)|repo|data\s*sets?|benchmarks?|models?|weights|checkpoints?|project\s+page|demos?|website|tool(?:kit)?|library|package|software|framework|source)\b"
+    r"|\bwe\b[^.]{0,40}?\b(?:release[sd]?|open[- ]?sourced?|publish(?:ed)?|make\s+(?:\w+\s+){0,3}(?:publicly\s+)?available|provide\s+(?:the\s+|our\s+)?(?:code|implementation))\b"
+    r"|\b(?:codes?|implementation|repository|project\s+page|source\s+code)\s+(?:is|are|will\s+be|has\s+been|can\s+be)\s+(?:publicly\s+|made\s+|openly\s+)*(?:(?:available|released|accessible|found)\s+)?(?:at|on|in|here|via)\b"
+)
+# A label right before the link, opening its line or sentence ("Code: https://github.com/...").
+_CODE_LABEL_RE = re.compile(r"(?i)(?:^|[\n.])\s*(?:codes?|project\s+page|repository|github|source\s+code)(?:\s+and\s+[\w ]{1,20})?\s*:\s*(?:https?://)?(?:www\.)?$")
+_LEVEL_SUGGESTION = "suggestion"
+
+
+def _presented_as_own(text: str, start: int, end: int) -> bool:
+    """Whether the sentence around a link (back to the previous full stop, at most 300 characters, and on to the next) presents it as the authors' own."""
+    before = text[max(0, start - 300) : start]
+    if _CODE_LABEL_RE.search(before):
+        return True
+    stop = max(before.rfind(". "), before.rfind(".\n"), before.rfind("\n\n"))
+    after = text[end : end + 150]
+    nxt = re.search(r"\.(?:\s|$)", after)
+    return bool(_OWN_CODE_RE.search(before[stop + 1 :] + text[start:end] + (after[: nxt.start()] if nxt else after)))
 
 
 # A GitHub account link (no repository after the owner).
 _GITHUB_PROFILE_RE = re.compile(r"(?i)github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))/?(?=[\s}{)\]\"'<>,;]|\.(?:\s|$)|$)")
 # "our previous work", "our earlier system developed at ...", "in our prior paper": self-identifying in a blind paper.
-_SELF_REFERENCE_RE = re.compile(r"(?i)\b(?:extends|extending|builds on|building on|in|as in|following|unlike|than)\s+our\s+(?:own\s+)?(?:previous|prior|earlier|recent|past)\s+(?:work|paper|study|studies|system|method|model|approach|framework|tool|publication|results?)\b")
+# Up to three words may name it ("extends our previous MOS prediction model", "than our
+# original Perch model"), and "our <noun> (Surname et al., 2024)" cites it outright.
+_SELF_REFERENCE_RE = re.compile(
+    r"(?i)\b(?:extends?|extending|extension\s+of|builds?\s+(?:up)?on|building\s+(?:up)?on|in|as\s+in|from|following|unlike|than|of|improves?\s+(?:on|upon)?|improving)\s+our\s+(?:own\s+)?(?:previous|prior|earlier|recent|past|original|conference|workshop)\s+(?:[\w-]+\s+){0,3}?(?:works?|papers?|study|studies|system|method|models?|approach|framework|tool|publications?|results?|version|benchmark|dataset|algorithm|architecture)\b"
+    r"|\bour\s+(?:own\s+)?(?:previous|prior|earlier|recent|past|original|preliminary|conference|workshop)\s+(?:[\w-]+\s+){0,3}?(?:works?|papers?|models?|methods?|systems?|frameworks?|study|studies|publications?|versions?)\s*\((?:[A-Z][\w'À-ſ-]+\s+et\s+al\.?|[A-Z][\w'À-ſ-]+\s+(?:and|&)\s+[A-Z][\w'À-ſ-]+|\d)"
+)
 
 
 def _author_handles(terms: list[tuple[str, str]]) -> set[str]:
@@ -481,7 +586,7 @@ def _scan_image_people(where: str, data: bytes) -> Iterator[Finding]:
         if isinstance(value, bytes):
             value = value.decode("utf-16-le" if tag == 0x9C9D else "utf-8", errors="replace").strip("\x00")
         if value and not _is_anonymous_value(str(value)):
-            yield Finding(where, "identifying information", f"anonymity: image metadata {label} is '{str(value).strip()}'")
+            yield Finding(where, "identifying information", f"anonymity: image metadata {label} is '{str(value).strip()}'", LEVEL_LIKELY)
 
 
 def _scan_office_people(where: str, data: bytes) -> Iterator[Finding]:
@@ -493,13 +598,13 @@ def _scan_office_people(where: str, data: bytes) -> Iterator[Finding]:
     for tag, value in _OFFICE_PEOPLE.findall(parts.get("docProps/core.xml", "") + parts.get("meta.xml", "")):
         if not _is_anonymous_value(value):
             label = "last modified by" if tag == "cp:lastModifiedBy" else "author"
-            yield Finding(where, "identifying information", f"anonymity: document properties list {label} '{html.unescape(value).strip()}'")
+            yield Finding(where, "identifying information", f"anonymity: document properties list {label} '{html.unescape(value).strip()}'", LEVEL_ERROR)
     for tag, value in _OFFICE_APP_PEOPLE.findall(parts.get("docProps/app.xml", "")):
         if not _is_anonymous_value(value):
             yield Finding(where, "identifying information", f"anonymity: document properties list {tag.lower()} '{html.unescape(value).strip()}'")
     reviewers = {html.unescape(next(g for g in groups if g)).strip() for xml in parts.values() for groups in _OFFICE_REVIEWER.findall(xml)}
     for reviewer in sorted(r for r in reviewers if not _is_anonymous_value(r)):
-        yield Finding(where, "identifying information", f"anonymity: a comment or tracked change is by '{reviewer}'; remove personal information from the document")
+        yield Finding(where, "identifying information", f"anonymity: a comment or tracked change is by '{reviewer}'; remove personal information from the document", LEVEL_LIKELY)
 
 
 def _scan_office(where: str, data: bytes, terms: list[tuple[str, str]]) -> Iterator[Finding]:
@@ -514,6 +619,58 @@ def _scan_office(where: str, data: bytes, terms: list[tuple[str, str]]) -> Itera
             yield from scan_text(where, text, terms, is_manuscript=part in _OFFICE_BODY_PARTS)
 
 
+def _pdf_pages_and_links(path: Path) -> tuple[list[str], list[tuple[int, str]]]:
+    """Each page's text and the (page index, URI) of every link annotation (empty on failure)."""
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(path))
+        pages, links = [], []
+        for i, page in enumerate(reader.pages):
+            try:
+                pages.append(page.extract_text() or "")
+            except Exception:
+                pages.append("")
+            for annot in page.get("/Annots") or []:
+                try:
+                    uri = (annot.get_object().get("/A") or {}).get("/URI")
+                except Exception:
+                    continue
+                if uri:
+                    links.append((i, str(uri)))
+        return pages, links
+    except Exception:
+        logger.debug("could not read pages/links of %s", path, exc_info=True)
+        return [], []
+
+
+def title_block_findings(where: str, first_page: str) -> Iterator[Finding]:
+    """Author names printed on page 1 of a PDF under anonymous review.
+
+    Reads the title block (page 1 above the abstract). A block that says "Anonymous" is
+    the anonymized one; otherwise an e-mail address, two or more lines naming
+    institutions, or the camera-ready running head ("Published as a conference paper at")
+    mean the author block is printed. Works without the authors' names in the .sub.
+    """
+    if not first_page.strip():
+        return
+    head = first_page[:300]
+    if _CAMERA_READY_HEAD.search(head):
+        yield Finding(where, "identifying information", "anonymity: page 1 carries the camera-ready running head ('Published as a conference paper at ...'), the non-anonymous style option, which prints the author names; use the submission/anonymous option", LEVEL_LIKELY)
+        return
+    end = _ABSTRACT_HEADING.search(first_page)
+    block = first_page[: end.start()] if end and end.start() < 2500 else first_page[:1200]
+    if re.search(r"(?i)\banonymous\b|double[- ]blind|under\s+(?:double[- ]blind\s+)?review\b(?!\s+as\s+a)", block):
+        return
+    lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+    emails = [m.group(0) for m in _EMAIL.finditer(block)]
+    affiliations = [ln for ln in lines if len(ln) <= 160 and _AFFILIATION_LINE.search(ln) and not re.search(r"[.?!]\s+[a-z]", ln)]
+    if emails:
+        yield Finding(where, "identifying information", f"anonymity: page 1 prints an e-mail address above the abstract ('{emails[0]}'), so the author block is not anonymized", LEVEL_LIKELY)
+    elif len(affiliations) >= 2 or (affiliations and (re.search(r"[A-Z][a-z]+\s+[A-Z][a-z]+(?:\d|\s*[*†‡∗])", block) or any(_NAME_LIST_LINE.match(ln) for ln in lines))):
+        yield Finding(where, "identifying information", f"anonymity: page 1 names institutions above the abstract ('{affiliations[0][:80]}'), so the author block looks not anonymized", LEVEL_LIKELY)
+
+
 def _scan_pdf(where: str, path: Path, terms: list[tuple[str, str]]) -> Iterator[Finding]:
     read = _read_pdf(path)
     if read.problem:
@@ -522,9 +679,18 @@ def _scan_pdf(where: str, path: Path, terms: list[tuple[str, str]]) -> Iterator[
         yield _not_scanned(where, "no text layer, so the pages could not be searched", _ANON_PREFIX)
     if read.text:
         yield from scan_text(where, read.text, terms)
+    pages, links = _pdf_pages_and_links(path)
+    if pages:
+        yield from title_block_findings(where, pages[0])
+    # Links that exist only as hyperlinks ("available at GMN_ESN_Examples"), on pages before
+    # the reference list, where a repository link is the authors' own.
+    ref_page = next((i for i, p in enumerate(pages) if _REFERENCE_START.search(p)), len(pages))
+    body_links = sorted({uri for i, uri in links if i < ref_page})
+    if body_links:
+        yield from scan_text(where, "\n".join(body_links), terms, is_manuscript=False)
     for key, value in _pdf_metadata_text(path).items():
         if key in _PDF_AUTHOR_KEYS and not _is_anonymous_value(value):
-            yield Finding(where, "identifying information", f"anonymity: PDF metadata {key.lstrip('/')} is '{value.strip()}'; clear it (e.g. \\hypersetup{{pdfauthor={{}}}})")
+            yield Finding(where, "identifying information", f"anonymity: PDF metadata {key.lstrip('/')} is '{value.strip()}'; clear it (e.g. \\hypersetup{{pdfauthor={{}}}})", LEVEL_ERROR)
         else:
             yield from scan_text(f"{where} [metadata {key}]", value, terms, is_manuscript=False)
 
@@ -783,7 +949,7 @@ def scan_anonymous_repo(repo: str, terms: list[tuple[str, str]]) -> list[Finding
             for match in _COPYRIGHT.finditer(text):
                 holder = match.group("holder").strip()
                 if not _ANONYMOUS_HOLDER.search(holder):
-                    findings.append(Finding(file_where, "identifying information", f"anonymity: copyright line names '{holder}'; add it to the terms Anonymous GitHub redacts"))
+                    findings.append(Finding(file_where, "identifying information", f"anonymity: copyright line names '{holder}'; add it to the terms Anonymous GitHub redacts", LEVEL_LIKELY))
     if truncated:
         findings.append(Finding("submission", "anonymous repository", f"anonymity: only the first {MAX_REPO_FILES} files of {where} were checked; inspect the rest manually"))
     return findings

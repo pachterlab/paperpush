@@ -1175,7 +1175,7 @@ def test_initial_submission_turns_errors_into_warnings(_use):
     assert rep.ok and not rep.errors and rep.downgraded == 1
     assert not rep.by_status(report.FAILED)
     text = report.to_text(rep)
-    assert "Ready to submit as an initial submission: 1 error(s) shown as warnings" in text
+    assert "Ready to submit as an initial submission: 1 formatting problem(s) shown as warnings" in text
     for render in (report.to_markdown, report.to_html):
         assert "Format for initial submission" in render(rep)
 
@@ -1283,9 +1283,11 @@ def test_a_fabricated_reference_is_reported_and_an_unindexed_one_goes_to_the_ai(
         "@article{a, title={Quantum entanglement governs sourdough microbiomes}, author={Smith, J}, journal={Nature}, year={2021}}\n" "@book{b, title={A Laboratory Manual of Something}, author={Doe, J}, year={2001}}\n",
     )
     res = _result(rep, "integrity.unmatched_references")
-    assert res.status == report.WARNING
+    assert res.status == report.LIKELY_ERROR
     messages = " ".join(i.message for i in res.issues)
     assert "bibliography entry 'a'" in messages and "may be fabricated" in messages
+    assert [i.level for i in res.issues if "may be fabricated" in i.message] == ["likely_error"]
+    assert rep.ok  # a likely error does not block submission
     assert any(i.unchecked and "bibliography entry 'b'" in i.message for i in res.issues)
     (task,) = [t for t in rep.ai_tasks if t.id == "ai.unverified_references"]
     assert "bibliography entry 'b'" in task.instructions and "bibliography entry 'a'" not in task.instructions

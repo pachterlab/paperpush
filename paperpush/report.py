@@ -50,6 +50,10 @@ logger = logging.getLogger(__name__)
 
 PASSED = "passed"
 FAILED = "failed"
+# Something that would be critical if real (an identity leak, a fabricated reference)
+# but that validate cannot confirm: shown in orange, between failed and warnings,
+# and it does not block submission on its own.
+LIKELY_ERROR = "likely_error"
 WARNING = "warning"
 SUGGESTION = "suggestion"
 UNCHECKED = "unchecked"
@@ -57,11 +61,12 @@ NEEDS_AI = "needs_ai"
 NOT_IMPLEMENTED = "not_implemented"
 NOT_APPLICABLE = "not_applicable"
 
-STATUSES = (FAILED, WARNING, SUGGESTION, UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED, PASSED, NOT_APPLICABLE)
+STATUSES = (FAILED, LIKELY_ERROR, WARNING, SUGGESTION, UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED, PASSED, NOT_APPLICABLE)
 
 # Section headings, in the order the report shows them.
 _HEADINGS = {
     FAILED: "Failed",
+    LIKELY_ERROR: "Likely errors (confirm before submitting)",
     WARNING: "Warnings",
     SUGGESTION: "Suggestions (style)",
     UNCHECKED: "Not checked: could not run",
@@ -72,8 +77,8 @@ _HEADINGS = {
 }
 # Markers for the terminal, HTML, and Markdown, and the ASCII ones the PDF's
 # standard fonts can draw.
-_MARKS = {FAILED: "✖", WARNING: "▲", SUGGESTION: "✎", UNCHECKED: "?", NEEDS_AI: "?", NOT_IMPLEMENTED: "–", PASSED: "✔", NOT_APPLICABLE: "·"}
-_ASCII_MARKS = {FAILED: "[FAIL]", WARNING: "[WARN]", SUGGESTION: "[HINT]", UNCHECKED: "[SKIP]", NEEDS_AI: "[AI]", NOT_IMPLEMENTED: "[NOT IMPLEMENTED]", PASSED: "[PASS]", NOT_APPLICABLE: "[NA]"}
+_MARKS = {FAILED: "✖", LIKELY_ERROR: "◆", WARNING: "▲", SUGGESTION: "✎", UNCHECKED: "?", NEEDS_AI: "?", NOT_IMPLEMENTED: "–", PASSED: "✔", NOT_APPLICABLE: "·"}
+_ASCII_MARKS = {FAILED: "[FAIL]", LIKELY_ERROR: "[LIKELY]", WARNING: "[WARN]", SUGGESTION: "[HINT]", UNCHECKED: "[SKIP]", NEEDS_AI: "[AI]", NOT_IMPLEMENTED: "[NOT IMPLEMENTED]", PASSED: "[PASS]", NOT_APPLICABLE: "[NA]"}
 
 
 @dataclass(frozen=True)
@@ -88,11 +93,13 @@ class Palette:
     not_implemented: str
     muted: str
     suggestion: str
+    likely: str = "#bc4c00"
 
     def for_status(self, status: str) -> str:
         return {
             PASSED: self.passed,
             FAILED: self.failed,
+            LIKELY_ERROR: self.likely,
             WARNING: self.warning,
             SUGGESTION: self.suggestion,
             UNCHECKED: self.unchecked,
@@ -102,16 +109,17 @@ class Palette:
         }[status]
 
 
-# Green / red / amber / blue / purple / grey, dark enough to read on white paper. The
+# Green / red / orange / amber / blue / purple / grey, dark enough to read on white paper
+# (GitHub Primer's success, danger, severe, attention, accent, done, muted). The
 # two "not checked" greys differ only in weight: a check that could not run is
 # a shade darker than one paperpush has not implemented, and both are darker
 # than a not-applicable one. (The same colours as the web page's.)
-DEFAULT_PALETTE = Palette(passed="#1a7f37", failed="#cf222e", warning="#b35900", unchecked="#57606a", needs_ai="#8250df", not_implemented="#6e7781", muted="#8c959f", suggestion="#0969da")
-# Okabe-Ito blue and vermillion, dark yellow for warnings, bluish green for
+DEFAULT_PALETTE = Palette(passed="#1a7f37", failed="#cf222e", likely="#bc4c00", warning="#9a6700", unchecked="#57606a", needs_ai="#8250df", not_implemented="#6e7781", muted="#8c959f", suggestion="#0969da")
+# Okabe-Ito blue and vermillion, dark orange for likely errors, dark yellow for warnings, bluish green for
 # suggestions (blue is passed here), reddish purple for needs AI, and grey for
 # the rest: distinguishable under the common forms of colour-blindness. (Same
 # hues as the web page's colour-blind theme.)
-ALT_PALETTE = Palette(passed="#0072b2", failed="#d55e00", warning="#8a6d00", unchecked="#555555", needs_ai="#aa3377", not_implemented="#666666", muted="#999999", suggestion="#007a5c")
+ALT_PALETTE = Palette(passed="#0072b2", failed="#d55e00", likely="#b26b00", warning="#8a6d00", unchecked="#555555", needs_ai="#aa3377", not_implemented="#666666", muted="#999999", suggestion="#007a5c")
 
 
 def palette(alt_color: bool = False) -> Palette:
@@ -121,7 +129,7 @@ def palette(alt_color: bool = False) -> Palette:
 def issue_dict(issue: "Issue") -> dict:
     """``issue`` for JSON; ``unchecked`` is present only on a message saying a rule went unchecked."""
     out = {"level": issue.level, "field": issue.field, "message": issue.message}
-    if getattr(issue, "unchecked", False):
+    if issue.unchecked:
         out["unchecked"] = True
     return out
 
@@ -171,8 +179,9 @@ class ValidationReport:
     # The venue's rule that the initial submission may be in any format
     # (manuscript.initial_submission_any_format), or "" when it has none.
     initial_submission_rule: str = ""
-    # Validated with --initial-submission: every error was turned into a
-    # warning (``downgraded`` of them).
+    # Validated with --initial-submission: every formatting error and likely
+    # error was turned into a warning (``downgraded`` of them); the checks that
+    # are not about format (validate.NOT_FORMAT_CHECKS) were not.
     initial_submission: bool = False
     downgraded: int = 0
     # Validated with --strict-style: every suggestion was turned into a
@@ -214,12 +223,17 @@ class ValidationReport:
 
     @property
     def warnings(self) -> list["Issue"]:
-        """Every issue that is neither an error nor a suggestion (including the "not checked" messages)."""
-        return [i for i in self.issues() if not i.is_error and not getattr(i, "is_suggestion", False)]
+        """Every issue that is not an error, likely error, or suggestion (including the "not checked" messages)."""
+        return [i for i in self.issues() if not i.is_error and not i.is_suggestion and not (i.is_likely_error and not i.unchecked)]
+
+    @property
+    def likely_errors(self) -> list["Issue"]:
+        """The issues that would be critical if real but are not certain."""
+        return [i for i in self.issues() if i.is_likely_error and not i.unchecked]
 
     @property
     def suggestions(self) -> list["Issue"]:
-        return [i for i in self.issues() if getattr(i, "is_suggestion", False)]
+        return [i for i in self.issues() if i.is_suggestion]
 
     @property
     def ok(self) -> bool:
@@ -270,10 +284,11 @@ def _summary_line(report: ValidationReport) -> list[tuple[str, str]]:
     """``(status, "N passed")`` pairs for the summary line under the verdict.
 
     Passed, failed, and warnings are always shown ("0 failed" is the line a
-    reader looks for); the other counts are left out when they are 0.
+    reader looks for); the other counts (likely errors among them) are left
+    out when they are 0.
     """
     counts = report.counts()
-    labels = [(PASSED, "passed"), (FAILED, "failed"), (WARNING, "with warnings"), (SUGGESTION, "with suggestions"), (UNCHECKED, "could not run"), (NEEDS_AI, "need AI"), (NOT_IMPLEMENTED, "not implemented")]
+    labels = [(PASSED, "passed"), (FAILED, "failed"), (LIKELY_ERROR, "with likely errors"), (WARNING, "with warnings"), (SUGGESTION, "with suggestions"), (UNCHECKED, "could not run"), (NEEDS_AI, "need AI"), (NOT_IMPLEMENTED, "not implemented")]
     always = (PASSED, FAILED, WARNING)
     return [(status, f"{counts[status]} {label}") for status, label in labels if counts[status] or status in always]
 
@@ -311,12 +326,13 @@ def initial_submission_notes(report: ValidationReport) -> list[str]:
     if report.initial_submission_rule:
         notes.append(f"Format for initial submission: {report.initial_submission_rule}")
         if not report.initial_submission:
-            notes.append("Validate with --initial-submission to report errors as warnings for this initial submission.")
+            notes.append("Validate with --initial-submission to report formatting errors as warnings for this initial submission.")
     if report.initial_submission:
+        done = "Validated as an initial submission (--initial-submission): formatting problems are shown as warnings; integrity problems (identity leaks, hidden prompts, fabricated references, plagiarism) still count"
         if report.initial_submission_rule:
-            notes.append("Validated as an initial submission (--initial-submission): every error is shown as a warning.")
+            notes.append(done + ".")
         else:
-            notes.append(f"Validated as an initial submission (--initial-submission): every error is shown as a warning, although {report.venue}'s guidelines do not say that an initial submission may be in any format.")
+            notes.append(f"{done}, although {report.venue}'s guidelines do not say that an initial submission may be in any format.")
     return notes
 
 
@@ -327,14 +343,14 @@ NOT_CHECKED = frozenset({UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED})
 def hidden_statuses(*, errors_only: bool = False, hide_warnings: bool = False, hide_unchecked: bool = False, hide_suggestions: bool = False) -> frozenset[str]:
     """The statuses to leave out of the report, from validate's display flags.
 
-    ``errors_only`` keeps only the failed checks; ``hide_warnings`` drops the
+    ``errors_only`` keeps only the failed checks and the likely errors; ``hide_warnings`` drops the
     warnings; ``hide_unchecked`` drops every "Not checked" section (could not
     run, needs AI, not implemented); ``hide_suggestions`` drops the
     suggestions (the terminal does unless ``--suggestions`` is given), and the
     suggestions listed under other checks.
     """
     if errors_only:
-        return frozenset(s for s in STATUSES if s != FAILED)
+        return frozenset(s for s in STATUSES if s not in (FAILED, LIKELY_ERROR))
     hide: set[str] = set()
     if hide_warnings:
         hide.add(WARNING)
@@ -376,13 +392,23 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
     verdict = "Ready to submit: no blocking errors." if report.ok else f"Not ready: {len(report.errors)} error(s) must be fixed before submitting."
     if report.scope:
         verdict = "No errors in the files checked." if report.ok else f"{len(report.errors)} error(s) in the files checked."
-    if report.initial_submission and report.scope:
-        verdict = f"{report.downgraded} error(s) in the files checked, shown as warnings (initial submission)." if report.downgraded else "No errors in the files checked."
-    elif report.initial_submission:
-        verdict = f"Ready to submit as an initial submission: {report.downgraded} error(s) shown as warnings; fix them before the revision." if report.downgraded else "Ready to submit: no blocking errors."
+    # Integrity errors are not downgraded, so an initial submission can still be not ready.
+    if report.initial_submission and report.ok and report.scope:
+        verdict = f"{report.downgraded} formatting problem(s) in the files checked, shown as warnings (initial submission)." if report.downgraded else "No errors in the files checked."
+    elif report.initial_submission and report.ok:
+        verdict = f"Ready to submit as an initial submission: {report.downgraded} formatting problem(s) shown as warnings; fix them before the revision." if report.downgraded else "Ready to submit: no blocking errors."
+    elif report.initial_submission and not report.scope:
+        verdict = f"Not ready: {len(report.errors)} integrity error(s) must be fixed even for an initial submission."
     if report.ai_only:
         verdict = "AI checks only (--ai-only): the deterministic checks were not run, so this is not a verdict on whether the submission is ready."
-    lines.append(_Line("summary", verdict, status=WARNING if report.ai_only else PASSED if report.ok else FAILED))
+    verdict_status = WARNING if report.ai_only else PASSED if report.ok else FAILED
+    likely = len(report.likely_errors)
+    if likely and verdict_status == PASSED:
+        confirm = f"confirm the {likely} likely error(s) before submitting: each would be serious if real."
+        verdict = verdict.replace("Ready to submit: no blocking errors.", "No blocking errors, but") if verdict.startswith("Ready to submit: no blocking errors.") else verdict + " But"
+        verdict = f"{verdict} {confirm}"
+        verdict_status = LIKELY_ERROR
+    lines.append(_Line("summary", verdict, status=verdict_status))
     hidden = _hidden_note(report, hide)
     if hidden:
         lines.append(_Line("meta", hidden))
@@ -406,9 +432,16 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
                 continue
             for issue in result.issues:
                 where = f"[{issue.field}] " if issue.field else ""
-                suggestion = getattr(issue, "is_suggestion", False)
-                level = "error" if issue.is_error else ("not checked" if getattr(issue, "unchecked", False) else "suggestion" if suggestion else "warning")
-                item_status = FAILED if issue.is_error else (UNCHECKED if getattr(issue, "unchecked", False) else SUGGESTION if suggestion else WARNING)
+                if issue.is_error:
+                    level, item_status = "error", FAILED
+                elif issue.unchecked:
+                    level, item_status = "not checked", UNCHECKED
+                elif issue.is_likely_error:
+                    level, item_status = "likely error", LIKELY_ERROR
+                elif issue.is_suggestion:
+                    level, item_status = "suggestion", SUGGESTION
+                else:
+                    level, item_status = "warning", WARNING
                 if status in (UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED):
                     item_status = status
                 if item_status in hide:
@@ -452,7 +485,7 @@ def print_report(report: ValidationReport, *, alt_color: bool = False, console=N
             console.print()
             console.print(Text(line.text.upper(), style=f"bold {color} underline"))
         elif line.role == "check":
-            bold = "bold " if line.status in (FAILED, WARNING) else ""
+            bold = "bold " if line.status in (FAILED, LIKELY_ERROR, WARNING) else ""
             text = Text(pad)
             text.append(f"{_MARKS[line.status]} ", style=f"bold {color}")
             text.append(line.text, style=f"{bold}{color}")
@@ -565,7 +598,7 @@ def to_html(report: ValidationReport, *, alt_color: bool = False, hide: frozense
             body.append(f'<h2 style="color:{color};border-color:{color}">{_MARKS[line.status]} {text}</h2><ul>')
             open_list = True
         elif line.role == "check":
-            weight = "600" if line.status in (FAILED, WARNING) else "500"
+            weight = "600" if line.status in (FAILED, LIKELY_ERROR, WARNING) else "500"
             body.append(f'<li class="check" style="color:{color};font-weight:{weight}"><span class="mark">{_MARKS[line.status]}</span> {text}</li>')
         elif line.role == "item":
             body.append(f'<li class="item" style="color:{color}">{text}</li>')

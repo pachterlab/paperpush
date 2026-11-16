@@ -1,4 +1,4 @@
-"""Warn when the manuscript refers to a supplement omitted from the submission."""
+"""A likely error when the manuscript refers to a supplement omitted from the submission."""
 
 import pytest
 
@@ -34,16 +34,17 @@ def _run(path=None, *, supplement=SUPPLEMENT, values=None, disable=False):
     "Fig. S1", "Table S2", "Supplementary Figure 1", "Supplementary Table 2",
     "Extended Data Fig. 1", "in the supplement",
 ])
-def test_referenced_supplement_without_attachment_is_a_warning(tmp_path, reference):
+def test_referenced_supplement_without_attachment_is_a_likely_error(tmp_path, reference):
     path = tmp_path / "manuscript.txt"
     path.write_text(f"See {reference} for further details.\n")
     validation, check = _run(path)
-    assert check.status == report.WARNING
+    assert check.status == report.LIKELY_ERROR
     assert len(check.issues) == 1
     issue = check.issues[0]
     assert issue.field == "manuscript_file"
     assert "no supplementary files are attached" in issue.message
     assert " ".join(reference.split()).rstrip(".") in issue.message
+    assert issue.level == "likely_error"
     assert validation.ok  # A missing supplement is not a blocking error.
 
 
@@ -86,7 +87,7 @@ def test_document_formats(tmp_path, monkeypatch, suffix):
         path.write_text(r"\documentclass{article}\begin{document}" + text + r"\end{document}")
         monkeypatch.setattr(document.Document, "pdf", property(lambda self: None))
     _, check = _run(path)
-    assert check.status == report.WARNING
+    assert check.status == report.LIKELY_ERROR
 
 
 def test_unreadable_manuscript_is_unchecked(tmp_path):
@@ -106,3 +107,11 @@ def test_check_can_be_disabled(tmp_path):
     path.write_text("See Supplementary Material.\n")
     _, check = _run(path, disable=True)
     assert check.status == report.UNCHECKED
+
+
+def test_a_supplement_captioned_in_the_manuscript_itself_is_not_reported(tmp_path):
+    # An appendix carrying "Supplementary Figure 1" in the same file: nothing is missing.
+    path = tmp_path / "manuscript.txt"
+    path.write_text("Results are in Supplementary Figure 1.\n\nSupplementary Figure 1. Raw data for every sample.\n")
+    _, check = _run(path)
+    assert check.status == report.NOT_APPLICABLE

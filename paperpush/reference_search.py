@@ -42,6 +42,7 @@ stall validation.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -54,6 +55,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
+from .sensitive import LEVEL_LIKELY
 from .references import (
     MAX_TEXT_BYTES,
     TITLE_MATCH_RATIO,
@@ -97,6 +99,54 @@ def _rate_limit_wait(exc: urllib.error.HTTPError, n: int) -> float:
     except (TypeError, ValueError):
         asked = 2.0 * n
     return max(0.5, min(asked, RATE_LIMIT_MAX_WAIT))
+
+
+def _asked_wait(exc: urllib.error.HTTPError) -> float:
+    """The Retry-After a 429 asked for in seconds, 0 when it gave none (or gave a date)."""
+    try:
+        return float((exc.headers or {}).get("Retry-After", ""))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+# Set PAPERPUSH_LOOKUP_CACHE to a directory to keep every successful registry response
+# (Crossref, OpenAlex, arXiv, bioRxiv) on disk and answer the same query from there next
+# time: repeated runs on one manuscript (its .tex and its PDF, or validate after each fix)
+# then ask each registry once. Off by default; responses are keyed by URL, minus any API key.
+_LOOKUP_CACHE_ENV = "PAPERPUSH_LOOKUP_CACHE"
+
+
+def _lookup_cache_path(url: str, accept: str) -> Path | None:
+    root = os.environ.get(_LOOKUP_CACHE_ENV, "").strip()
+    if not root:
+        return None
+    parts = urllib.parse.urlsplit(url)
+    query = urllib.parse.urlencode([(k, v) for k, v in urllib.parse.parse_qsl(parts.query, keep_blank_values=True) if k not in ("api_key", "mailto")])
+    key = hashlib.sha256(f"{accept}\n{parts.scheme}://{parts.netloc}{parts.path}?{query}".encode()).hexdigest()
+    return Path(root).expanduser() / key[:2] / key
+
+
+def _lookup_cache_read(url: str, accept: str) -> bytes | None:
+    path = _lookup_cache_path(url, accept)
+    if path is None:
+        return None
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
+def _lookup_cache_write(url: str, accept: str, body: bytes) -> None:
+    path = _lookup_cache_path(url, accept)
+    if path is None:
+        return
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        tmp.write_bytes(body)
+        os.replace(tmp, path)  # atomic, so parallel runs never read half a file
+    except OSError as exc:
+        logger.debug("could not cache %s: %s", url, exc)
 # A service is given up on after this many consecutive failed requests.
 MAX_CONSECUTIVE_FAILURES = 3
 # Below TITLE_MATCH_RATIO but at least this similar is a near miss: maybe the
@@ -235,10 +285,14 @@ class _Service:
         self.delay = delay
         self.failures = 0
         self.down = False
+        self.throttled_out = 0  # requests still refused with 429 after every wait
         self._last = 0.0
 
     def get(self, url: str, accept: str = "application/json") -> bytes | None:
         """The response body, or None when the request failed (and is counted against the service)."""
+        cached = _lookup_cache_read(url, accept)
+        if cached is not None:
+            return cached
         if self.down or self.budget <= 0:
             return None
         self.budget -= 1
@@ -258,7 +312,18 @@ class _Service:
                 error: Exception = exc
                 if exc.code not in _RETRY_STATUS:
                     break
-                if exc.code == 429 and throttled < RATE_LIMIT_RETRIES:
+                if exc.code == 429:
+                    if throttled >= RATE_LIMIT_RETRIES:
+                        self.throttled_out += 1
+                    if _asked_wait(exc) > RATE_LIMIT_MAX_WAIT or self.throttled_out >= 2:
+                        # Told to come back later than we ever wait (a spent daily budget), or
+                        # refused through every wait twice: the rest of this run's queries would
+                        # only wait out the same refusal (~90 s each), so give up on it now.
+                        self.down = True
+                        logger.info("%s is rate limiting this client; leaving the rest of its lookups unchecked", self.name)
+                        break
+                    if throttled >= RATE_LIMIT_RETRIES:
+                        break
                     # Rate limited, not down: wait as long as asked rather than spend a retry.
                     throttled += 1
                     time.sleep(_rate_limit_wait(exc, throttled))
@@ -274,12 +339,13 @@ class _Service:
             self._last = time.monotonic()
             self.failures += 1
             logger.debug("%s request failed (%s): %s", self.name, exc, url)
-            if self.failures >= MAX_CONSECUTIVE_FAILURES:
+            if self.failures >= MAX_CONSECUTIVE_FAILURES and not self.down:
                 logger.info("%s stopped answering; leaving the rest of its lookups unchecked", self.name)
                 self.down = True
             return None
         self._last = time.monotonic()
-        self.failures = 0
+        self.failures = self.throttled_out = 0
+        _lookup_cache_write(url, accept, body)
         return body
 
     def get_json(self, url: str):
@@ -531,7 +597,13 @@ def _is_candidate(record: dict) -> bool:
     title = _title_of(record).strip()
     if any(isinstance(u, dict) and u.get("type") in _RETRACTION_NOTICES for u in record.get("update-to") or []):
         return False  # the notice itself, often titled "Retracted: ..." like the article
+    if str(record.get("type", "")).lower() == "reference-entry" and _PERSON_ENTRY_TITLE.match(title):
+        return False  # an encyclopedia's entry about a person ("Bonferroni, Carlo Emilio"), not their work
     return bool(title) and not _NOT_THE_WORK.match(title) and str(record.get("type", "")).lower() not in _NOT_WORK_TYPES
+
+
+# An encyclopedia entry titled with a person's name, family name first.
+_PERSON_ENTRY_TITLE = re.compile(r"^[A-Z][\w'\u00c0-\u017f-]+(?:\s+[A-Z][\w'\u00c0-\u017f-]+)?,\s*[A-Z][\w.'\u00c0-\u017f-]*(?:\s+[A-Z][\w.'\u00c0-\u017f-]*){0,3}$")
 
 
 def _prose_overlap(text: str, record: dict) -> float:
@@ -607,6 +679,12 @@ PROSE_STRONG_TITLE = 0.9
 PROSE_AUTHOR_SHARE = 0.5
 
 
+def _title_share_in(registered: str, own: str) -> float:
+    """Share of the registered title's significant words that the entry's own title holds."""
+    reg = set(_significant_words(_work_title(registered)))
+    return len(reg & set(_significant_words(_work_title(own)))) / len(reg) if reg else 0.0
+
+
 def _registered_families(record: dict) -> list[str]:
     out = []
     for a in record.get("author") or []:
@@ -659,6 +737,58 @@ def _entry_lead_author(text: str) -> str:
         return ""
     # "Smith, J." puts the family name first; "John Smith," last.
     return words[0] if re.match(r"\s*[^\s,]+,\s*[A-Z]\.?(?:\s|,|$)", text) else words[-1]
+
+
+def _entry_lead_given(text: str) -> tuple[str, str]:
+    """(given name, family name) of a reference-list entry's first author when it is written
+    given-name first ("Ethan Perez, ..."); ("", "") for "Perez, E." order or anything unclear."""
+    text = re.sub(r"^\s*(?:\[\d+\]|\d+[.)])\s*", "", text)
+    if re.match(r"\s*[^\s,]+,\s*[A-Z]\.?(?:\s|,|$)", text):
+        return "", ""
+    first = re.split(r",|\s+and\s+|\s+&\s+|\s+et\s+al\b|\.\s+(?=[A-Z][a-z])", text, maxsplit=1)[0].strip()
+    words = first.split()
+    if not 2 <= len(words) <= 4 or not all(w[:1].isupper() for w in words):
+        return "", ""
+    return _normalize_text(words[0]), _family(words[-1])
+
+
+def _registered_lead_given(record: dict) -> tuple[str, str]:
+    """(given name, family name) of the registered first person author, normalized; ("", "") if unknown."""
+    for a in record.get("author") or []:
+        if not isinstance(a, dict):
+            continue
+        family = a.get("family") or ""
+        given = a.get("given") or ""
+        if not given and a.get("literal") and family:
+            lit = a["literal"].strip()
+            given = lit[: -len(family)].strip() if lit.endswith(family) else ""
+        if family and given:
+            return _normalize_text(given), _family(family)
+        return "", ""
+    return "", ""
+
+
+def _lead_given_conflict(text: str, record: dict) -> str:
+    """A problem when the entry's first author has the work's first author's family name but a
+    different given name ("Ethan Perez" for Fabio Perez): the same surname, another person.
+    Compared by initial, so "J." and "John" or "Jurgen" and "Juergen" agree, and skipped when
+    the entry may have the name order reversed (its given name is the registered family name)."""
+    given, family = _entry_lead_given(text)
+    reg_given, reg_family = _registered_lead_given(record)
+    if not (given and reg_given and family and family == reg_family):
+        return ""
+    g, r = given.split()[0], reg_given.split()[0]
+    if g[0] == r[0] or g == reg_family or _family(r) == family:
+        return ""
+    # A preferred name among several given names ("Zhenyu Chen" for Dave Zhenyu Chen).
+    if g in reg_given.split():
+        return ""
+    # The work's first author named in full anywhere in the entry: the entry read here may be
+    # merged with the one before it ("... Haokun Lin ... Quantized LLMs. Ji Lin, Chuang Gan ...").
+    if re.search(rf"\b{re.escape(r)}\s+(?:[a-z]\s+)?{re.escape(reg_family)}\b", _normalize_text(text)):
+        return ""
+    # "Wen-tau" / "Wen tau" / "Wentau": initials of hyphenated given names agree already.
+    return f"{WRONG_AUTHORS}: its first author is {given.title()} {family.title()}, but the work's first author is {reg_given.title()} {reg_family.title()}"
 
 
 _INDEXED_VENUE = re.compile(r"\bIn\s*(?:Proc|Advances|International|Annual|The\s+\w+\s+(?:Conference|Workshop)|Conference|Findings|Workshop|Forty|Thirty|Twenty)|Proceedings|Conference|Transactions|Journal|\barXiv\b|Letters|\bNature\b|\bScience\b", re.IGNORECASE)
@@ -725,6 +855,11 @@ def _prose_problems(text: str, words: set[str], record: dict, title_score: float
         problems.append(f"{WRONG_AUTHORS}: {named}" if lead not in all_registered else f"the entry's co-authors differ from the work's: {named}")
     elif families and families[0] not in words and same_title:
         problems.append(f"the entry does not name the registered first author ({families[0]})")
+    if same_title and not any(p.startswith(WRONG_AUTHORS) for p in problems):
+        given = _lead_given_conflict(text, record)
+        if given:
+            # The right surname on another person outranks "the co-authors differ".
+            problems = [given] + [p for p in problems if not p.startswith("the entry's co-authors differ")]
     found_year = _year_value(_year_of(record))
     years = [int(y) for y in re.findall(r"\b(?:19|20)\d{2}\b", text)]
     if same_title and found_year and years and all(abs(y - found_year) > YEAR_TOLERANCE for y in years):
@@ -748,6 +883,18 @@ def match_text(ref: Reference, candidates: list[dict]) -> Lookup:
         # title can be read, it has to be that title.
         if _title_conflict(own_title, _title_of(c)):
             continue
+        # A readable title of five or more words that shares under half its words with the
+        # registered one is another work by the same people ("Type inference in the presence of
+        # first-class polymorphism" is not "Constraint-based type inference and parametric
+        # polymorphism"), however many of the registered title's words the entry holds.
+        # The title read from the entry can run on into the venue ("Visual instruction
+        # tuning.Advances in Neural ..."), so a registered title held almost whole in it still counts.
+        if len(_significant_words(own_title)) >= 5 and word_overlap(own_title, _title_of(c)) < 0.5 and _title_share_in(_title_of(c), own_title) < 0.9:
+            continue
+        # A record with no authors (a book chapter, proceedings front matter, a journal's annual
+        # index, a conference's name) has nothing to check the entry against but its title.
+        if not _registered_families(c) and not _same_title(own_title, _title_of(c)):
+            continue
         family = _family(_first_author_of(c))
         if not family or family in words:
             return Lookup(ref, MATCHED, record=c, problems=_prose_problems(ref.text, words, c, score))
@@ -770,6 +917,11 @@ def _same_authors(ref: Reference, record: dict) -> bool:
         return False
     if ref.text:
         words = set(_normalize_text(ref.text[:600]).split())
+        # Common surnames (Zhang, Yang, Li) turn up in any long author list, so the entry's own
+        # first author has to be the work's.
+        lead = _family(_entry_lead_author(ref.text))
+        if lead and lead != families[0]:
+            return False
         return families[0] in words and sum(f in words for f in families) >= max(1, len(families) // 2)
     return bool(ref.author) and _family(ref.author) == families[0]
 
@@ -785,6 +937,9 @@ def match_arxiv(ref: Reference, record: dict | None) -> Lookup:
         return Lookup(ref, MATCHED, record=record, source="arXiv", problems=[f'it cites arXiv:{ref.arxiv_id}, but that identifier is "{record["title"]}"'])
     if ref.text and not ref.title and _prose_overlap(ref.text, record) < PROSE_NEAR_OVERLAP and not same_people:
         return Lookup(ref, MATCHED, record=record, source="arXiv", problems=[f'it cites arXiv:{ref.arxiv_id}, but that identifier is "{record["title"]}"'])
+    given = _lead_given_conflict(ref.text, record) if ref.text else ""
+    if given:
+        return Lookup(ref, MATCHED, record=record, source="arXiv", problems=[f"it cites arXiv:{ref.arxiv_id}, but {given.split(': ', 1)[1]}"])
     return Lookup(ref, MATCHED, record=record, source="arXiv")
 
 
@@ -880,7 +1035,7 @@ def search_references(refs: list[Reference], *, services: _Services | None = Non
             lk.problems = []
         if lk.status == MATCHED and lk.problems:
             what = f"the closest registered work is {_describe(lk.record)}" if lk.record else ""
-            result.findings.append(Finding(lk.ref.where, "reference does not match a registered work", f"{lk.ref.label} looks wrong: {'; '.join(lk.problems)}" + (f"; {what}" if what and lk.source != "arXiv" else "") + ". Check it against the published work"))
+            result.findings.append(Finding(lk.ref.where, "reference does not match a registered work", f"{lk.ref.label} looks wrong: {'; '.join(lk.problems)}" + (f"; {what}" if what and lk.source != "arXiv" else "") + ". Check it against the published work", LEVEL_LIKELY))
         elif lk.status == NOT_FOUND and (lk.ref.indexed or (lk.confident_miss and claims_indexed_venue(lk.ref.text))):
             searched = lk.source or "Crossref"
             near = f" (the closest title found was {_describe(lk.candidates[0])})" if lk.candidates else ""
@@ -889,6 +1044,7 @@ def search_references(refs: list[Reference], *, services: _Services | None = Non
                     lk.ref.where,
                     "no registered work",
                     f'{lk.ref.label} ("{(lk.ref.title or _prose_title(lk.ref.text))[:120]}", {lk.ref.author or _entry_lead_author(lk.ref.text) or "no author"}, {lk.ref.year or "no year"}) matches no work in {searched}{near}. Check that it exists and its title is right; a reference that cannot be found may be fabricated',
+                    LEVEL_LIKELY,
                 )
             )
         elif lk.status == MATCHED and lk.source != "arXiv" and lk.record and lk.record.get("DOI"):

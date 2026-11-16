@@ -1413,7 +1413,8 @@ def test_validate_command_for_each_subfile(scenario, monkeypatch, capsys):
     ``tests/manuscript_files/...``) resolve during the file-existence checks.
     """
     monkeypatch.chdir(REPO_ROOT)
-    rc = main(["validate", str(scenario.path)])
+    # --no-report: the default report would land next to the committed sample.
+    rc = main(["validate", str(scenario.path), "--no-report"])
     out = capsys.readouterr().out
 
     assert rc == 0, out

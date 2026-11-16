@@ -127,8 +127,8 @@ on one. The same holds for a listed venue: where its own guidelines are silent a
 that rule applies as a warning. These options are refused for a ``.sub`` made
 for a listed venue.
 
-Relative paths are resolved against the working directory. ``-o`` with no path
-saves the report next to the first file named. ``--web`` needs a ``.sub``.
+Relative paths are resolved against the working directory. Without a ``.sub``,
+the report is saved next to the first file named. ``--web`` needs a ``.sub``.
 
 What it checks
 --------------
@@ -364,15 +364,20 @@ Arguments
    :ref:`vc-anonymity`.
 
 ``--initial-submission``
-   Validate the file as an initial submission: every error is reported as a
-   warning, so nothing blocks it, and the command exits 0. Meant for venues
+   Validate the file as an initial submission: every formatting error and
+   formatting likely error (a modified template) is reported as a warning, so
+   formatting rules that apply only from revision do not block it. Checks that
+   are not about format keep their level: identity leaks, hidden prompts,
+   fabricated references, plagiarism, an AI tool listed as an author, a cited
+   supplement that is not attached, trial registration, and ethics approval.
+   The command exits 1 if one of those errors remains, and 0 otherwise. Meant for venues
    whose guidelines let the initial submission be in any format (Nature and
    its sister journals, the Cell journals, PLOS Computational Biology, PNAS,
    Bioinformatics, Science Advances, ...; recorded as
    ``manuscript.initial_submission_any_format``). For those venues the report
    opens with a "Format for initial submission" note quoting the rule, with or
    without this flag. Used on a venue without such a rule it still turns
-   errors into warnings, and the note says the venue states no such rule.
+   formatting errors into warnings, and the note says the venue states no such rule.
    ``paperpush submit`` still validates normally. On the web page, the
    "initial submission (any format)" checkbox next to the Validate buttons
    does the same (it is greyed out for venues without the rule).
@@ -413,15 +418,20 @@ Arguments
    old (default 7) or lies in the future. See :ref:`vc-cover-letter`.
 
 ``-o [OUT]``, ``--output [OUT]``
-   Also save the report. PDF by default, which keeps the colors; a path ending
-   in ``.html``, ``.md``, or ``.txt`` saves that format instead. With no OUT,
-   writes ``<subfile>_validation.pdf`` next to the ``.sub``. Refuses to replace
-   an existing file (checked before any checks run) unless ``--overwrite`` is
-   given.
+   Where to save the report. The report is always saved unless you say
+   otherwise: without ``-o`` (or with ``-o`` and no OUT) it is written to
+   ``<subfile>_validation.pdf`` next to the ``.sub``, replacing the one an
+   earlier run saved there. OUT can be a path ending in ``.pdf`` (keeps the
+   colors), ``.html``, ``.md``, or ``.txt``, or a directory. An OUT that already
+   exists is not replaced (checked before any checks run) unless
+   ``--overwrite`` is given. ``-o none`` or ``-o ""`` saves nothing.
+
+``--no-report``
+   Do not save the report; only print it. The same as ``-o none``.
 
 ``--overwrite``
-   Replace the report file named by ``-o`` if it already exists. (``--force``
-   is accepted as an older name.)
+   Replace the file named by ``-o`` if it already exists. The default report
+   path is always replaced. (``--force`` is accepted as an older name.)
 
 ``--show-errors-only``
    Show only the failed checks and their errors. Overrides

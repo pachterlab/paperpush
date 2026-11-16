@@ -950,7 +950,7 @@ class ValidateRequest(BaseModel):
     check_links: bool = True
     check_references: bool = True
     anonymous: Optional[bool] = None
-    # Report every error as a warning (paperpush validate --initial-submission).
+    # Report every formatting error as a warning; integrity errors stay (paperpush validate --initial-submission).
     initial_submission: bool = False
     # Report every suggestion on style as a warning (paperpush validate --strict-style).
     strict_style: bool = False

@@ -173,9 +173,32 @@ def test_cli_takes_back_a_sub_swallowed_by_a_file_list(tmp_path, fig1_png, monke
     assert seen == {"path": str(sub), "figures": str(fig1_png), "files_only": False}
 
 
-def test_cli_saves_the_report_next_to_the_manuscript(manuscript_pdf, capsys):
-    assert main(["validate", "--manuscript", str(manuscript_pdf), "-o", "", *OFFLINE]) == 0
-    assert (manuscript_pdf.parent / f"{manuscript_pdf.stem}_validation.pdf").is_file()
+def test_cli_saves_the_report_next_to_the_manuscript_by_default(manuscript_pdf, capsys):
+    report = manuscript_pdf.parent / f"{manuscript_pdf.stem}_validation.pdf"
+    assert main(["validate", "--manuscript", str(manuscript_pdf), *OFFLINE]) == 0
+    assert report.is_file()
+    # A second run replaces the default report without --overwrite.
+    assert main(["validate", "--manuscript", str(manuscript_pdf), *OFFLINE]) == 0
+    # A bare -o means the default path too.
+    report.unlink()
+    assert main(["validate", "--manuscript", str(manuscript_pdf), "-o", *OFFLINE]) == 0
+    assert report.is_file()
+
+
+@pytest.mark.parametrize("flags", [["-o", ""], ["-o", "none"], ["-o", "None"], ["--no-report"]])
+def test_cli_can_save_no_report(manuscript_pdf, capsys, flags):
+    assert main(["validate", "--manuscript", str(manuscript_pdf), *flags, *OFFLINE]) == 0
+    assert not list(manuscript_pdf.parent.glob("*_validation.*"))
+    assert "Saved the report" not in capsys.readouterr().out
+
+
+def test_cli_does_not_replace_an_explicit_report_path_without_overwrite(manuscript_pdf, tmp_path, capsys):
+    out = tmp_path / "report.md"
+    out.write_text("keep me", encoding="utf-8")
+    assert main(["validate", "--manuscript", str(manuscript_pdf), "-o", str(out), *OFFLINE]) == 1
+    assert out.read_text(encoding="utf-8") == "keep me"
+    assert main(["validate", "--manuscript", str(manuscript_pdf), "-o", str(out), "--overwrite", *OFFLINE]) == 0
+    assert out.read_text(encoding="utf-8") != "keep me"
 
 
 def test_cli_web_needs_a_sub(manuscript_pdf, capsys):

@@ -1,0 +1,43 @@
+name: Validate benchmark
+
+# Scores `paperpush validate` against real papers whose findings were reviewed by
+# hand (tests/validate_benchmark/*.json): fails when a change brings back a false
+# alarm fixed earlier or loses a real finding. It downloads the papers from arXiv,
+# so it runs monthly and on demand, not on every push (see scripts/validate_benchmark.py).
+
+on:
+  schedule:
+    - cron: "0 6 1 * *"
+  workflow_dispatch: {}
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install paperpush (with dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # The papers are pinned to a version, so a cached PDF never goes stale.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/paperpush-benchmark
+          key: validate-benchmark-${{ hashFiles('tests/validate_benchmark/*.json') }}
+          restore-keys: validate-benchmark-
+
+      - name: Run the benchmark
+        run: python scripts/validate_benchmark.py -v --json benchmark.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validate-benchmark
+          path: benchmark.json

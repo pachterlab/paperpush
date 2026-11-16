@@ -328,19 +328,19 @@ def summary(result: ScanResult, opts: PlagiarismOptions) -> str:
 
 
 def check_text(text: str, opts: PlagiarismOptions, field_id: str = "manuscript"):
-    """``(issues, detail)`` for ``text``: warnings when the unaccepted similarity reaches the threshold."""
-    from .validate import WARNING, Issue
+    """``(issues, detail)`` for ``text``: a likely error when the unaccepted similarity reaches the threshold (each matching source listed as a warning under it), and for text that hides matches."""
+    from .validate import LIKELY_ERROR, WARNING, Issue
 
     result = scan(text, opts)
     issues: list = []
     score = result.unaccepted_score
     if score >= opts.threshold:
-        issues.append(Issue(WARNING, field_id, f"plagiarism: {score:g}% of the text matches other sources ({opts.name}); check that each match below is quoted and cited, or is your own earlier version (accept it with --plagiarism-accept URL)"))
+        issues.append(Issue(LIKELY_ERROR, field_id, f"plagiarism: {score:g}% of the text matches other sources ({opts.name}); check that each match below is quoted and cited, or is your own earlier version (accept it with --plagiarism-accept URL)"))
         for s in sorted(result.sources, key=lambda s: -s.percent):
             if s.accepted or s.percent < SOURCE_ISSUE_PERCENT:
                 continue
             example = f', e.g. "{_snippet(s.passages[0])}"' if s.passages else ""
             issues.append(Issue(WARNING, field_id, f"plagiarism: {s.percent:g}% matches {s.url}{' (' + s.title + ')' if s.title else ''}{example}"))
     for flag in result.flags:
-        issues.append(Issue(WARNING, field_id, f"plagiarism: {opts.name} found {flag} in the text, which can hide matching text from similarity checks"))
+        issues.append(Issue(LIKELY_ERROR, field_id, f"plagiarism: {opts.name} found {flag} in the text, which can hide matching text from similarity checks"))
     return issues, summary(result, opts)

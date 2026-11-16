@@ -1,0 +1,307 @@
+{
+  "description": "Recent arXiv cs.AI papers (Nov 2026) in ACL, ICML, MLSys, AAAI-like, and natbib layouts. Expected findings reviewed by hand against each paper's PDF and LaTeX source.",
+  "venue": "arxiv",
+  "papers": [
+    {
+      "arxiv": "2611.17338v1",
+      "title": "When Should LLM Agents Forget? (ACL style, author-year)",
+      "expected": [
+        {
+          "check": "citations.table",
+          "contains": "Table 1, 3, 4, 5, 6, 7, 8, 9, 11 are never cited",
+          "why": "main.tex references only tab:mab, tab:fullgrid (and figures); the other tables have no \\ref"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 2 has panels a, c",
+          "why": "the text cites only Figure 2b"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "'LLM'",
+          "why": "LLM is never spelled out"
+        }
+      ]
+    },
+    {
+      "arxiv": "2611.17339v1",
+      "title": "Hallucination detector audit (AAAI-like, numbered)",
+      "expected": [
+        {
+          "check": "citations.table",
+          "contains": "Table 1 is never cited",
+          "why": "the text's table numbers are off by one: it calls Table 1 'Table 2'"
+        },
+        {
+          "check": "citations.table",
+          "contains": "cites Table 4, but no such table",
+          "why": "only Tables 1-3 exist; 'Table 4 reports the ...' means Table 3"
+        },
+        {
+          "check": "bibliography.uncited",
+          "contains": [
+            "[2]",
+            "[5]",
+            "[7]"
+          ],
+          "why": "references 2, 5 and 7 are never cited in the body"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "used before they are spelled out",
+          "why": "AUROC and NLI are used before their definitions"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "the abstract uses without spelling out",
+          "why": "AUROC in the abstract"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "used but never spelled out",
+          "why": "ROUGE, LLM never spelled out"
+        }
+      ]
+    },
+    {
+      "arxiv": "2611.17340v1",
+      "title": "LoRAWeaver (ACL style, vector heatmap grid)",
+      "expected": [
+        {
+          "check": "figures.text_size",
+          "contains": "page 7, drawing 2",
+          "why": "3.1 pt labels in the main-text figure"
+        },
+        {
+          "check": "figures.text_size",
+          "contains": "page 22, drawings 1, 2, 3, 4, 5, 6",
+          "why": "1.4 pt heatmap tick labels"
+        },
+        {
+          "check": "figures.text_size",
+          "contains": "page 23, drawings 1, 2, 3, 4, 5, 6",
+          "why": "1.4 pt heatmap tick labels"
+        },
+        {
+          "check": "citations.figure",
+          "contains": "Figure 4 is cited before Figure 3",
+          "why": "text order"
+        },
+        {
+          "check": "citations.table",
+          "contains": "Table 3 is cited before Table 1",
+          "why": "'reported in Tables 3, 4, and 5' comes before 'Tables 1 and 2'"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "'IID'",
+          "why": "IID/OOD/FLAN only in legends and tables, never spelled out"
+        }
+      ]
+    },
+    {
+      "arxiv": "2611.17341v1",
+      "title": "Tabular Population Priors (ICML style, Surname-initials)",
+      "expected": [
+        {
+          "check": "citations.figure",
+          "contains": "Figure 1 is never cited",
+          "why": "no \\ref to the figure in the source"
+        },
+        {
+          "check": "citations.table",
+          "contains": "Table 4 is never cited",
+          "why": "tab:efficiency has no \\ref"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "the abstract uses without spelling out",
+          "why": "RAG and EHR in the abstract"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "used but never spelled out",
+          "why": "FAISS, LLM"
+        }
+      ]
+    },
+    {
+      "arxiv": "2611.17495v1",
+      "title": "Opaque Serial Depth (natbib author-year)",
+      "expected": [
+        {
+          "check": "front_matter.contact_email",
+          "contains": "gives no e-mail address",
+          "why": "no address anywhere in the paper"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "used but never spelled out",
+          "why": "GDM, NL, RL, ... never spelled out"
+        },
+        {
+          "check": "rigor.code_availability",
+          "contains": "links no code repository",
+          "why": "no repository or archive is linked"
+        }
+      ]
+    },
+    {
+      "arxiv": "2611.17501v1",
+      "title": "MXFP6 for R&R models (MLSys style, running heads)",
+      "expected": [
+        {
+          "check": "prose.acronyms",
+          "contains": "used before they are spelled out",
+          "why": "NE, MLP, DCPP used before definitions"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "used but never spelled out",
+          "why": "GEMM, FLOP, SIMD, ..."
+        },
+        {
+          "check": "rigor.code_availability",
+          "contains": "links no code repository",
+          "why": "no repository for the kernels is linked"
+        }
+      ]
+    },
+    {
+      "arxiv": "2611.17515v1",
+      "title": "Bank-agent framing experiments (Chicago author-date, n.d. entries)",
+      "expected": [
+        {
+          "check": "citations.figure",
+          "contains": "Figure 2 is cited before Figure 1",
+          "why": "Figure 2 is cited in Section 5; Figure 1 first in a later section"
+        },
+        {
+          "check": "citations.figure",
+          "contains": "Figure 4 is never cited",
+          "why": "Figure 4 has a caption and no citation"
+        },
+        {
+          "check": "citations.table",
+          "contains": "Table 8 is never cited",
+          "why": "Table 8 has a caption and no citation"
+        },
+        {
+          "check": "front_matter.contact_email",
+          "contains": "gives no e-mail address",
+          "why": "no address in the paper"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "'LLM'",
+          "why": "LLM is never spelled out (UBS and P&L in the same message are names)"
+        },
+        {
+          "check": "rigor.code_availability",
+          "contains": "links no code repository",
+          "why": "no repository is linked"
+        }
+      ]
+    },
+    {
+      "arxiv": "2611.17524v1",
+      "title": "Model annealing (IEEE, Fig. N. captions under legends)",
+      "expected": [
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 1 has panel b",
+          "why": "the text cites only Fig. 1(a)"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "'KL'",
+          "why": "KL and CE are never spelled out ('AB' in the same message is Alberta in an affiliation: a known imprecision)"
+        }
+      ]
+    },
+    {
+      "arxiv": "2611.17532v1",
+      "title": "Astrocyte drift detection (numbered, kerned 'T able')",
+      "expected": [
+        {
+          "check": "prose.acronyms",
+          "contains": "'RS'",
+          "why": "RS is never spelled out ('WL' in the same message is an author's initials)"
+        },
+        {
+          "check": "rigor.code_availability",
+          "contains": "links no code repository",
+          "why": "no repository is linked"
+        }
+      ]
+    },
+    {
+      "arxiv": "2611.17539v1",
+      "title": "pXRD structure agents (natbib, appendix before references)",
+      "expected": [
+        {
+          "check": "figures.dpi",
+          "contains": "page 11, image 1 is 143 dpi",
+          "why": "546 px placed 97 mm wide"
+        },
+        {
+          "check": "figures.dpi",
+          "contains": "page 18, image 1 is 132 dpi",
+          "why": "322 px placed 62 mm wide"
+        },
+        {
+          "check": "figures.text_size",
+          "contains": "page 3, drawing 1",
+          "why": "3.6 pt axis labels"
+        },
+        {
+          "check": "citations.figure",
+          "contains": "Figure 11 is cited before Figure 4",
+          "why": "Figure 11 is cited in Section 4 before Figure 4"
+        },
+        {
+          "check": "citations.figure",
+          "contains": "Figure 12 is never cited",
+          "why": "caption only"
+        },
+        {
+          "check": "citations.table",
+          "contains": "Table 2, 3, 12, 13, 14, 15, 16, 20, 21 are never cited",
+          "why": "captions only"
+        },
+        {
+          "check": "citations.panels",
+          "contains": "Fig. 3 has panels c, d",
+          "why": "the text cites Figure 3a and 3(b) only"
+        },
+        {
+          "check": "prose.repeated_words",
+          "contains": "contain contain",
+          "why": "'can contain / contain multiple phases' across a line break"
+        },
+        {
+          "check": "prose.spelling",
+          "contains": "'belows'",
+          "why": "'is belows tol.'"
+        },
+        {
+          "check": "prose.acronyms",
+          "contains": "'LLM'",
+          "why": "LLM, CIF, ... never spelled out"
+        },
+        {
+          "check": "prose.usage",
+          "contains": "each system were",
+          "why": "agreement slip in the text"
+        }
+      ],
+      "tolerated": [
+        {
+          "check": "prose.spelling",
+          "contains": "'unparseable'",
+          "why": "reported in the same message as 'belows'; 'unparseable' is a common variant spelling that codespell lists"
+        }
+      ]
+    }
+  ]
+}

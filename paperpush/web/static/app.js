@@ -1695,7 +1695,7 @@
     return (state.plan ? state.plan.initial_submission_rule : state.venue.initial_submission_rule) || "";
   }
 
-  // The live checks with every error turned into a warning, as
+  // The live checks (the form only, so formatting) with every error turned into a warning, as
   // `paperpush validate --initial-submission` does on the server.
   function asInitialSubmission(live) {
     const soften = (i) => (i.level === "error" ? { ...i, level: "warning" } : i);
@@ -1713,7 +1713,7 @@
     box.disabled = !rule;
     box.checked = state.initialSubmission;
     const message = rule
-      ? `Show every error as a warning. ${rule}`
+      ? `Show formatting errors as warnings (integrity problems still count). ${rule}`
       : `${state.venue ? state.venue.name : "This venue"}'s guidelines do not let the initial submission be in any format.`;
     wrap.dataset.tooltip = message;
     wrap.setAttribute("aria-label", message);
@@ -1735,7 +1735,7 @@
     const server = {};
     if (state.results && !state.resultsStale) {
       for (const c of state.results.checks) {
-        if (c.group === "live" || !["failed", "warning", "suggestion"].includes(c.status)) continue;
+        if (c.group === "live" || !["failed", "likely_error", "warning", "suggestion"].includes(c.status)) continue;
         for (const i of c.issues) if (i.field) (server[i.field] ||= []).push(i);
       }
     }
@@ -1743,7 +1743,7 @@
       const live = (state.live.byField[fid] || []).filter((i) => i.check !== "form.required" || state.showRequired || touchedFields.has(fid));
       const all = [...live, ...(server[fid] || [])];
       const list = $(".field-issues", w.card);
-      list.replaceChildren(...all.map((i) => el("li", { class: i.level === "error" ? "error" : i.level === "suggestion" ? "suggestion" : "warning", text: i.message })));
+      list.replaceChildren(...all.map((i) => el("li", { class: i.level === "error" ? "error" : i.level === "likely_error" ? "likely" : i.level === "suggestion" ? "suggestion" : "warning", text: i.message })));
       w.card.querySelectorAll(".input").forEach((n) => n.classList.toggle("invalid", live.some((i) => i.level === "error")));
       w.issues = all;
     }
@@ -1751,12 +1751,13 @@
   }
 
   // One status per field, shown as the card's coloured edge and the menu
-  // dot: red for an error, orange for a warning, yellow for a value autofill
+  // dot: red for an error, orange for a likely error, amber for a warning, yellow for a value autofill
   // wants read over, green for filled, hollow grey for empty. A suggestion on
   // style leaves the field green: it is listed, but nothing needs fixing.
-  const STATUS_CLASSES = ["st-ok", "st-warn", "st-issue", "st-review", "st-empty", "st-pending"];
+  const STATUS_CLASSES = ["st-ok", "st-warn", "st-likely", "st-issue", "st-review", "st-empty", "st-pending"];
   function fieldStatus(value, issues, review) {
     if (issues.some((i) => i.level === "error")) return "st-issue";
+    if (issues.some((i) => i.level === "likely_error" && !i.unchecked)) return "st-likely";
     if (issues.some((i) => i.level !== "suggestion")) return "st-warn";
     if (!String(value || "").trim()) return "st-empty";
     return review ? "st-review" : "st-ok";
@@ -1824,16 +1825,18 @@
     }
     // Once a file is removed or replaced, the last validation's tally no
     // longer describes the files: show none until Validate runs again.
-    const c = state.filesChanged ? { passed: 0, failed: 0, warning: 0, suggestion: 0, needs_ai: 0 } : r.counts;
-    const ran = c.passed + c.failed + c.warning + (c.suggestion || 0);
+    const c = state.filesChanged ? { passed: 0, failed: 0, likely_error: 0, warning: 0, suggestion: 0, needs_ai: 0 } : r.counts;
+    const likely = c.likely_error || 0;
+    const ran = c.passed + c.failed + likely + c.warning + (c.suggestion || 0);
     $("#stat-checks").textContent = `${c.passed}/${ran}`;
     $("#stat-checks-label").textContent = state.resultsStale ? "checks passed (out of date)" : "checks passed";
-    const cls = state.resultsStale ? "stale" : c.failed ? "bad" : c.warning ? "partial" : "good";
+    const cls = state.resultsStale ? "stale" : c.failed ? "bad" : likely ? "likely" : c.warning ? "partial" : "good";
     tile.className = `stat jump ${cls}`;
-    setStatus(item, state.resultsStale ? "st-pending" : c.failed ? "st-issue" : c.warning ? "st-warn" : "st-ok");
+    setStatus(item, state.resultsStale ? "st-pending" : c.failed ? "st-issue" : likely ? "st-likely" : c.warning ? "st-warn" : "st-ok");
     const tiles = [
       ["good", c.passed, "passed"],
       [c.failed ? "bad" : "", c.failed, "failed"],
+      ...(likely ? [["likely", likely, "likely errors"]] : []),
       [c.warning ? "partial" : "", c.warning, "warnings"],
       [c.suggestion ? "suggest" : "", c.suggestion || 0, "suggestions"],
       [c.needs_ai ? "ai" : "", c.needs_ai || 0, "need AI"],
@@ -1849,8 +1852,8 @@
     ["ai", "Checked only with AI", "Judgements that need someone to read the files: lettering in raster figures, free-text guideline rules, whether every field says what the manuscript says. Run them with “Validate, extended with AI”."],
     ["manual", "Not checked by paperpush", "Rules in the guidelines paperpush has no check for yet. Check these yourself."],
   ];
-  const MARKS = { passed: "✔", failed: "✖", warning: "▲", suggestion: "✎", unchecked: "?", needs_ai: "?", not_implemented: "–", not_applicable: "·", pending: "○" };
-  const STATUS_WORDS = { suggestion: "style", unchecked: "could not run", needs_ai: "needs AI", not_implemented: "check by hand" };
+  const MARKS = { passed: "✔", failed: "✖", likely_error: "◆", warning: "▲", suggestion: "✎", unchecked: "?", needs_ai: "?", not_implemented: "–", not_applicable: "·", pending: "○" };
+  const STATUS_WORDS = { likely_error: "likely error: confirm", suggestion: "style", unchecked: "could not run", needs_ai: "needs AI", not_implemented: "check by hand" };
 
   // The checks of one block, each with the status to show (grey "pending"
   // until there is a result for it).
@@ -1878,7 +1881,7 @@
 
   function checkItem(c) {
     const status = c.status;
-    const cls = { passed: "st-passed", failed: "st-failed", warning: "st-warning", suggestion: "st-suggestion", unchecked: "st-unchecked", needs_ai: "st-needs-ai", not_applicable: "st-na" }[status] || "";
+    const cls = { passed: "st-passed", failed: "st-failed", likely_error: "st-likely", warning: "st-warning", suggestion: "st-suggestion", unchecked: "st-unchecked", needs_ai: "st-needs-ai", not_applicable: "st-na" }[status] || "";
     const tag = c.source === "ai" ? el("span", { class: "tag", text: "AI" }) : null;
     const word = STATUS_WORDS[status] ? el("span", { class: "cat", text: STATUS_WORDS[status] }) : null;
     const head = [el("span", { class: "mk", "aria-hidden": "true", text: MARKS[status] || "○" }), el("span", { class: "ttl", text: c.title }), tag, word, el("span", { class: "cat", text: c.category })];
@@ -1894,7 +1897,7 @@
         i.field && state.fields.has(i.field) ? ": " : "",
         i.message))) : null,
     );
-    return el("details", { class: `check ${cls}`, "data-check": c.id, open: status === "failed" || status === "unchecked" || (status === "warning" && issues.length <= 6) ? true : null },
+    return el("details", { class: `check ${cls}`, "data-check": c.id, open: status === "failed" || status === "likely_error" || status === "unchecked" || (status === "warning" && issues.length <= 6) ? true : null },
       el("summary", {}, ...head), body);
   }
 
@@ -1904,7 +1907,7 @@
     const rule = initialRule();
     if (rule) {
       root.append(el("p", { class: "initial-notice" }, el("b", { text: "Format for initial submission: " }), rule,
-        state.initialSubmission ? " Errors are shown as warnings (initial submission is ticked)." : " Tick “initial submission (any format)” to show errors as warnings."));
+        state.initialSubmission ? " Formatting errors are shown as warnings (initial submission is ticked); integrity problems still count." : " Tick “initial submission (any format)” to show formatting errors as warnings."));
     }
     if ($("#toc").children.length) renderCheckStatus();
     if (state.results && state.resultsStale) {
@@ -1915,8 +1918,13 @@
       const ok = state.results.ok;
       const errors = state.results.checks.filter((c) => c.status === "failed").length;
       const downgraded = state.results.downgraded || 0;
-      if (downgraded) root.append(el("p", { class: "verdict partial", text: `▲ Ready as an initial submission: ${plural(downgraded, "error")} shown as warnings. Fix them before the revision.` }));
-      else root.append(el("p", { class: `verdict ${ok ? "ok" : "bad"}`, text: ok ? "✔ No blocking errors. Read any warnings, then submit." : `✖ Not ready: ${plural(errors, "check")} failed. Fix them before submitting.` }));
+      // Integrity errors are not downgraded, so "ready" needs no errors left.
+      if (downgraded && ok) root.append(el("p", { class: "verdict partial", text: `▲ Ready as an initial submission: ${plural(downgraded, "formatting problem")} shown as warnings. Fix them before the revision.` }));
+      else {
+        const likely = state.results.checks.filter((c) => c.status === "likely_error").length;
+        if (ok && likely) root.append(el("p", { class: "verdict likely", text: `◆ No blocking errors, but ${plural(likely, "check")} found a likely error. Each would be serious if real: confirm them before submitting.` }));
+        else root.append(el("p", { class: `verdict ${ok ? "ok" : "bad"}`, text: ok ? "✔ No blocking errors. Read any warnings, then submit." : `✖ Not ready: ${plural(errors, "check")} failed. Fix them before submitting.` }));
+      }
     }
     for (const [group, title, hint] of BLOCKS) {
       const checks = blockChecks(group);
@@ -1926,10 +1934,11 @@
       }
       const shown = checks.filter((c) => c.status !== "not_applicable");
       const na = checks.filter((c) => c.status === "not_applicable");
-      const done = shown.filter((c) => ["passed", "failed", "warning", "suggestion"].includes(c.status));
+      const done = shown.filter((c) => ["passed", "failed", "likely_error", "warning", "suggestion"].includes(c.status));
       // A suggestion counts as passed: nothing in it needs fixing.
       const counts = done.length ? `${done.filter((c) => c.status === "passed" || c.status === "suggestion").length} of ${shown.length} passed` : plural(shown.length, "check");
       const worst = shown.some((c) => c.status === "failed") ? "st-failed"
+        : shown.some((c) => c.status === "likely_error") ? "st-likely"
         : shown.some((c) => c.status === "warning") ? "st-warning"
           : shown.length && done.length === shown.length ? "st-passed" : "st-pending";
       root.append(el("div", { class: `check-group ${worst}`, "data-group": group },

@@ -227,6 +227,17 @@ def _strip_comments(text: str) -> str:
     return "\n".join(out)
 
 
+# Spacing tweaks a reviewer is unlikely to notice: reported as warnings. Every other
+# source edit (page geometry, margins, line spacing, body font, space-saving packages)
+# changes the template visibly and is a likely error.
+_MINOR_SKIPS = ("parskip", "abovedisplayskip", "belowdisplayskip", "textfloatsep", "floatsep", "intextsep", "abovecaptionskip", "belowcaptionskip")
+
+
+def is_minor_source_problem(problem: str) -> bool:
+    """True for a :func:`source_problems` sentence about a small spacing tweak, not the page layout."""
+    return problem.startswith("uses negative \\vspace") or any(problem.startswith(f"changes \\{skip} ") for skip in _MINOR_SKIPS)
+
+
 def source_problems(text: str) -> Iterator[str]:
     """Template-changing edits in one LaTeX source file, as sentences."""
     body = _strip_comments(text)

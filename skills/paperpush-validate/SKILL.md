@@ -56,8 +56,9 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
   The same goes for a `.sub` whose manuscript is one form while the other is
   in the directory. Never validate only the PDF because it is "what will be
   submitted".
-- Whether they want the report saved, and where (default: none; `-o` with no
-  path writes `<sub stem>_validation.pdf` next to the `.sub`). Mention
+- Where they want the report saved. `validate` saves it by default as
+  `<sub stem>_validation.pdf` next to the `.sub`; `-o <path>` saves it
+  elsewhere, and `--no-report` saves nothing. Mention
   `--colorblind` if they ask for color-blind-friendly colors.
 - Whether this is an initial submission, if the venue accepts an initial
   submission in any format (the report's "Format for initial submission" note;
@@ -227,8 +228,10 @@ guess failed.
    ```
 
    (MCP alternative: `validate_subfile(subfile, ai_results=[...], output=...)`.)
-   Your verdicts appear marked "(AI)". A failed AI check is a warning, never a
-   blocking error; a `suggest` verdict is a suggestion.
+   Your verdicts appear marked "(AI)". A failed AI check never blocks: it is a
+   likely error for the checks where a real failure is critical (unverified
+   references, the template, trial registration, ethics approval) and a warning
+   for the rest; a `suggest` verdict is a suggestion.
 
    If the user asks for the AI checks only, add `--ai-only` to both commands
    (MCP: `ai_only=true`): the report then lists just the AI checks and gives
@@ -236,7 +239,10 @@ guess failed.
    the deterministic checks too.
 
 4. **Summarize for the user**, in this order: blocking errors (must fix),
-   warnings (deterministic first, then AI), what could not be checked and why
+   likely errors (status `likely_error`, orange ◆: each would be critical if
+   real, such as an identity leak or a fabricated reference, so ask the author
+   to confirm or fix every one before submitting), warnings (deterministic
+   first, then AI), what could not be checked and why
    (could not run / not implemented), suggestions on style (one line with the
    count and the check ids, unless the user asks for them; the JSON and a
    saved report list them, and so does the terminal with `--suggestions`),

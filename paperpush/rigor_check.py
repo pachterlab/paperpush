@@ -47,7 +47,7 @@ from typing import Optional
 from .ai_validate import AiTask
 from .database import Venue
 from .requirements import get_requirements, notes_mention, resolve
-from .validate import SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .validate import LIKELY_ERROR, SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -681,7 +681,7 @@ def _trial_registration_check(venue: Venue, values: dict[str, str]) -> Outcome:
     if reason is None:
         raise NotApplicable("the manuscript does not report a clinical trial")
     gap = "it mentions trial registration but gives no registry ID" if _REGISTRY_NAMED.search(body) else "no trial registry ID was found"
-    return Outcome([Issue(WARNING, texts[0][0], f"{reason}, but {gap} (for example NCT01234567 or ISRCTN12345678). ICMJE journals require trials to be registered and the number given in the manuscript; ignore this if the manuscript does not report a trial")], "no registry ID found")
+    return Outcome([Issue(LIKELY_ERROR, texts[0][0], f"{reason}, but {gap} (for example NCT01234567 or ISRCTN12345678). ICMJE journals require trials to be registered and the number given in the manuscript; ignore this if the manuscript does not report a trial")], "no registry ID found")
 
 
 # ---------------------------------------------------------------------------

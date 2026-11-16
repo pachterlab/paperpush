@@ -301,9 +301,13 @@ def is_personal_email(address: str) -> bool:
     return domain in PERSONAL_EMAIL_DOMAINS or bool(_PERSONAL_EMAIL_BRANDS.match(domain))
 
 
+# Several authors' addresses on one domain: "{a.smith, b.jones}@uni.ac.uk" (or "(...)@").
+_GROUPED_EMAIL = re.compile(r"[{(][\w.+\-,;\s]{1,300}[})]\s?@[\w-]+(?:\.[\w-]+)+")
+
+
 def emails_in(text: str) -> list[str]:
     """E-mail addresses written in ``text`` (as LaTeX ``\\email{}``, plain, or spelled out)."""
-    found = EMAIL.findall(text) + _TEX_EMAIL.findall(text)
+    found = EMAIL.findall(text) + _TEX_EMAIL.findall(text) + _GROUPED_EMAIL.findall(text)
     if not found:
         found = [m for m in _SPELLED_EMAIL.findall(text) if re.search(r"\b(?:edu|org|com|ac|gov|net|de|uk|fr|cn|jp|ca)\b", m, re.IGNORECASE)]
     return list(dict.fromkeys(found))

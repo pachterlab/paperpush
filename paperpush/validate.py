@@ -42,6 +42,9 @@ from .subfile import SubFile
 logger = logging.getLogger(__name__)
 
 ERROR = "error"
+# Serious and probably real, but not certain: reported with the errors, and it is a
+# warning for the verdict (it does not block submission on its own).
+LIKELY_ERROR = "likely_error"
 WARNING = "warning"
 # A stylistic finding a reasonable editor could leave as it is (repetitive
 # word choice, a spelled-out number): reported, but it never makes a check a
@@ -76,6 +79,10 @@ class Issue:
     @property
     def is_error(self) -> bool:
         return self.level == ERROR
+
+    @property
+    def is_likely_error(self) -> bool:
+        return self.level == LIKELY_ERROR
 
     @property
     def is_suggestion(self) -> bool:
@@ -774,7 +781,7 @@ def _upload_paths_or_skip(venue: Venue, values: dict[str, str]) -> list[Path]:
 
 
 def _findings_to_issues(findings) -> list[Issue]:
-    """Turn scanner :class:`~paperpush.sensitive.Finding` objects into WARNINGs.
+    """Turn scanner :class:`~paperpush.sensitive.Finding` objects into issues at each finding's level (WARNING unless it says otherwise).
 
     A file-scoped finding names its file in the message (``... (in main.tex)``);
     a submission-level one (``where == "submission"``) is shown as-is.
@@ -784,10 +791,11 @@ def _findings_to_issues(findings) -> list[Issue]:
     issues: list[Issue] = []
     for finding in findings:
         not_scanned = finding.category == NOT_SCANNED
+        level = getattr(finding, "level", WARNING)
         if finding.where and finding.where != "submission":
-            issues.append(Issue(WARNING, "", f"{finding.detail} (in {finding.where})", unchecked=not_scanned))
+            issues.append(Issue(level, "", f"{finding.detail} (in {finding.where})", unchecked=not_scanned))
         else:
-            issues.append(Issue(WARNING, "", finding.detail, unchecked=not_scanned))
+            issues.append(Issue(level, "", finding.detail, unchecked=not_scanned))
     return issues
 
 
@@ -1058,9 +1066,9 @@ def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     ``arxiv_latex_cleaner``. (Reachability of the links it *does* cite is a
     separate, on-by-default check; see :func:`_link_issues`.)
 
-    Findings are advisory (WARNING) -- they surface what would become public
-    alongside the paper so the author can act, but they never block a
-    submission. This is opt-in because reading and text-extracting every
+    Findings never block a submission. Credentials and study participants'
+    personal data are LIKELY_ERRORs (a leak would be serious, but the patterns
+    can match harmless text); the rest are WARNINGs. This is opt-in because reading and text-extracting every
     attachment is more work than the generic field checks.
     """
     from . import sensitive
@@ -1102,14 +1110,24 @@ def _anonymity_issues(venue: Venue, values: dict[str, str], *, check_repos: bool
     return _findings_to_issues(anonymity.scan_submission(paths, terms, field_texts, check_repos=check_repos))
 
 
+def _hidden_text_level(finding) -> str:
+    """ERROR for a hidden prompt, LIKELY_ERROR for a visible one (it may quote an example), else WARNING."""
+    from . import hidden_text
+
+    if finding.is_error:
+        return ERROR
+    return LIKELY_ERROR if finding.category == hidden_text.VISIBLE_INJECTION else WARNING
+
+
 def _hidden_text_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     """Flag text a reader cannot see, above all prompts aimed at AI reviewers.
 
     Scans every PDF, LaTeX source, and Word upload for white, invisible,
     microscopic, or off-page text (see :mod:`paperpush.hidden_text`). Hidden
     text that instructs a reviewer or language model is an ERROR -- conferences
-    treat it as an ethics violation -- and other hidden prose, or visible text
-    addressed to an AI reviewer, is a WARNING. Runs by default (disable with
+    treat it as an ethics violation --, visible text addressed to an AI reviewer
+    is a LIKELY_ERROR (it may be a quoted example), and other hidden prose is a
+    WARNING. Runs by default (disable with
     ``--disable-integrity.hidden_text``); makes no network requests.
     """
     from . import hidden_text, pdf_layout
@@ -1118,7 +1136,7 @@ def _hidden_text_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     logger.info("Checking %d upload file(s) for hidden text (%s)", len(paths), venue.slug)
     issues: list[Issue] = []
     for finding in hidden_text.scan_paths(paths):
-        level = ERROR if finding.is_error else WARNING
+        level = _hidden_text_level(finding)
         issues.append(Issue(level, "", f"{finding.detail} (in {finding.where})", unchecked=finding.category == hidden_text.NOT_SCANNED))
     if not pdf_layout.available():
         pdfs = [path.name for path in paths if path.suffix.lower() == ".pdf"]
@@ -1181,7 +1199,7 @@ def _plagiarism_issues(venue: Venue, values: dict[str, str], options) -> "Outcom
 
     Opt-in (``--plagiarism``); sends the text, without its reference list, to
     the service. The score and the matching sources are always reported, in the
-    check's note; reaching the threshold is a warning.
+    check's note; reaching the threshold is a likely error.
     """
     from . import plagiarism_check
     from .manuscript import manuscript_text, without_reference_list
@@ -1312,6 +1330,8 @@ def _status_for(issues: list[Issue]) -> str:
 
     if any(i.is_error for i in issues):
         return report.FAILED
+    if any(i.is_likely_error and not i.unchecked for i in issues):
+        return report.LIKELY_ERROR
     if any(i.is_warning and not i.unchecked for i in issues):
         return report.WARNING
     if any(i.is_suggestion for i in issues):
@@ -1742,7 +1762,12 @@ def validate_report(
     give comma-separated names or the path of a text file listing them.
 
     ``initial_submission`` validates the file as an initial submission: every
-    error is reported as a warning instead, so nothing blocks it. It is meant
+    formatting error and likely error (a modified template, say) is reported
+    as a warning instead. The checks that are not about format
+    (:data:`NOT_FORMAT_CHECKS`: identity leaks, hidden prompts, fabricated
+    references, plagiarism, an AI tool as author, a missing supplement, trial
+    registration, ethics approval) keep their errors and likely errors, since
+    no initial submission may have them. It is meant
     for venues whose guidelines let the initial submission be in any format
     (``manuscript.initial_submission_any_format``); that rule is put on the
     report (``initial_submission_rule``) whether or not the flag is set.
@@ -2002,10 +2027,35 @@ def _set_scope(result, venue: Venue, values: dict[str, str], files_only: bool, n
         result.files = [str(p) for p in _iter_upload_paths(venue, values)]
 
 
-def downgrade_errors(results: list) -> int:
-    """Turn every error in ``results`` into a warning, in place; return how many.
+# Checks that are not about format: an initial submission in any format still
+# may not leak the authors' identity, hide prompts, cite fabricated work,
+# plagiarize, list an AI tool as an author, leave out the supplement it cites,
+# or report a trial or human/animal study without registration or ethics
+# approval. --initial-submission leaves their errors and likely errors as they
+# are; every other check is formatting, and its errors and likely errors (a
+# modified template, say) become warnings.
+NOT_FORMAT_CHECKS = (
+    "integrity.",
+    "guidelines.ai_policy",
+    "ai.unverified_references",
+    "citations.supplementary_attachments",
+    "rigor.trial_registration",
+    "ai.rigor.trial_registration",
+    "ai.details.ethics",
+)
 
-    A failed check becomes a warning check. Used by ``--initial-submission``.
+
+def is_format_check(check_id: str) -> bool:
+    return not check_id.startswith(NOT_FORMAT_CHECKS)
+
+
+def downgrade_errors(results: list) -> int:
+    """Turn the errors and likely errors of formatting checks into warnings, in place; return how many.
+
+    Used by ``--initial-submission``: the venue lets the first submission be
+    in any format, so its formatting rules do not apply yet. The checks in
+    :data:`NOT_FORMAT_CHECKS` (integrity, ethics, a cited supplement) are left
+    as they are.
     """
     from dataclasses import replace
 
@@ -2013,10 +2063,13 @@ def downgrade_errors(results: list) -> int:
 
     count = 0
     for result in results:
-        if any(i.is_error for i in result.issues):
-            count += sum(1 for i in result.issues if i.is_error)
-            result.issues = [replace(i, level=WARNING) if i.is_error else i for i in result.issues]
-        if result.status == report.FAILED:
+        if not is_format_check(result.id):
+            continue
+        serious = [i for i in result.issues if i.is_error or (i.is_likely_error and not i.unchecked)]
+        if serious:
+            count += len(serious)
+            result.issues = [replace(i, level=WARNING) if i in serious else i for i in result.issues]
+        if result.status in (report.FAILED, report.LIKELY_ERROR):
             result.status = report.WARNING
     return count
 

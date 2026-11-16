@@ -177,6 +177,57 @@ _TEX_BREAK = r"\\(?:part|chapter|section|subsection|subsubsection|paragraph|subp
 _TEX_NO_PROSE_ENVS = r"(?:equation|align|gather|multline|eqnarray|displaymath|math|verbatim|lstlisting|minted|tabular|tabularx|longtable|tikzpicture|algorithmic|algorithm2e|filecontents|comment)\*?"
 
 
+# Commands whose (nested) brace argument is settings, not prose: TikZ and pgfplots styles, listings setup.
+_TEX_SETTINGS = re.compile(r"\\(?:tikzset|pgfplotsset|pgfkeys|lstset|sisetup|tcbset)\s*\{")
+
+
+def _closing(text: str, start: int, open_: str, close: str) -> int:
+    """Index just past the ``close`` that matches the ``open_`` before ``start``, or -1."""
+    depth = 1
+    i = start
+    while i < len(text):
+        c = text[i]
+        if c == "\\":
+            i += 2
+            continue
+        if c == open_:
+            depth += 1
+        elif c == close:
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return -1
+
+
+def _tex_set_aside(text: str) -> str:
+    """``text`` with settings and ICML-style ``\\twocolumn[...]`` title blocks masked, and footnotes moved to the end.
+
+    A footnote is a paragraph of its own; left in place it would split the sentence around it,
+    and a bracket opened before it and closed after it ("(... like this.\\footnote{...} ...)").
+    """
+    notes: list[str] = []
+    out: list[str] = []
+    pos = 0
+    pattern = re.compile(r"\\footnote\s*(?:\[[^\]]*\])?\s*\{|\\twocolumn\s*\[|" + _TEX_SETTINGS.pattern)
+    while True:
+        m = pattern.search(text, pos)
+        if m is None:
+            break
+        bracket = m.group(0).endswith("[")
+        end = _closing(text, m.end(), "[" if bracket else "{", "]" if bracket else "}")
+        if end == -1:
+            break
+        out.append(text[pos: m.start()])
+        if m.group(0).startswith("\\footnote"):
+            notes.append(text[m.end(): end - 1])
+        else:
+            out.append(_MASK)
+        pos = end
+    out.append(text[pos:])
+    return "".join(out) + "".join(f"\n\n{note}\n\n" for note in notes)
+
+
 def _tex_paragraphs(source: str) -> list[str]:
     from .manuscript import _TEX_BIBLIOGRAPHY, _TEX_REFERENCE_SECTION
 
@@ -188,6 +239,7 @@ def _tex_paragraphs(source: str) -> list[str]:
     begin = re.search(r"\\begin\s*\{document\}", text)
     if begin:
         text = text[begin.end() :]
+    text = _tex_set_aside(text)
     text = re.sub(
         r"\\begin\s*\{(" + _TEX_NO_PROSE_ENVS + r")\}.*?\\end\s*\{\1\}",
         _MASK,
@@ -323,8 +375,19 @@ def _table_cells(paragraph: str, m: re.Match[str]) -> bool:
     """Whether the repeat ``m`` in a PDF's text reads as neighbouring table cells ("NA NA 34", "Female Female")."""
     if m.group(3)[0].isupper():
         return True
+    # A row of yes/no cells ("Position controls no no yes no yes").
+    if m.group(1).lower() in ("no", "yes") and re.match(r"\s+(?:yes|no)\b", paragraph[m.end():], re.IGNORECASE):
+        return True
     if m.group(1).lower() in _STOP_WORDS:
         return False
+    # A legend's keys: "Boundary lb lb = 1 lb = 8".
+    if re.match(r"\s*[=<>\u2264\u2265:]", paragraph[m.end():]):
+        return True
+    # A figure's axis labels or a legend: a run of names with no function word or punctuation
+    # among them ("anli anli anli arc arc bool cb common copa cosmos_qa ...").
+    window = paragraph[max(0, m.start() - 80): m.end() + 80].split()[1:-1]
+    if len(window) >= 8 and not any(w.lower() in _STOP_WORDS or re.search(r"[.,;:!?]$", w) for w in window):
+        return True
     return bool(re.match(r"\s+[\d.,]+(?:\s|$)", paragraph[m.end() :]) or re.search(r"(?:^|\s)[\d.,]+\s+$", paragraph[: m.start()]))
 
 
@@ -465,6 +528,34 @@ def misspellings() -> dict[str, list[str]] | None:
 _WORD = re.compile(r"(?<![\w\-/.@'\u2019])[A-Za-z]+(?:['\u2019][a-z]+)?(?![\w\-/@])")
 
 
+# Math beside a word makes it a symbol ("R^{d_out x r}" extracts as "R dout×r").
+_MATH_NEAR = re.compile(r"[\u00d7\u2208\u2200-\u22ff=^_\u0370-\u03ff]")
+
+
+def _extraction_artifact(text: str, m: re.Match[str], table: dict[str, list[str]]) -> bool:
+    """Whether the "misspelling" at ``m`` is PDF extraction, not the author's typo.
+
+    A symbol in an equation ("dout×r"), a word split by a stray space ("singl e"), or
+    the short tail of a word hyphenated across columns at the start of a line ("ment").
+    """
+    before, after = text[max(0, m.start() - 2): m.start()], text[m.end(): m.end() + 2]
+    if _MATH_NEAR.search(before + after):
+        return True
+    # "singl e": joined with the letters after it, the word is codespell's own suggestion.
+    rest = re.match(r" ([a-z]{1,2})\b", text[m.end():])
+    if rest and m.group(0).lower() + rest.group(1) in [f.lower() for f in table.get(m.group(0).lower(), [])]:
+        return True
+    fixes = [f.lower() for f in table.get(m.group(0).lower(), [])]
+    # "vectore y": a word and a one-letter math symbol after it ("vector $e_y$") run together.
+    if m.group(0)[:-1].lower() in fixes and re.match(r" [A-Za-z](?![\w])", text[m.end():]):
+        return True
+    # "levelin vivoand": an italic phrase glued to its neighbours, as PDF extraction leaves it.
+    if any(" " in f for f in fixes) and re.search(r"[a-z]{3}(?:and|the|of|or|in|to)\b", text[m.end(): m.end() + 30]):
+        return True
+    line_start = text[: m.start()].rstrip(" \t")
+    return len(m.group(0)) <= 4 and m.group(0).lower() not in _SHORT_TYPOS and line_start.endswith("\n") and bool(re.search(r"[a-z]\s*$", line_start[:-1]))
+
+
 def spelling(paragraph: str, table: dict[str, list[str]]) -> list[str]:
     """Words of ``paragraph`` on codespell's list of misspellings, with its suggestions."""
     masked = _URL.sub(lambda m: _MASK * len(m.group(0)), paragraph)
@@ -477,6 +568,8 @@ def spelling(paragraph: str, table: dict[str, list[str]]) -> list[str]:
         if len(lower) <= 3 and lower not in _SHORT_TYPOS:
             continue
         fixes = table.get(lower)
+        if fixes and _extraction_artifact(masked, m, table):
+            continue
         if fixes:
             found.append(
                 f"'{word}' (did you mean {' or '.join(repr(f) for f in fixes[:3])}?)"

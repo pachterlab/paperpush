@@ -62,7 +62,7 @@ from .manuscript import headings as manuscript_headings
 from .manuscript import normalize_heading, pages_before_references, reference_count, section_word_counts, structured_abstract_labels, title_page_text, total_pages, total_words, words_before_references, words_excluding
 from .report import NOT_APPLICABLE, NOT_IMPLEMENTED
 from .requirements import ManuscriptRequirements, get_requirements, heading_aliases, resolve
-from .validate import BYTES_PER_MB, ERROR, WARNING, Checks, _accepts_name, Issue, NotApplicable, Outcome, Unchecked, unchecked
+from .validate import BYTES_PER_MB, ERROR, LIKELY_ERROR, WARNING, Checks, _accepts_name, Issue, NotApplicable, Outcome, Unchecked, unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -605,8 +605,10 @@ def _text_field_issues(venue: Venue, reqs: ManuscriptRequirements, values: dict[
 def _template_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> list[Issue]:
     """Report a manuscript whose compiled layout departs from the venue's template.
 
-    A WARNING per departure: the geometry is measured from extracted glyphs, so
-    it is strong evidence of an edited template but not proof.
+    A WARNING per departure, then one LIKELY_ERROR saying the template was
+    modified: the geometry is measured from extracted glyphs, so it is strong
+    evidence of an edited template but not proof, and a modified template is
+    grounds for desk rejection.
     """
     layout = reqs.manuscript.template_layout
     if layout is None:
@@ -623,7 +625,7 @@ def _template_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> 
     issues = [Issue(WARNING, field.id, f"template: {path.name}: {problem}") for problem in template_check.layout_problems(measured, layout, reqs.manuscript.font_size_pt)]
     if issues:
         style = f"'{reqs.manuscript.latex_class}' style" if reqs.manuscript.latex_class else "template"
-        issues.append(Issue(WARNING, field.id, f"template: {path.name} does not match the venue's {style} as distributed; papers that modify it can be desk-rejected"))
+        issues.append(Issue(LIKELY_ERROR, field.id, f"template: {path.name} does not match the venue's {style} as distributed; papers that modify it can be desk-rejected"))
     return issues
 
 
@@ -644,7 +646,8 @@ def _template_source_issues(venue: Venue, reqs: ManuscriptRequirements, values: 
             seen.add(path)
             for where, text in template_check.iter_latex_sources(path):
                 for problem in template_check.source_problems(text):
-                    issues.append(Issue(WARNING, field.id, f"template: {where} {problem}"))
+                    level = WARNING if template_check.is_minor_source_problem(problem) else LIKELY_ERROR
+                    issues.append(Issue(level, field.id, f"template: {where} {problem}"))
     return issues
 
 
