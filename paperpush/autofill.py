@@ -230,8 +230,12 @@ class AutofillResult:
         return [i for i in self.issues if i.is_likely_error and not i.unchecked]
 
     @property
+    def similarities(self) -> list[Issue]:
+        return [i for i in self.issues if i.is_similarity and not i.unchecked]
+
+    @property
     def warnings(self) -> list[Issue]:
-        return [i for i in self.issues if not i.is_error and not i.is_suggestion and not (i.is_likely_error and not i.unchecked)]
+        return [i for i in self.issues if not i.is_error and not i.is_suggestion and not ((i.is_likely_error or i.is_similarity) and not i.unchecked)]
 
     @property
     def suggestions(self) -> list[Issue]:

@@ -740,6 +740,8 @@ def validate_subfile(
     plagiarism_provider: Optional[str] = None,
     plagiarism_accept: Optional[list[str]] = None,
     plagiarism_threshold: Optional[float] = None,
+    ai_detection: bool = False,
+    ai_detection_threshold: Optional[float] = None,
 ) -> dict[str, Any]:
     """Run paperpush's pre-submission checks on a `.sub` file and report every check.
 
@@ -850,14 +852,28 @@ def validate_subfile(
     Originality.ai (`plagiarism_provider`: winston, the default, or originality;
     the key comes from WINSTON_API_KEY or ORIGINALITY_API_KEY in this server's environment)
     and reports check integrity.plagiarism: the similarity score and every
-    matching source in its detail, and a warning when the score reaches
-    `plagiarism_threshold` percent (default 20). It costs credits on the
-    author's account. `plagiarism_accept` lists sources that may match (the
-    author's preprint: a domain, page URL, or DOI); they are still listed but
-    do not count toward the warning.
+    matching source in its detail, and `similarities` (pink in the report)
+    when the score reaches `plagiarism_threshold` percent (default 20). It
+    costs credits on the author's account. `plagiarism_accept` lists sources
+    that may match (the author's preprint: a domain, page URL, or DOI); they
+    are still listed but do not count toward the threshold.
+
+    `ai_detection` (off by default; only when the author asks for it) sends the
+    same text to Pangram (the key comes from PANGRAM_API_KEY in this server's
+    environment) and reports check integrity.ai_text: the shares of
+    AI-generated, AI-assisted, and human text in its detail, and
+    `similarities` when the AI-generated share reaches `ai_detection_threshold`
+    percent (default 20), saying whether the manuscript has a statement on AI
+    use. It costs credits on the author's account.
+
+    `similarities` are the plagiarism and AI-text scans' findings at their
+    threshold: a score from an outside service, never an error and not a
+    warning. Relay them to the author as matches to review; never rewrite the
+    text to lower an AI-detection score (the remedy for AI use a venue allows
+    is the disclosure it asks for).
 
     `checks` lists every check with its status: passed, failed, likely_error,
-    warning, suggestion, unchecked (could not run here), needs_ai,
+    similarity, warning, suggestion, unchecked (could not run here), needs_ai,
     not_implemented, or not_applicable. `errors` block submission;
     `likely_errors` would be critical if real (an identity leak, a fabricated
     reference) but are not certain: they do not block, but ask the author to
@@ -882,7 +898,12 @@ def validate_subfile(
         from . import plagiarism_check
 
         plagiarism_opts = plagiarism_check.options(plagiarism_provider, None, plagiarism_accept or (), plagiarism_threshold)
-    result = _run_validate_report(sub, venue_def, plagiarism=plagiarism_opts, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, reproduce_figures=reproduce_figures, reproduce_minutes=reproduce_minutes, reproduce_download_gb=reproduce_download_gb, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, disable=disable or (), enable=enable or (), initial_submission=initial_submission, strict_style=strict_style, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
+    ai_detection_opts = None
+    if ai_detection:
+        from . import ai_text_check
+
+        ai_detection_opts = ai_text_check.options(None, None, ai_detection_threshold)
+    result = _run_validate_report(sub, venue_def, plagiarism=plagiarism_opts, ai_detection=ai_detection_opts, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, reproduce_figures=reproduce_figures, reproduce_minutes=reproduce_minutes, reproduce_download_gb=reproduce_download_gb, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, disable=disable or (), enable=enable or (), initial_submission=initial_submission, strict_style=strict_style, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
     out: dict[str, Any] = {
         "path": str(path or ""),
         # When it ran and a fingerprint of each input, to tell later whether the result is stale.
@@ -900,6 +921,8 @@ def validate_subfile(
         "errors": _issue_dicts(result.errors),
         # Serious if real but not certain: confirm each before submitting.
         "likely_errors": _issue_dicts(result.likely_errors),
+        # The plagiarism and AI-text scans at their threshold (pink): review, not a verdict.
+        "similarities": _issue_dicts(result.similarities),
         "warnings": _issue_dicts(result.warnings),
         "suggestions": _issue_dicts(result.suggestions),
         "strict_style": result.strict_style,

@@ -27,6 +27,9 @@ check manuscript files without a ``.sub``, with or without a venue (see
                              [--plagiarism-api-key KEY]
                              [--plagiarism-accept URL[,URL...]]
                              [--plagiarism-threshold PERCENT]
+                             [--ai-detection] [--ai-detection-api-key KEY]
+                             [--ai-detection-threshold PERCENT]
+                             [--ai-detection-model MODEL]
                              [subfile]
 
 Synopsis
@@ -43,9 +46,12 @@ Synopsis
    paperpush validate --venue nature --manuscript main.pdf --cover-letter cover.docx
    paperpush validate --issn 0012-365X --manuscript main.pdf   # a journal paperpush does not list
    paperpush validate biorxiv.sub.txt --plagiarism --plagiarism-accept 10.1101/2025.01.01.123456  # plagiarism scan (API key)
+   paperpush validate biorxiv.sub.txt --ai-detection   # AI-text scan with Pangram (API key)
 
 ``validate`` prints a report of every check, grouped and colored by what
-happened to it: **failed** (red), **warnings** (amber), **suggestions**
+happened to it: **failed** (red), **likely errors** (orange),
+**similarity** (pink; only from the opt-in plagiarism and AI-text scans),
+**warnings** (amber), **suggestions**
 on style (blue; only counted in the terminal unless ``--suggestions`` is
 given), **needs AI** (purple), **not checked** -- because it could not run here, with the reason
 on the line below, or because paperpush has no check for the rule yet (gray)
@@ -403,15 +409,39 @@ Arguments
 
    The report always shows the similarity score and the matching sources, so
    you can see when a match is your own preprint. A score at or over
-   ``--plagiarism-threshold PERCENT`` (default 20) is a warning, listing each
-   source with a passage it matches; it is never an error, since methods
+   ``--plagiarism-threshold PERCENT`` (default 20) is a *similarity* finding
+   (pink), listing each source with a passage it matches; it is never an
+   error, and it is not counted with the warnings, since methods
    sections and quotations always match something. ``--plagiarism-accept``
    (optional, repeatable, comma-separated) names sources that may match, such
    as your preprint or an earlier conference version: a domain
    (``biorxiv.org``), a page (any version and format of it), or a DOI. They
-   are still listed, marked "accepted", but do not count toward the warning.
+   are still listed, marked "accepted", but do not count toward the threshold.
    If the service cannot be reached or refuses (a wrong key, no credits left),
    the check is reported as not checked. Not available with ``--web``.
+
+``--ai-detection``
+   Estimate how much of the manuscript's text reads as AI-generated (check
+   ``integrity.ai_text``), through `Pangram <https://www.pangram.com>`_. Off by
+   default: it sends the same text as ``--plagiarism`` (without the reference
+   list) to Pangram and costs credits on your account. The key is read from
+   ``PANGRAM_API_KEY`` (or given with ``--ai-detection-api-key KEY``; keys given
+   on the command line are masked in the saved report's command line).
+   ``--ai-detection-model`` passes Pangram a model selector (such as
+   ``pangram-4``); by default the account's default model is used.
+
+   The report always shows the shares of AI-generated, AI-assisted, and human
+   text. An AI-generated share at or over ``--ai-detection-threshold PERCENT``
+   (default 20) is a *similarity* finding (pink), listing the passages Pangram
+   reads as AI-generated with medium or high confidence, and saying whether
+   the manuscript has a statement on AI use. Passages Pangram reads as AI text
+   reworded by a "humanizer" tool are listed too. It is never an error and
+   not counted with the warnings: a detector's score is an estimate, not
+   proof, and it misjudges some human writing. Many venues allow AI-assisted
+   writing when it is disclosed, so if AI tools helped write the text, the
+   remedy is the disclosure the venue's guidelines ask for; paperpush never
+   rewrites text to lower the score. If the service cannot be reached or
+   refuses, the check is reported as not checked. Not available with ``--web``.
 
 ``--cover-letter-max-age DAYS``
    Warn when the date at the top of the cover letter is more than DAYS days

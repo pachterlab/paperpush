@@ -37,6 +37,22 @@ def test_serial_lists_tell_the_two_forms_apart():
     assert u.serial_lists("Samples from Smith, Jones, or Lee were used.")[0][0] is True
 
 
+def test_serial_lists_survive_an_empty_first_segment():
+    # PDF text from an ICLR 2026 paper (Etu7q4KcZ7) left a bare ", " after a semicolon or colon;
+    # the empty segment before it crashed the check (IndexError), so prose.serial_comma never ran.
+    assert u.serial_lists("We compare two settings; , large language models and small ones.") == []
+    assert u.serial_lists("Results: , deep neural networks and trees.") == []
+
+
+def test_each_after_a_preposition_modifies_a_plural_subject():
+    # ICLR 2026 false alarms: the subject is "scores"/"pipelines", not "each task".
+    assert u.agreement("The scores for each task are computed by voting.") == []
+    assert u.agreement("The pipelines for each modality are described in Appendix B.") == []
+    # Still a slip, also at the start of a sentence.
+    assert u.agreement("Each sample were measured twice.")
+    assert u.agreement("In this study each sample were measured.")
+
+
 def test_serial_lists_skip_introductory_phrases_and_asides():
     for sentence in (
         "In 2020, we sampled soil and water.",

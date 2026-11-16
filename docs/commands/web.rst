@@ -76,7 +76,7 @@ whenever you validate (``paperpush validate --plagiarism``). Ticking it opens
 a dialog for the service (Winston AI, the default, or Originality.ai), your
 API key for it, the sources that may match (your own preprint or an earlier
 conference version, as a domain, page, or DOI), and the percentage that
-makes a warning (default 20). Cancelling the dialog leaves the box unticked;
+makes a similarity finding (pink; default 20). Cancelling the dialog leaves the box unticked;
 untick and tick it again to change the settings. The key is separate from
 the AI provider's key at the top of the page. It is sent only with validate
 requests, never stored on the server, and kept in the browser only for that
@@ -87,6 +87,19 @@ The website never uses a key of its own. On a ``--web`` page, leave the key
 empty to use ``WINSTON_API_KEY`` or ``ORIGINALITY_API_KEY`` from your
 environment. A server started with link checks switched off
 (``PAPERPUSH_WEB_NETWORK_CHECKS=0``) switches the scan off too.
+
+The AI-text scan
+----------------
+
+Tick **AI-text scan**, next to **Validate**, to estimate the share of
+AI-generated text with Pangram whenever you validate (``paperpush validate
+--ai-detection``). Ticking it opens a dialog for your Pangram API key and the
+percentage of AI-generated text that makes a similarity finding (pink;
+default 20). The key is handled like the plagiarism scan's: sent only with
+validate requests, never stored on the server, and forgotten when the tab
+closes unless you ask to remember it. Each scan costs credits on your Pangram
+account, so the box starts unticked whenever the page loads. On a ``--web``
+page, leave the key empty to use ``PANGRAM_API_KEY`` from your environment.
 
 The buttons at the bottom of the page
 -------------------------------------

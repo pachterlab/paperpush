@@ -241,7 +241,12 @@ guess failed.
 4. **Summarize for the user**, in this order: blocking errors (must fix),
    likely errors (status `likely_error`, orange ◆: each would be critical if
    real, such as an identity leak or a fabricated reference, so ask the author
-   to confirm or fix every one before submitting), warnings (deterministic
+   to confirm or fix every one before submitting), similarity findings
+   (status `similarity`, pink ◈: the plagiarism or AI-text scan reached its
+   threshold; give the score and the matches, say it is an outside service's
+   estimate, not a verdict, and never offer to reword text to lower an
+   AI-detection score: if AI tools helped write it, the fix is the disclosure
+   the venue asks for), warnings (deterministic
    first, then AI), what could not be checked and why
    (could not run / not implemented), suggestions on style (one line with the
    count and the check ids, unless the user asks for them; the JSON and a

@@ -15,13 +15,18 @@ Severity policy
 * **Warning**: a likely substantive problem or venue-rule violation requiring
   author review, including uncertain text/image measurements and external
   metadata. Serious findings remain warnings when the evidence is heuristic.
+* **Similarity**: reserved for the opt-in outside scans (``integrity.plagiarism``
+  and ``integrity.ai_text``) at or over their threshold, shown in pink. A score
+  from a third-party service is a reason to look, not a verdict, so it never
+  blocks and is not counted with the warnings.
 * **Suggestion**: a defensible stylistic choice or optional improvement.
   Detection confidence alone does not make a preference a warning.
 * **Unchecked / needs AI / not applicable**: coverage states, not violations.
   Missing tools or inconclusive network responses must not imply success.
 
 A check can produce more than one severity. Its report status follows its
-most severe finding: error, warning, suggestion, then unchecked. Mixed checks
+most severe finding: error, likely error, similarity, warning, suggestion,
+then unchecked. Mixed checks
 retain each issue's own level; a table row is not a fixed level for every
 possible outcome.
 
@@ -203,19 +208,22 @@ and the explicit initial-submission override above.
    "guidelines.title_page","warning","Guideline concerns detected through section, text, image, or layout heuristics require confirmation."
    "guidelines.title_page_file","warning","The guidelines ask for a separate title page the portal does not require; a required portal field is form.required's error."
    "guidelines.title_page_own_page","warning","Where the abstract starts is found by heading and page-break heuristics, so it needs confirmation; a file without fixed pages is not applicable."
+   "integrity.ai_text","similarity","Opt-in scan (--ai-detection, Pangram); a detector's estimate is not proof and misjudges some human writing, so reaching the threshold is a similarity finding that says whether the manuscript discloses AI use; a service failure is unchecked."
    "integrity.anonymity","warning","A serious concern worth review, but identity matching, metadata, external services, and content context can be imperfect."
+   "integrity.chatbot_residue","likely error","A chatbot's own words ('As an AI language model', 'Regenerate response') would be critical if left in, but the narrow patterns can still match quoted output in a paper about language models, so the author confirms."
    "integrity.dois","warning","A serious concern worth review, but identity matching, metadata, external services, and content context can be imperfect."
    "integrity.hidden_text","error / warning","Hidden reviewer-directed instructions are errors; other hidden text or visible reviewer-directed prose is a warning."
    "integrity.latex_cleaner","warning / information","Author-only source becoming public warrants review; elsewhere cleanup is informational. Missing tool is unchecked."
    "integrity.links","warning","A serious concern worth review, but identity matching, metadata, external services, and content context can be imperfect."
    "integrity.openreview","error / warning","An explicitly supplied nonexistent or inactive profile blocks the portal; absent IDs and profile-quality concerns are warnings."
    "integrity.pdf_reader","unchecked","Missing optional PDF tools mean checks did not run, not that the manuscript violated a rule."
-   "integrity.plagiarism","warning","Opt-in scan (--plagiarism); similarity needs a reader (methods text, quotations, the author's own preprint), so reaching the threshold is never an error; a service failure is unchecked."
-   "integrity.reference_versions","warning / suggestion","A preprint since published, or a preprint listed beside its article, is a reference error; citing an older arXiv version is a preference."
+   "integrity.plagiarism","similarity / likely error","Opt-in scan (--plagiarism); similarity needs a reader (methods text, quotations, the author's own preprint), so reaching the threshold is a similarity finding, never an error; characters that hide text from the scan are a likely error; a service failure is unchecked."
+   "integrity.reference_versions","warning / suggestion","A preprint listed beside its article is a reference error; citing a preprint since published, or an older arXiv version, is a preference."
    "integrity.retractions","warning","A serious concern worth review, but identity matching, metadata, external services, and content context can be imperfect."
    "integrity.sensitive","warning","A serious concern worth review, but identity matching, metadata, external services, and content context can be imperfect."
    "integrity.unmatched_references","warning / suggestion","Likely bibliographic mismatch is a warning; adding a DOI to a confirmed work is a suggestion. Unverified works remain unchecked."
    "layout.font","warning","Measurements or inference suggest a venue-rule violation; typography and document geometry are not conclusive."
+   "layout.density","suggestion","Page fill is a reviewer's impression, not a venue rule; the gap and page-limit measures are heuristics over PDF geometry."
    "layout.font_size","warning","Measurements or inference suggest a venue-rule violation; typography and document geometry are not conclusive."
    "layout.footnotes","warning","Footnotes are read from the Word or LaTeX markup; a venue may accept them moved elsewhere, so the author decides."
    "layout.forbidden_fonts","warning","The fonts a Word file names are reported; the author decides how to replace them."
@@ -226,10 +234,11 @@ and the explicit initial-submission override above.
    "layout.margins","warning","Measurements or inference suggest a venue-rule violation; typography and document geometry are not conclusive."
    "layout.page_numbers","warning","Measurements or inference suggest a venue-rule violation; typography and document geometry are not conclusive."
    "layout.page_size","warning","Measurements or inference suggest a venue-rule violation; typography and document geometry are not conclusive."
+   "layout.section_balance","suggestion","How a paper divides its space is the author's call; the ranges are typical of accepted papers, not rules."
    "layout.template","warning","Measurements or inference suggest a venue-rule violation; typography and document geometry are not conclusive."
    "prose.acronyms","warning / suggestion","Undefined, conflicting, or prematurely used acronyms are warnings; repeated definitions, late definitions after full terms, and unused abbreviations are suggestions."
    "prose.brackets","warning","A likely mechanical mistake, rather than an optional stylistic preference; extraction can produce false positives."
-   "prose.conventions","warning / suggestion","Malformed abbreviations are warnings; consistent choice among defensible forms is optional style."
+   "prose.conventions","warning / suggestion","Malformed 'et al.' is a warning; a malformed 'i.e.'/'e.g.' (often PDF extraction debris) and consistent choice among defensible forms are optional style."
    "prose.dashes","warning / suggestion","LaTeX opening quotes rendered incorrectly are warnings; dash and range typography is optional style."
    "prose.double_spaces","suggestion","Optional style or consistency advice; an explicitly required English variant is checked separately by layout.language."
    "prose.heading_case","suggestion","Optional style or consistency advice; an explicitly required English variant is checked separately by layout.language."

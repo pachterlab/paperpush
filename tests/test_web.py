@@ -337,6 +337,43 @@ def test_plagiarism_scan_runs_with_the_visitors_key_and_masks_it(tmp_path, monke
         assert check["status"] == "unchecked" and "tick Plagiarism scan" in check["detail"]
 
 
+def test_ai_text_scan_needs_the_visitors_key_not_the_servers(tmp_path, monkeypatch):
+    with _plagiarism_client(tmp_path, monkeypatch) as client:
+        monkeypatch.setenv("PANGRAM_API_KEY", "server-key")
+        assert client.get("/api/info").json()["ai_detection_env"] is False  # only a local session sees it
+        ws = client.post("/api/workspaces").json()["id"]
+        res = client.post(f"/api/workspaces/{ws}/validate", json={"text": _filled_template(), "ai_detection": True, "check_links": False, "check_references": False})
+        assert res.status_code == 400 and "add yours on the page" in res.json()["detail"]
+
+
+def test_ai_text_scan_runs_with_the_visitors_key_and_masks_it(tmp_path, monkeypatch):
+    import importlib
+
+    validate_mod = importlib.import_module("paperpush.validate")
+    seen = {}
+
+    def fake_scan(venue, values, options):
+        seen["options"] = options
+        return validate_mod.Outcome([validate_mod.Issue(validate_mod.SIMILARITY, "", "AI text: 40% AI-generated")], f"Pangram: 40% AI-generated (key {options.api_key})")
+
+    monkeypatch.setattr(validate_mod, "_ai_text_issues", fake_scan)
+    monkeypatch.delenv("PANGRAM_API_KEY", raising=False)
+    with _plagiarism_client(tmp_path, monkeypatch) as client:
+        ws = client.post("/api/workspaces").json()["id"]
+        body = {"text": _filled_template(), "ai_detection": True, "ai_detection_threshold": 30, "check_links": False, "check_references": False}
+        res = client.post(f"/api/workspaces/{ws}/validate", json=body, headers={"X-Ai-Detection-Key": "visitor-pangram-key"})
+        assert res.status_code == 200, res.text
+        out = res.json()
+        assert out["ai_detection"] == "Pangram"
+        assert (seen["options"].api_key, seen["options"].threshold) == ("visitor-pangram-key", 30.0)
+        check = next(c for c in out["checks"] if c["id"] == "integrity.ai_text")
+        assert check["status"] == "similarity" and out["counts"]["similarity"] >= 1
+        assert "visitor-pangram-key" not in res.text and "[your API key]" in check["detail"]
+        plain = client.post(f"/api/workspaces/{ws}/validate", json={"text": _filled_template(), "check_links": False, "check_references": False}).json()
+        check = next(c for c in plain["checks"] if c["id"] == "integrity.ai_text")
+        assert check["status"] == "unchecked" and "tick AI-text scan" in check["detail"]
+
+
 def test_visitor_brings_their_own_api_key(tmp_path, monkeypatch, caplog):
     from fastapi import HTTPException
 

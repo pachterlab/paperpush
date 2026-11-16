@@ -205,7 +205,8 @@ def serial_lists(paragraph: str) -> list[tuple[bool, str]]:
                 m = re.match(r"\s*((?:\S+\s+){0,%d}?\S+)\s+(and|or)\s+((?:(?:a|an|the)\s+)?\S+)" % (_ITEM_MAX_WORDS - 1), parts[j][1], re.I)
                 # "automatic, machine-to-machine publishing and rapid ...": with one comma, an adjective before a
                 # longer phrase modifies it (coordinate adjectives) rather than being a list item.
-                adjectives = bool(m) and j == i + 1 and len(m.group(1).split()) > 1 and _is_modifier(first[-1])
+                # An empty first segment ("settings; , large models and ..." in PDF text) has no word to test.
+                adjectives = bool(m) and bool(first) and j == i + 1 and len(m.group(1).split()) > 1 and _is_modifier(first[-1])
                 if m and not adjectives and ok_first and ok_middle and _middle_item(m.group(1)) and m.group(3).lower() not in _CLAUSE_WORDS:
                     found.append((False, _snip(paragraph, start, _trim(paragraph, offset + parts[j][0] + m.end()))))
             i = j
@@ -391,7 +392,8 @@ _AGREEMENT = [
     (re.compile(rf"\b(these|those|many|several|both|various|multiple)\s+({_SINGULAR_RE})(?=\s*(?:[.,;:)]|$)|\s+(?:is|are|was|were|has|have|show|showed|suggest|of|in|for|that|which|and|or)\b)", re.I), "the plural is '{pl}'", False),
     (re.compile(r"\b(the|these|those|our|their)\s+(results|findings)\s+(is|was|has|shows|suggests|indicates|demonstrates|confirms|reveals)\b", re.I), "plural subject, singular verb", True),
     (re.compile(r"\bthere\s+(is|was|exists)\s+(many|several|multiple|numerous|various|few|two|three|four|five|both)\b", re.I), "write 'there are' or 'there were'", False),
-    (re.compile(r"\b(each|every)\s+([a-z]+)\s+(are|were|have)\b"), "'{0} {1}' takes a singular verb", False),
+    # "The scores for each task are computed": after a preposition, "each task" modifies the subject.
+    (re.compile(r"\b([Ee]ach|[Ee]very)\s+([a-z]+)\s+(are|were|have)\b"), "'{0} {1}' takes a singular verb", True),
     (re.compile(r"\bits['\u2019](?!\w)", re.I), "write 'its'", False),
 ]
 _OBJECT_OF = re.compile(r"\b(?:of|in|on|for|from|with|between|among)\s+(?:\w+\s+)?$", re.I)

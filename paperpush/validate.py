@@ -50,6 +50,11 @@ WARNING = "warning"
 # word choice, a spelled-out number): reported, but it never makes a check a
 # warning, and it is not counted with the warnings (see paperpush.report).
 SUGGESTION = "suggestion"
+# The share of the text a plagiarism or AI-text scan matched (see
+# paperpush.plagiarism_check and paperpush.ai_text_check): shown in pink, kept for
+# those two scans only. A score from an outside service is a reason to look,
+# not a verdict, so it never blocks and is not counted with the warnings.
+SIMILARITY = "similarity"
 
 # Below this DPI, raster figures tend to look soft in print.
 MIN_FIGURE_DPI = 300
@@ -66,7 +71,7 @@ _FALSE = {"no", "n", "false", "0", "off"}
 
 @dataclass(frozen=True)
 class Issue:
-    level: str  # ERROR, WARNING, or SUGGESTION
+    level: str  # ERROR, LIKELY_ERROR, SIMILARITY, WARNING, or SUGGESTION
     field: str  # field id the issue concerns ("" for file-level)
     message: str
     # Id of the check that raised it (see paperpush.report); stamped by the
@@ -87,6 +92,10 @@ class Issue:
     @property
     def is_suggestion(self) -> bool:
         return self.level == SUGGESTION
+
+    @property
+    def is_similarity(self) -> bool:
+        return self.level == SIMILARITY
 
     @property
     def is_warning(self) -> bool:
@@ -1048,9 +1057,12 @@ def _reference_version_issues(venue: Venue, values: dict[str, str], ctx: _Refere
         arxiv_checked=getattr(search, "arxiv_checked", ()),
     )
     issues = _findings_to_issues(findings)
-    # Citing an older arXiv version is a preference (the latest version); a published
-    # preprint or a work listed twice is a real reference error and stays a warning.
-    issues = [replace(i, level=SUGGESTION) if f.category == "older preprint version" else i for f, i in zip(findings, issues)]
+    # Citing an older arXiv version, or a preprint that has since been published, is an
+    # improvement the author can leave (the preprint is still the work cited, and ML venues
+    # cite arXiv routinely: 65-68% of accepted ICLR 2026 papers did); a work listed twice
+    # (preprint and article both cited) is a real reference error and stays a warning.
+    _MINOR = ("older preprint version", "preprint has been published")
+    issues = [replace(i, level=SUGGESTION) if f.category in _MINOR else i for f, i in zip(findings, issues)]
     return Outcome(issues, f"checked {len(cited) + len(arxiv_refs)} cited work(s) for a newer version")
 
 
@@ -1194,32 +1206,69 @@ def _openreview_profile_issues(venue: Venue, values: dict[str, str]) -> list[Iss
     return [Issue(ERROR if p.error else WARNING, p.field, f"openreview: {p.message}", unchecked=p.unchecked) for p in openreview_profiles.check(venue, values)]
 
 
-def _plagiarism_issues(venue: Venue, values: dict[str, str], options) -> "Outcome":
-    """Scan the manuscript's text with a plagiarism service (see :mod:`paperpush.plagiarism_check`).
-
-    Opt-in (``--plagiarism``); sends the text, without its reference list, to
-    the service. The score and the matching sources are always reported, in the
-    check's note; reaching the threshold is a likely error.
-    """
-    from . import plagiarism_check
+def _scan_text(venue: Venue, values: dict[str, str]) -> tuple[str, str, str]:
+    """``(field id, text without the reference list, full text)`` of the manuscript, for the outside scans."""
     from .manuscript import manuscript_text, without_reference_list
     from .requirements_check import manuscript_files
 
     files = manuscript_files(venue, values)
     if not files:
         raise NotApplicable("no manuscript file to scan")
-    field_id = files[0][0].id
     texts = []
     for _, path in files:
         text = manuscript_text(path)
         if text is None:
             raise Unchecked(f"could not read the text of {path.name}")
-        texts.append(without_reference_list(text))
+        texts.append(text)
+    return files[0][0].id, "\n\n".join(without_reference_list(t) for t in texts), "\n\n".join(texts)
+
+
+def _plagiarism_issues(venue: Venue, values: dict[str, str], options) -> "Outcome":
+    """Scan the manuscript's text with a plagiarism service (see :mod:`paperpush.plagiarism_check`).
+
+    Opt-in (``--plagiarism``); sends the text, without its reference list, to
+    the service. The score and the matching sources are always reported, in the
+    check's note; reaching the threshold is a SIMILARITY finding (pink).
+    """
+    from . import plagiarism_check
+
+    field_id, text, _ = _scan_text(venue, values)
     try:
-        issues, detail = plagiarism_check.check_text("\n\n".join(texts), options, field_id)
+        issues, detail = plagiarism_check.check_text(text, options, field_id)
     except plagiarism_check.PlagiarismError as exc:
         raise Unchecked(f"{options.name}: {exc}") from None
     return Outcome(issues, detail)
+
+
+def _ai_text_issues(venue: Venue, values: dict[str, str], options) -> "Outcome":
+    """Estimate the share of AI-generated text with a detector (see :mod:`paperpush.ai_text_check`).
+
+    Opt-in (``--ai-detection``); sends the text, without its reference list, to
+    the service. The shares are always reported, in the check's note; reaching
+    the threshold is a SIMILARITY finding (pink).
+    """
+    from . import ai_text_check
+
+    field_id, text, full = _scan_text(venue, values)
+    try:
+        issues, detail = ai_text_check.check_text(text, options, field_id, full_text=full)
+    except ai_text_check.AiTextError as exc:
+        raise Unchecked(f"{options.name}: {exc}") from None
+    return Outcome(issues, detail)
+
+
+CHATBOT_RESIDUE_TITLE = "No text left over from a chatbot's reply (\"As an AI language model\", \"Regenerate response\")"
+
+
+def _chatbot_residue_issues(venue: Venue, values: dict[str, str]) -> "Outcome":
+    """A chatbot's own words pasted into the files or text fields (see :mod:`paperpush.chatbot_residue`).
+
+    Runs by default (disable with ``--disable-integrity.chatbot_residue``);
+    deterministic, no network. Each find is a LIKELY_ERROR.
+    """
+    from . import chatbot_residue
+
+    return chatbot_residue.check(venue, values)
 
 
 def _manuscript_requirement_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
@@ -1332,6 +1381,8 @@ def _status_for(issues: list[Issue]) -> str:
         return report.FAILED
     if any(i.is_likely_error and not i.unchecked for i in issues):
         return report.LIKELY_ERROR
+    if any(i.is_similarity and not i.unchecked for i in issues):
+        return report.SIMILARITY
     if any(i.is_warning and not i.unchecked for i in issues):
         return report.WARNING
     if any(i.is_suggestion for i in issues):
@@ -1558,6 +1609,7 @@ class _Progress:
 _MANUSCRIPT_STAGES = (
     ("requirements_check", "Author guidelines"),
     ("layout_check", "Page layout"),
+    ("density_check", "Page density and balance"),
     ("figure_check", "Figures"),
     ("citation_check", "Figure and table order"),
     ("consistency", "Form against the manuscript"),
@@ -1634,6 +1686,7 @@ def validate(
     references_alphabetical: bool = False,
     references_citation_order: bool = False,
     plagiarism=None,
+    ai_detection=None,
     disable: Iterable[str] = (),
     enable: Iterable[str] = (),
 ) -> list[Issue]:
@@ -1666,6 +1719,7 @@ def validate(
         references_alphabetical=references_alphabetical,
         references_citation_order=references_citation_order,
         plagiarism=plagiarism,
+        ai_detection=ai_detection,
         disable=disable,
         enable=enable,
     ).issues()
@@ -1692,6 +1746,7 @@ def validate_report(
     references_alphabetical: bool = False,
     references_citation_order: bool = False,
     plagiarism=None,
+    ai_detection=None,
     ai=None,
     subfile_path: str = "",
     ai_only: bool = False,
@@ -1724,7 +1779,8 @@ def validate_report(
     sections and statements, title-page items, figure resolution, reference
     count (see :mod:`paperpush.requirements_check`); a LaTeX manuscript is
     compiled to a scratch PDF for its page count. The same switch covers the
-    page layout (:mod:`paperpush.layout_check`), the figures' resolution,
+    page layout (:mod:`paperpush.layout_check`), how full a conference paper's
+    pages are and how its space is split (:mod:`paperpush.density_check`), the figures' resolution,
     lettering, and type (:mod:`paperpush.figure_check`), the order figures and
     tables are cited in (:mod:`paperpush.citation_check`), and whether the
     title, abstract, authors, keywords, and statements in the ``.sub`` match
@@ -1778,9 +1834,16 @@ def validate_report(
 
     ``plagiarism`` (a :class:`~paperpush.plagiarism_check.PlagiarismOptions`)
     sends the manuscript's text to Winston AI or Originality.ai and reports the
-    similarity score and the matching sources, warning at the threshold (see
-    :mod:`paperpush.plagiarism_check`). None (the default) leaves the check off:
-    it costs credits and shares the text with the service.
+    similarity score and the matching sources, with a SIMILARITY finding (pink)
+    at the threshold (see :mod:`paperpush.plagiarism_check`). None (the
+    default) leaves the check off: it costs credits and shares the text with
+    the service.
+
+    ``ai_detection`` (a :class:`~paperpush.ai_text_check.AiTextOptions`) sends
+    the same text to Pangram and reports the shares of AI-generated,
+    AI-assisted, and human text, with a SIMILARITY finding at the threshold and
+    whether the manuscript has a statement on AI use (see
+    :mod:`paperpush.ai_text_check`). None (the default) leaves it off.
 
     ``cover_letter_max_age_days`` is how old the cover letter's date may be
     before it is reported (see :mod:`paperpush.cover_letter_check`, which also
@@ -1867,8 +1930,10 @@ def validate_report(
         (True, "LaTeX source"),
         (check_anonymous, "Anonymity"),
         (check_hidden_text, "Hidden text"),
+        (True, "Chatbot leftovers"),
         (openreview_applies and check_openreview, "OpenReview profiles"),
         (plagiarism is not None, "Plagiarism"),
+        (ai_detection is not None, "AI-text detection"),
     )
     stages = ["Submission form"] + [label for on, label in optional if on]
     if check_manuscript:
@@ -1928,6 +1993,7 @@ def validate_report(
         bar.run("Hidden text", checks.run, "integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, _hidden_text_issues, venue, values)
     else:
         checks.record("integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, report.UNCHECKED, detail="switched off (--disable-integrity.hidden_text)")
+    bar.run("Chatbot leftovers", checks.run, "integrity.chatbot_residue", CHATBOT_RESIDUE_TITLE, integrity, _chatbot_residue_issues, venue, values)
     pdf_reader = _pdf_reader_issues(venue, values, check_hidden_text=check_hidden_text and not checks.disabled_by("integrity.hidden_text"), check_manuscript=check_manuscript)
     if pdf_reader:
         checks.record("integrity.pdf_reader", "PDF text extractor (pdfminer.six) installed, which the PDF-based checks need", integrity, report.UNCHECKED, issues=[replace_unchecked(i) for i in pdf_reader])
@@ -1944,6 +2010,11 @@ def validate_report(
         bar.run("Plagiarism", checks.run, "integrity.plagiarism", plagiarism_title, integrity, _plagiarism_issues, venue, values, plagiarism)
     else:
         checks.record("integrity.plagiarism", plagiarism_title, integrity, report.UNCHECKED, detail="off by default: run with --plagiarism and WINSTON_API_KEY or ORIGINALITY_API_KEY set (sends the manuscript's text to that service; costs credits)")
+    ai_text_title = "Share of the text an AI-text detector reads as AI-generated (AI-detection scan)"
+    if ai_detection is not None:
+        bar.run("AI-text detection", checks.run, "integrity.ai_text", ai_text_title, integrity, _ai_text_issues, venue, values, ai_detection)
+    else:
+        checks.record("integrity.ai_text", ai_text_title, integrity, report.UNCHECKED, detail="off by default: run with --ai-detection and PANGRAM_API_KEY set (sends the manuscript's text to Pangram; costs credits)")
 
     if check_manuscript:
         from . import requirements_check

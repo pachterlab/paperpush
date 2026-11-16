@@ -113,8 +113,12 @@ paperpush validate <abs .sub> --json <scratch>/round1.json --ai-tasks <scratch>/
 
 In `round1.json`, `checks[]` gives each check's `id`, `status` (`failed`,
 `warning`, `suggestion`, `unchecked`, `needs_ai`, `passed`, ...) and
-`issues[]`, each with `level` (`error`, `warning`, or `suggestion`), `field`
-(the `.sub` field), and `message`. A limit issue states both
+`issues[]`, each with `level` (`error`, `likely_error`, `similarity`,
+`warning`, or `suggestion`), `field` (the `.sub` field), and `message`.
+Never fix a `similarity` issue (the plagiarism or AI-text scan): list it under
+"Needs your decision" with its score and matches. Don't reword text to lower a
+plagiarism or AI-detection score; if AI tools helped write the text, the remedy
+is the disclosure the venue asks for, which the author writes. A limit issue states both
 numbers in its message: "Abstract: 312 words exceeds the 250-word limit",
 "Title: 160 characters exceeds the 150-character limit", "7 keywords given;
 the author guidelines allow at most 6", "14 pages exceeds the 12-page limit".

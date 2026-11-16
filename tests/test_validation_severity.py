@@ -201,8 +201,8 @@ def test_reference_version_findings_levels(monkeypatch):
     monkeypatch.setattr(reference_search, "version_findings", lambda *args, **kwargs: findings)
     ctx = validation._ReferenceContext(refs=[], resolved={"10.1234/example": {"DOI": "10.1234/example"}})
     outcome = validation._reference_version_issues(Venue(slug="general", name="General"), {}, ctx)
-    # A published preprint or a work listed twice is a reference error; an older arXiv version is a preference.
-    assert [i.level for i in outcome.issues] == [WARNING, SUGGESTION, WARNING]
+    # A work listed twice is a reference error; a published preprint or an older arXiv version is a preference.
+    assert [i.level for i in outcome.issues] == [SUGGESTION, SUGGESTION, WARNING]
 
 
 def test_stale_letter_suggests_while_future_letter_warns():

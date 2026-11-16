@@ -8,7 +8,7 @@ sensitive-data scan (see :ref:`submit-validation`).
 
 .. BEGIN VALIDATION CHECK COUNT
 
-PaperPush currently has **170 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
+PaperPush currently has **174 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
 
 .. END VALIDATION CHECK COUNT
 
@@ -194,61 +194,65 @@ Venue rules marked *not implemented* are excluded.
 
 **Integrity and external sources**
 
-125. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
-126. ``integrity.dois`` — Reference DOIs match the works they cite
-127. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
-128. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
-129. ``integrity.links`` — Links cited in the files and URL fields are reachable
-130. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
-131. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
-132. ``integrity.plagiarism`` — The manuscript's text does not match other sources (plagiarism scan)
-133. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
-134. ``integrity.retractions`` — No cited work has been retracted
-135. ``integrity.sensitive`` — No secrets or private information in the files
-136. ``integrity.unmatched_references`` — References without a DOI match a registered work
+125. ``integrity.ai_text`` — Share of the text an AI-text detector reads as AI-generated (AI-detection scan)
+126. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
+127. ``integrity.chatbot_residue`` — No text left over from a chatbot's reply ("As an AI language model", "Regenerate response")
+128. ``integrity.dois`` — Reference DOIs match the works they cite
+129. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
+130. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
+131. ``integrity.links`` — Links cited in the files and URL fields are reachable
+132. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
+133. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
+134. ``integrity.plagiarism`` — The manuscript's text does not match other sources (plagiarism scan)
+135. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
+136. ``integrity.retractions`` — No cited work has been retracted
+137. ``integrity.sensitive`` — No secrets or private information in the files
+138. ``integrity.unmatched_references`` — References without a DOI match a registered work
 
 **Page layout**
 
-137. ``layout.font`` — Body font matches the guidelines
-138. ``layout.font_size`` — Body text size matches the guidelines
-139. ``layout.footnotes`` — No footnotes or endnotes where the guidelines forbid them
-140. ``layout.forbidden_fonts`` — No fonts the guidelines forbid (e.g., Symbol)
-141. ``layout.heading_levels`` — Headings within the guidelines' number of levels
-142. ``layout.language`` — Spelling follows the required English variant (US or UK)
-143. ``layout.line_numbers`` — Lines numbered continuously
-144. ``layout.line_spacing`` — Text is double-spaced
-145. ``layout.margins`` — Page margins match the guidelines
-146. ``layout.page_numbers`` — Pages are numbered
-147. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
-148. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
+139. ``layout.density`` — Main-text pages are full and use the page limit (AI conferences)
+140. ``layout.font`` — Body font matches the guidelines
+141. ``layout.font_size`` — Body text size matches the guidelines
+142. ``layout.footnotes`` — No footnotes or endnotes where the guidelines forbid them
+143. ``layout.forbidden_fonts`` — No fonts the guidelines forbid (e.g., Symbol)
+144. ``layout.heading_levels`` — Headings within the guidelines' number of levels
+145. ``layout.language`` — Spelling follows the required English variant (US or UK)
+146. ``layout.line_numbers`` — Lines numbered continuously
+147. ``layout.line_spacing`` — Text is double-spaced
+148. ``layout.margins`` — Page margins match the guidelines
+149. ``layout.page_numbers`` — Pages are numbered
+150. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
+151. ``layout.section_balance`` — Space split between sections, figures, and equations is typical (AI conferences)
+152. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
 
 **Prose**
 
-149. ``prose.acronyms`` — Acronyms spelled out at first use
-150. ``prose.brackets`` — Brackets and quotes pair up
-151. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
-152. ``prose.dashes`` — Hyphens, en dashes, em dashes, and quotes used as expected
-153. ``prose.double_spaces`` — No double spaces between words
-154. ``prose.heading_case`` — Headings of the same level capitalized one way
-155. ``prose.number_format`` — Statistics, units, and percent signs written one way
-156. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
-157. ``prose.punctuation_spacing`` — Spacing around punctuation
-158. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
-159. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
-160. ``prose.serial_comma`` — Lists use the serial (Oxford) comma one way
-161. ``prose.spelling`` — Common misspellings (codespell)
-162. ``prose.spelling_variant`` — Spelling uses one English variant (US or UK)
-163. ``prose.usage`` — Agreement, contractions, and very long sentences
+153. ``prose.acronyms`` — Acronyms spelled out at first use
+154. ``prose.brackets`` — Brackets and quotes pair up
+155. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
+156. ``prose.dashes`` — Hyphens, en dashes, em dashes, and quotes used as expected
+157. ``prose.double_spaces`` — No double spaces between words
+158. ``prose.heading_case`` — Headings of the same level capitalized one way
+159. ``prose.number_format`` — Statistics, units, and percent signs written one way
+160. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
+161. ``prose.punctuation_spacing`` — Spacing around punctuation
+162. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
+163. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
+164. ``prose.serial_comma`` — Lists use the serial (Oxford) comma one way
+165. ``prose.spelling`` — Common misspellings (codespell)
+166. ``prose.spelling_variant`` — Spelling uses one English variant (US or UK)
+167. ``prose.usage`` — Agreement, contractions, and very long sentences
 
 **Rigor and reproducibility**
 
-164. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
-165. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
-166. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
-167. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
-168. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
-169. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
-170. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
+168. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
+169. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
+170. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
+171. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
+172. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
+173. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
+174. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
 
 .. END VALIDATION CHECK LIST
 
@@ -531,6 +535,10 @@ The passes at a glance
    * - :ref:`Hidden text and prompt injection <vc-hidden-text>`
      - yes
      - ``--disable-integrity.hidden_text``
+     - no
+   * - :ref:`Text left over from a chatbot <vc-chatbot-residue>`
+     - yes
+     - ``--disable-integrity.chatbot_residue``
      - no
    * - :ref:`Page layout <vc-layout>`
      - venues whose guidelines set one
@@ -900,6 +908,43 @@ A **Word** file's page setup, styles, and run properties are read from its XML.
 **LaTeX** that cannot be compiled is read from its preamble (class options,
 ``geometry``, ``setspace``, ``lineno``, font packages). All findings are
 warnings. Reading PDFs needs the optional ``validate`` extra.
+
+.. _vc-density:
+
+Page density and balance (AI conferences)
+-----------------------------------------
+
+Reviewers at AI conferences (ICLR, CVPR, ACL, AAAI, AISTATS, ...) tend to read a
+paper with half-empty pages, or one that stops well short of the page limit,
+as less finished, and they notice when the space goes to the wrong places.
+For every venue whose ``venue_type`` is ``conference``, two checks measure the
+main text (up to the reference list, or a heading in the venue's
+``main_text_end_headings``) of the manuscript PDF, or of LaTeX compiled to one:
+
+- ``layout.density``: vertical gaps in the text block taller than 5 body lines
+  (a float pushed to the next page leaves the bottom of this one blank),
+  reported for each page where they add up to 20% of the text block, and a
+  main text that leaves half a page or more of the page limit unused.
+- ``layout.section_balance``: the share of the main text's words in each
+  top-level section, classified by heading (introduction, related work,
+  background, limitations, conclusion, and the rest), the share of the text
+  block covered by figures, and the share of lines that are display equations
+  (rows set mostly in math fonts). Reported when the introduction takes under
+  6% or over 30%, related work over 20%, the conclusion over 10%, limitations
+  over 12%, introduction + related work + background over 50%, figures over
+  35% (or none at all), display equations over 15% of the lines, or when the
+  word "limitation" appears nowhere.
+
+The bounds sit just outside what accepted papers do. In 195 accepted ICLR 2026
+papers (5th-95th percentile) the introduction took 10%-29% of the main text,
+related work up to 19%, the conclusion up to 7%, figures 2%-20% of the area,
+and display equations up to 9% of the lines; no page was 20% empty. Each bound
+flags at most 4% of those papers. Rejected submissions look much the same on
+these measures, so they are hygiene, not predictors of acceptance. Sections
+are found from LaTeX ``\section`` commands or, in a PDF, from numbered
+headings whose numbers run 1, 2, 3, ...; the main text also ends at an
+unnumbered acknowledgments, reproducibility, or ethics statement, which
+conferences do not count in the page limit. Every finding is a suggestion: a theory paper may rightly be equation-heavy.
 
 .. _vc-figures:
 
@@ -1866,6 +1911,36 @@ instructions, or addresses "LLM reviewers", for example. Other hidden text of
 four or more words is a warning. Visible text addressed to an AI reviewer is
 a warning too, since a paper about prompt injection may be quoting an example.
 Pass ``--disable-integrity.hidden_text`` to skip this pass.
+
+.. _vc-chatbot-residue:
+
+Text left over from a chatbot
+-----------------------------
+
+Journals have retracted papers that still carried a chatbot's reply around
+the text it wrote: "Certainly, here is a possible introduction for your
+topic", "As an AI language model", "Regenerate response", "As of my last
+knowledge update". ``integrity.chatbot_residue`` looks for a chatbot's own
+words: speaking of itself, its knowledge cutoff, a refusal, the opening or
+sign-off of a reply addressed to the person who asked ("Here is a revised
+version of your abstract", "Let me know if you would like me to expand"),
+and interface text copied with it ("Regenerate response", "Copy code").
+It runs for every venue, reads no network, and reads the manuscript, title
+page, cover letter, and the ``.sub``'s text fields.
+
+It does not judge style: words often called AI tells ("delve", "pivotal")
+are written by people too, and are left to the opt-in detector
+(``integrity.ai_text``). Unfilled slots such as "[Insert citation]" are
+``details.placeholders``. Since a false alarm costs more than a miss, it
+leaves out the supplement, the appendix, the reference list, text in double
+quotation marks, LaTeX verbatim, code, quotation, box, figure, and table
+environments, and a phrase introduced as an example ("responses such as",
+"starting with"), where a paper about language models quotes their output.
+
+Each find is a **likely error** with the passage quoted: the author confirms
+it and deletes the leftover. Using an AI tool is not the problem; disclose it
+where the venue asks (``guidelines.ai_policy``). Pass
+``--disable-integrity.chatbot_residue`` to skip this pass.
 
 .. _vc-template:
 

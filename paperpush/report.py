@@ -54,6 +54,10 @@ FAILED = "failed"
 # but that validate cannot confirm: shown in orange, between failed and warnings,
 # and it does not block submission on its own.
 LIKELY_ERROR = "likely_error"
+# The plagiarism and AI-text scans' scores at or over their threshold: shown in
+# pink, between likely errors and warnings, and reserved for those two scans. A
+# score from an outside service is a reason to look, never a verdict.
+SIMILARITY = "similarity"
 WARNING = "warning"
 SUGGESTION = "suggestion"
 UNCHECKED = "unchecked"
@@ -61,12 +65,13 @@ NEEDS_AI = "needs_ai"
 NOT_IMPLEMENTED = "not_implemented"
 NOT_APPLICABLE = "not_applicable"
 
-STATUSES = (FAILED, LIKELY_ERROR, WARNING, SUGGESTION, UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED, PASSED, NOT_APPLICABLE)
+STATUSES = (FAILED, LIKELY_ERROR, SIMILARITY, WARNING, SUGGESTION, UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED, PASSED, NOT_APPLICABLE)
 
 # Section headings, in the order the report shows them.
 _HEADINGS = {
     FAILED: "Failed",
     LIKELY_ERROR: "Likely errors (confirm before submitting)",
+    SIMILARITY: "Similarity (plagiarism and AI-text scans: review the matches)",
     WARNING: "Warnings",
     SUGGESTION: "Suggestions (style)",
     UNCHECKED: "Not checked: could not run",
@@ -77,8 +82,8 @@ _HEADINGS = {
 }
 # Markers for the terminal, HTML, and Markdown, and the ASCII ones the PDF's
 # standard fonts can draw.
-_MARKS = {FAILED: "✖", LIKELY_ERROR: "◆", WARNING: "▲", SUGGESTION: "✎", UNCHECKED: "?", NEEDS_AI: "?", NOT_IMPLEMENTED: "–", PASSED: "✔", NOT_APPLICABLE: "·"}
-_ASCII_MARKS = {FAILED: "[FAIL]", LIKELY_ERROR: "[LIKELY]", WARNING: "[WARN]", SUGGESTION: "[HINT]", UNCHECKED: "[SKIP]", NEEDS_AI: "[AI]", NOT_IMPLEMENTED: "[NOT IMPLEMENTED]", PASSED: "[PASS]", NOT_APPLICABLE: "[NA]"}
+_MARKS = {FAILED: "✖", LIKELY_ERROR: "◆", SIMILARITY: "◈", WARNING: "▲", SUGGESTION: "✎", UNCHECKED: "?", NEEDS_AI: "?", NOT_IMPLEMENTED: "–", PASSED: "✔", NOT_APPLICABLE: "·"}
+_ASCII_MARKS = {FAILED: "[FAIL]", LIKELY_ERROR: "[LIKELY]", SIMILARITY: "[SIMILAR]", WARNING: "[WARN]", SUGGESTION: "[HINT]", UNCHECKED: "[SKIP]", NEEDS_AI: "[AI]", NOT_IMPLEMENTED: "[NOT IMPLEMENTED]", PASSED: "[PASS]", NOT_APPLICABLE: "[NA]"}
 
 
 @dataclass(frozen=True)
@@ -94,12 +99,14 @@ class Palette:
     muted: str
     suggestion: str
     likely: str = "#bc4c00"
+    similarity: str = "#bf3989"
 
     def for_status(self, status: str) -> str:
         return {
             PASSED: self.passed,
             FAILED: self.failed,
             LIKELY_ERROR: self.likely,
+            SIMILARITY: self.similarity,
             WARNING: self.warning,
             SUGGESTION: self.suggestion,
             UNCHECKED: self.unchecked,
@@ -109,17 +116,18 @@ class Palette:
         }[status]
 
 
-# Green / red / orange / amber / blue / purple / grey, dark enough to read on white paper
-# (GitHub Primer's success, danger, severe, attention, accent, done, muted). The
+# Green / red / orange / pink / amber / blue / purple / grey, dark enough to read on white paper
+# (GitHub Primer's success, danger, severe, sponsors, attention, accent, done, muted). The
 # two "not checked" greys differ only in weight: a check that could not run is
 # a shade darker than one paperpush has not implemented, and both are darker
 # than a not-applicable one. (The same colours as the web page's.)
-DEFAULT_PALETTE = Palette(passed="#1a7f37", failed="#cf222e", likely="#bc4c00", warning="#9a6700", unchecked="#57606a", needs_ai="#8250df", not_implemented="#6e7781", muted="#8c959f", suggestion="#0969da")
-# Okabe-Ito blue and vermillion, dark orange for likely errors, dark yellow for warnings, bluish green for
+DEFAULT_PALETTE = Palette(passed="#1a7f37", failed="#cf222e", likely="#bc4c00", similarity="#bf3989", warning="#9a6700", unchecked="#57606a", needs_ai="#8250df", not_implemented="#6e7781", muted="#8c959f", suggestion="#0969da")
+# Okabe-Ito blue and vermillion, dark orange for likely errors, a darkened Okabe-Ito
+# reddish purple (pink) for similarity, dark yellow for warnings, bluish green for
 # suggestions (blue is passed here), reddish purple for needs AI, and grey for
 # the rest: distinguishable under the common forms of colour-blindness. (Same
 # hues as the web page's colour-blind theme.)
-ALT_PALETTE = Palette(passed="#0072b2", failed="#d55e00", likely="#b26b00", warning="#8a6d00", unchecked="#555555", needs_ai="#aa3377", not_implemented="#666666", muted="#999999", suggestion="#007a5c")
+ALT_PALETTE = Palette(passed="#0072b2", failed="#d55e00", likely="#b26b00", similarity="#b0567f", warning="#8a6d00", unchecked="#555555", needs_ai="#aa3377", not_implemented="#666666", muted="#999999", suggestion="#007a5c")
 
 
 def palette(alt_color: bool = False) -> Palette:
@@ -224,13 +232,18 @@ class ValidationReport:
 
     @property
     def warnings(self) -> list["Issue"]:
-        """Every issue that is not an error, likely error, or suggestion (including the "not checked" messages)."""
-        return [i for i in self.issues() if not i.is_error and not i.is_suggestion and not (i.is_likely_error and not i.unchecked)]
+        """Every issue that is not an error, likely error, similarity finding, or suggestion (including the "not checked" messages)."""
+        return [i for i in self.issues() if not i.is_error and not i.is_suggestion and not ((i.is_likely_error or i.is_similarity) and not i.unchecked)]
 
     @property
     def likely_errors(self) -> list["Issue"]:
         """The issues that would be critical if real but are not certain."""
         return [i for i in self.issues() if i.is_likely_error and not i.unchecked]
+
+    @property
+    def similarities(self) -> list["Issue"]:
+        """The plagiarism and AI-text scans' findings at or over their threshold (pink)."""
+        return [i for i in self.issues() if i.is_similarity and not i.unchecked]
 
     @property
     def suggestions(self) -> list["Issue"]:
@@ -289,7 +302,7 @@ def _summary_line(report: ValidationReport) -> list[tuple[str, str]]:
     out when they are 0.
     """
     counts = report.counts()
-    labels = [(PASSED, "passed"), (FAILED, "failed"), (LIKELY_ERROR, "with likely errors"), (WARNING, "with warnings"), (SUGGESTION, "with suggestions"), (UNCHECKED, "could not run"), (NEEDS_AI, "need AI"), (NOT_IMPLEMENTED, "not implemented")]
+    labels = [(PASSED, "passed"), (FAILED, "failed"), (LIKELY_ERROR, "with likely errors"), (SIMILARITY, "with similarity to review"), (WARNING, "with warnings"), (SUGGESTION, "with suggestions"), (UNCHECKED, "could not run"), (NEEDS_AI, "need AI"), (NOT_IMPLEMENTED, "not implemented")]
     always = (PASSED, FAILED, WARNING)
     return [(status, f"{counts[status]} {label}") for status, label in labels if counts[status] or status in always]
 
@@ -409,6 +422,12 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
         verdict = verdict.replace("Ready to submit: no blocking errors.", "No blocking errors, but") if verdict.startswith("Ready to submit: no blocking errors.") else verdict + " But"
         verdict = f"{verdict} {confirm}"
         verdict_status = LIKELY_ERROR
+    similar = len({i.check for i in report.similarities})
+    if similar and verdict_status in (PASSED, LIKELY_ERROR):
+        review = f"Review the similarity scan{'s' if similar > 1 else ''} (pink) before submitting: {'scores' if similar > 1 else 'a score'} from an outside service, not {'verdicts' if similar > 1 else 'a verdict'}."
+        verdict = f"{verdict} {review}"
+        if verdict_status == PASSED:
+            verdict_status = SIMILARITY
     lines.append(_Line("summary", verdict, status=verdict_status))
     hidden = _hidden_note(report, hide)
     if hidden:
@@ -439,6 +458,8 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
                     level, item_status = "not checked", UNCHECKED
                 elif issue.is_likely_error:
                     level, item_status = "likely error", LIKELY_ERROR
+                elif issue.is_similarity:
+                    level, item_status = "similarity", SIMILARITY
                 elif issue.is_suggestion:
                     level, item_status = "suggestion", SUGGESTION
                 else:
@@ -486,7 +507,7 @@ def print_report(report: ValidationReport, *, alt_color: bool = False, console=N
             console.print()
             console.print(Text(line.text.upper(), style=f"bold {color} underline"))
         elif line.role == "check":
-            bold = "bold " if line.status in (FAILED, LIKELY_ERROR, WARNING) else ""
+            bold = "bold " if line.status in (FAILED, LIKELY_ERROR, SIMILARITY, WARNING) else ""
             text = Text(pad)
             text.append(f"{_MARKS[line.status]} ", style=f"bold {color}")
             text.append(line.text, style=f"{bold}{color}")
@@ -599,7 +620,7 @@ def to_html(report: ValidationReport, *, alt_color: bool = False, hide: frozense
             body.append(f'<h2 style="color:{color};border-color:{color}">{_MARKS[line.status]} {text}</h2><ul>')
             open_list = True
         elif line.role == "check":
-            weight = "600" if line.status in (FAILED, LIKELY_ERROR, WARNING) else "500"
+            weight = "600" if line.status in (FAILED, LIKELY_ERROR, SIMILARITY, WARNING) else "500"
             body.append(f'<li class="check" style="color:{color};font-weight:{weight}"><span class="mark">{_MARKS[line.status]}</span> {text}</li>')
         elif line.role == "item":
             body.append(f'<li class="item" style="color:{color}">{text}</li>')

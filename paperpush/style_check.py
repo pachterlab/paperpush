@@ -398,7 +398,9 @@ def conventions(paragraphs: list[str], *, hyphens: bool = True, et_al_period: Op
             closed.update(w.lower() for w in re.findall(r"(?<![\w-])[A-Za-z]{5,}(?![\w-])", p))
 
     if malformed:
+        # A missing period in 'i.e.'/'e.g.' is minor, and in a PDF often extraction debris ("i.e«.p0"): a suggestion.
         out.problems.append(f"{len(malformed)} malformed 'i.e.'/'e.g.': " + "; ".join(malformed[:MAX_EXAMPLES]))
+        out.style.append(out.problems[-1])
     ie = _minority(ie_forms, ie_examples, "'i.e.'/'e.g.'")
     if ie:
         out.problems.append(ie)
@@ -429,6 +431,9 @@ _DEFINITION = re.compile(r"\(\s*([A-Z][A-Z&]*[A-Z])s?\s*(?=[);,])")
 # A mixed-case coinage in parentheses, "t-Distributed Neural Networks (TDistNNs)": an acronym only
 # when the words before it spell its capitals, so "(PyTorch)" or "(ImageNet)" is not one.
 # A legend's glossary entry, "FA: false alarms" or "FA = false alarms", at the start of a sentence: a definition in a legend only.
+# What follows the acronym in "(PSNR, MSE)" (a list of metrics) or "(AIME, 2025)" (a citation): the
+# parenthesis names the acronym, it does not spell it out, so a use before it is not too early (ICLR 2026).
+_NOT_A_DEFINITION = re.compile(r"s?\s*,\s*(?:(?:19|20)\d{2}[a-z]?\b|[A-Z][A-Z0-9&-]*[A-Z0-9]s?\s*[,)])")
 _LEGEND_DEFINITION = re.compile(r"(?:^|(?<=[.;]\s))\s*([A-Z][A-Z&]*[A-Z])s?\s*[:=]\s+(?=[a-z])")
 _MIXED_DEFINITION = re.compile(r"\(\s*([A-Z](?=[A-Za-z]*[a-z])(?=[A-Za-z]*[A-Z][A-Za-z]*[A-Z])[A-Za-z]{2,10}?)s?\s*(?=[);,])")
 # Known to every reader of a paper, or not an acronym at all.
@@ -671,7 +676,7 @@ def _scan_acronyms(paragraphs: list[str], mixed: set[str] | frozenset[str] = fro
                         else:
                             entry.other_uses += 1
             continue
-        defined_here = {(m.group(1), m.start(1)) for m in _acronym_matches(p, _DEFINITION, mixed_def)}
+        defined_here = {(m.group(1), m.start(1)) for m in _acronym_matches(p, _DEFINITION, mixed_def) if not _NOT_A_DEFINITION.match(p, m.end(1))}
         reverse = {(acr, pos): term for acr, pos, term in _reverse_definitions(p)}
         defined_here |= set(reverse)
         for acr, pos in sorted(defined_here, key=lambda x: x[1]):
@@ -736,6 +741,8 @@ def _meaning_key(expansion: str) -> str:
     """
     words = re.findall(r"[a-z0-9]+", expansion.lower())
     words = [_LINK_GLUED.sub("", w) for w in words if w not in _ACRONYM_LINK_WORDS]
+    # "convolutional" and "convolution" name one thing (ICLR 2026: "variational transposed convolution(al) (VTC)").
+    words = [w[:-2] if len(w) > 6 and w.endswith("ional") else w for w in words]
     return " ".join(_singular(w) for w in words)
 
 
@@ -1012,15 +1019,47 @@ def _tex_main_floats(source: str) -> tuple[list[str], list[str]]:
     return legends, cells
 
 
+# A line ending in one of these has not ended its sentence ("Wang et al." / "e.g.").
+_ABBREVIATION_END = re.compile(r"(?:\bet al|\be\.g|\bi\.e|\bvs|\betc|\bcf|\bFig|\bEq|\bSec|\bTab|\bNo)\.$", re.IGNORECASE)
+
+
+def _pdf_caption_ends(line: str, following: str, width: int) -> bool:
+    """Whether a PDF legend ends at ``line``: a sentence ends there and the page's text after it is not legend.
+
+    A legend often has no blank line after it, so a legend that ended on a long line ran on into
+    the main text and took its definitions along (ICLR 2026: "aggregation (HWFA)" and "Machines
+    (CPFSMs)", spelled out in the introduction right under Figure 1, were read as legend, so the
+    acronyms were reported as defined only in the abstract or used too early). The legend has ended
+    when its sentence-final line is short, when the next line picks up a sentence in lower case
+    (the main text resumes mid-sentence after the figure), or when the line is clearly shorter than
+    the page's full lines and the next line opens a new sentence.
+    """
+    text, nxt = line.rstrip(), following.strip()
+    if not text.endswith((".", ".)")) or _ABBREVIATION_END.search(text):
+        return False
+    if len(line) < 50:
+        return True
+    if re.match(r"[a-z]", nxt):
+        return True
+    # A new sentence ("To capture more ...", "In this work, we"), not a table's header row ("Task Model FID").
+    return bool(width) and len(text.strip()) < 0.93 * width and bool(re.match(r"[A-Z][a-z]*,? [a-z]", nxt))
+
+
 def _pdf_split_captions(page: str) -> tuple[str, list[str]]:
     """A PDF page's text without its figure and table legends (from a 'Figure 2.' line to the paragraph's end), and the legends."""
     lines = page.split("\n")
+    long_lines = sorted(len(line.strip()) for line in lines if len(line.strip()) > 40)
+    width = long_lines[len(long_lines) // 2] if long_lines else 0
     keep, legends, in_caption = [], [], False
-    for line in lines:
+    for i, line in enumerate(lines):
         if _CAPTION_START.match(line):
             in_caption = True
             legends.append([])
-        elif in_caption and (not line.strip() or (line.rstrip().endswith(".") and len(line) < 50)):
+            if _pdf_caption_ends(line, lines[i + 1] if i + 1 < len(lines) else "", width):
+                legends[-1].append(line)
+                in_caption = False
+                continue
+        elif in_caption and (not line.strip() or _pdf_caption_ends(line, lines[i + 1] if i + 1 < len(lines) else "", width)):
             in_caption = False
             legends[-1].append(line)
             continue
@@ -1231,6 +1270,11 @@ def _acronym_check(venue: Venue, values: dict[str, str]) -> Outcome:
         found.abstract_undefined = [h for h in found.abstract_undefined if re.search(rf"(?<![\w-]){re.escape(h.split(chr(39))[1])}", in_abstract)]
         for kind, noun, advice, level in _ACRONYM_KINDS:
             hits = getattr(found, kind)
+            if kind == "undefined" and pdf_legends:
+                # In a PDF's page text, "never spelled out" is mostly names (datasets, products, cited
+                # methods), figure and table labels, and math, which no pattern tells from a term: 1 of
+                # 17 such reports was right in a fresh ICLR 2026 sample. A suggestion, not a warning.
+                level = SUGGESTION
             if hits:
                 issues.append(_report(hits, noun, fld.id, text.path.name, advice, named=True, level=level))
         if not any(getattr(found, k) for k, *_ in _ACRONYM_KINDS):

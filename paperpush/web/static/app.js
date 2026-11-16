@@ -65,12 +65,15 @@
   // The visitor's Originality.ai or Winston AI key for the plagiarism scan,
   // kept the same way and sent only with that request (app.py:visitor_plagiarism).
   const plagiarismKey = keyStore("plagiarism");
+  // The visitor's Pangram key for the AI-text scan (app.py:visitor_ai_detection).
+  const aiDetectionKey = keyStore("ai-detection");
   const PROVIDER_LABELS = { anthropic: "Anthropic", openai: "OpenAI", google: "Gemini" };
   const guessProvider = (key) => (key.startsWith("sk-ant-") ? "anthropic" : key.startsWith("AIza") ? "google" : key.startsWith("sk-") ? "openai" : "");
 
   const state = {
     llm: { key: "", provider: "", remember: false },
     plagiarism: null, // {provider, key, accept, threshold} while the plagiarism box is ticked
+    aiDetection: null, // {key, threshold} while the AI-text scan box is ticked
     info: null,
     venues: [],
     venue: null, // venue detail from /api/venues/<slug>
@@ -1735,7 +1738,7 @@
     const server = {};
     if (state.results && !state.resultsStale) {
       for (const c of state.results.checks) {
-        if (c.group === "live" || !["failed", "likely_error", "warning", "suggestion"].includes(c.status)) continue;
+        if (c.group === "live" || !["failed", "likely_error", "similarity", "warning", "suggestion"].includes(c.status)) continue;
         for (const i of c.issues) if (i.field) (server[i.field] ||= []).push(i);
       }
     }
@@ -1743,7 +1746,7 @@
       const live = (state.live.byField[fid] || []).filter((i) => i.check !== "form.required" || state.showRequired || touchedFields.has(fid));
       const all = [...live, ...(server[fid] || [])];
       const list = $(".field-issues", w.card);
-      list.replaceChildren(...all.map((i) => el("li", { class: i.level === "error" ? "error" : i.level === "likely_error" ? "likely" : i.level === "suggestion" ? "suggestion" : "warning", text: i.message })));
+      list.replaceChildren(...all.map((i) => el("li", { class: i.level === "error" ? "error" : i.level === "likely_error" ? "likely" : i.level === "similarity" ? "similar" : i.level === "suggestion" ? "suggestion" : "warning", text: i.message })));
       w.card.querySelectorAll(".input").forEach((n) => n.classList.toggle("invalid", live.some((i) => i.level === "error")));
       w.issues = all;
     }
@@ -1751,13 +1754,15 @@
   }
 
   // One status per field, shown as the card's coloured edge and the menu
-  // dot: red for an error, orange for a likely error, amber for a warning, yellow for a value autofill
+  // dot: red for an error, orange for a likely error, pink for a plagiarism or
+  // AI-text scan at its threshold, amber for a warning, yellow for a value autofill
   // wants read over, green for filled, hollow grey for empty. A suggestion on
   // style leaves the field green: it is listed, but nothing needs fixing.
-  const STATUS_CLASSES = ["st-ok", "st-warn", "st-likely", "st-issue", "st-review", "st-empty", "st-pending"];
+  const STATUS_CLASSES = ["st-ok", "st-warn", "st-likely", "st-similar", "st-issue", "st-review", "st-empty", "st-pending"];
   function fieldStatus(value, issues, review) {
     if (issues.some((i) => i.level === "error")) return "st-issue";
     if (issues.some((i) => i.level === "likely_error" && !i.unchecked)) return "st-likely";
+    if (issues.some((i) => i.level === "similarity" && !i.unchecked)) return "st-similar";
     if (issues.some((i) => i.level !== "suggestion")) return "st-warn";
     if (!String(value || "").trim()) return "st-empty";
     return review ? "st-review" : "st-ok";
@@ -1825,18 +1830,20 @@
     }
     // Once a file is removed or replaced, the last validation's tally no
     // longer describes the files: show none until Validate runs again.
-    const c = state.filesChanged ? { passed: 0, failed: 0, likely_error: 0, warning: 0, suggestion: 0, needs_ai: 0 } : r.counts;
+    const c = state.filesChanged ? { passed: 0, failed: 0, likely_error: 0, similarity: 0, warning: 0, suggestion: 0, needs_ai: 0 } : r.counts;
     const likely = c.likely_error || 0;
-    const ran = c.passed + c.failed + likely + c.warning + (c.suggestion || 0);
+    const similar = c.similarity || 0;
+    const ran = c.passed + c.failed + likely + similar + c.warning + (c.suggestion || 0);
     $("#stat-checks").textContent = `${c.passed}/${ran}`;
     $("#stat-checks-label").textContent = state.resultsStale ? "checks passed (out of date)" : "checks passed";
-    const cls = state.resultsStale ? "stale" : c.failed ? "bad" : likely ? "likely" : c.warning ? "partial" : "good";
+    const cls = state.resultsStale ? "stale" : c.failed ? "bad" : likely ? "likely" : similar ? "similar" : c.warning ? "partial" : "good";
     tile.className = `stat jump ${cls}`;
-    setStatus(item, state.resultsStale ? "st-pending" : c.failed ? "st-issue" : likely ? "st-likely" : c.warning ? "st-warn" : "st-ok");
+    setStatus(item, state.resultsStale ? "st-pending" : c.failed ? "st-issue" : likely ? "st-likely" : similar ? "st-similar" : c.warning ? "st-warn" : "st-ok");
     const tiles = [
       ["good", c.passed, "passed"],
       [c.failed ? "bad" : "", c.failed, "failed"],
       ...(likely ? [["likely", likely, "likely errors"]] : []),
+      ...(similar ? [["similar", similar, "similarity to review"]] : []),
       [c.warning ? "partial" : "", c.warning, "warnings"],
       [c.suggestion ? "suggest" : "", c.suggestion || 0, "suggestions"],
       [c.needs_ai ? "ai" : "", c.needs_ai || 0, "need AI"],
@@ -1852,8 +1859,8 @@
     ["ai", "Checked only with AI", "Judgements that need someone to read the files: lettering in raster figures, free-text guideline rules, whether every field says what the manuscript says. Run them with “Validate, extended with AI”."],
     ["manual", "Not checked by paperpush", "Rules in the guidelines paperpush has no check for yet. Check these yourself."],
   ];
-  const MARKS = { passed: "✔", failed: "✖", likely_error: "◆", warning: "▲", suggestion: "✎", unchecked: "?", needs_ai: "?", not_implemented: "–", not_applicable: "·", pending: "○" };
-  const STATUS_WORDS = { likely_error: "likely error: confirm", suggestion: "style", unchecked: "could not run", needs_ai: "needs AI", not_implemented: "check by hand" };
+  const MARKS = { passed: "✔", failed: "✖", likely_error: "◆", similarity: "◈", warning: "▲", suggestion: "✎", unchecked: "?", needs_ai: "?", not_implemented: "–", not_applicable: "·", pending: "○" };
+  const STATUS_WORDS = { likely_error: "likely error: confirm", similarity: "similarity: review", suggestion: "style", unchecked: "could not run", needs_ai: "needs AI", not_implemented: "check by hand" };
 
   // The checks of one block, each with the status to show (grey "pending"
   // until there is a result for it).
@@ -1881,7 +1888,7 @@
 
   function checkItem(c) {
     const status = c.status;
-    const cls = { passed: "st-passed", failed: "st-failed", likely_error: "st-likely", warning: "st-warning", suggestion: "st-suggestion", unchecked: "st-unchecked", needs_ai: "st-needs-ai", not_applicable: "st-na" }[status] || "";
+    const cls = { passed: "st-passed", failed: "st-failed", likely_error: "st-likely", similarity: "st-similar", warning: "st-warning", suggestion: "st-suggestion", unchecked: "st-unchecked", needs_ai: "st-needs-ai", not_applicable: "st-na" }[status] || "";
     const tag = c.source === "ai" ? el("span", { class: "tag", text: "AI" }) : null;
     const word = STATUS_WORDS[status] ? el("span", { class: "cat", text: STATUS_WORDS[status] }) : null;
     const head = [el("span", { class: "mk", "aria-hidden": "true", text: MARKS[status] || "○" }), el("span", { class: "ttl", text: c.title }), tag, word, el("span", { class: "cat", text: c.category })];
@@ -1897,7 +1904,7 @@
         i.field && state.fields.has(i.field) ? ": " : "",
         i.message))) : null,
     );
-    return el("details", { class: `check ${cls}`, "data-check": c.id, open: status === "failed" || status === "likely_error" || status === "unchecked" || (status === "warning" && issues.length <= 6) ? true : null },
+    return el("details", { class: `check ${cls}`, "data-check": c.id, open: status === "failed" || status === "likely_error" || status === "similarity" || status === "unchecked" || (status === "warning" && issues.length <= 6) ? true : null },
       el("summary", {}, ...head), body);
   }
 
@@ -1922,7 +1929,9 @@
       if (downgraded && ok) root.append(el("p", { class: "verdict partial", text: `▲ Ready as an initial submission: ${plural(downgraded, "formatting problem")} shown as warnings. Fix them before the revision.` }));
       else {
         const likely = state.results.checks.filter((c) => c.status === "likely_error").length;
+        const similar = state.results.checks.filter((c) => c.status === "similarity").length;
         if (ok && likely) root.append(el("p", { class: "verdict likely", text: `◆ No blocking errors, but ${plural(likely, "check")} found a likely error. Each would be serious if real: confirm them before submitting.` }));
+        else if (ok && similar) root.append(el("p", { class: "verdict similar", text: `◈ No blocking errors, but the ${similar > 1 ? "plagiarism and AI-text scans" : "similarity scan"} reached ${similar > 1 ? "their thresholds" : "its threshold"}. ${similar > 1 ? "Scores" : "A score"} from an outside service, not ${similar > 1 ? "verdicts" : "a verdict"}: review the matches before submitting.` }));
         else root.append(el("p", { class: `verdict ${ok ? "ok" : "bad"}`, text: ok ? "✔ No blocking errors. Read any warnings, then submit." : `✖ Not ready: ${plural(errors, "check")} failed. Fix them before submitting.` }));
       }
     }
@@ -1934,11 +1943,12 @@
       }
       const shown = checks.filter((c) => c.status !== "not_applicable");
       const na = checks.filter((c) => c.status === "not_applicable");
-      const done = shown.filter((c) => ["passed", "failed", "likely_error", "warning", "suggestion"].includes(c.status));
+      const done = shown.filter((c) => ["passed", "failed", "likely_error", "similarity", "warning", "suggestion"].includes(c.status));
       // A suggestion counts as passed: nothing in it needs fixing.
       const counts = done.length ? `${done.filter((c) => c.status === "passed" || c.status === "suggestion").length} of ${shown.length} passed` : plural(shown.length, "check");
       const worst = shown.some((c) => c.status === "failed") ? "st-failed"
         : shown.some((c) => c.status === "likely_error") ? "st-likely"
+        : shown.some((c) => c.status === "similarity") ? "st-similar"
         : shown.some((c) => c.status === "warning") ? "st-warning"
           : shown.length && done.length === shown.length ? "st-passed" : "st-pending";
       root.append(el("div", { class: `check-group ${worst}`, "data-group": group },
@@ -1987,22 +1997,23 @@
   }
   const schedulePlan = debounce(refreshPlan, 900);
 
-  // With the plagiarism box ticked (state.plagiarism), the scan runs too.
+  // With the plagiarism or AI-text box ticked (state.plagiarism, state.aiDetection), those scans run too.
   async function runValidate(withAi) {
     const plagiarism = state.plagiarism;
+    const aiDetection = state.aiDetection;
     const status = $("#validate-status");
     const buttons = [$("#validate-btn"), $("#validate-ai-btn")];
     buttons.forEach((b) => (b.disabled = true));
     status.className = "small";
     const bar = el("progress", { class: "validate-progress", max: "1", value: "0", "aria-label": "Validation progress" });
-    const slow = withAi || plagiarism;
-    const label = el("span", { class: "validate-progress-label", text: slow ? `Validating, with ${[withAi && "the AI checks", plagiarism && "the plagiarism scan"].filter(Boolean).join(" and ")} (this can take a minute)…` : "Validating…" });
+    const slow = withAi || plagiarism || aiDetection;
+    const label = el("span", { class: "validate-progress-label", text: slow ? `Validating, with ${[withAi && "the AI checks", plagiarism && "the plagiarism scan", aiDetection && "the AI-text scan"].filter(Boolean).join(" and ")} (this can take a minute)…` : "Validating…" });
     status.replaceChildren(bar, label);
     const onProgress = ({ done, total, label: stage }) => {
       bar.max = total || 1;
       bar.value = done;
       const pct = total ? Math.round((100 * done) / total) : 0;
-      label.textContent = stage === "done" ? "Finishing…" : `${pct}% · ${stage}${(withAi && stage === "AI checks") || (plagiarism && stage === "Plagiarism") ? " (this can take a minute)" : ""}…`;
+      label.textContent = stage === "done" ? "Finishing…" : `${pct}% · ${stage}${(withAi && stage === "AI checks") || (plagiarism && stage === "Plagiarism") || (aiDetection && stage === "AI-text detection") ? " (this can take a minute)" : ""}…`;
     };
     state.showRequired = true;
     try {
@@ -2012,6 +2023,10 @@
         Object.assign(body, { plagiarism: true, plagiarism_accept: plagiarism.accept, plagiarism_threshold: plagiarism.threshold });
         headers["X-Plagiarism-Provider"] = plagiarism.provider;
         if (plagiarism.key) headers["X-Plagiarism-Key"] = plagiarism.key;
+      }
+      if (aiDetection) {
+        Object.assign(body, { ai_detection: true, ai_detection_threshold: aiDetection.threshold });
+        if (aiDetection.key) headers["X-Ai-Detection-Key"] = aiDetection.key;
       }
       const res = await postStream(`/api/workspaces/${state.ws}/validate`, body, headers, onProgress);
       state.results = res;
@@ -2024,8 +2039,10 @@
       if (res.ai_error) notes.push(`AI checks failed: ${res.ai_error}`);
       const plag = plagiarism && (res.checks || []).find((ch) => ch.id === "integrity.plagiarism");
       if (plag && plag.status === "unchecked") notes.push(`plagiarism scan did not run: ${plag.detail}`);
-      status.textContent = `${c.passed} passed, ${c.failed} failed, ${c.warning} with warnings${c.suggestion ? `, ${c.suggestion} with suggestions on style` : ""}${c.needs_ai ? `, ${c.needs_ai} need AI` : ""}.${notes.length ? ` (${notes.join("; ")})` : ""}`;
-      if (res.ai_error || (plag && plag.status === "unchecked")) status.className = "small err";
+      const aidet = aiDetection && (res.checks || []).find((ch) => ch.id === "integrity.ai_text");
+      if (aidet && aidet.status === "unchecked") notes.push(`AI-text scan did not run: ${aidet.detail}`);
+      status.textContent = `${c.passed} passed, ${c.failed} failed${c.similarity ? `, ${c.similarity} with similarity to review` : ""}, ${c.warning} with warnings${c.suggestion ? `, ${c.suggestion} with suggestions on style` : ""}${c.needs_ai ? `, ${c.needs_ai} need AI` : ""}.${notes.length ? ` (${notes.join("; ")})` : ""}`;
+      if (res.ai_error || (plag && plag.status === "unchecked") || (aidet && aidet.status === "unchecked")) status.className = "small err";
     } catch (err) {
       status.className = "small err";
       status.textContent = err.message;
@@ -2110,6 +2127,70 @@
     $("#plag-close").addEventListener("click", () => dialog.close());
     $("#plag-key").addEventListener("input", renderPlagiarismKeyNote);
     $("#plagiarism-form").addEventListener("submit", (e) => { e.preventDefault(); savePlagiarism(); });
+  }
+
+  // ------------------------------------------------------- AI-text scan
+
+  // The "AI-text scan" box next to Validate: like the plagiarism box, ticking
+  // it opens a dialog for the visitor's own Pangram key and the threshold, and
+  // while it is ticked both Validate buttons also run the scan
+  // (`paperpush validate --ai-detection`). It starts unticked on every page load.
+  const aiDetectionEnv = () => Boolean(state.info && state.info.ai_detection_env);
+
+  function openAiDetection() {
+    const saved = aiDetectionKey.load();
+    $("#aidet-key").value = saved.key;
+    $("#aidet-remember").checked = saved.remember;
+    $("#aidet-threshold").value = store.get("ai-detection-threshold") || "";
+    $("#aidet-status").textContent = "";
+    renderAiDetectionKeyNote();
+    $("#ai-detection-dialog").showModal();
+  }
+
+  function renderAiDetectionKeyNote() {
+    $("#aidet-key-note").textContent = aiDetectionEnv() && !$("#aidet-key").value.trim()
+      ? "Leave empty to use the Pangram key set in your environment."
+      : "Sent only with validate requests; never stored on the server.";
+  }
+
+  function saveAiDetection() {
+    const status = $("#aidet-status");
+    const key = $("#aidet-key").value.trim();
+    const remember = $("#aidet-remember").checked;
+    const rawThreshold = $("#aidet-threshold").value.trim();
+    const threshold = rawThreshold === "" ? null : Number(rawThreshold);
+    status.className = "small err";
+    if (!key && !aiDetectionEnv()) {
+      status.textContent = "Add your API key first.";
+      $("#aidet-key").focus();
+      return;
+    }
+    if (threshold !== null && !(threshold >= 0 && threshold <= 100)) {
+      status.textContent = "The threshold is a percentage, 0 to 100.";
+      return;
+    }
+    aiDetectionKey.save(key, "pangram", remember);
+    if (threshold === null) store.del("ai-detection-threshold"); else store.set("ai-detection-threshold", String(threshold));
+    state.aiDetection = { key, threshold };
+    $("#ai-detection-dialog").close("saved");
+  }
+
+  function wireAiDetection() {
+    const box = $("#ai-detection-check");
+    const dialog = $("#ai-detection-dialog");
+    box.checked = false;
+    box.addEventListener("change", () => {
+      if (box.checked) openAiDetection();
+      else state.aiDetection = null;
+    });
+    dialog.addEventListener("close", () => {
+      if (dialog.returnValue !== "saved") { box.checked = false; state.aiDetection = null; }
+      dialog.returnValue = "";
+    });
+    $("#aidet-run").addEventListener("click", saveAiDetection);
+    $("#aidet-close").addEventListener("click", () => dialog.close());
+    $("#aidet-key").addEventListener("input", renderAiDetectionKeyNote);
+    $("#ai-detection-form").addEventListener("submit", (e) => { e.preventDefault(); saveAiDetection(); });
   }
 
   function focusField(fid) {
@@ -2826,6 +2907,7 @@
     $("#validate-btn").addEventListener("click", () => runValidate(false));
     $("#validate-ai-btn").addEventListener("click", () => runValidate(true));
     wirePlagiarism();
+    wireAiDetection();
     $("#initial-submission").addEventListener("change", (e) => setInitialSubmission(e.target.checked));
     $("#download-sub").addEventListener("click", downloadSub);
     $("#download-zip").addEventListener("click", downloadBundle);

@@ -16,9 +16,12 @@ service's size limit. The result is always shown: the similarity score and the
 matching sources, so the author can see that a match is their own preprint.
 ``accepted_urls`` lists sources that are fine to match (the author's preprint,
 an earlier conference version): they are still listed, marked accepted, and do
-not count toward the warning. Similarity at or over ``threshold`` percent is a
-warning, never an error: methods sections, standard phrases, and quotations
-always match something, so a score needs a reader.
+not count toward the threshold. Similarity at or over ``threshold`` percent is
+reported at the *similarity* level (pink in the report), the level kept for the
+plagiarism and AI-text scans: never an error, and not counted with the
+warnings, since methods sections, standard phrases, and quotations always
+match something, so a score needs a reader. Characters that hide text from the
+scan are a likely error.
 """
 
 from __future__ import annotations
@@ -328,19 +331,19 @@ def summary(result: ScanResult, opts: PlagiarismOptions) -> str:
 
 
 def check_text(text: str, opts: PlagiarismOptions, field_id: str = "manuscript"):
-    """``(issues, detail)`` for ``text``: a likely error when the unaccepted similarity reaches the threshold (each matching source listed as a warning under it), and for text that hides matches."""
-    from .validate import LIKELY_ERROR, WARNING, Issue
+    """``(issues, detail)`` for ``text``: SIMILARITY findings when the unaccepted similarity reaches the threshold (the score, then each matching source), and a likely error for text that hides matches."""
+    from .validate import LIKELY_ERROR, SIMILARITY, Issue
 
     result = scan(text, opts)
     issues: list = []
     score = result.unaccepted_score
     if score >= opts.threshold:
-        issues.append(Issue(LIKELY_ERROR, field_id, f"plagiarism: {score:g}% of the text matches other sources ({opts.name}); check that each match below is quoted and cited, or is your own earlier version (accept it with --plagiarism-accept URL)"))
+        issues.append(Issue(SIMILARITY, field_id, f"plagiarism: {score:g}% of the text matches other sources ({opts.name}); check that each match below is quoted and cited, or is your own earlier version (accept it with --plagiarism-accept URL)"))
         for s in sorted(result.sources, key=lambda s: -s.percent):
             if s.accepted or s.percent < SOURCE_ISSUE_PERCENT:
                 continue
             example = f', e.g. "{_snippet(s.passages[0])}"' if s.passages else ""
-            issues.append(Issue(WARNING, field_id, f"plagiarism: {s.percent:g}% matches {s.url}{' (' + s.title + ')' if s.title else ''}{example}"))
+            issues.append(Issue(SIMILARITY, field_id, f"plagiarism: {s.percent:g}% matches {s.url}{' (' + s.title + ')' if s.title else ''}{example}"))
     for flag in result.flags:
         issues.append(Issue(LIKELY_ERROR, field_id, f"plagiarism: {opts.name} found {flag} in the text, which can hide matching text from similarity checks"))
     return issues, summary(result, opts)

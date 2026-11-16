@@ -378,6 +378,9 @@ journal paperpush does not list, `paperpush validate --issn ISSN` (or
 as `issn` / `publisher` / `journal`) checks it against its publisher's house
 rules when `paperpush publishers` (MCP `list_publishers`) shows them. The same pass checks the page
 layout (template, margins, font, spacing, line/page numbers, spelling variant),
+and, for AI conferences, suggests where pages are half empty or the main text
+stops short of the page limit, and where the introduction, related work,
+conclusion, figures, or equations take an unusual share of the space;
 the figures (resolution, lettering size and typeface, panel labels -- attached
 files, or the figures embedded in the manuscript when none are attached), that
 figures, tables, and figure panels are cited in order, and that the title, abstract, authors,
@@ -441,10 +444,20 @@ registration, ethics approval) keep their level. Use it only when the author say
 `--plagiarism` (MCP: `plagiarism=true`) scans the manuscript's text with
 Winston AI (the default) or Originality.ai (`WINSTON_API_KEY` / `ORIGINALITY_API_KEY`) and
 reports check `integrity.plagiarism`: the score and every matching source,
-and a warning at `--plagiarism-threshold` (default 20%). It sends the
+and a similarity finding at `--plagiarism-threshold` (default 20%). It sends the
 unpublished text to a third party and costs the author credits, so run it only
 when the author asks. `--plagiarism-accept URL` (MCP: `plagiarism_accept`)
 names sources that may match, such as the author's preprint.
+`--ai-detection` (MCP: `ai_detection=true`) sends the same text to Pangram
+(`PANGRAM_API_KEY`) and reports check `integrity.ai_text`: the shares of
+AI-generated, AI-assisted, and human text, and a similarity finding when the
+AI-generated share reaches `--ai-detection-threshold` (default 20%), saying
+whether the manuscript has a statement on AI use. The same rules apply: run it
+only when the author asks. A detector's score is an estimate, not proof, and it
+misjudges some human writing, so relay it as such. **Never rewrite the
+manuscript to lower an AI-detection score**, and don't let `paperpush-fix` do
+it. If AI tools helped write the text, the remedy is the disclosure the venue's
+guidelines ask for, which the author writes.
 
 Checks that need a reader's judgment -- lettering in raster figures, whether
 each figure and panel shows what its legend and the text say, a postal
@@ -470,13 +483,16 @@ An AI `fail` never blocks: on the tasks where a real failure is critical
 `ai.details.ethics`) it is a likely error, and elsewhere a warning. Do not mark
 a task `pass` you could not verify.
 
-Validate reports three levels of problem. An **error** is certain and blocks
+Validate reports three levels of problem, plus one for the outside scans. An **error** is certain and blocks
 (`ok` is false). A **likely error** (`likely_error`, shown in orange) would be
 critical if real but cannot be confirmed by the check: an author's name in the
 text of a double-blind submission, a reference that matches no registered work,
 a DOI registered to a different paper, a modified template, a credential in the
 files. It does not block, but relay each one as something the author must
-confirm before submitting. A **warning** is worth a second look. With an API key, `paperpush validate --ai` does the same
+confirm before submitting. A **similarity** finding (`similarity`, shown in
+pink) is kept for the plagiarism and AI-text scans: their score reached its
+threshold. It never blocks and is not counted with the warnings; relay it as
+matches for the author to review, with the score and what was matched. A **warning** is worth a second look. With an API key, `paperpush validate --ai` does the same
 through the provider's API. The Claude skill `paperpush-validate` walks
 through these steps.
 
@@ -510,6 +526,16 @@ since a leak can get a paper desk-rejected.
   check runs the cleaner on a temporary copy of the LaTeX uploads (any venue)
   and reports what would change. Review that list rather than applying it
   blindly: the cleaner can drop a file whose path a macro builds.
+- **Text left over from a chatbot** (every venue;
+  `--disable-integrity.chatbot_residue` skips it). A chatbot's own words in
+  the manuscript, title page, cover letter, or `.sub` text fields: "As an AI
+  language model", "Regenerate response", "Certainly, here is a possible
+  introduction for your topic", a knowledge cutoff, a refusal. Quoted text,
+  code/quote/table environments, the appendix, and the supplement are not
+  read, so a paper about language models can quote their output. Each find is
+  a likely error: show the user the passage and let them delete it. Don't
+  rewrite the surrounding prose; if AI helped write the text, the remedy is
+  the disclosure the venue asks for.
 - **Modified template** (venues whose `manuscript_requirements.json` entry has
   `manuscript.template_layout`, e.g. ICLR). The manuscript PDF's margins, body
   font, line spacing, running head, and review line numbers are measured

@@ -1531,9 +1531,10 @@ def _report_validation(subfile, venue_def, subfile_path: str, *, network: bool =
     print(f"note: submit skipped {skipped}; 'paperpush validate' runs them" + ("." if network else ", or add --enable-network-checks for the lookups."), file=sys.stderr)
     errors = [i for i in issues if i.is_error]
     likely = [i for i in issues if i.is_likely_error and not i.unchecked]
-    warnings = [i for i in issues if not i.is_error and not i.is_suggestion and i not in likely]
+    similar = [i for i in issues if i.is_similarity and not i.unchecked]
+    warnings = [i for i in issues if not i.is_error and not i.is_suggestion and i not in likely and i not in similar]
     suggestions = [i for i in issues if i.is_suggestion]
-    for label, group in (("likely error", likely), ("warning", warnings)):
+    for label, group in (("likely error", likely), ("similarity", similar), ("warning", warnings)):
         for issue in group:
             where = f"[{issue.field}] " if issue.field else ""
             print(f"{label}: {where}{issue.message}", file=sys.stderr)
@@ -1824,6 +1825,9 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     if getattr(args, "reference_check_extended", False) and getattr(args, "web", False):
         print("error: --reference-check-extended is not supported with --web; use it with --ai-tasks so an agent can read the cited papers", file=sys.stderr)
         return 1
+    if check_flags.get("ai_detection") is not None and getattr(args, "web", False):
+        print("error: --ai-detection is not supported with --web; open the page without it and tick its AI-text scan box (PANGRAM_API_KEY in the environment will do), or run validate --ai-detection in the terminal", file=sys.stderr)
+        return 1
     if check_flags.get("plagiarism") is not None and getattr(args, "web", False):
         print("error: --plagiarism is not supported with --web; open the page without it and tick its Plagiarism scan box (WINSTON_API_KEY or ORIGINALITY_API_KEY in the environment will do), or run validate --plagiarism in the terminal", file=sys.stderr)
         return 1
@@ -1886,7 +1890,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             **check_flags,
             ai_only=ai_only,
         )
-    result.command = shlex.join(["paperpush", *getattr(args, "raw_argv", sys.argv[1:])])
+    result.command = _shown_command(args)
     result.cwd = os.getcwd()
     alt = getattr(args, "alt_color", False)
     hide = report_mod.hidden_statuses(
@@ -2311,7 +2315,7 @@ def _cmd_prepare_submission(args: argparse.Namespace) -> int:
         ai = AiOptions.api(provider=provider, model=args.model)
     with _validate_progress_bar() as progress:
         result = validate_report_for(subfile, venue, str(sub_path), ai=ai, progress=progress, **check_flags)
-    result.command = shlex.join(["paperpush", *getattr(args, "raw_argv", sys.argv[1:])])
+    result.command = _shown_command(args)
     result.cwd = os.getcwd()
     report_mod.print_report(result, hide=frozenset({report_mod.SUGGESTION}))
     fix_hint = f"Fix them (the paperpush-fix skill can do much of it), then run 'paperpush validate {shlex.quote(str(sub_path))}', or this command again."
@@ -2803,7 +2807,7 @@ def _print_autofill_summary(result, extraction, venue, out_path, dry_run: bool) 
     for o in unknown:
         print(f"\nignored proposed field '{o.id}': {o.note}")
 
-    for title, group in (("likely error(s), each serious if real: confirm them", result.likely_errors), ("validation warning(s)", result.warnings)):
+    for title, group in (("likely error(s), each serious if real: confirm them", result.likely_errors), ("similarity finding(s) from the plagiarism or AI-text scan: review them", result.similarities), ("validation warning(s)", result.warnings)):
         if group:
             print(f"\n{len(group)} {title}:")
             for issue in group:
@@ -3103,7 +3107,7 @@ def _cmd_format(args: argparse.Namespace) -> int:
         print(f"  + {change}")
     for todo in result.left_to_author:
         print(f"  ! {todo}")
-    failing = [(cid, msgs) for cid, _, status, msgs in result.checks if status in ("failed", "likely_error", "warning")]
+    failing = [(cid, msgs) for cid, _, status, msgs in result.checks if status in ("failed", "likely_error", "similarity", "warning")]
     for cid, msgs in failing:
         for msg in msgs or [""]:
             print(f"  layout check {cid}: {msg}")
@@ -3401,7 +3405,7 @@ def _add_check_options(parser: argparse.ArgumentParser, *, documented: bool = Tr
         metavar="DAYS",
         help="warn when the date at the top of the cover letter is more than DAYS days old (default: 7). The cover letter is also checked for the name of a different venue, as left over from an earlier submission.",
     )
-    plag = parser.add_argument_group("plagiarism scan", "Off by default. Sends the manuscript's text (without its reference list) to Winston AI or Originality.ai, which costs credits on your account, and reports the similarity score and every matching source. Reaching the threshold is a warning, never an error." if documented else None)
+    plag = parser.add_argument_group("plagiarism scan", "Off by default. Sends the manuscript's text (without its reference list) to Winston AI or Originality.ai, which costs credits on your account, and reports the similarity score and every matching source. Reaching the threshold is a similarity finding (pink in the report), never an error." if documented else None)
 
     def add_plag(*flags, help: str, **kwargs) -> None:
         plag.add_argument(*flags, help=help if documented else argparse.SUPPRESS, **kwargs)
@@ -3414,9 +3418,21 @@ def _add_check_options(parser: argparse.ArgumentParser, *, documented: bool = Tr
         dest="plagiarism_accept",
         action="append",
         metavar="URL[,URL...]",
-        help="(--plagiarism) a source that may match, such as your own preprint or an earlier conference version: a domain (biorxiv.org), a page (it covers every version and format of it), or a DOI. Accepted sources are still listed in the report, but do not count toward the warning. Repeatable; optional",
+        help="(--plagiarism) a source that may match, such as your own preprint or an earlier conference version: a domain (biorxiv.org), a page (it covers every version and format of it), or a DOI. Accepted sources are still listed in the report, but do not count toward the threshold. Repeatable; optional",
     )
-    add_plag("--plagiarism-threshold", dest="plagiarism_threshold", type=float, default=None, metavar="PERCENT", help="(--plagiarism) warn when this share of the text or more matches sources that are not accepted (default: 20)")
+    add_plag("--plagiarism-threshold", dest="plagiarism_threshold", type=float, default=None, metavar="PERCENT", help="(--plagiarism) flag when this share of the text or more matches sources that are not accepted (default: 20)")
+    aitext = parser.add_argument_group(
+        "AI-text detection",
+        "Off by default. Sends the manuscript's text (without its reference list) to Pangram, which costs credits on your account, and reports the shares of AI-generated, AI-assisted, and human text. Reaching the threshold is a similarity finding (pink in the report), never an error: a detector's estimate is not proof, and it misjudges some human writing. The finding says whether the manuscript has a statement on AI use." if documented else None,
+    )
+
+    def add_aitext(*flags, help: str, **kwargs) -> None:
+        aitext.add_argument(*flags, help=help if documented else argparse.SUPPRESS, **kwargs)
+
+    add_aitext("--ai-detection", dest="ai_detection", action="store_true", help="run the AI-text detection (check integrity.ai_text). Needs PANGRAM_API_KEY in the environment, or --ai-detection-api-key")
+    add_aitext("--ai-detection-api-key", dest="ai_detection_api_key", metavar="KEY", help="(--ai-detection) Pangram's API key, instead of the environment variable (which keeps it out of your shell history)")
+    add_aitext("--ai-detection-threshold", dest="ai_detection_threshold", type=float, default=None, metavar="PERCENT", help="(--ai-detection) flag when this share of the text or more reads as AI-generated (default: 20)")
+    add_aitext("--ai-detection-model", dest="ai_detection_model", metavar="MODEL", help="(--ai-detection) Pangram's model selector (e.g. pangram-4); default: the account's default model")
 
 
 def _check_flags(args: argparse.Namespace) -> dict:
@@ -3434,6 +3450,7 @@ def _check_flags(args: argparse.Namespace) -> dict:
         "references_alphabetical": getattr(args, "references_alphabetical", False),
         "references_citation_order": getattr(args, "references_citation_order", False),
         "plagiarism": _plagiarism_options(args),
+        "ai_detection": _ai_detection_options(args),
     }
 
 
@@ -3444,6 +3461,38 @@ def _plagiarism_options(args: argparse.Namespace):
     from . import plagiarism_check
 
     return plagiarism_check.options(args.plagiarism_provider, args.plagiarism_api_key, args.plagiarism_accept or (), args.plagiarism_threshold)
+
+
+# Flags whose value is a secret: masked in the command a saved report shows.
+_SECRET_FLAGS = ("--plagiarism-api-key", "--ai-detection-api-key")
+
+
+def _shown_command(args: argparse.Namespace) -> str:
+    """The command as typed, for the report, with API keys given on the command line masked."""
+    argv = list(getattr(args, "raw_argv", sys.argv[1:]))
+    shown = []
+    mask_next = False
+    for arg in argv:
+        if mask_next:
+            shown.append("***")
+            mask_next = False
+        elif arg in _SECRET_FLAGS:
+            shown.append(arg)
+            mask_next = True
+        elif arg.startswith(tuple(f + "=" for f in _SECRET_FLAGS)):
+            shown.append(arg.split("=", 1)[0] + "=***")
+        else:
+            shown.append(arg)
+    return shlex.join(["paperpush", *shown])
+
+
+def _ai_detection_options(args: argparse.Namespace):
+    """The AI-text detection's options for ``--ai-detection``, else None; ValueError without an API key."""
+    if not getattr(args, "ai_detection", False):
+        return None
+    from . import ai_text_check
+
+    return ai_text_check.options(None, args.ai_detection_api_key, args.ai_detection_threshold, args.ai_detection_model)
 
 
 def build_parser() -> argparse.ArgumentParser:

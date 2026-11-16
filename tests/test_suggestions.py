@@ -89,12 +89,13 @@ def test_strict_style_note_on_the_report():
     assert "Validated with --strict-style: 2 suggestion(s) on style shown as warnings." in report.to_text(rep)
 
 
-def test_conventions_marks_consistency_as_style_and_mistakes_as_not():
+def test_conventions_marks_consistency_and_malformed_abbreviations_as_style():
+    # A malformed 'i.e.'/'e.g.' is minor and, in a PDF, often extraction debris: a suggestion too.
     found = sc.conventions(["We used a net (ie a model).", "A vs. B and C vs D and E vs. F."])
     malformed = [p for p in found.problems if "malformed" in p]
     two_ways = [p for p in found.problems if "written two ways" in p]
     assert malformed and two_ways
-    assert all(p not in found.style for p in malformed)
+    assert all(p in found.style for p in malformed)
     assert all(p in found.style for p in two_ways)
 
 

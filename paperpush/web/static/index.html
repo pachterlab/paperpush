@@ -175,6 +175,7 @@
             <span class="mark st-passed">✔ passed</span>
             <span class="mark st-failed">✖ failed</span>
             <span class="mark st-likely">◆ likely error</span>
+            <span class="mark st-similar">◈ similarity (plagiarism / AI-text scan)</span>
             <span class="mark st-warning">▲ warning</span>
             <span class="mark st-suggestion">✎ suggestion (style)</span>
             <span class="mark st-pending">○ not checked yet</span>
@@ -185,6 +186,7 @@
           <span class="ai-button-wrap" id="validate-ai-wrap" tabindex="0"><button type="button" class="btn" id="validate-ai-btn" disabled><span aria-hidden="true">✨</span> Validate, extended with AI</button></span>
           <span class="ai-button-wrap initial-wrap" id="initial-wrap" tabindex="0"><label class="initial-check"><input type="checkbox" id="initial-submission" disabled> initial submission (any format)</label></span>
           <label class="initial-check" title="Also check the manuscript's text against published sources with Winston AI or Originality.ai when validating (your own API key; costs credits)"><input type="checkbox" id="plagiarism-check"> plagiarism scan</label>
+          <label class="initial-check" title="Also estimate how much of the manuscript's text reads as AI-generated, with Pangram, when validating (your own API key; costs credits)"><input type="checkbox" id="ai-detection-check"> AI-text scan</label>
           <span id="validate-status" role="status" class="small"></span>
         </div>
         <div class="stats" id="check-stats" hidden></div>
@@ -239,19 +241,36 @@
   <dialog id="plagiarism-dialog">
     <form method="dialog" class="dialog-inner" id="plagiarism-form" autocomplete="off">
       <h2>Plagiarism scan</h2>
-      <p class="hint">While the box is ticked, Validate also sends the manuscript's text (without its reference list) to Winston AI or Originality.ai, which reports the share of it that matches other sources and lists every match. <strong>Each scan costs credits on your account with that service.</strong> Reaching the threshold is a warning, never an error.</p>
+      <p class="hint">While the box is ticked, Validate also sends the manuscript's text (without its reference list) to Winston AI or Originality.ai, which reports the share of it that matches other sources and lists every match. <strong>Each scan costs credits on your account with that service.</strong> Reaching the threshold is a pink <em>similarity</em> finding to review, never an error.</p>
       <div class="rec-grid">
         <label class="rec-field"><span class="name">Service</span>
           <select id="plag-provider" class="input"><option value="winston">Winston AI</option><option value="originality">Originality.ai</option></select></label>
-        <label class="rec-field"><span class="name">Warn at (% matching)</span><input type="number" id="plag-threshold" class="input" min="0" max="100" step="1" placeholder="20"></label>
+        <label class="rec-field"><span class="name">Flag at (% matching)</span><input type="number" id="plag-threshold" class="input" min="0" max="100" step="1" placeholder="20"></label>
         <label class="rec-field rec-wide"><span class="name">API key</span><input type="password" id="plag-key" class="input mono" autocomplete="off" spellcheck="false" placeholder="Your Winston AI or Originality.ai API key"><span class="hint small" id="plag-key-note"></span></label>
         <label class="rec-field rec-wide plag-remember"><input type="checkbox" id="plag-remember"> Remember this key on this device <span class="hint small">(otherwise it is forgotten when you close this tab)</span></label>
-        <label class="rec-field rec-wide"><span class="name">Sources that may match (optional)</span><textarea id="plag-accept" class="input mono" rows="3" placeholder="One per line: your own preprint or an earlier conference version, as a domain (biorxiv.org), a page, or a DOI"></textarea><span class="hint small">Still listed in the report, but they do not count toward the warning.</span></label>
+        <label class="rec-field rec-wide"><span class="name">Sources that may match (optional)</span><textarea id="plag-accept" class="input mono" rows="3" placeholder="One per line: your own preprint or an earlier conference version, as a domain (biorxiv.org), a page, or a DOI"></textarea><span class="hint small">Still listed in the report, but they do not count toward the threshold.</span></label>
       </div>
       <div class="dialog-actions">
         <span id="plag-status" class="small muted" role="status"></span>
         <button type="button" class="btn" id="plag-close">Cancel</button>
         <button type="button" class="btn primary" id="plag-run">Turn on the scan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="ai-detection-dialog">
+    <form method="dialog" class="dialog-inner" id="ai-detection-form" autocomplete="off">
+      <h2>AI-text scan</h2>
+      <p class="hint">While the box is ticked, Validate also sends the manuscript's text (without its reference list) to Pangram, which estimates the shares of AI-generated, AI-assisted, and human text and marks the passages it reads as AI-generated. <strong>Each scan costs credits on your Pangram account.</strong> Reaching the threshold is a pink <em>similarity</em> finding to review, never an error: a detector's estimate is not proof, and it misjudges some human writing. If AI tools helped write the manuscript, the fix is the disclosure the venue asks for.</p>
+      <div class="rec-grid">
+        <label class="rec-field"><span class="name">Flag at (% AI-generated)</span><input type="number" id="aidet-threshold" class="input" min="0" max="100" step="1" placeholder="20"></label>
+        <label class="rec-field rec-wide"><span class="name">Pangram API key</span><input type="password" id="aidet-key" class="input mono" autocomplete="off" spellcheck="false" placeholder="Your Pangram API key"><span class="hint small" id="aidet-key-note"></span></label>
+        <label class="rec-field rec-wide plag-remember"><input type="checkbox" id="aidet-remember"> Remember this key on this device <span class="hint small">(otherwise it is forgotten when you close this tab)</span></label>
+      </div>
+      <div class="dialog-actions">
+        <span id="aidet-status" class="small muted" role="status"></span>
+        <button type="button" class="btn" id="aidet-close">Cancel</button>
+        <button type="button" class="btn primary" id="aidet-run">Turn on the scan</button>
       </div>
     </form>
   </dialog>
