@@ -78,6 +78,8 @@ OFFICE_EXTS = {".docx", ".pptx", ".xlsx", ".docm", ".pptm", ".xlsm", ".odt", ".o
 OPAQUE_EXTS = {".doc", ".ppt", ".xls", ".7z", ".rar"}
 # Category of a finding that says a file went unread, so the scan is not a pass.
 NOT_SCANNED = "not scanned"
+# Part of what a check meant to read could not be fetched (a linked repository's files): an incomplete check, not a finding.
+NOT_FETCHED = "not fetched"
 
 # Auxiliary / editor / VCS files that do not help compile a paper but routinely
 # ride along inside a source bundle and leak drafts, build paths, or history.

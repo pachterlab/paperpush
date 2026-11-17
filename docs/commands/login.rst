@@ -10,7 +10,8 @@ in the ``.sub`` file.
    usage: paperpush login [-h] [-v] [-q] [--list] [-u USERNAME]
                           [--password PASSWORD] [--confirm-password] [--orcid] [--github]
                           [--provider NAME] [--orcid-id ID] [--into SUBFILE] [--status] [--check]
-                          [--logout] [--no-verify] [--verify-headless]
+                          [--logout] [--browser] [--port PORT] [--no-open]
+                          [--form-timeout SECONDS] [--no-verify] [--verify-headless]
                           [--timeout SECONDS]
                           [venue]
 
@@ -82,6 +83,50 @@ Credential entry
    Ask for the password a second time and check the two match. Off by default:
    the prompt asks once, and a typo is caught by the sign-in check anyway. Has
    no effect when the password comes from ``--password`` or the environment.
+
+Type the credentials into a browser page
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``--browser``
+   Collect the username and password on a one-time page in your browser instead
+   of terminal prompts. paperpush serves the page on ``127.0.0.1`` only, at a
+   random path, opens a tab on it, and prints its URL. The page offers every
+   sign-in method the venue supports (its own account, ORCID, GitHub) and, for
+   the NCBI venues, the identity providers, unless ``--orcid``, ``--github``, or
+   ``--provider`` picks one. What you type is checked against the venue's
+   sign-in exactly as in the terminal (a CAPTCHA or two-factor step is finished
+   in the window that opens), then stored. A wrong password puts the form back
+   with the reason. The command exits ``0`` once a login is stored, and ``1``
+   after 5 failed tries or when ``--form-timeout`` runs out.
+
+   The command needs no keyboard input, which is what lets an AI agent start it
+   for you (the ``paperpush-login`` skill, or the MCP ``login`` tool with
+   ``browser=true``): you type the password into the page, and the agent only
+   sees the URL and whether the login was stored. That keeps the password out of
+   the conversation, though any program running as you can still read the
+   keyring.
+
+   .. code-block:: text
+
+      $ paperpush login nature --browser
+      Sign in to nature on this page, which is served only on this computer:
+        http://127.0.0.1:53817/9xQ…
+      A browser tab with the page should have opened. Your password goes from that page to paperpush only; it is never printed here.
+      Waiting for the sign-in (15 minutes)…
+      Checking the Venue account credentials by signing in to nature…
+      Stored credentials for nature (ada@example.edu).
+
+``--port PORT``
+   Serve the page on this port rather than a free one, e.g. to forward it over
+   SSH (``ssh -L PORT:127.0.0.1:PORT host``, then open the URL on your own
+   machine).
+
+``--no-open``
+   Print the URL without opening a browser tab.
+
+``--form-timeout SECONDS``
+   How long the page waits for a sign-in. Default: ``900`` (15 minutes);
+   ``0`` waits forever.
 
 Sign in with ORCID
 ~~~~~~~~~~~~~~~~~~~
@@ -217,6 +262,12 @@ Confirm the stored login still works before submitting:
 .. code-block:: bash
 
    paperpush login biorxiv --check
+
+Sign in on a page in your browser instead of the terminal:
+
+.. code-block:: bash
+
+   paperpush login biorxiv --browser
 
 Sign in with ORCID (you are prompted for your ORCID password):
 

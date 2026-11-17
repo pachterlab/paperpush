@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 # Enough for any main text plus a long appendix; a larger PDF is read only this far.
 MAX_PAGES = 80
+# Embedded vector figures larger than this (decoded) are laid out as an empty box: see _Interpreter.do_Do.
+MAX_FORM_BYTES = 8_000_000
 
 
 INSTALL_HINT = "pip install 'paperpush[validate]'"
@@ -149,10 +151,11 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
     try:
         from pdfminer.converter import PDFPageAggregator
         from pdfminer.layout import LTChar, LTCurve, LTFigure, LTImage, LTPage
-        from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
+        from pdfminer.pdfinterp import LITERAL_FORM, PDFPageInterpreter, PDFResourceManager
         from pdfminer.pdfpage import PDFPage
-        from pdfminer.pdftypes import resolve1
+        from pdfminer.pdftypes import list_value, resolve1, stream_value
         from pdfminer.psparser import literal_name
+        from pdfminer.utils import MATRIX_IDENTITY
     except ImportError:
         logger.debug("pdfminer.six not installed; skipping glyph-level PDF checks")
         return None
@@ -192,6 +195,23 @@ def _read(path: Path, max_pages: int) -> list[Page] | None:
             if self.paperpush_alphas:
                 self.device.fill_alpha = self.paperpush_alphas.pop()
             super().do_Q()
+
+        def do_Do(self, xobjid_arg):
+            # A vector figure whose content stream decodes to tens of MB (a scatter plot of
+            # 10^5 points) takes pdfminer minutes per page to tokenize; several made ICLR 2026
+            # papers time out after 15 min. Keep the figure's box but skip its contents: the
+            # text outside it is still read.
+            try:
+                xobjid = literal_name(xobjid_arg)
+                xobj = stream_value(self.xobjmap[xobjid])
+                huge = xobj.get("Subtype") is LITERAL_FORM and "BBox" in xobj and len(xobj.get_data()) > MAX_FORM_BYTES
+            except Exception:
+                huge = False
+            if not huge:
+                return super().do_Do(xobjid_arg)
+            logger.info("skipping the contents of figure %s (over %d MB of drawing commands)", xobjid, MAX_FORM_BYTES // 1_000_000)
+            self.device.begin_figure(xobjid, list_value(xobj["BBox"]), list_value(xobj.get("Matrix", MATRIX_IDENTITY)))
+            self.device.end_figure(xobjid)
 
         def do_gs(self, name):
             try:

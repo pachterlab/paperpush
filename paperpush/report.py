@@ -61,11 +61,15 @@ SIMILARITY = "similarity"
 WARNING = "warning"
 SUGGESTION = "suggestion"
 UNCHECKED = "unchecked"
+# Ran, but part of it could not be done because a registry or web service did not answer
+# (some references not looked up, a linked repository not fetched). Grey, like the "not checked"
+# sections: absence of a finding there is not a pass.
+INCOMPLETE = "incomplete"
 NEEDS_AI = "needs_ai"
 NOT_IMPLEMENTED = "not_implemented"
 NOT_APPLICABLE = "not_applicable"
 
-STATUSES = (FAILED, LIKELY_ERROR, SIMILARITY, WARNING, SUGGESTION, UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED, PASSED, NOT_APPLICABLE)
+STATUSES = (FAILED, LIKELY_ERROR, SIMILARITY, WARNING, SUGGESTION, INCOMPLETE, UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED, PASSED, NOT_APPLICABLE)
 
 # Section headings, in the order the report shows them.
 _HEADINGS = {
@@ -74,6 +78,7 @@ _HEADINGS = {
     SIMILARITY: "Similarity (plagiarism and AI-text scans: review the matches)",
     WARNING: "Warnings",
     SUGGESTION: "Suggestions (style)",
+    INCOMPLETE: "Incomplete: a service did not answer, or a lookup limit was reached",
     UNCHECKED: "Not checked: could not run",
     NEEDS_AI: "Not checked: needs AI",
     NOT_IMPLEMENTED: "Not checked: not implemented",
@@ -82,8 +87,8 @@ _HEADINGS = {
 }
 # Markers for the terminal, HTML, and Markdown, and the ASCII ones the PDF's
 # standard fonts can draw.
-_MARKS = {FAILED: "✖", LIKELY_ERROR: "◆", SIMILARITY: "◈", WARNING: "▲", SUGGESTION: "✎", UNCHECKED: "?", NEEDS_AI: "?", NOT_IMPLEMENTED: "–", PASSED: "✔", NOT_APPLICABLE: "·"}
-_ASCII_MARKS = {FAILED: "[FAIL]", LIKELY_ERROR: "[LIKELY]", SIMILARITY: "[SIMILAR]", WARNING: "[WARN]", SUGGESTION: "[HINT]", UNCHECKED: "[SKIP]", NEEDS_AI: "[AI]", NOT_IMPLEMENTED: "[NOT IMPLEMENTED]", PASSED: "[PASS]", NOT_APPLICABLE: "[NA]"}
+_MARKS = {FAILED: "✖", LIKELY_ERROR: "◆", SIMILARITY: "◈", WARNING: "▲", SUGGESTION: "✎", INCOMPLETE: "◌", UNCHECKED: "?", NEEDS_AI: "?", NOT_IMPLEMENTED: "–", PASSED: "✔", NOT_APPLICABLE: "·"}
+_ASCII_MARKS = {FAILED: "[FAIL]", LIKELY_ERROR: "[LIKELY]", SIMILARITY: "[SIMILAR]", WARNING: "[WARN]", SUGGESTION: "[HINT]", INCOMPLETE: "[PARTIAL]", UNCHECKED: "[SKIP]", NEEDS_AI: "[AI]", NOT_IMPLEMENTED: "[NOT IMPLEMENTED]", PASSED: "[PASS]", NOT_APPLICABLE: "[NA]"}
 
 
 @dataclass(frozen=True)
@@ -110,6 +115,7 @@ class Palette:
             WARNING: self.warning,
             SUGGESTION: self.suggestion,
             UNCHECKED: self.unchecked,
+            INCOMPLETE: self.unchecked,
             NEEDS_AI: self.needs_ai,
             NOT_IMPLEMENTED: self.not_implemented,
             NOT_APPLICABLE: self.muted,
@@ -139,6 +145,8 @@ def issue_dict(issue: "Issue") -> dict:
     out = {"level": issue.level, "field": issue.field, "message": issue.message}
     if issue.unchecked:
         out["unchecked"] = True
+    if getattr(issue, "incomplete", False):
+        out["incomplete"] = True
     return out
 
 
@@ -222,6 +230,11 @@ class ValidationReport:
     def counts(self) -> dict[str, int]:
         return {s: len(self.by_status(s)) for s in STATUSES}
 
+    def incomplete(self) -> list[CheckResult]:
+        """Every check part of which could not be done: those with status INCOMPLETE, and those
+        that found something (and are reported under it) but also left lookups unmade."""
+        return [r for r in self.results if r.status == INCOMPLETE or any(getattr(i, "incomplete", False) for i in r.issues)]
+
     def issues(self) -> list["Issue"]:
         """Every issue, in check order: the flat list ``validate`` returns."""
         return [i for r in self.results for i in r.issues]
@@ -266,6 +279,8 @@ class ValidationReport:
             "ai": self.ai,
             "ai_error": self.ai_error,
             "counts": self.counts(),
+            # Checks listed in the "Incomplete" section, including ones whose status is a finding.
+            "incomplete": [r.id for r in self.incomplete()],
             "initial_submission_rule": self.initial_submission_rule,
             "initial_submission": self.initial_submission,
             "downgraded": self.downgraded,
@@ -302,8 +317,10 @@ def _summary_line(report: ValidationReport) -> list[tuple[str, str]]:
     out when they are 0.
     """
     counts = report.counts()
-    labels = [(PASSED, "passed"), (FAILED, "failed"), (LIKELY_ERROR, "with likely errors"), (SIMILARITY, "with similarity to review"), (WARNING, "with warnings"), (SUGGESTION, "with suggestions"), (UNCHECKED, "could not run"), (NEEDS_AI, "need AI"), (NOT_IMPLEMENTED, "not implemented")]
+    labels = [(PASSED, "passed"), (FAILED, "failed"), (LIKELY_ERROR, "with likely errors"), (SIMILARITY, "with similarity to review"), (WARNING, "with warnings"), (SUGGESTION, "with suggestions"), (INCOMPLETE, "incomplete"), (UNCHECKED, "could not run"), (NEEDS_AI, "need AI"), (NOT_IMPLEMENTED, "not implemented")]
     always = (PASSED, FAILED, WARNING)
+    # The incomplete section also lists checks counted under what they found.
+    counts = {**counts, INCOMPLETE: len(report.incomplete())}
     return [(status, f"{counts[status]} {label}") for status, label in labels if counts[status] or status in always]
 
 
@@ -350,8 +367,8 @@ def initial_submission_notes(report: ValidationReport) -> list[str]:
     return notes
 
 
-# The "Not checked" sections: could not run, needs AI, not implemented.
-NOT_CHECKED = frozenset({UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED})
+# The grey sections: incomplete, and the "Not checked" ones (could not run, needs AI, not implemented).
+NOT_CHECKED = frozenset({INCOMPLETE, UNCHECKED, NEEDS_AI, NOT_IMPLEMENTED})
 
 
 def hidden_statuses(*, errors_only: bool = False, hide_warnings: bool = False, hide_unchecked: bool = False, hide_suggestions: bool = False) -> frozenset[str]:
@@ -433,7 +450,8 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
     if hidden:
         lines.append(_Line("meta", hidden))
     for status in STATUSES:
-        results = report.by_status(status)
+        # The incomplete section also lists checks reported above for what they found.
+        results = report.incomplete() if status == INCOMPLETE else report.by_status(status)
         if not results or status in hide:
             continue
         lines.append(_Line("heading", f"{_HEADINGS[status]} ({len(results)})", status=status))
@@ -450,12 +468,16 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
                 lines.append(_Line("note", result.detail, indent=2, status=status))
             if status in (PASSED, NOT_APPLICABLE):
                 continue
-            for issue in result.issues:
+            # Under "Incomplete", a check listed elsewhere for its findings shows only what was not done.
+            shown = [i for i in result.issues if getattr(i, "incomplete", False)] if status == INCOMPLETE and result.status != INCOMPLETE else result.issues
+            for issue in shown:
                 where = f"[{issue.field}] " if issue.field else ""
                 if issue.is_error:
                     level, item_status = "error", FAILED
                 elif issue.unchecked:
                     level, item_status = "not checked", UNCHECKED
+                elif getattr(issue, "incomplete", False):
+                    level, item_status = "incomplete", INCOMPLETE
                 elif issue.is_likely_error:
                     level, item_status = "likely error", LIKELY_ERROR
                 elif issue.is_similarity:

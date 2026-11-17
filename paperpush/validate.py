@@ -80,6 +80,11 @@ class Issue:
     # The message says a rule could not be checked (an unreadable file, a
     # missing tool), rather than that it was broken.
     unchecked: bool = False
+    # The message says part of the check could not be done (a registry or web
+    # service did not answer, so some lookups were not made). Like ``unchecked``
+    # it does not set the check's status: a check that found nothing else is
+    # INCOMPLETE, and one that did find something is also listed as incomplete.
+    incomplete: bool = False
 
     @property
     def is_error(self) -> bool:
@@ -105,6 +110,11 @@ class Issue:
 def unchecked(field: str, message: str) -> Issue:
     """A WARNING saying a rule went unchecked, and why."""
     return Issue(WARNING, field, message, unchecked=True)
+
+
+def incomplete(field: str, message: str) -> Issue:
+    """A WARNING saying part of a check could not be done (a service did not answer), and what."""
+    return Issue(WARNING, field, message, incomplete=True)
 
 
 def _truthy_bool(value: str) -> bool:
@@ -795,16 +805,17 @@ def _findings_to_issues(findings) -> list[Issue]:
     A file-scoped finding names its file in the message (``... (in main.tex)``);
     a submission-level one (``where == "submission"``) is shown as-is.
     """
-    from .sensitive import NOT_SCANNED
+    from .sensitive import NOT_FETCHED, NOT_SCANNED
 
     issues: list[Issue] = []
     for finding in findings:
         not_scanned = finding.category == NOT_SCANNED
+        partial = finding.category == NOT_FETCHED
         level = getattr(finding, "level", WARNING)
         if finding.where and finding.where != "submission":
-            issues.append(Issue(level, "", f"{finding.detail} (in {finding.where})", unchecked=not_scanned))
+            issues.append(Issue(level, "", f"{finding.detail} (in {finding.where})", unchecked=not_scanned, incomplete=partial))
         else:
-            issues.append(Issue(level, "", finding.detail, unchecked=not_scanned))
+            issues.append(Issue(level, "", finding.detail, unchecked=not_scanned, incomplete=partial))
     return issues
 
 
@@ -844,7 +855,7 @@ def _link_issues(venue: Venue, values: dict[str, str]) -> Outcome:
     if probed and len(unanswered) == probed and not issues:
         raise Unchecked(f"none of the {probed} link(s) could be reached (no network, or the sites did not answer)")
     if unanswered:
-        issues.append(unchecked("", f"{len(unanswered)} of {probed} link(s) got no answer and were not verified: {_listed(unanswered)}"))
+        issues.append(incomplete("", f"{len(unanswered)} of {probed} link(s) got no answer and were not verified: {_listed(unanswered)}"))
     unread = [path.name for path in paths if path.suffix.lower() in (".pdf", ".docx") and not any(True for _ in sensitive._iter_text_blobs(path))]
     if unread:
         issues.append(unchecked("", f"no text could be read from {_listed(unread)}, so any links in it were not checked"))
@@ -888,7 +899,7 @@ def _with_coverage(issues: list[Issue], coverage: dict | None) -> list[Issue]:
         return issues
     if references.nothing_looked_up(coverage) and not issues:
         raise Unchecked(note)
-    return issues + [unchecked("", note)]
+    return issues + [incomplete("", note)]
 
 
 def _retraction_issues(venue: Venue, values: dict[str, str], retracted: list | None, coverage: dict | None = None) -> list[Issue]:
@@ -996,15 +1007,19 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
     unknown = result.by_status(reference_search.UNKNOWN)
     pending = [lk.ref for lk in unknown] + result.skipped
     if unverified or pending:
-        labels = [lk.ref.label for lk in unverified] + [r.label for r in pending]
-        why = []
+        # Near misses need a reader; lookups that were never made (no answer, or skipped) mean the
+        # check is incomplete, which is a different thing from a doubtful reference.
         if unverified:
-            why.append(f"{len(unverified)} could not be matched with certainty (near misses, or kinds of work the registries often miss)")
-        if unknown:
-            why.append(f"{len(unknown)} could not be looked up (the registries did not answer)")
-        if result.skipped:
-            why.append(f"{len(result.skipped)} were not looked up ({result.skipped_reason})")
-        issues.append(unchecked("", f"{len(labels)} reference(s) without a DOI are unverified: {'; '.join(why)}. Check them by hand, or run the AI check: {_listed(labels)}"))
+            labels = [lk.ref.label for lk in unverified]
+            issues.append(unchecked("", f"{len(labels)} reference(s) without a DOI are unverified: they could not be matched with certainty (near misses, or kinds of work the registries often miss). Check them by hand, or run the AI check: {_listed(labels)}"))
+        if pending:
+            why = []
+            if unknown:
+                why.append(f"{len(unknown)} could not be looked up (the registries did not answer)")
+            if result.skipped:
+                why.append(f"{len(result.skipped)} were not looked up ({result.skipped_reason})")
+            labels = [r.label for r in pending]
+            issues.append(incomplete("", f"{len(labels)} reference(s) without a DOI were not checked: {'; '.join(why)}. Run validate again later, check them by hand, or run the AI check: {_listed(labels)}"))
         if ctx.files:
             ctx.ai_tasks.append(
                 ai_validate.AiTask(
@@ -1203,7 +1218,7 @@ def _openreview_profile_issues(venue: Venue, values: dict[str, str]) -> list[Iss
     if not openreview_profiles.applies(venue):
         return []
     logger.info("Checking OpenReview author profiles (%s)", venue.slug)
-    return [Issue(ERROR if p.error else WARNING, p.field, f"openreview: {p.message}", unchecked=p.unchecked) for p in openreview_profiles.check(venue, values)]
+    return [Issue(ERROR if p.error else WARNING, p.field, f"openreview: {p.message}", unchecked=p.unchecked, incomplete=p.incomplete) for p in openreview_profiles.check(venue, values)]
 
 
 def _scan_text(venue: Venue, values: dict[str, str]) -> tuple[str, str, str]:
@@ -1375,6 +1390,17 @@ class Outcome:
 
 
 def _status_for(issues: list[Issue]) -> str:
+    from . import report
+
+    # Lookups that could not be made (a service did not answer) are not findings: a check
+    # whose other issues are at most style suggestions is INCOMPLETE rather than passed.
+    status = _finding_status([i for i in issues if not i.incomplete])
+    if len(issues) > len([i for i in issues if not i.incomplete]) and status in (report.PASSED, report.SUGGESTION, report.UNCHECKED):
+        return report.INCOMPLETE
+    return status
+
+
+def _finding_status(issues: list[Issue]) -> str:
     from . import report
 
     if any(i.is_error for i in issues):

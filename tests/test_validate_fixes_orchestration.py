@@ -135,8 +135,9 @@ def test_links_are_unchecked_when_none_answered(tmp_path, monkeypatch):
 def test_links_partly_answered_says_so(tmp_path, monkeypatch):
     monkeypatch.setattr(sensitive, "_url_is_reachable", lambda url: None if url.endswith("/b") else True)
     result = _check(_run("biorxiv", _with_links(tmp_path), check_links=True), "integrity.links")
-    assert result.status == "unchecked"
-    assert "1 of 2" in result.issues[0].message
+    # One link answered and one did not: the check ran but is incomplete.
+    assert result.status == "incomplete"
+    assert "1 of 2" in result.issues[0].message and result.issues[0].incomplete
 
 
 def test_links_all_answered_pass(tmp_path, monkeypatch):

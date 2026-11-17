@@ -327,7 +327,7 @@ delete anything in the source directory**; every change happens in the copy.
       <the author's remaining tasks, most important first>
       (format-free: "Apply <new venue>'s formatting when it asks, at revision
        or acceptance")
-      paperpush submit <abs new .sub>   (after: paperpush login <new venue>;
+      paperpush submit <abs new .sub>   (after: paperpush login <new venue> --browser;
        format-free: add --initial-submission)
       (or, when paperpush cannot submit to the new venue: upload the files
        through <new venue>'s own portal, using the .sub as your checklist)
@@ -348,8 +348,9 @@ delete anything in the source directory**; every change happens in the copy.
    and with which template (or the layout rules); the validation counts; and
    what is left for them. Under format-free, say what was removed and which
    warnings still apply, so a passing validation is not mistaken for all clear.
-   For the portal, point them to `paperpush-submit` (or
-   `paperpush login <venue>` then `paperpush submit <abs .sub>`, adding
+   For the portal, point them to `paperpush-submit`, which signs them in
+   through `paperpush-login` when needed (or `paperpush login <venue>
+   --browser` then `paperpush submit <abs .sub>`, adding
    `--initial-submission` under format-free, or validation will refuse the
    formatting errors). If
    `paperpush venues` shows the new venue is validate-only, or it is a draft
@@ -376,8 +377,8 @@ submitted to. Tell the user so up front, then:
   variable, paperpush does not know the venue. Tell `paperpush-autofill` that
   `venue_draft/` is not part of the manuscript, and tell `paperpush-validate`
   the draft entry already exists so it does not build a second one.
-- **Never run `paperpush login`, `paperpush submit`, or `paperpush-submit` for
-  it.** paperpush has no runner for this venue's portal.
+- **Never run `paperpush login`, `paperpush-login`, `paperpush submit`, or
+  `paperpush-submit` for it.** paperpush has no runner for this venue's portal.
 - In the summary, say the rules came from a draft entry read from the
   guidelines just now, so they are only as good as that reading. Pass on
   `paperpush-validate`'s pointers for hot-fixing the draft (with the paths

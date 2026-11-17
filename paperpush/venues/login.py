@@ -258,7 +258,7 @@ def verify_login(
                 # Headed: a wrong field, CAPTCHA, or two-factor step may just need
                 # the human to finish in the window we already opened.
                 print(f"Automated sign-in did not complete: {exc}")
-                wait_for_human("Finish signing in to the browser window, then return here")
+                _wait_for_finish(base_slug, page, module)
                 ok = module.is_logged_in(page)
             if not ok:
                 raise LoginVerificationError("the sign-in did not take -- the username or password may be wrong, " "or the site added a step (CAPTCHA / two-factor) that could not be " "completed")
@@ -267,6 +267,23 @@ def verify_login(
         finally:
             context.close()
             browser.close()
+
+
+def _wait_for_finish(name: str, page, module) -> None:
+    """Give the human a chance to finish a sign-in the script could not.
+
+    At a terminal, waits for Enter. Without one (``paperpush login --browser``
+    run by an agent, which sets a sign-in watch), watches the page until it is
+    signed in, the window is closed, or the watch times out; the caller's
+    ``is_logged_in`` check then decides.
+    """
+    from . import common
+
+    watch = common._sign_in_watch
+    if watch is not None and not common._stdin_is_terminal():
+        common._watch_sign_in(name, watch, page, module.is_logged_in)
+        return
+    wait_for_human("Finish signing in to the browser window, then return here")
 
 
 def first_present(locators, timeout_ms: int):

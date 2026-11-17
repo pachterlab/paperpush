@@ -49,16 +49,18 @@ command line.**
    link** on its site and give it to the user. Ask them to create an account,
    or to tell you if they already have one. Ask whether they sign in with
    ORCID.
-3. Once `login()` is written (step A4), ask the user to run
-   `paperpush login <slug> -u <their username>` **in a separate terminal
-   window** (from the repo root), not in this session. A `!` command here
-   gets no keyboard input, so the username and password prompts fail
-   ("a username is required"). Never suggest `--password` or
-   `PAPERPUSH_PASSWORD` to get around that: both expose the password. The
-   command prompts for the password, verifies it with your `login()` in a
-   real browser, and stores it in the OS keyring (or paperpush's encrypted
-   file fallback). If it fails, ask them to paste the error: it tells you
-   what to fix in `login()`. Ask them to run it again after the fix.
+3. Once `login()` is written (step A4), run `paperpush login <slug>
+   --browser` from the repo root in the background (the `paperpush-login`
+   skill's steps 2-4). The user types the username and password into the
+   sign-in page it opens, never into the chat. The command verifies them with
+   your `login()` in a real browser and stores them in the OS keyring (or
+   paperpush's file fallback). If verification fails, the page and the
+   command's output show the error: it tells you what to fix in `login()`.
+   Open the page again after the fix. Never suggest `--password` or
+   `PAPERPUSH_PASSWORD`: both expose the password. If the page can't be
+   reached, the user can run `paperpush login <slug>` in a separate terminal
+   window instead (not with `!` in this session, which gets no keyboard
+   input).
 4. Until then, explore the signed-in portal through a browser the user signs
    into themselves: `paperpush codegen <login_url>`, or a headed Playwright
    page you open and they type into. Save the session state to a scratch file
@@ -126,8 +128,8 @@ python scripts/gen_subfile_templates.py
 - Stop before the final submit and hand off with `hold_open`, as the
   template does. **Never click the send control, in code or by hand.**
 
-Then do credentials step 3: have the user run `paperpush login <slug>` in a
-separate terminal (not with `!` in this session).
+Then do credentials step 3: open the sign-in page with `paperpush login
+<slug> --browser` for the user.
 
 **A5. Ground-truth sample and tests.**
 - Add `<slug>.sub.txt` to `tests/sample_subfiles.json`, with values for every

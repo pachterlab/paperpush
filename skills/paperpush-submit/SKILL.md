@@ -4,7 +4,9 @@ description: >-
   Fill in a venue's submission portal from a paperpush .sub file: confirm the
   stored login still signs in, then run `paperpush submit`, which walks the
   portal wizard and stops before the final submit button for the author to
-  review and send. Hands a run that fails partway to paperpush-portal-debug.
+  review and send. Signs the author in through paperpush-login when no
+  working login is stored. Hands a run that fails partway to
+  paperpush-portal-debug.
   Handles a request to skip validation. Triggers: "submit my sub", "fill out the submission portal for
   <venue>", "fill out submission portal to nature. skip validation", "push
   this .sub to the portal", "log in and submit".
@@ -91,37 +93,22 @@ password changed since they logged in. Over MCP, call
   venue "could not be checked", or `check.status` `unchecked`, also counts as a
   pass. Some venues need no login (`login_status` says so); go on to step 2.
 - Exit 1, or `failed` / `timed_out`, means nothing is stored or the sign-in
-  failed. **Stop and ask the user** which way they want to sign in:
+  failed. **Invoke the `paperpush-login` skill** (via the Skill tool) with the
+  venue. It opens a one-time sign-in page in the user's browser, where they
+  type their credentials (never in the chat), and waits for the login to be
+  stored. Pass along any sign-in method the user named ("I use ORCID").
 
-  1. **Store a login** (the next runs sign in by themselves). They run, in
-     their own terminal window (not with `!` in this session, which gets no
-     keyboard input, so the username and password prompts fail),
+  - It comes back **logged in**: go on to step 2.
+  - It comes back **waiting** (the user has not finished on the page): end
+    your turn, and continue from step 2 once it reports the login stored.
+  - It comes back **not logged in**: give the reason, and offer to open the
+    page again or to use manual sign-in instead.
 
-     ```
-     paperpush login <venue>
-     ```
-
-     This opens a browser and may need their password, ORCID, CAPTCHA, or
-     two-factor code.
-  2. **Sign in by hand in the submission's browser window**, with nothing
-     stored. Go on to step 2 with manual login (see
-     [Manual sign-in](#manual-sign-in)).
-
-  If the user already said they want to sign in themselves in the browser
-  ("I'll log in manually", "don't store my password"), take option 2 without
-  asking. For option 1, tell them in the same message:
-  - If they have no account on the venue's submission system yet, they must
-    register there first. Give them the portal URL: `submission_url` from
-    `describe_venue`, or without MCP
-    `python -c "from paperpush.database import get_venue; print(get_venue('<venue>').submission_url)"`.
-    paperpush cannot create accounts.
-  - `paperpush login` tries the sign-in before it saves anything, so a wrong
-    username or password is reported right away and nothing is stored. If it
-    fails, they should check the details (or reset the password on the
-    portal) and run it again.
-
-  When they say they are done, run the check again. Never run
-  `paperpush login` yourself, and never ask for a password in the chat.
+  If the user already said they would rather sign in themselves in the
+  submission's browser window ("I'll log in manually", "don't store my
+  password"), skip `paperpush-login` and go on to step 2 with manual login
+  (see [Manual sign-in](#manual-sign-in)). `paperpush-login` also hands back
+  that choice when the sign-in page can't be reached.
 
 #### Manual sign-in
 
@@ -234,8 +221,9 @@ way.
 
 ## Rules
 
-- Never run `paperpush login` yourself or ask for a password. With manual
-  sign-in, the user signs in in the browser window, never through you.
+- Never ask for a password. Store a login only through `paperpush-login`,
+  where the user types it into the local sign-in page. With manual sign-in,
+  the user signs in in the browser window, never through you.
 - Never press, or try to press, the final submit button.
 - `submit` is for initial submissions. Warn and ask before submitting a `.sub`
   that looks like a revision (step 0b).

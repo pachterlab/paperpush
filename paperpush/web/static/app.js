@@ -1763,7 +1763,7 @@
     if (issues.some((i) => i.level === "error")) return "st-issue";
     if (issues.some((i) => i.level === "likely_error" && !i.unchecked)) return "st-likely";
     if (issues.some((i) => i.level === "similarity" && !i.unchecked)) return "st-similar";
-    if (issues.some((i) => i.level !== "suggestion")) return "st-warn";
+    if (issues.some((i) => i.level !== "suggestion" && !i.incomplete)) return "st-warn";
     if (!String(value || "").trim()) return "st-empty";
     return review ? "st-review" : "st-ok";
   }
@@ -1830,10 +1830,12 @@
     }
     // Once a file is removed or replaced, the last validation's tally no
     // longer describes the files: show none until Validate runs again.
-    const c = state.filesChanged ? { passed: 0, failed: 0, likely_error: 0, similarity: 0, warning: 0, suggestion: 0, needs_ai: 0 } : r.counts;
+    const c = state.filesChanged ? { passed: 0, failed: 0, likely_error: 0, similarity: 0, warning: 0, suggestion: 0, incomplete: 0, needs_ai: 0 } : r.counts;
+    // Checks part of which was not done (a service did not answer), including ones counted under a finding.
+    const partial = state.filesChanged ? 0 : (r.incomplete || []).length;
     const likely = c.likely_error || 0;
     const similar = c.similarity || 0;
-    const ran = c.passed + c.failed + likely + similar + c.warning + (c.suggestion || 0);
+    const ran = c.passed + c.failed + likely + similar + c.warning + (c.suggestion || 0) + (c.incomplete || 0);
     $("#stat-checks").textContent = `${c.passed}/${ran}`;
     $("#stat-checks-label").textContent = state.resultsStale ? "checks passed (out of date)" : "checks passed";
     const cls = state.resultsStale ? "stale" : c.failed ? "bad" : likely ? "likely" : similar ? "similar" : c.warning ? "partial" : "good";
@@ -1846,6 +1848,7 @@
       ...(similar ? [["similar", similar, "similarity to review"]] : []),
       [c.warning ? "partial" : "", c.warning, "warnings"],
       [c.suggestion ? "suggest" : "", c.suggestion || 0, "suggestions"],
+      ...(partial ? [["", partial, "incomplete (a service did not answer)"]] : []),
       [c.needs_ai ? "ai" : "", c.needs_ai || 0, "need AI"],
     ];
     statsRow.replaceChildren(...tiles.map(([k, n, label]) => el("div", { class: `stat ${k}` }, el("b", { text: String(n) }), el("span", { text: label }))));
@@ -1859,8 +1862,8 @@
     ["ai", "Checked only with AI", "Judgements that need someone to read the files: lettering in raster figures, free-text guideline rules, whether every field says what the manuscript says. Run them with “Validate, extended with AI”."],
     ["manual", "Not checked by paperpush", "Rules in the guidelines paperpush has no check for yet. Check these yourself."],
   ];
-  const MARKS = { passed: "✔", failed: "✖", likely_error: "◆", similarity: "◈", warning: "▲", suggestion: "✎", unchecked: "?", needs_ai: "?", not_implemented: "–", not_applicable: "·", pending: "○" };
-  const STATUS_WORDS = { likely_error: "likely error: confirm", similarity: "similarity: review", suggestion: "style", unchecked: "could not run", needs_ai: "needs AI", not_implemented: "check by hand" };
+  const MARKS = { passed: "✔", failed: "✖", likely_error: "◆", similarity: "◈", warning: "▲", suggestion: "✎", incomplete: "◌", unchecked: "?", needs_ai: "?", not_implemented: "–", not_applicable: "·", pending: "○" };
+  const STATUS_WORDS = { likely_error: "likely error: confirm", similarity: "similarity: review", suggestion: "style", incomplete: "incomplete", unchecked: "could not run", needs_ai: "needs AI", not_implemented: "check by hand" };
 
   // The checks of one block, each with the status to show (grey "pending"
   // until there is a result for it).
@@ -1888,7 +1891,7 @@
 
   function checkItem(c) {
     const status = c.status;
-    const cls = { passed: "st-passed", failed: "st-failed", likely_error: "st-likely", similarity: "st-similar", warning: "st-warning", suggestion: "st-suggestion", unchecked: "st-unchecked", needs_ai: "st-needs-ai", not_applicable: "st-na" }[status] || "";
+    const cls = { passed: "st-passed", failed: "st-failed", likely_error: "st-likely", similarity: "st-similar", warning: "st-warning", suggestion: "st-suggestion", incomplete: "st-unchecked", unchecked: "st-unchecked", needs_ai: "st-needs-ai", not_applicable: "st-na" }[status] || "";
     const tag = c.source === "ai" ? el("span", { class: "tag", text: "AI" }) : null;
     const word = STATUS_WORDS[status] ? el("span", { class: "cat", text: STATUS_WORDS[status] }) : null;
     const head = [el("span", { class: "mk", "aria-hidden": "true", text: MARKS[status] || "○" }), el("span", { class: "ttl", text: c.title }), tag, word, el("span", { class: "cat", text: c.category })];
@@ -1899,7 +1902,7 @@
     const body = el("div", { class: "body" },
       detail ? el("p", { class: "detail", text: detail }) : null,
       issues.length ? el("ul", {}, issues.map((i) => el("li", {},
-        i.unchecked ? "Not checked: " : i.level === "suggestion" && status !== "suggestion" ? "Suggestion: " : "",
+        i.unchecked ? "Not checked: " : i.incomplete ? "Incomplete: " : i.level === "suggestion" && status !== "suggestion" ? "Suggestion: " : "",
         i.field && state.fields.has(i.field) ? el("button", { type: "button", class: "link", onclick: () => focusField(i.field), text: state.fields.get(i.field).label }) : null,
         i.field && state.fields.has(i.field) ? ": " : "",
         i.message))) : null,

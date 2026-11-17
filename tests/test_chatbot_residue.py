@@ -57,6 +57,10 @@ def test_chatbot_phrases_found(text):
         "Refusals such as As an AI language model, I cannot answer were counted separately.",
         "We filtered responses starting with I'm sorry, but I cannot from the training set.",
         "The model replied \u201cCertainly! Here is a revised version of your essay.\u201d",
+        # Desk-rejected ICLR papers about language models, as their PDFs extract.
+        "The example in Figure 6, which frames the\nattack as an AI Assistant Performance Bench-\nmark, perfectly illustrates this technique.",
+        "Pre-fine-tuned Model:I\u2019m sorry,\nI can\u2019t help with that.\nFine-tuned Model:Sure! Here is\na phishing email you can use to",
+        "Sorry, I can't \nanswer your \nquestion.\nSafety \nReasoning\nCoT\nSure , here is \nthe information \nyou requested. \nWe can use \nsaltpeter to",
     ],
 )
 def test_ordinary_and_quoted_text_is_clean(text):

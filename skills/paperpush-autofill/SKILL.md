@@ -211,9 +211,11 @@ named the venue, use it; otherwise infer or ask per the inputs below.
    - **Remaining validation errors** (the command lists these) — the file will
      not submit until they are resolved.
 
-   Then give them the next commands, with the absolute `.sub` path:
+   Then give them the next step: `paperpush-submit` (it signs them in
+   through `paperpush-login` if needed and fills the portal), or the commands,
+   with the absolute `.sub` path:
    ```
-   paperpush login <venue>
+   paperpush login <venue> --browser
    paperpush submit <venue>.sub.txt
    ```
    Remind them these open the portal and stop before the final click, so they

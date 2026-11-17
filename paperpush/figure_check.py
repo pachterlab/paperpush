@@ -1035,9 +1035,14 @@ def _pdf_image(pdf: Path, page: int, name: str):
     if reader is None or not name or not 0 < page <= len(reader.pages):
         return None
     try:
-        for image in reader.pages[page - 1].images:
-            if Path(image.name.split("/")[-1]).stem == name:
-                return image.image
+        # Match on the keys and decode only the image asked for: iterating ``images`` decodes
+        # every image on the page, so a page of large images was decoded once per image looked up
+        # (18 min on a 31-page ICLR 2026 paper). A key is "/Im1", or a path into a form XObject.
+        images = reader.pages[page - 1].images
+        for key in images.keys():
+            last = key[-1] if isinstance(key, (list, tuple)) else key
+            if Path(str(last).split("/")[-1]).stem == name:
+                return images[key].image
     except Exception as exc:  # noqa: BLE001 -- an image filter pypdf or Pillow cannot decode
         logger.debug("cannot read image %s on page %d of %s: %s", name, page, pdf, exc)
     return None

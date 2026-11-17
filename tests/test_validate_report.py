@@ -1312,7 +1312,7 @@ def test_a_published_preprint_doi_is_reported_by_the_version_check(_use, tmp_pat
     monkeypatch.setattr(references, "_resolve_doi", lambda doi, **k: (references.DOI_FOUND, record))
     rep = _bib_report(_use, tmp_path, "@article{pre, title={Modular and efficient pre-processing}, author={Melsted, P}, year={2019}, doi={10.1101/673285}}")
     res = _result(rep, "integrity.reference_versions")
-    assert res.status == report.WARNING and "10.1038/s41587-021-00870-2" in res.issues[0].message
+    assert res.status == report.SUGGESTION and "10.1038/s41587-021-00870-2" in res.issues[0].message
 
 
 def test_bib_structure_check_runs_with_the_manuscript_checks(_use, tmp_path):

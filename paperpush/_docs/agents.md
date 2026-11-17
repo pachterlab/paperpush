@@ -22,6 +22,7 @@ submission portal. Match the user's request to one of these entry points:
 | move a manuscript from one venue to another | `paperpush-transfer` |
 | convert a manuscript between Markdown, Word, and LaTeX | `paperpush convert --manuscript FILE --to docx\|tex` (MCP: `convert_manuscript`) |
 | respond to reviewers | `paperpush-respond-to-reviewers` |
+| sign in to a venue (store, check, or remove a login) | `paperpush-login` |
 
 The same flow through the CLI, step by step:
 
@@ -29,7 +30,7 @@ The same flow through the CLI, step by step:
 paperpush subfile <venue>                # create <venue>.sub.txt
                                          # fill it in (skill: paperpush-autofill)
 paperpush validate <venue>.sub.txt       # skill: paperpush-validate
-paperpush login <venue>                  # the user runs this, not you (see below)
+paperpush login <venue> --browser        # skill: paperpush-login; the user types the password into a local page
 paperpush submit <venue>.sub.txt         # skill: paperpush-submit; stops before the final submit
 ```
 
@@ -66,16 +67,18 @@ open the `SKILL.md` and follow it as written.
 | `paperpush-fix` | Backs up the files, runs `paperpush validate --json`, finds the editable source behind each file (the `.tex`/`.docx` behind a PDF), fixes the mechanical issues and trims text over a limit by at most 100 words and 50% of the limit, rebuilds the PDF, and validates again, for up to three rounds. For page-layout issues it offers `paperpush format` first (the venue's template, applied to a new copy), and for a file type the venue does not accept it offers `paperpush convert`. Reports what it fixed, what needs the author's decision, and what it can't fix. Never ticks a confirmation or invents content. | asks to fix what validate found, to make a `.sub` pass validation, or to clean up the errors and warnings. |
 | `paperpush-transfer` | Moves a manuscript prepared for one venue to another: copies the files into `<source-dir>/<venue>/` (never touching the originals), creates the new `.sub`, runs `autofill` reusing the values in earlier `.sub` files, converts the manuscript copy with `paperpush convert` when the new venue does not accept its file type, reformats it for the new venue with `paperpush format` (its template when one is found, else its layout rules), runs `validate` (offering `fix`), and writes `transfer.txt` listing every change. For a venue paperpush does not support yet, builds a draft entry with `paperpush-add-venue-validate` (temporary mode), kept in the transfer's `venue_draft/`, and never submits. | wants to transfer, resubmit, or move a manuscript from one venue to another, e.g. after a rejection. |
 | `paperpush-respond-to-reviewers` | Two phases. Phase 1: makes `<manuscript-dir>/revisionN/` (N = one more than the existing revisions), copies the manuscript files and the reviews into it, drafts the response document (comments verbatim in italics, responses in plain text), and proposes a plan per comment, then stops for the author. Phase 2, once approved: revises the copy, writes the responses, builds the marked manuscript (`revision.marked_manuscript` from the venue's guidelines unless the user overrides it; default red text; or highlight, Word Track Changes, or none), and runs `validate`. Never touches the originals or submits. | has received reviews or a decision letter and wants a revision, a response to reviewers, or a rebuttal letter. |
-| `paperpush-submit` | Takes a filled `.sub` to the portal: re-checks the login (`paperpush login <venue> --check`), confirms with the user, runs `submit` (or `submit(skip_validate=true)` when asked to skip validation), and follows the run, handing a failed step to `paperpush-portal-debug`. Stops before the final submit. | has a `.sub` ready and wants the portal filled in, e.g. "fill out the submission portal to nature", optionally "skip validation". |
+| `paperpush-login` | Gets a working, stored login for one venue without the password passing through the chat: runs `paperpush login <venue> --browser` in the background, which opens a one-time sign-in page on 127.0.0.1 where the author types their credentials; paperpush checks them against the venue and stores them in the OS keyring. Also reports (`--status`), re-checks (`--check`), and removes (`--logout`) a login. | wants to sign in to a venue, store or switch a login, or check one still works, with or without a submission to follow. `paperpush-submit` and `prepare-submission` call it for a missing login. |
+| `paperpush-submit` | Takes a filled `.sub` to the portal: re-checks the login (`paperpush login <venue> --check`, signing in through `paperpush-login` when it fails), confirms with the user, runs `submit` (or `submit(skip_validate=true)` when asked to skip validation), and follows the run, handing a failed step to `paperpush-portal-debug`. Stops before the final submit. | has a `.sub` ready and wants the portal filled in, e.g. "fill out the submission portal to nature", optionally "skip validation". |
 | `paperpush-portal-debug` | Gets a stalled `paperpush submit` run past the failing step on the live page (`submit_page` / `submit_act` / `submit_resume`), logs every runner change it needs, and puts those changes into the runner with a test when working in a source checkout. Never sends the submission. | reports that `submit` is stuck, failed at a step, or hit a portal that changed. Also use it yourself whenever `submit_status` shows `recovery.paused`. |
 | `paperpush-add-venue-validate` | Reads a venue's author guidelines (from its web pages, or from guideline files the user provides) and records them in `manuscript_requirements.json`, and its basic submission fields in `submission_forms.json`, through a venue file and `paperpush add-venue`. For an existing venue, re-reads the pages and updates what changed. Temporary mode writes a draft entry outside paperpush's databases instead (no clone needed). Suggests a pull request for a new venue. | wants a venue that `validate` can check against, or wants a venue's guidelines, limits, or rules added or refreshed. *Contributor skill: needs a clone of the repo.* |
-| `paperpush-add-venue` | Full `submit` support: a `Venue` class with Playwright `login()` / `submit()`, the portal's fields, a sample `.sub` with generated documents, unit tests, and a live run that stops before the final submit. For an existing runner, runs its tests and fixes what fails. Has the user create an account and run `paperpush login` rather than handing over a password. | wants to submit to a venue paperpush can't submit to yet, or reports that a venue's runner or tests are broken. Runs `paperpush-add-venue-validate` first if the venue has no guidelines entry yet. *Contributor skill: needs a clone of the repo.* |
+| `paperpush-add-venue` | Full `submit` support: a `Venue` class with Playwright `login()` / `submit()`, the portal's fields, a sample `.sub` with generated documents, unit tests, and a live run that stops before the final submit. For an existing runner, runs its tests and fixes what fails. Has the user create an account and sign in on the `paperpush login --browser` page rather than handing over a password. | wants to submit to a venue paperpush can't submit to yet, or reports that a venue's runner or tests are broken. Runs `paperpush-add-venue-validate` first if the venue has no guidelines entry yet. *Contributor skill: needs a clone of the repo.* |
 
 The skills call each other where the steps overlap: `pick-venue` hands the chosen venue to `prepare-submission` or `transfer`, and `prepare-submission` runs `pick-venue` when no venue was given; `prepare-submission` runs
 `autofill`, `validate`, and `submit`, and offers `fix` when validate stops it;
 `transfer` runs `autofill` and `validate`, and offers `fix`; `respond-to-reviewers` runs `validate` (and `autofill` for a new `.sub`), and offers `fix`; `validate`, `prepare-submission`, and `transfer` run `add-venue-validate` in temporary mode for a venue paperpush does not support; `fix` uses `validate`'s AI-check steps
-in its first and last rounds; `submit` uses `portal-debug` for a
-step that fails; `add-venue` runs `add-venue-validate`, and uses
+in its first and last rounds; `prepare-submission` and `submit` use `login` for a missing login, and
+`add-venue` uses it to store the login its live run needs; `submit` uses
+`portal-debug` for a step that fails; `add-venue` runs `add-venue-validate`, and uses
 `portal-debug` for a live step that stalls. Don't run the same step twice.
 
 ### Installing the skills
@@ -134,10 +137,11 @@ let the user run them in their own terminal.
 
 ## Before anything else: check the user is logged in
 
-The pipeline ends in a real browser sign-in, and that sign-in is the one step you
-cannot do for the user — it may need their password, ORCID, a CAPTCHA, or a
-two-factor code. Check it **first**, before you read a single manuscript file, so
-the user can log in while you work instead of discovering the blocker at the end:
+The pipeline ends in a real browser sign-in. You cannot type the user's
+password for them, and it must never pass through the conversation, but you
+can start the sign-in for them. Check the login **first**, before you read a
+single manuscript file, so the user signs in while you work instead of
+discovering the blocker at the end:
 
 ```
 paperpush login --list
@@ -145,21 +149,36 @@ paperpush login --list
 
 It prints `Not logged in to any venues.` or a `Logged in to:` block with one
 `<venue>: <who>` line per stored credential. If the target venue is not in that
-list, stop and tell the user right away — in your very next message — to run the
-login themselves in their terminal:
+list, start the sign-in right away (skill: `paperpush-login`), **in the
+background**:
 
 ```
-paperpush login <venue>
+paperpush login <venue> --browser
 ```
 
-Say plainly that this opens a browser and is theirs to complete, and that you
-will keep going in the meantime. Do not run `paperpush login` yourself, and do
-not treat a missing login as a reason to skip the extraction work — do the
-`.sub` creation, autofill, and validation regardless, then run
-`paperpush login <venue> --check` before the submit step. `--check` signs in
-headless with the stored credentials, so it also catches a password changed
-since login; `--list` and `--status` only show that something is stored. On
-exit 1, ask the user to run `paperpush login <venue>` again.
+It needs no keyboard input. It serves a one-time sign-in page on 127.0.0.1
+(at a random, unguessable path; it opens a browser tab on it and prints the
+URL), where the user types their username and password, or picks ORCID or
+GitHub when the venue offers them. paperpush checks the details against the
+venue's real sign-in (a CAPTCHA or two-factor step is finished by hand in the
+window that opens), stores them in the OS keyring, prints who the login
+belongs to (never the password), and exits 0. It exits 1 after 5 failed tries
+or 15 minutes with no sign-in. In your next message, tell the user to sign in
+on that page, **not in the chat**, and that you will keep going in the
+meantime. Over SSH, the command prints an `ssh -L` line for opening the page
+from their own machine (`--port` fixes the port).
+
+Never ask for a password, never pass `--password` or set `PAPERPUSH_PASSWORD`,
+and never fill in the sign-in page yourself (with Playwright, a browser tool,
+or `curl`): the page is for the user's hands only. Running `paperpush login
+<venue>` without `--browser` prompts in a terminal, which you don't have; a
+user who prefers that form runs it in their own terminal. Don't treat a
+missing login as a reason to skip the extraction work: do the `.sub`
+creation, autofill, and validation regardless, then run `paperpush login
+<venue> --check` before the submit step. `--check` signs in headless with the
+stored credentials, so it also catches a password changed since login;
+`--list` and `--status` only show that something is stored. On exit 1, open
+the sign-in page again.
 
 Some public submission systems do not have author accounts. If the target is
 absent from `--list`, check it with `paperpush login <venue> --status` before
@@ -174,12 +193,16 @@ login and exits successfully; proceed without credentials in that case.
 `login_command` to pass along when the venue is not signed in. Before
 `submit`, call `login_status(venue=..., check=true)`, the MCP form of
 `--check`: a `check.status` of `failed` or `timed_out` sets `logged_in` to false
-and gives the `login_command`. The `login` tool
-is the same guard in one call: it reports an existing login, and otherwise hands
-back the command for the user to run, so the user's password never passes
-through the conversation. (It does run the login itself when
-`PAPERPUSH_USERNAME` and `PAPERPUSH_PASSWORD` are already set in the server's
-environment.) Everything else in this document maps to a tool too —
+and gives the `login_command`. To sign the user in, call
+`login(venue=..., browser=true)`: it starts `paperpush login <venue> --browser`
+and returns `awaiting_sign_in` with the page's `url`. Tell the user to sign in
+there, then poll `login_status(venue=...)` until `logged_in` is true;
+`login_progress` reports the page's state (`waiting`, `finished`, `failed`).
+Without `browser=true` the `login` tool is a guard: it reports an existing
+login, and otherwise hands back the command (and `browser_command`) for the
+user to run, so the user's password never passes through the conversation.
+(It does run the terminal login itself when `PAPERPUSH_USERNAME` and
+`PAPERPUSH_PASSWORD` are already set in the server's environment.) Everything else in this document maps to a tool too —
 `list_supported_venues`, `pick_venue` (find journals and conferences for a
 manuscript: by default any journal or conference, from OpenAlex, with the ones
 paperpush supports marked by slug and conferences carrying rank, deadlines, and
@@ -337,9 +360,9 @@ defaults to `--engine manual`, which applies the `values.json` **you** wrote. So
 
    This runs `subfile` → `autofill --engine manual` (applying your values) →
    `validate` → `login` → `submit`, stopping at the first failure. The `login`
-   step is interactive, so it is the user's to complete in their terminal — if
-   the pre-flight check above showed them logged out, make sure they have run
-   `paperpush login <venue>` before you kick off the pipeline. The submit
+   step prompts in a terminal, so if the pre-flight check above showed the
+   user logged out, have them sign in first (`paperpush login <venue>
+   --browser`, see above) before you kick off the pipeline. The submit
    step opens the portal headed and stops before the final click so the user can
    review. Add `--headless`, `--force`, etc. as the user needs (see `--help`).
    `--orcid` signs in with the user's ORCID iD and ORCID password instead of a
@@ -423,9 +446,17 @@ with `paperpush-transfer`.
 
 ## The report, and the checks you run yourself
 
-`validate` reports every check as passed, failed, warning, suggestion, could
-not run, needs AI, not implemented, or not applicable (MCP: `checks` in the
-`validate_subfile` result). A **suggestion** is a point of style an editor
+`validate` reports every check as passed, failed, warning, suggestion,
+incomplete, could not run, needs AI, not implemented, or not applicable (MCP:
+`checks` in the `validate_subfile` result). **Incomplete** (grey) means part of
+the check was not done because a registry or web service did not answer (or a
+lookup limit was reached): some references were not looked up, some links got
+no answer, a linked repository was not fetched. It is not a pass, and not a
+problem with the manuscript: tell the user which lookups were not made and
+suggest running validate again later. A check that found something and also
+left lookups unmade keeps its finding's status and is listed under Incomplete
+too (`incomplete` in the JSON names every such check; each such issue carries
+`"incomplete": true`). A **suggestion** is a point of style an editor
 could leave as it is (repetitive word choice, a spelled-out number, a form or
 heading style used two ways, double spaces): mention how many there are, but
 never count them as warnings, stop on them, or rewrite the prose for them

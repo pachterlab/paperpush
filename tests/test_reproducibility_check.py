@@ -159,10 +159,12 @@ def test_repository_hygiene_warns_when_the_venue_asks(tmp_path, monkeypatch):
     assert {i.level for i in results["rigor.code_availability"].issues} == {"warning"}
 
 
-def test_github_rate_limit_is_unchecked_not_passed(tmp_path):
+def test_github_rate_limit_is_incomplete_not_passed(tmp_path):
     results, _ = _run(_values(tmp_path, "Code availability\nhttps://github.com/lab/paper-code (10.5281/zenodo.42)"), check_repositories=True)
     result = results["rigor.code_availability"]
-    assert any(i.unchecked for i in result.issues) and "GITHUB_TOKEN" in _messages(result)
+    # GitHub not answering leaves part of the check undone: incomplete, never passed.
+    assert any(i.incomplete for i in result.issues) and "GITHUB_TOKEN" in _messages(result)
+    assert result.status != report.PASSED
 
 
 @pytest.mark.parametrize("count, expected", [("1", report.PASSED), ("0", report.WARNING)])

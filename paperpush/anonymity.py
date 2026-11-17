@@ -73,6 +73,7 @@ from .sensitive import (
     MAX_ARCHIVE_MEMBERS,
     MAX_BLOB_BYTES,
     MAX_TEXT_BYTES,
+    NOT_FETCHED,
     OFFICE_EXTS,
     OPAQUE_EXTS,
     UNREAD,
@@ -943,7 +944,7 @@ def scan_anonymous_repo(repo: str, terms: list[tuple[str, str]]) -> list[Finding
     missed = unlisted + [p for p, s in files if Path(p).suffix.lower() not in _BINARY_EXTS and s > MAX_REPO_FILE_BYTES] + [p for p, body in fetched if body is None]
     if missed:
         shown = ", ".join(missed[:3]) + (", ..." if len(missed) > 3 else "")
-        findings.append(Finding("submission", "anonymous repository", f"anonymity: {len(missed)} item(s) of {where} could not be fetched and were not checked ({shown}); inspect them manually"))
+        findings.append(Finding("submission", NOT_FETCHED, f"anonymity: {len(missed)} item(s) of {where} could not be fetched and were not checked ({shown}); inspect them manually"))
     for path, body in fetched:
         if body is None:
             continue
@@ -958,7 +959,7 @@ def scan_anonymous_repo(repo: str, terms: list[tuple[str, str]]) -> list[Finding
                 if not _ANONYMOUS_HOLDER.search(holder):
                     findings.append(Finding(file_where, "identifying information", f"anonymity: copyright line names '{holder}'; add it to the terms Anonymous GitHub redacts", LEVEL_LIKELY))
     if truncated:
-        findings.append(Finding("submission", "anonymous repository", f"anonymity: only the first {MAX_REPO_FILES} files of {where} were checked; inspect the rest manually"))
+        findings.append(Finding("submission", NOT_FETCHED, f"anonymity: only the first {MAX_REPO_FILES} files of {where} were checked; inspect the rest manually"))
     return findings
 
 

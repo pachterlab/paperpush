@@ -381,9 +381,9 @@ def _code_availability_check(venue: Venue, values: dict[str, str], online: bool)
             hygiene_level = WARNING if notes_mention(venue.slug, values, _CODE_HYGIENE_RULE) else SUGGESTION
             issues.extend(Issue(hygiene_level if any(h in p for h in _HYGIENE_PROBLEMS) else WARNING, where, p) for p in _repo_problems(name, info))
         if unknown:
-            from .validate import unchecked
+            from .validate import incomplete
 
-            issues.append(unchecked(where, f"GitHub did not answer for {', '.join(unknown)} (rate limit or no network; set GITHUB_TOKEN to raise the limit), so its license, README, and environment files were not checked"))
+            issues.append(incomplete(where, f"GitHub did not answer for {', '.join(unknown)} (rate limit or no network; set GITHUB_TOKEN to raise the limit), so its license, README, and environment files were not checked"))
     detail = f"code: {src.describe()}" + (f"; inspected {', '.join(checked)}" if checked else "")
     return Outcome(issues, detail)
 
@@ -427,9 +427,9 @@ def _data_accessions_check(venue: Venue, values: dict[str, str], online: bool) -
     if unknown and len(unknown) == len(accessions[:MAX_ACCESSIONS]):
         raise Unchecked("NCBI did not answer")
     if unknown:
-        from .validate import unchecked
+        from .validate import incomplete
 
-        issues.append(unchecked(where, f"NCBI did not answer for {', '.join(unknown)}"))
+        issues.append(incomplete(where, f"NCBI did not answer for {', '.join(unknown)}"))
     more = f" (the first {MAX_ACCESSIONS} of {len(accessions)})" if len(accessions) > MAX_ACCESSIONS else ""
     return Outcome(issues, f"looked up {', '.join(accessions[:MAX_ACCESSIONS])}{more}")
 

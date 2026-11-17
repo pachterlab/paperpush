@@ -279,6 +279,10 @@ def _rrids_check(venue: Venue, values: dict[str, str], online: bool) -> Outcome:
                 issues.append(Issue(WARNING, field_id, f"RRID:{rrid} is not known to the SciCrunch resolver; check it for a typo"))
             elif known is None:
                 unchecked += 1
+    if unchecked:
+        from .validate import incomplete
+
+        issues.append(incomplete("", f"{unchecked} RRID(s) could not be looked up (the SciCrunch resolver did not answer)"))
     detail = "with RRIDs: " + "; ".join(counted) if counted else ""
     if given:
         detail += ("; " if detail else "") + f"{len(given)} RRID(s) given" + ("" if online else " (not looked up: registry checks are switched off)") + (f", {unchecked} could not be looked up" if unchecked else "")
@@ -354,6 +358,10 @@ def _cell_lines_check(venue: Venue, values: dict[str, str], online: bool) -> Out
             elif got:
                 accession, problem = got
                 issues.append(Issue(WARNING, field_id, f"{name} ({accession}) is listed as problematic in Cellosaurus: {problem[:200]}"))
+    if unasked:
+        from .validate import incomplete
+
+        issues.append(incomplete("", f"{unasked} cell line(s) could not be looked up (Cellosaurus did not answer)"))
     detail = f"{len(lines)} cell line(s) named" + ("" if online else "; not looked up in Cellosaurus (registry checks are switched off)") + (f"; {unasked} could not be looked up" if unasked else "")
     return Outcome(issues, detail)
 

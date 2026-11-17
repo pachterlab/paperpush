@@ -52,6 +52,8 @@ class Problem:
     message: str
     # The message says the lookup did not happen, rather than that it found something.
     unchecked: bool = False
+    # The lookup was attempted but OpenReview did not answer: part of the check was not done.
+    incomplete: bool = False
 
 
 # Signed-in sessions, kept for a while so a long-lived server reuses one. Only a
@@ -212,7 +214,7 @@ def check(venue, values: dict[str, str], *, today: _dt.date | None = None) -> li
     ids = sorted({str(a.get(ID_COLUMN, "")).strip() for _, a in rows if str(a.get(ID_COLUMN, "")).strip().startswith("~")})
     by_id = _fetch_by_ids(ids, token)
     if by_id is None:
-        problems.append(Problem(False, "", "OpenReview profile check skipped: the profile lookup failed", unchecked=True))
+        problems.append(Problem(False, "", "OpenReview profile check skipped: the profile lookup failed", incomplete=True))
         return problems
 
     seen: dict[str, str] = {}
@@ -233,7 +235,7 @@ def check(venue, values: dict[str, str], *, today: _dt.date | None = None) -> li
         elif name:
             result = _search_name(name, token)
             if result is None:
-                problems.append(Problem(False, field.id, f"{who}: the OpenReview name search failed; not checked", unchecked=True))
+                problems.append(Problem(False, field.id, f"{who}: the OpenReview name search failed; not checked", incomplete=True))
                 continue
             exact, total = result
             suffixes = [s for s in re.split(r"[,\s]+", str(author.get("email_suffixes", ""))) if s]

@@ -21,12 +21,18 @@ Severity policy
   blocks and is not counted with the warnings.
 * **Suggestion**: a defensible stylistic choice or optional improvement.
   Detection confidence alone does not make a preference a warning.
+* **Incomplete**: the check ran, but part of it was not done because a
+  registry or web service did not answer (or a lookup limit was reached):
+  references not looked up, links with no answer, a linked repository's files
+  not fetched. Grey, like the coverage states: not a pass, and not a finding.
+  A check that also found something keeps that finding's status and is listed
+  under Incomplete as well.
 * **Unchecked / needs AI / not applicable**: coverage states, not violations.
   Missing tools or inconclusive network responses must not imply success.
 
 A check can produce more than one severity. Its report status follows its
-most severe finding: error, likely error, similarity, warning, suggestion,
-then unchecked. Mixed checks
+most severe finding: error, likely error, similarity, warning, then (when part
+of it was not done) incomplete, suggestion, then unchecked. Mixed checks
 retain each issue's own level; a table row is not a fixed level for every
 possible outcome.
 

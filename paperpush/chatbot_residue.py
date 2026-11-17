@@ -22,7 +22,9 @@ whole paper:
 * in PDF/Word/Markdown text, not the reference list or an appendix;
 * not text in double quotation marks;
 * not a phrase introduced as an example ("responses such as", "e.g.",
-  "starting with").
+  "starting with") or after a speaker label ("Model: Sure! Here is");
+* not text from a figure (a column of short lines, as a PDF's diagram
+  text comes out).
 
 What it finds is a LIKELY_ERROR: critical if real, but for the author to
 confirm. Using AI is not the issue: the fix is to delete the leftover and to
@@ -44,7 +46,9 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # Code-block chrome and speaker labels from a copied chat, each a line of its own.
     ("a chat interface label", re.compile(r"^[ \t]*(?:(?:python|bash|latex|r|sql|plaintext|markdown)[ \t]+)?Copy code[ \t]*$|^[ \t]*ChatGPT said:", re.MULTILINE | re.IGNORECASE)),
     # The model speaking of itself.
-    ("a chatbot speaking of itself", re.compile(r"\b(?:As an AI language model|As a large language model|As an AI (?:assistant|developed by|trained by)|I(?:'m| am) an AI (?:language model|assistant))\b", re.IGNORECASE)),
+    # Followed by the comma the reply goes on after ("As an AI language model, I cannot..."), so a
+    # phrase like "frames the attack as an AI Assistant Performance Benchmark" is not one.
+    ("a chatbot speaking of itself", re.compile(r"\b(?:(?i:as an AI language model|as a large language model)|[Aa]s an AI (?:assistant|developed by \w+|trained by \w+))\s*,|\bI(?:'m| am) an AI (?:language model|assistant)\b")),
     ("a chatbot's knowledge cutoff", re.compile(r"\b(?:as of my (?:last |latest )?(?:knowledge |training )?(?:update|cut-?off)|my knowledge cut-?off|my training (?:data )?(?:only )?(?:goes|extends|runs) (?:up )?(?:to|until))\b", re.IGNORECASE)),
     ("a chatbot's refusal", re.compile(r"\bI(?:'m| am) (?:very |really |so )?sorry,? but (?:as an AI|I (?:can(?:'|no)t|don't|do not|am unable|am not able|don't have))|\bI (?:don't|do not) have (?:access to )?real-time (?:data|information|access)|\bI (?:can(?:'|no)t|am unable to|don't have the ability to) (?:browse|access) the (?:internet|web)\b", re.IGNORECASE)),
     # The reply's opening, addressed to the person who asked.
@@ -58,7 +62,8 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 ]
 
 # A phrase introduced as an example: "refusals such as As an AI language model, ...".
-_EXAMPLE_LEAD = re.compile(r"\b(?:such as|e\.g\.|i\.e\.|for example|for instance|like|phrases?|responses?|outputs?|refus\w*|strings?|templates?|patterns?|prompts?|begin(?:s|ning)? with|start(?:s|ing)? with|contain(?:s|ing)?|the words?)\W*$", re.IGNORECASE)
+# A speaker label ("Fine-tuned Model: Sure! Here is ...") counts too: the paper is showing a reply.
+_EXAMPLE_LEAD = re.compile(r":\s*$|\b(?:such as|e\.g\.|i\.e\.|for example|for instance|like|phrases?|responses?|outputs?|refus\w*|strings?|templates?|patterns?|prompts?|begin(?:s|ning)? with|start(?:s|ing)? with|contain(?:s|ing)?|the words?)\W*$", re.IGNORECASE)
 
 # Text in double quotation marks, within a paragraph.
 _QUOTED = re.compile(r"“[^”\n]{0,600}”|\"[^\"\n]{0,600}\"|``(?:(?!'').){0,600}''", re.DOTALL)
@@ -120,13 +125,29 @@ def _excerpt(text: str, start: int, end: int) -> str:
     return " ".join(text[a:b].split())
 
 
+# Text extracted from a figure in a PDF comes out as a column of short lines (the labels and
+# boxes of a diagram); a figure showing a model's replies is not residue.
+_SHORT_LINE = 35
+_NEIGHBOR_LINES = 3
+
+
+def _in_figure_text(text: str, start: int) -> bool:
+    """Whether the lines around ``start`` are mostly short, as a figure's text is when extracted from a PDF."""
+    before = [ln for ln in text[:start].split("\n")[-_NEIGHBOR_LINES - 1 :] if ln.strip()]
+    after = [ln for ln in text[start:].split("\n")[1 : _NEIGHBOR_LINES + 1] if ln.strip()]
+    around = before + after
+    if len(around) < 4:
+        return False
+    return sum(len(ln.strip()) < _SHORT_LINE for ln in around) / len(around) >= 0.75
+
+
 def scan_text(text: str) -> list[tuple[str, str]]:
     """``(what, excerpt)`` for each chatbot phrase in ``text``, quoted text and examples left out."""
     text = _QUOTED.sub(lambda m: " " * len(m.group(0)), text)
     hits: list[tuple[str, str]] = []
     for what, pattern in _PATTERNS:
         for m in pattern.finditer(text):
-            if _EXAMPLE_LEAD.search(text[max(0, m.start() - 60) : m.start()]):
+            if _EXAMPLE_LEAD.search(text[max(0, m.start() - 60) : m.start()]) or _in_figure_text(text, m.start()):
                 continue
             hits.append((what, _excerpt(text, m.start(), m.end())))
     return hits

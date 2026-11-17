@@ -59,31 +59,19 @@ fly. See step 1.
    ```
 
    If the venue is not listed (or the output is `Not logged in to any venues.`),
-   tell the user immediately — in your next message, not at the end — to run
+   **invoke the `paperpush-login` skill** (via the Skill tool) with the venue
+   right away, before any other work. It starts a one-time sign-in page in the
+   user's browser in the background, and in your next message you tell the
+   user to sign in there (not in the chat), so they sign in while you work.
+   Mention in the same message that they can instead sign in by hand in the
+   submission's browser window when it opens, with nothing stored
+   (paperpush-submit's manual sign-in). If they choose that, or already said
+   they would rather log in themselves in the browser, skip `paperpush-login`
+   and pass the choice on to paperpush-submit.
 
-   ```
-   paperpush login <venue>
-   ```
-
-   themselves in a terminal, since it opens a browser and may need their
-   password, ORCID, CAPTCHA, or two-factor code. In the same message, tell them:
-   - If they have no account on the venue's submission system yet, they must
-     register there first. Give them the portal URL: `submission_url` from
-     the `describe_venue` MCP tool, or without MCP
-     `python -c "from paperpush.database import get_venue; print(get_venue('<venue>').submission_url)"`.
-     paperpush cannot create accounts.
-   - `paperpush login` signs in with what they type before saving it, so a
-     wrong username or password is reported then and nothing is stored. If it
-     fails, they should check the details (or reset the password on the portal)
-     and run it again.
-
-   Also tell them that, instead, they can sign in by hand in the submission's
-   browser window when it opens, with nothing stored (paperpush-submit's
-   manual sign-in). If they choose that, or already said they would rather log
-   in themselves in the browser, pass it on to paperpush-submit.
-
-   Then **carry on with steps 1-3 anyway** while they do it; a missing login
-   only blocks step 4. Never ask for their password in the chat.
+   Then **carry on with steps 1-3** while they sign in; a missing login only
+   blocks step 4, where paperpush-submit checks it again. Never ask for their
+   password in the chat.
 
    Skip this step for a validate-only venue (`paperpush venues` marks them;
    `submit` cannot fill their portal) or a venue paperpush does not support.
@@ -190,11 +178,12 @@ not submitted. Tell the user so up front, then:
 - **Always use absolute paths** for the `.sub` file and the manuscript directory.
 - Never infer the manuscript directory; ask (in plain text) if it is missing.
 - Generate the `.sub` in the manuscript directory, not the working directory.
-- Check `paperpush login --list` up front and surface a missing login
-  immediately (with the register-first note), so the user can log in while
-  you do the rest of the work.
-- Never run `paperpush login` yourself — it is interactive and belongs in the
-  user's terminal.
+- Check `paperpush login --list` up front and start `paperpush-login`
+  immediately for a missing login, so the user can sign in while you do the
+  rest of the work.
+- Store a login only through `paperpush-login` (its browser page). Never run
+  the prompting `paperpush login <venue>` yourself, and never take a password
+  in the chat.
 - Never run `paperpush-submit` for a validate-only venue or a venue paperpush
   does not support.
 - Never go on to `paperpush-submit` past a failed `validate`, or past warnings

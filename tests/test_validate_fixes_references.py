@@ -71,7 +71,8 @@ def test_partly_answered_and_over_budget_dois_are_noted_in_both_checks(tmp_path,
     checks, retracted, coverage = Checks(), [], {}
     dois = checks.run("integrity.dois", "t", "I", _reference_issues, VENUE, {}, retracted, {}, coverage)
     assert coverage == {"total": 130, "unknown": 0, "unbudgeted": 30}
-    assert [i.unchecked for i in dois.issues] == [True]
+    assert [i.incomplete for i in dois.issues] == [True]
+    assert dois.status == report.INCOMPLETE
     assert "30 of 130" in dois.issues[0].message
     gone = checks.run("integrity.retractions", "t", "I", _retraction_issues, VENUE, {}, retracted, coverage)
     assert gone.status != report.PASSED

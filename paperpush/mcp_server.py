@@ -35,12 +35,14 @@ any browser it launched the moment the process exits. A blocking
 :func:`submit` for why its stdin is a pipe rather than the inherited stream.
 
 One thing is deliberately *not* exposed: ``login``'s credential prompts.
-Collecting a username and password needs the user's own terminal, and routing a
-password through a tool call would write it into the model's context and the
-client's transcript. :func:`login` is a *guard* instead: it reports an existing
-login, and otherwise hands back the exact command for the user to run. It shells
-out only when both ``PAPERPUSH_USERNAME`` and ``PAPERPUSH_PASSWORD`` are already
-set in the server's own environment.
+Routing a password through a tool call would write it into the model's context
+and the client's transcript. :func:`login` is a *guard* instead: it reports an
+existing login, and otherwise either starts ``paperpush login --browser`` (with
+``browser=True``: the author types the credentials into a one-time page on
+127.0.0.1, and the tool returns only its URL) or hands back the exact command
+for the user to run. It runs the terminal login itself only when both
+``PAPERPUSH_USERNAME`` and ``PAPERPUSH_PASSWORD`` are already set in the
+server's own environment.
 """
 
 from __future__ import annotations
@@ -50,6 +52,8 @@ import logging
 import os
 import subprocess
 import sys
+import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import IO, Any, Literal, Optional
@@ -1190,6 +1194,9 @@ def login_status(venue: Optional[str] = None, check: bool = False) -> dict[str, 
             "login_required": True,
             "logged_in": credential is not None,
         }
+        progress = _login_progress(base)
+        if progress is not None:
+            entry["login_progress"] = progress
         if credential is None:
             entry["login_command"] = " ".join(["paperpush", "login", base])
             return entry
@@ -1230,6 +1237,7 @@ def login(
     timeout_seconds: float = LOGIN_TIMEOUT_SECONDS,
     method: str = "password",
     provider: str = "",
+    browser: bool = False,
 ) -> dict[str, Any]:
     """Ensure credentials are stored for a venue, running `paperpush login` if it can.
 
@@ -1249,8 +1257,17 @@ def login(
     - If `PAPERPUSH_USERNAME` and `PAPERPUSH_PASSWORD` are both set in the
       *server's* environment, it runs `paperpush login <venue>` for real and
       returns `logged_in` or `failed`.
+    - With `browser=true`, it starts `paperpush login <venue> --browser` in the
+      background and returns `awaiting_sign_in` with the `url` of a one-time
+      page served on 127.0.0.1 (a browser tab opens on it). The author types the
+      username and password there, not in the chat; the page checks them
+      against the venue and stores them. Tell the author to sign in on that
+      page, then poll `login_status(venue=...)` until `logged_in` is true (or
+      `login_progress` says the page closed). This is the way to sign in
+      without the author running a command.
     - Otherwise it returns `action_required` with the exact `command` for the
-      user to run in their own terminal.
+      user to run in their own terminal (and `browser_command`, the same with
+      `--browser`).
 
     There is deliberately no way to pass a username or password to this tool: a
     credential sent as a tool argument ends up in the model's context and the
@@ -1318,6 +1335,9 @@ def login(
         command.append("--verify-headless")
         display_command += " --verify-headless"
 
+    if browser:
+        return _start_browser_login(command, display_command, resolved.slug, base)
+
     # The CLI collects the username and password from these env vars when they
     # are set, and prompts otherwise. A prompt has no terminal to read from
     # here, so unless both are already present, hand the command back instead of
@@ -1328,7 +1348,13 @@ def login(
             "venue": resolved.slug,
             "credential_stored_under": base,
             "command": display_command,
-            "reason": (f"No credentials are stored for {base} and signing in needs a username and " "password. Ask the user to run this command in their own terminal -- it will " "prompt them, and the password never passes through this conversation."),
+            "browser_command": display_command + " --browser",
+            "reason": (
+                f"No credentials are stored for {base} and signing in needs a username and "
+                "password. Call login again with browser=true to open a sign-in page in the "
+                "user's browser, or ask the user to run this command in their own terminal -- "
+                "either way the password never passes through this conversation."
+            ),
         }
 
     logger.info("login: running %s for %s", display_command, base)
@@ -1373,6 +1399,112 @@ def login(
         "exit_code": completed.returncode,
         "output": (completed.stderr or completed.stdout).strip(),
         "reason": "The sign-in did not complete. Ask the user to run the command in their own terminal.",
+    }
+
+
+# `paperpush login --browser` processes started by `login(browser=True)`, keyed
+# by the base venue slug: one page per venue at a time. Kept so a second call
+# returns the open page instead of starting another, and so finished processes
+# are reaped (no zombies) when login_status looks at them.
+_LOGIN_RUNS: dict[str, tuple[subprocess.Popen, Path]] = {}
+#: How long login(browser=True) waits for the page's URL to be printed.
+LOGIN_PAGE_START_SECONDS = 20.0
+
+
+def _login_page_url(log_path: Path) -> Optional[str]:
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for token in text.split():
+        if token.startswith("http://127.0.0.1:"):
+            return token
+    return None
+
+
+def _login_progress(base: str) -> Optional[dict[str, Any]]:
+    """The state of a sign-in page started for ``base``, reaping it once it exits."""
+    entry = _LOGIN_RUNS.get(base)
+    if entry is None:
+        return None
+    process, log_path = entry
+    code = process.poll()
+    try:
+        tail = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-5:]
+    except OSError:
+        tail = []
+    if code is None:
+        return {"state": "waiting", "pid": process.pid, "url": _login_page_url(log_path), "output_tail": tail}
+    del _LOGIN_RUNS[base]
+    return {"state": "finished" if code == 0 else "failed", "exit_code": code, "output_tail": tail}
+
+
+def _start_browser_login(command: list[str], display_command: str, slug: str, base: str) -> dict[str, Any]:
+    """Run ``paperpush login --browser`` detached and hand back its page's URL."""
+    progress = _login_progress(base)
+    if progress is not None and progress["state"] == "waiting":
+        return {
+            "status": "awaiting_sign_in",
+            "venue": slug,
+            "credential_stored_under": base,
+            "pid": progress["pid"],
+            "url": progress["url"],
+            "reason": "A sign-in page for this venue is already open. Ask the user to sign in there, then poll login_status.",
+        }
+    command = [*command, "--browser"]
+    display_command += " --browser"
+    log_dir = Path(tempfile.mkdtemp(prefix="paperpush-login-"))
+    log_path = log_dir / "login.log"
+    log_file = log_path.open("wb")
+    try:
+        # Audited for B603: a fixed argv (see login) with --browser added. stdin
+        # is DEVNULL: the page collects the credentials, so nothing is read from
+        # it, and this server's own stdin is the JSON-RPC stream.
+        process = subprocess.Popen(  # nosec B603
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        )
+    except OSError as exc:
+        raise ValueError(f"could not run {display_command}: {exc}") from exc
+    finally:
+        log_file.close()
+    _LOGIN_RUNS[base] = (process, log_path)
+    logger.info("login: started %s for %s as pid %d", display_command, base, process.pid)
+
+    deadline = time.monotonic() + LOGIN_PAGE_START_SECONDS
+    url = None
+    while time.monotonic() < deadline:
+        url = _login_page_url(log_path)
+        if url or process.poll() is not None:
+            break
+        time.sleep(0.2)
+    if url is None:
+        progress = _login_progress(base) or {}
+        return {
+            "status": "failed",
+            "venue": slug,
+            "credential_stored_under": base,
+            "command": display_command,
+            "output": "\n".join(progress.get("output_tail", [])),
+            "reason": "The sign-in page did not start. Ask the user to run `paperpush login` in their own terminal.",
+        }
+    return {
+        "status": "awaiting_sign_in",
+        "venue": slug,
+        "credential_stored_under": base,
+        "pid": process.pid,
+        "url": url,
+        "command": display_command,
+        "reason": (
+            f"A sign-in page for {base} is open at this URL (a browser tab should have opened on it). "
+            "Ask the user to sign in there -- never in the chat -- then poll login_status(venue=...) "
+            "until logged_in is true. The page checks the details against the venue before saving "
+            "them, may open a browser window for a CAPTCHA or two-factor code, and closes after 15 minutes."
+        ),
     }
 
 
@@ -2073,7 +2205,7 @@ def build_server():
     server = server_class(
         "paperpush",
         **extra,
-        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile (format_manuscript reformats a .docx/.tex for the venue, with its template when one is found; convert_manuscript moves a manuscript between Markdown, Word, and LaTeX) -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status until `state` is `ready_for_review` (then stop polling; the process stays running to hold the browser); if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first) -- " "or manual_login=true, when the author would rather sign in in the browser window: the run then waits " "(state `awaiting_sign_in`) until they have, continuing by itself or on submit_signed_in; " "it refuses rather than opening a browser otherwise.\n\n" "Signing in is the one step you cannot do for the user: login hands back a " "`paperpush login <venue>` command for them to run in their own terminal, and a manual_login run waits for them to sign in in the browser."),
+        instructions=(f"paperpush {__version__} -- prepare and check academic manuscript submissions.\n\n" "Typical flow: list_supported_venues (or pick_venue, to find venues for a manuscript; find_reviewers suggests reviewers) -> describe_venue -> create_subfile -> " "autofill_subfile (you extract the values from the manuscript; the tool applies " "them) -> validate_subfile (format_manuscript reformats a .docx/.tex for the venue, with its template when one is found; convert_manuscript moves a manuscript between Markdown, Word, and LaTeX) -> login_status -> submit.\n\n" "validate_subfile reports every check (passed, failed, not checked). Checks that need a " "reader's judgement come back as needs_ai with tasks in `ai_tasks` (or from " "validation_ai_tasks): do them yourself and pass your verdicts back as `ai_results`.\n\n" "Pass absolute paths: this server has its own working directory, so a relative " "path means something different here than it does to you. Tools that take a " "manuscript_dir resolve relative paths against it.\n\n" "submit fills the venue's form and stops before the final submit button, leaving " "the browser open for the author to review and send themselves -- so it returns a " "pid, not a finished run. Follow it with submit_status until `state` is `ready_for_review` (then stop polling; the process stays running to hold the browser); if a step fails the run pauses " "(recovery.paused) for you to fix with submit_page, submit_act and submit_resume. Call submit_close when the " "author says they are done. If steps needed recovery, offer the author a redacted bug report " "(recovery_report) that they can file so the venue gets fixed for everyone. It needs a .sub file that passes validation (unless the author asked to skip it: skip_validate) and, for " "portals that require authentication, a stored login (check login_status first) -- " "or manual_login=true, when the author would rather sign in in the browser window: the run then waits " "(state `awaiting_sign_in`) until they have, continuing by itself or on submit_signed_in; " "it refuses rather than opening a browser otherwise.\n\n" "Never ask for a password in the chat. To sign the user in, call login(venue, browser=true): it opens a one-time sign-in page on " "this computer where they type their credentials (you get only the URL), then poll login_status(venue=...) until logged_in. " "Alternatively, login hands back a `paperpush login <venue>` command for them to run in their own terminal, and a manual_login run waits for them to sign in in the browser."),
     )
     for tool in TOOLS:
         server.tool()(tool)

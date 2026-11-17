@@ -1282,6 +1282,15 @@ def _cmd_login(args: argparse.Namespace) -> int:
             print(f"error: {venue.slug} does not offer the sign-in provider {provider!r}; choose from: {', '.join(offered)}", file=sys.stderr)
             return 2
 
+    if getattr(args, "browser", False):
+        if args.password:
+            print("error: --browser collects the password on its own page; drop --password", file=sys.stderr)
+            return 2
+        if (args.orcid or args.orcid_id) and not venues.orcid_login_offered(venue.slug):
+            print(f"error: {venue.slug} does not offer signing in with ORCID.", file=sys.stderr)
+            return 2
+        return _login_browser(venue, args, github=github, provider=provider)
+
     if args.orcid or args.orcid_id:
         # ORCID sign-in is a journal thing: the preprint servers and conference
         # portals have their own accounts and no ORCID button to click.
@@ -1299,6 +1308,7 @@ def _cmd_login(args: argparse.Namespace) -> int:
             username = input("GitHub username or email: " if github else f"{provider} username or email: " if provider else f"{venue.slug} username or email: ").strip()
         except EOFError:
             username = ""
+            print(f"\nNo terminal to type into. Run 'paperpush login {venue.slug} --browser' to sign in on a page in your browser instead.", file=sys.stderr)
     if not username:
         print("error: a username is required", file=sys.stderr)
         return 1
@@ -1348,12 +1358,7 @@ def _cmd_login(args: argparse.Namespace) -> int:
     used_keyring = credentials.save_credential(venue.slug, username, password, provider=provider, **({"method": "github"} if github else {}))
     logger.info("login: stored %s credentials for %s (keyring=%s)", "github" if github else "password", venue.slug, used_keyring)
     print(f"Stored credentials for {venue.slug} (user: {username}).")
-    if used_keyring:
-        print("  Saved to the operating system secret store.")
-    else:
-        path = credentials.config_dir() / "credentials.json"
-        print(f"  Saved to {path} (readable only by you).")
-        print("  Note: no usable OS secret store was found, so this fallback " "file is not encrypted.")
+    _print_store_location(used_keyring)
     if venue.submission_url:
         print(f"  Submission system: {venue.submission_url}")
     return 0
@@ -1462,12 +1467,7 @@ def _login_orcid(venue, args: argparse.Namespace) -> int:
 
     who = orcid_id + (f" ({profile.name})" if profile and profile.name else "")
     print(f"Stored ORCID login for {venue.slug} (iD: {who}).")
-    if used_keyring:
-        print("  Saved to the operating system secret store.")
-    else:
-        path = credentials.config_dir() / "credentials.json"
-        print(f"  Saved to {path} (readable only by you).")
-        print("  Note: no usable OS secret store was found, so this fallback " "file is not encrypted.")
+    _print_store_location(used_keyring)
     if profile and profile.affiliation:
         print(f"  Affiliation: {profile.affiliation}")
     if venue.submission_url:
@@ -1475,6 +1475,137 @@ def _login_orcid(venue, args: argparse.Namespace) -> int:
 
     if profile is not None:
         _populate_orcid_into(args.into, venue, profile)
+    return 0
+
+
+def _print_store_location(used_keyring: bool) -> None:
+    """Say where a just-stored credential went (never what it is)."""
+    if used_keyring:
+        print("  Saved to the operating system secret store.")
+    else:
+        path = credentials.config_dir() / "credentials.json"
+        print(f"  Saved to {path} (readable only by you).")
+        print("  Note: no usable OS secret store was found, so this fallback " "file is not encrypted.")
+
+
+def _login_browser(venue, args: argparse.Namespace, *, github: bool, provider: str) -> int:
+    """``paperpush login <venue> --browser``: collect the credentials on a local page.
+
+    For an author whose agent runs paperpush: the agent starts this command (it
+    needs no terminal input), the author types the username and password into a
+    page served on 127.0.0.1, and the password never appears in the agent's
+    output or context. The credentials are checked against the venue's real
+    sign-in and stored exactly as the terminal prompts would store them. See
+    :mod:`paperpush.login_form`.
+
+    The sign-in methods offered follow the flags: ``--orcid`` / ``--github`` /
+    ``--provider`` fix one; otherwise the page offers every method the venue
+    supports (venue account, ORCID, GitHub) and, for a venue with several
+    identity providers, a list of them.
+    """
+    from . import login_form
+    from . import orcid as orcid_mod
+    from . import venues
+
+    impl = venues.try_get_venue_impl(venue.slug)
+    if github:
+        methods: tuple[str, ...] = ("github",)
+    elif args.orcid or args.orcid_id:
+        methods = ("orcid",)
+    elif provider:
+        methods = ("password",)
+    else:
+        offered = ["password"]
+        if venues.orcid_login_offered(venue.slug):
+            offered.append("orcid")
+        if impl is not None and impl.supports_github_login:
+            offered.append("github")
+        methods = tuple(offered)
+    providers = tuple(impl.login_providers) if (impl is not None and impl.login_providers and not provider and "password" in methods) else ()
+    verifying = not getattr(args, "no_verify", False)
+    prefill = args.orcid_id if (args.orcid or args.orcid_id) else (args.username or os.environ.get("PAPERPUSH_USERNAME") or "")
+    spec = login_form.LoginFormSpec(
+        venue=venue.slug,
+        venue_name=getattr(venue, "name", "") or venue.slug,
+        methods=methods,
+        providers=providers,
+        provider=provider,
+        username=prefill or "",
+        submission_url=venue.submission_url or "",
+        verifying=verifying,
+    )
+    stored: dict = {}
+    timeout = getattr(args, "timeout", DEFAULT_TIMEOUT_SECONDS)
+
+    def check(attempt: "login_form.Attempt") -> "login_form.AttemptResult":
+        username = attempt.username
+        chosen_provider = attempt.provider if attempt.method == "password" else ""
+        if attempt.method == "orcid":
+            if not orcid_mod.is_valid_identity(username):
+                return login_form.AttemptResult(False, f"'{username}' is not an ORCID iD or email address (an iD looks like 0000-0002-1825-0097).")
+            username = orcid_mod.normalize_identity(username)
+        if verifying:
+            from .venues.common import use_sign_in_watch
+            from .venues.login import LoginVerificationError, verify_login
+
+            print(f"Checking the {login_form.METHOD_LABELS.get(attempt.method, attempt.method)} credentials by signing in to {venue.slug}…", flush=True)
+            try:
+                # No terminal here: a CAPTCHA or two-factor step the script cannot
+                # do is finished by the author in the verification window, which
+                # is watched until it signs in (or the watch gives up).
+                with use_sign_in_watch(None, timeout=10 * 60):
+                    verify_login(
+                        venue.slug,
+                        username,
+                        attempt.password,
+                        method=attempt.method,
+                        provider=chosen_provider,
+                        headless=getattr(args, "verify_headless", False),
+                        timeout=timeout,
+                    )
+            except NotImplementedError as exc:
+                logger.warning("login --browser: no automated %s sign-in for %s: %s", attempt.method, venue.slug, exc)
+                if len(methods) > 1:
+                    return login_form.AttemptResult(False, f"{exc} Choose another sign-in method.")
+                return login_form.AttemptResult(False, str(exc), final=True)
+            except LoginVerificationError as exc:
+                logger.warning("login --browser: verification failed for %s: %s", venue.slug, exc)
+                return login_form.AttemptResult(False, f"The sign-in did not work: {exc}")
+            except Exception as exc:  # noqa: BLE001 -- e.g. no display for a headed browser
+                logger.warning("login --browser: could not run the sign-in check for %s: %s", venue.slug, exc)
+                return login_form.AttemptResult(False, f"The sign-in check could not run: {exc}")
+        profile = None
+        if attempt.method == "orcid":
+            if args.into and orcid_mod.is_valid_id(username):
+                try:
+                    profile = orcid_mod.fetch_profile(username)
+                except orcid_mod.OrcidError as exc:
+                    logger.warning("login --browser: could not read public record for %s: %s", username, exc)
+            used = credentials.save_orcid_credential(venue.slug, username, attempt.password, name=profile.name if profile else "")
+            who = f"ORCID iD {username}" if orcid_mod.is_valid_id(username) else f"ORCID account {username}"
+        else:
+            used = credentials.save_credential(venue.slug, username, attempt.password, provider=chosen_provider, **({"method": attempt.method} if attempt.method != "password" else {}))
+            who = f"GitHub account {username}" if attempt.method == "github" else (f"{username} ({chosen_provider} account)" if chosen_provider else username)
+        logger.info("login --browser: stored %s credentials for %s (keyring=%s)", attempt.method, venue.slug, used)
+        stored.update(used_keyring=used, who=who, profile=profile)
+        return login_form.AttemptResult(True, f"Saved your {venue.slug} login ({who}).")
+
+    outcome = login_form.run_login_form(
+        spec,
+        check,
+        port=getattr(args, "port", 0) or 0,
+        open_browser=not getattr(args, "no_open", False),
+        timeout=getattr(args, "form_timeout", login_form.DEFAULT_FORM_TIMEOUT_SECONDS),
+    )
+    if not outcome.ok:
+        print(f"error: the login was not stored: {outcome.message}", file=sys.stderr)
+        return 1
+    print(f"Stored credentials for {venue.slug} ({stored['who']}).")
+    _print_store_location(stored["used_keyring"])
+    if venue.submission_url:
+        print(f"  Submission system: {venue.submission_url}")
+    if stored.get("profile") is not None and args.into:
+        _populate_orcid_into(args.into, venue, stored["profile"])
     return 0
 
 
@@ -3755,6 +3886,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="sign in with the stored credentials (headless) to confirm " "they still work, then exit; unlike --status this catches a " "changed password. Exits 1 if nothing is stored or the sign-in fails",
     )
     p_login.add_argument("--logout", action="store_true", help="remove stored credentials for the venue")
+    p_login.add_argument(
+        "--browser",
+        action="store_true",
+        help="type the username and password into a one-time page served on 127.0.0.1 (opened in your browser) "
+        "instead of the terminal. Needs no terminal input, so an AI agent can start it without ever seeing the "
+        "password; the page offers the venue's sign-in methods (account, ORCID, GitHub) unless a flag picks one",
+    )
+    p_login.add_argument("--port", type=int, default=0, metavar="PORT", help="(--browser) serve the page on this port, e.g. to forward it over SSH (default: a free port)")
+    p_login.add_argument("--no-open", dest="no_open", action="store_true", help="(--browser) print the page's URL without opening a browser")
+    p_login.add_argument(
+        "--form-timeout",
+        dest="form_timeout",
+        type=float,
+        default=15 * 60,
+        metavar="SECONDS",
+        help="(--browser) how long the page waits for the sign-in before giving up (default: 900s; 0 waits forever)",
+    )
     p_login.add_argument("--no-verify", dest="no_verify", action="store_true", help="store the credentials without checking them against " "the venue's sign-in (the default opens a browser and " "verifies first)")
     p_login.add_argument("--verify-headless", dest="verify_headless", action="store_true", help="run the verification browser headless (no window; " "cannot complete a CAPTCHA or two-factor prompt)")
     p_login.add_argument(
