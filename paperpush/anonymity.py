@@ -627,13 +627,20 @@ def _pdf_pages_and_links(path: Path) -> tuple[list[str], list[tuple[int, str]]]:
     try:
         from pypdf import PdfReader
 
+        from .manuscript import pdf_raw_pages
+
         reader = PdfReader(str(path))
+        raw = pdf_raw_pages(path)
+        shared = raw[0] if raw is not None and len(raw[0]) == len(reader.pages) else None
         pages, links = [], []
         for i, page in enumerate(reader.pages):
-            try:
-                pages.append(page.extract_text() or "")
-            except Exception:
-                pages.append("")
+            if shared is not None:
+                pages.append(shared[i])
+            else:
+                try:
+                    pages.append(page.extract_text() or "")
+                except Exception:
+                    pages.append("")
             for annot in page.get("/Annots") or []:
                 try:
                     uri = (annot.get_object().get("/A") or {}).get("/URI")

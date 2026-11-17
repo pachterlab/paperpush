@@ -512,12 +512,50 @@ def _form_width(form) -> float:
         return 0.0
 
 
+# Images decoded per page, largest first, and the largest decoded: pypdf decodes (and for JPEG
+# 2000, re-encodes) every image it is asked for, and a page can hold a hundred tiles of one
+# figure (an ICLR 2026 paper with ~700 images on 31 pages took over 15 minutes).
+MAX_IMAGES_PER_PAGE = 12
+MAX_IMAGE_PIXELS = 25_000_000
+
+
+def _xobject_at(page, key):
+    """The raw image XObject behind a ``page.images`` key ("/Im1", or a path through forms)."""
+    try:
+        resources = page.get("/Resources")
+        obj = None
+        for name in key if isinstance(key, (list, tuple)) else [key]:
+            xobjects = (resources.get_object() if resources is not None else {}).get("/XObject")
+            if xobjects is None:
+                return None
+            obj = xobjects.get_object().get(name)
+            if obj is None:
+                return None
+            obj = obj.get_object()
+            resources = obj.get("/Resources")
+        return obj
+    except Exception:  # noqa: BLE001 -- a malformed resource dictionary
+        return None
+
+
 def _page_images(page, min_width_px: int) -> list:
     out = []
     try:
-        for image in page.images:
+        images = page.images
+        sized = []
+        for key in images.keys():
+            raw = _xobject_at(page, key)
             try:
-                img = image.image
+                w, h = (int(raw.get("/Width", 0)), int(raw.get("/Height", 0))) if raw is not None else (0, 0)
+            except Exception:  # noqa: BLE001
+                w = h = 0
+            if raw is not None and w and (w < min_width_px or w * h > MAX_IMAGE_PIXELS):
+                continue  # too small to be a figure, or too large to decode in reasonable time
+            sized.append((w * h, key))
+        sized.sort(key=lambda t: -t[0])
+        for _, key in sized[:MAX_IMAGES_PER_PAGE]:
+            try:
+                img = images[key].image
             except Exception:  # noqa: BLE001 -- a filter Pillow cannot decode
                 continue
             if img is not None and img.width >= min_width_px:

@@ -232,3 +232,37 @@ def test_model_name_glued_to_citation_publisher_line_and_lone_parenthesized_auth
     assert not any(r.label.startswith(("Soc", "American")) for r in bib.refs) and _uncited(bib) == []
     short = _bib("the TWu et al. (2020) baseline.", "Xia Wu and Bo Li. Short names. In ICML, 2020.\n")
     assert _uncited(short) == ["Wu (2020)"]  # a two-letter surname after a capital may be an acronym's tail
+
+
+def test_an_entry_after_a_url_is_split_off_and_keeps_its_venue_fragment():
+    # ICLR iXp4UywUfr: a fabricated reference followed an entry closed by its URL, across a page
+    # break, and its venue wrapped onto a line that read like a one-word author ("Vis."). It merged
+    # into the real entry before it, whose registry match then hid it from the reference check.
+    tail = (
+        "Yifan Wang, Jianjun Zhou, Haoyi Zhu, and Tong He. Pi3: Scalable permutation-equivariant visual\n"
+        "geometry learning, 2025a. URL https://arxiv.org/abs/2507.13347.\n"
+        "\n\n\n"
+        "Zihang Wang et al. Uncertainty-aware ensemble nerf for active view planning. InIEEE Conf. Comput.\n"
+        "Vis. Pattern Recog., 2023.\n"
+        "Zirui Wang, Yash Bhalgat, Ruining Li, and Victor Adrian Prisacariu. Active view selector: Fast and\n"
+        "accurate active view selection. 2025b.\n"
+    )
+    bib = _bib("We build on Wang et al. (2025a), Wang et al. (2023), and Wang et al. (2025b).", tail)
+    entries = [r.authors for r in bib.refs]
+    fabricated = [e for e in entries if e.startswith("Zihang Wang")]
+    assert len(fabricated) == 1 and fabricated[0].endswith("Vis. Pattern Recog., 2023.")
+    assert not any(e.startswith("Vis.") for e in entries)
+    assert next(e for e in entries if e.startswith("Yifan Wang")).endswith("2507.13347.")
+
+
+def test_a_url_wrapped_after_a_slash_does_not_close_its_entry():
+    # ICLR IrGJvFKuX2: "... URL https://storage.googleapis.com/deepmind-media/" / "Model-Cards/Veo-3-Model-Card.pdf ."
+    tail = (
+        "Google DeepMind. Veo: a text-to-video generation system. Technical report, Google DeepMind, 2025. URL https://storage.googleapis.com/deepmind-media/\n"
+        "Model-Cards/Veo-3-Model-Card.pdf . Veo 3 Technical Report.\n"
+        "Daya Guo, Qihao Zhu, Dejian Yang, and Zhenda Xie. Deepseek-coder: When the large language model meets\n"
+        "programming. arXiv preprint arXiv:2401.14196, 2024.\n"
+    )
+    bib = _bib("Veo (Google, 2025) and DeepSeek-Coder (Guo et al., 2024).", tail)
+    entries = [r.authors for r in bib.refs]
+    assert len(entries) == 2 and entries[0].endswith("Veo 3 Technical Report.") and entries[1].startswith("Daya Guo")

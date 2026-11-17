@@ -10,8 +10,9 @@ searched for:
 * a ``.bib`` entry by its title, first author, and year, in Crossref
   (``query.bibliographic``) and, when Crossref has nothing, in OpenAlex, which
   also indexes conference papers and arXiv;
-* an entry citing an arXiv identifier, in the arXiv API, which says outright
-  whether the identifier exists;
+* an entry citing an arXiv identifier, by the DOI arXiv registers for every
+  paper (10.48550/arXiv.<id>) in DataCite, which says outright whether the
+  identifier exists (arXiv's own API when DataCite does not answer);
 * an entry of a manuscript's own reference list (a PDF or Word file with no
   ``.bib``), by the entry's whole text in Crossref, which is what
   ``query.bibliographic`` is built for.
@@ -162,7 +163,13 @@ PROSE_TITLE_OVERLAP = 0.8
 PROSE_NEAR_OVERLAP = 0.5
 # arXiv asks for one request every three seconds, and takes up to this many ids at once.
 ARXIV_BATCH = 50
-ARXIV_DELAY = 3.0
+ARXIV_DELAY = 3.5
+# arXiv requests a run spends on title searches.
+ARXIV_TITLE_REQUESTS = 30
+# DataCite requests a run spends: one per arXiv identifier cited, plus title searches. DataCite
+# holds the DOI arXiv registers for every paper (10.48550/arXiv.<id>), and unlike arXiv's own API
+# (one request per 3 s per client) it takes a batch of validate runs without refusing them.
+DATACITE_REQUESTS = 250
 # Titles shorter than this many words are too generic to search on.
 MIN_TITLE_WORDS = 3
 # How many unverified references the AI task lists.
@@ -276,20 +283,76 @@ class SearchResult:
 # --- HTTP -------------------------------------------------------------------------------
 
 
+# After a 429 from a service paced across processes, every process waits this long (times the
+# attempt) before the next request to it.
+SHARED_BACKOFF = 30.0
+
+
+def _pace_across_processes(name: str, delay: float, backoff: float = 0.0) -> None:
+    """Wait until ``delay`` seconds after the last request any paperpush process sent to ``name``.
+
+    With ``backoff`` (after a 429), the next request of every process is put off that many
+    seconds, and this one waits it out. The time of the next allowed request is kept in a lock
+    file in the temporary directory; without ``fcntl`` (Windows) only this process is paced."""
+    try:
+        import fcntl
+        import tempfile
+    except ImportError:
+        time.sleep(backoff)
+        return
+    path = Path(tempfile.gettempdir()) / f"paperpush-{re.sub(r'[^a-z0-9]+', '-', name.lower())}.pace"
+    wait_after = 0.0
+    try:
+        with open(path, "a+") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                fh.seek(0)
+                try:
+                    allowed = float(fh.read().strip() or 0)  # when the next request may go
+                except ValueError:
+                    allowed = 0.0
+                now = time.time()
+                if backoff:
+                    allowed = max(allowed, now + backoff)
+                    wait_after = allowed - now
+                else:
+                    # Capped, so a clock set back (or a stale file) never stalls a run.
+                    wait = min(max(allowed - now, 0.0), delay + SHARED_BACKOFF * RATE_LIMIT_RETRIES)
+                    if wait:
+                        time.sleep(wait)  # holding the lock: the processes queue up
+                    allowed = time.time() + delay
+                fh.seek(0)
+                fh.truncate()
+                fh.write(f"{allowed:.6f}")
+                fh.flush()
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+    except OSError:
+        logger.debug("could not pace %s requests across processes", name, exc_info=True)
+        wait_after = backoff
+    if wait_after:
+        time.sleep(wait_after)
+
+
 class _Service:
     """One remote service: its own request budget and circuit breaker."""
 
-    def __init__(self, name: str, budget: int, delay: float = 0.0) -> None:
+    def __init__(self, name: str, budget: int, delay: float = 0.0, shared_pace: bool = False) -> None:
         self.name = name
         self.budget = budget
         self.delay = delay
+        # Keep ``delay`` between requests from every paperpush process on this machine, not just
+        # this one: arXiv's one request per three seconds is per client, and several validate
+        # runs at once (a batch of papers) were refused with 429 for the rest of the hour.
+        self.shared_pace = shared_pace
         self.failures = 0
         self.down = False
         self.throttled_out = 0  # requests still refused with 429 after every wait
         self._last = 0.0
 
-    def get(self, url: str, accept: str = "application/json") -> bytes | None:
-        """The response body, or None when the request failed (and is counted against the service)."""
+    def get(self, url: str, accept: str = "application/json", missing_ok: bool = False) -> bytes | None:
+        """The response body, or None when the request failed (and is counted against the service).
+        With ``missing_ok``, a 404 is an answer (the record does not exist): ``b""``."""
         cached = _lookup_cache_read(url, accept)
         if cached is not None:
             return cached
@@ -300,6 +363,8 @@ class _Service:
             wait = self._last + self.delay - time.monotonic()
             if wait > 0:
                 time.sleep(wait)
+            if self.shared_pace:
+                _pace_across_processes(self.name, self.delay)
         req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": USER_AGENT})
         body = None
         attempt = throttled = 0
@@ -310,6 +375,9 @@ class _Service:
                 break
             except urllib.error.HTTPError as exc:
                 error: Exception = exc
+                if exc.code == 404 and missing_ok:
+                    body = b""
+                    break
                 if exc.code not in _RETRY_STATUS:
                     break
                 if exc.code == 429:
@@ -326,7 +394,12 @@ class _Service:
                         break
                     # Rate limited, not down: wait as long as asked rather than spend a retry.
                     throttled += 1
-                    time.sleep(_rate_limit_wait(exc, throttled))
+                    if self.shared_pace:
+                        # Every process backs off, or the others keep the limit tripped.
+                        _pace_across_processes(self.name, self.delay, backoff=SHARED_BACKOFF * throttled)
+                        _pace_across_processes(self.name, self.delay)
+                    else:
+                        time.sleep(_rate_limit_wait(exc, throttled))
                     continue
             except Exception as exc:  # noqa: BLE001 -- inconclusive, never an accusation
                 error = exc
@@ -345,7 +418,10 @@ class _Service:
             return None
         self._last = time.monotonic()
         self.failures = self.throttled_out = 0
-        _lookup_cache_write(url, accept, body)
+        # Not an arXiv feed with no entries: arXiv sends those now and then (and while throttling),
+        # and a cached one made every later "ask again" read the same empty answer.
+        if not (accept == "application/atom+xml" and b"<entry" not in body):
+            _lookup_cache_write(url, accept, body)
         return body
 
     def get_json(self, url: str):
@@ -368,13 +444,16 @@ class _Services:
     openalex: _Service
     arxiv: _Service
     biorxiv: _Service
+    datacite: _Service = field(default_factory=lambda: _Service("DataCite", DATACITE_REQUESTS))
 
 
 def _services() -> _Services:
     return _Services(
         crossref=_Service("Crossref", MAX_SEARCHES),
-        openalex=_Service("OpenAlex", MAX_SEARCHES),
-        arxiv=_Service("arXiv", 10, delay=ARXIV_DELAY),
+        openalex=_Service("OpenAlex", MAX_SEARCHES * OPENALEX_REQUESTS_PER_SEARCH),
+        # Id batches, plus title searches (one or two each) for references the other registries
+        # could not match; the rest stay unverified. Paced across processes, so it is slow.
+        arxiv=_Service("arXiv", 10 + ARXIV_TITLE_REQUESTS, delay=ARXIV_DELAY, shared_pace=True),
         biorxiv=_Service("bioRxiv", 40),
     )
 
@@ -395,6 +474,24 @@ def crossref_search(query: str, service: _Service) -> list[dict] | None:
     return [i for i in items if isinstance(i, dict)]
 
 
+# OpenAlex sometimes keeps a record's names unparsed: "Villegas, R" (family first) and
+# "CortesCorinna" (family and given run together, from some arXiv records).
+_RUN_TOGETHER_NAME = re.compile(r"^([A-Z][a-z]{2,})([A-Z][a-z]{2,})$")
+
+
+def _openalex_author(name: str) -> dict:
+    """A CSL author from an OpenAlex display name."""
+    name = name.strip()
+    if "," in name:
+        family, given = (x.strip() for x in name.split(",", 1))
+        if family and given:
+            return {"family": family.split()[-1], "literal": f"{given} {family}"}
+    m = _RUN_TOGETHER_NAME.match(name)
+    if m:
+        return {"family": m.group(1), "literal": f"{m.group(2)} {m.group(1)}"}
+    return {"family": name.split()[-1], "literal": name}
+
+
 def _openalex_record(work: dict) -> dict:
     """An OpenAlex work in the CSL shape the comparison helpers read."""
     doi = work.get("doi") or ""
@@ -402,7 +499,7 @@ def _openalex_record(work: dict) -> dict:
     for a in work.get("authorships") or []:
         name = ((a or {}).get("author") or {}).get("display_name") or ""
         if name:
-            authors.append({"family": name.split()[-1], "literal": name})
+            authors.append(_openalex_author(name))
     year = work.get("publication_year")
     return {
         "title": work.get("display_name") or work.get("title") or "",
@@ -413,20 +510,142 @@ def _openalex_record(work: dict) -> dict:
     }
 
 
+# OpenAlex prices a full-text title search (``filter=title.search``) at $0.001, so a key's $1/day
+# (or the shared keyless $0.10/day) covers only ~1,000 searches, while its autocomplete and
+# single-work endpoints are free. A title is first looked up through autocomplete, which
+# matches a phrase anywhere in a work's title: the whole title, then its first four words and
+# its last OPENALEX_CHUNK, so one misread or dropped word (or text run on after the title) does
+# not hide the work. The OPENALEX_CANDIDATES titles most like the reference's are then fetched
+# whole (authors, year, DOI) for the usual comparison; among equally good titles the most cited
+# record comes first, since OpenAlex keeps duplicates (dataset mirrors, unparsed author names). Only when autocomplete finds no title at all like the
+# reference's is the paid search run (the key's budget, then the keyless one); once both are
+# spent, OpenAlex counts as not answering, and arXiv's free title search decides instead.
+OPENALEX_CHUNK = 5
+OPENALEX_CANDIDATES = 5
+# Each OpenAlex lookup takes up to 3 autocomplete + 5 record requests (+1 paid search).
+OPENALEX_REQUESTS_PER_SEARCH = 9
+_OPENALEX_SELECT = "doi,display_name,publication_year,type,authorships"
+_OPENALEX_ID = re.compile(r"W\d+$")
+# Set once the key's paid budget (or the keyless one) refuses a search, for the rest of the process.
+_openalex_paid_spent: dict[str, bool] = {}
+
+
+def _openalex_key() -> str:
+    return os.environ.get("OPENALEX_API_KEY", "").strip()
+
+
+def _openalex_url(path: str, params: dict, keyed: bool = True) -> str:
+    params = dict(params)
+    if keyed and _openalex_key():
+        params["api_key"] = _openalex_key()
+    return f"https://api.openalex.org/{path}?" + urllib.parse.urlencode(params)
+
+
+# Text a title read from a reference list can run on into: ", 2021", ".arXiv preprint ...", "In ICLR".
+_TITLE_TAIL = re.compile(r"(?i)(?:[\s.,;:]+(?:arxiv\b.*|in\s+(?:proceedings|advances|international|the)\b.*|\(?(?:19|20)\d\d[a-z]?\)?))+\s*$")
+
+
+def _autocomplete_text(title: str) -> str:
+    """A title as autocomplete matches it: words, apostrophes kept ("Let's" is not "let s"),
+    lower case, without what ran on after it."""
+    title = _TITLE_TAIL.sub("", title.strip())
+    title = re.sub(r"[\u2018\u2019`]", "'", title)
+    return " ".join(re.sub(r"[^\w']+", " ", title.lower()).split())
+
+
+def _openalex_autocomplete(query: str, service: _Service) -> list[dict] | None:
+    data = service.get_json(_openalex_url("autocomplete/works", {"q": query[:200]}))
+    if not isinstance(data, dict) or not isinstance(data.get("results"), list):
+        return None
+    return [r for r in data["results"] if isinstance(r, dict) and r.get("display_name") and _OPENALEX_ID.search(str(r.get("id", "")))]
+
+
+def _openalex_paid_search(title: str, service: _Service) -> list[dict] | None:
+    """OpenAlex's full-text title search: the key's budget first, then the shared keyless one."""
+    params = {"filter": "title.search:" + _normalize_text(title)[:300], "per_page": 5, "select": _OPENALEX_SELECT}
+    for keyed in ((True, False) if _openalex_key() else (False,)):
+        which = "key" if keyed else "free"
+        if _openalex_paid_spent.get(which):
+            continue
+        url = _openalex_url("works", params, keyed=keyed)
+        cached = _lookup_cache_read(url, "application/json")
+        body = cached if cached is not None else _openalex_paid_get(url, service)
+        if body is None:
+            _openalex_paid_spent[which] = True
+            logger.info("OpenAlex's paid title search (%s budget) refused; trying %s", which, "the keyless budget" if keyed else "no further budget")
+            continue
+        try:
+            data = json.loads(body.decode("utf-8", "replace"))
+        except ValueError:
+            continue
+        if isinstance(data, dict) and isinstance(data.get("results"), list):
+            return [_openalex_record(w) for w in data["results"] if isinstance(w, dict)]
+    return None
+
+
+def _openalex_paid_get(url: str, service: _Service) -> bytes | None:
+    """One paid request, outside the service's circuit breaker: a spent budget (429) must not
+    stop the free endpoints."""
+    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
+    for attempt in range(RETRIES + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:  # nosec B310 -- https literal URL
+                body = resp.read(MAX_TEXT_BYTES)
+            _lookup_cache_write(url, "application/json", body)
+            return body
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429 or exc.code not in _RETRY_STATUS:
+                return None
+        except Exception:  # noqa: BLE001 -- inconclusive
+            pass
+        time.sleep(RETRY_DELAY)
+    return None
+
+
 def openalex_search(title: str, service: _Service) -> list[dict] | None:
     """OpenAlex works whose title matches ``title`` (CSL-shaped), or None if it did not answer.
 
-    Set ``OPENALEX_API_KEY`` to use your own daily budget instead of the shared keyless one.
+    Uses the free autocomplete and single-work endpoints first (see OPENALEX_CHUNK). Set
+    ``OPENALEX_API_KEY`` to give the paid fallback search your own daily budget.
     """
-    # A comma separates filters, so the title goes in as plain words.
-    params = {"filter": "title.search:" + _normalize_text(title)[:300], "per_page": 5, "select": "doi,display_name,publication_year,type,authorships"}
-    key = os.environ.get("OPENALEX_API_KEY", "").strip()
-    if key:
-        params["api_key"] = key
-    data = service.get_json("https://api.openalex.org/works?" + urllib.parse.urlencode(params))
-    if not isinstance(data, dict) or not isinstance(data.get("results"), list):
+    norm = _autocomplete_text(title)
+    words = norm.split()
+    if not words:
+        return []
+    queries = [norm]
+    if len(words) >= OPENALEX_CHUNK + 2:
+        queries += [" ".join(words[:4]), " ".join(words[-OPENALEX_CHUNK:])]
+    found: dict[str, tuple[float, dict]] = {}
+    for i, q in enumerate(queries):
+        hits = _openalex_autocomplete(q, service)
+        if hits is None:
+            continue
+        for h in hits:
+            wid = _OPENALEX_ID.search(str(h["id"])).group(0)
+            found.setdefault(wid, (title_similarity(title, str(h["display_name"])), h))
+        # The whole-title hit can be a duplicate with unparsed authors; the first-words chunk
+        # brings the other records of that title, so stop only after it.
+        if i >= 1 and any(sim >= TITLE_MATCH_RATIO for sim, _ in found.values()):
+            break
+    def rank(item):
+        sim, hit = item[1]
+        return (sim >= TITLE_MATCH_RATIO, round(sim, 2) if sim < TITLE_MATCH_RATIO else 1.0, int(hit.get("cited_by_count") or 0))
+
+    near = [(sim, wid) for wid, (sim, _) in sorted(found.items(), key=rank, reverse=True) if sim >= NEAR_TITLE_RATIO]
+    if not near:
+        # Autocomplete found no title like this one, but its index lacks works the full-text
+        # search has ("Training Verifiers to Solve Math Word Problems"), so its miss is no answer.
+        # Confirm with the paid search while a budget lasts; otherwise OpenAlex did not answer
+        # (and arXiv's title search, in _search_one, may still settle it).
+        return _openalex_paid_search(title, service)
+    records = []
+    for _, wid in near[:OPENALEX_CANDIDATES]:
+        work = service.get_json(_openalex_url(f"works/{wid}", {"select": _OPENALEX_SELECT}))
+        if isinstance(work, dict) and work.get("display_name"):
+            records.append(_openalex_record(work))
+    if not records:
         return None
-    return [_openalex_record(w) for w in data["results"] if isinstance(w, dict)]
+    return records
 
 
 def arxiv_lookup(ids: list[str], service: _Service) -> dict[str, dict] | None:
@@ -475,6 +694,154 @@ def arxiv_lookup(ids: list[str], service: _Service) -> dict[str, dict] | None:
                 "journal_ref": " ".join((entry.findtext(f"{_ARXIV_NS}journal_ref") or "").split()),
             }
     return found
+
+
+# Words of a title searched in arXiv's title field (the longest, up to this many; then the 3 longest).
+ARXIV_TITLE_WORDS = 5
+_ARXIV_SKIP = {"through", "towards", "toward", "with", "without", "using", "based", "from", "into", "over", "under", "via", "their", "beyond", "between", "among", "about"}
+
+
+def _arxiv_query_words(title: str) -> list[str]:
+    words = list(dict.fromkeys(w for w in _significant_words(_autocomplete_text(title).replace("'", " ")) if w.isalpha() and w not in _ARXIV_SKIP))
+    words.sort(key=len, reverse=True)
+    return words
+
+
+def arxiv_title_search(title: str, service: _Service) -> list[dict] | None:
+    """arXiv papers whose title has the title's significant words (CSL-shaped), or None if arXiv
+    did not answer. Free, unlike OpenAlex's full-text search, and it holds most of the machine
+    learning literature that Crossref lacks."""
+    import xml.etree.ElementTree as ET  # nosec B405 -- a response from arXiv's own API
+
+    # The longest words, which a misremembered title ("through" for "via") or a symbol arXiv
+    # spells otherwise ("I2SB" for "I$^2$SB") is least likely to touch.
+    words = _arxiv_query_words(title)
+    if len(words) < 2:
+        return None
+    entries = None
+    for take in (ARXIV_TITLE_WORDS, 3):
+        url = "https://export.arxiv.org/api/query?" + urllib.parse.urlencode({"search_query": " AND ".join(f"ti:{w}" for w in words[:take]), "max_results": 5})
+        body = service.get(url, accept="application/atom+xml")
+        if body is None:
+            return None
+        try:
+            entries = ET.fromstring(body).findall(f"{_ATOM}entry")  # nosec B314
+        except ET.ParseError:
+            return None
+        if entries or len(words) <= 3:
+            break
+    out = []
+    for entry in entries or []:
+        m = re.search(r"arxiv\.org/abs/" + _ARXIV_ID + r"$", (entry.findtext(f"{_ATOM}id") or "").strip(), re.IGNORECASE)
+        if not m:
+            continue
+        year = (entry.findtext(f"{_ATOM}published") or "")[:4]
+        out.append({
+            "title": " ".join((entry.findtext(f"{_ATOM}title") or "").split()),
+            "author": [{"family": n.split()[-1], "literal": n} for n in ((a.findtext(f"{_ATOM}name") or "").strip() for a in entry.findall(f"{_ATOM}author")) if n],
+            "issued": {"date-parts": [[int(year)]]} if year.isdigit() else {},
+            "DOI": f"10.48550/arxiv.{_arxiv_key(m.group(1))}",
+            "type": "posted-content",
+        })
+    return out
+
+
+def _datacite_arxiv_record(attrs: dict) -> dict | None:
+    """An arXiv paper's DataCite record in the shape :func:`arxiv_lookup` returns."""
+    titles = [t.get("title") for t in attrs.get("titles") or [] if isinstance(t, dict) and t.get("title")]
+    if not titles:
+        return None
+    authors = []
+    for c in attrs.get("creators") or []:
+        if not isinstance(c, dict):
+            continue
+        family, given, name = (c.get("familyName") or "").strip(), (c.get("givenName") or "").strip(), (c.get("name") or "").strip()
+        if not family and name:
+            family, _, given = (x.strip() for x in name.partition(",")) if "," in name else (name.split()[-1], "", " ".join(name.split()[:-1]))
+        if family:
+            authors.append({"family": family, "given": given, "literal": f"{given} {family}".strip()})
+    year = str(attrs.get("publicationYear") or "")
+    version = str(attrs.get("version") or "")
+    journal = next((normalize_doi(str(r.get("relatedIdentifier") or "")) for r in attrs.get("relatedIdentifiers") or [] if isinstance(r, dict) and r.get("relationType") == "IsVersionOf" and str(r.get("relatedIdentifierType", "DOI")).upper() == "DOI" and not str(r.get("relatedIdentifier", "")).lower().startswith("10.48550/")), "")
+    return {
+        "title": " ".join(titles[0].split()),
+        "author": authors,
+        "issued": {"date-parts": [[int(year)]]} if year.isdigit() else {},
+        "latest_version": int(version) if version.isdigit() else None,
+        "journal_doi": journal,
+        "journal_ref": "",
+    }
+
+
+def datacite_arxiv_lookup(ids: list[str], service: _Service) -> tuple[dict[str, dict], set[str]]:
+    """arXiv's DataCite record for each id that exists, and the ids DataCite answered for (a 404
+    means arXiv has no such paper: it registers a DOI for every one)."""
+    found: dict[str, dict] = {}
+    checked: set[str] = set()
+    for i in ids:
+        if not service.available:
+            break
+        body = service.get("https://api.datacite.org/dois/10.48550/arxiv." + urllib.parse.quote(i, safe="/."), accept="application/vnd.api+json", missing_ok=True)
+        if body is None:
+            continue
+        checked.add(i)
+        if not body:
+            continue  # 404: no such paper
+        try:
+            rec = _datacite_arxiv_record(json.loads(body.decode("utf-8", "replace"))["data"]["attributes"])
+        except (ValueError, KeyError, TypeError):
+            checked.discard(i)
+            continue
+        if rec:
+            found[i] = rec
+    return found, checked
+
+
+def _arxiv_records(ids: list[str], svc: _Services) -> tuple[dict[str, dict], set[str]]:
+    """Records of the arXiv ids (absent: no such paper), and the ids that were checked: DataCite
+    first, then arXiv's own API for any DataCite did not answer."""
+    records, checked = datacite_arxiv_lookup(ids, svc.datacite) if svc.datacite.available else ({}, set())
+    missing = [i for i in ids if i not in checked]
+    if missing and svc.arxiv.available:
+        answer = arxiv_lookup(missing, svc.arxiv)
+        if answer is not None:
+            records.update(answer)
+            checked |= set(missing)
+    return records, checked
+
+
+def datacite_arxiv_title_search(title: str, service: _Service) -> list[dict] | None:
+    """arXiv papers (through their DataCite DOIs) whose title has the title's longest words, or
+    None if DataCite did not answer. The same query as :func:`arxiv_title_search`."""
+    words = _arxiv_query_words(title)
+    if len(words) < 2:
+        return None
+    # The whole title as a phrase first: a title of short words ("Let's Verify Step by Step") is
+    # lost among the matches of its longest ones.
+    queries = ['titles.title:"' + _autocomplete_text(title).replace('"', " ") + '"', "titles.title:(" + " AND ".join(words[:ARXIV_TITLE_WORDS]) + ")"]
+    if len(words) > 3:
+        queries.append("titles.title:(" + " AND ".join(words[:3]) + ")")
+    data = None
+    for query in queries:
+        params = {"query": query, "client-id": "arxiv.content", "page[size]": 5}
+        body = service.get("https://api.datacite.org/dois?" + urllib.parse.urlencode(params), accept="application/vnd.api+json")
+        if body is None:
+            return None
+        try:
+            data = json.loads(body.decode("utf-8", "replace")).get("data") or []
+        except (ValueError, AttributeError):
+            return None
+        if data:
+            break
+    out = []
+    for item in data or []:
+        attrs = (item or {}).get("attributes") or {}
+        rec = _datacite_arxiv_record(attrs)
+        if rec:
+            rec["DOI"] = normalize_doi(str(attrs.get("doi") or ""))
+            rec["type"] = "posted-content"
+            out.append(rec)
+    return out
 
 
 def biorxiv_published_doi(doi: str, service: _Service) -> str | None:
@@ -768,6 +1135,9 @@ def _registered_lead_given(record: dict) -> tuple[str, str]:
     return "", ""
 
 
+_TEAM_WORDS = {"team", "group", "lab", "labs", "research", "ai", "consortium", "collaboration", "contributors", "community", "project"}
+
+
 def _lead_given_conflict(text: str, record: dict) -> str:
     """A problem when the entry's first author has the work's first author's family name but a
     different given name ("Ethan Perez" for Fabio Perez): the same surname, another person.
@@ -777,11 +1147,15 @@ def _lead_given_conflict(text: str, record: dict) -> str:
     reg_given, reg_family = _registered_lead_given(record)
     if not (given and reg_given and family and family == reg_family):
         return ""
+    # "NovelSeek Team" and "InternAgent Team" (one project, renamed): a team, not a person.
+    if family in _TEAM_WORDS or reg_family in _TEAM_WORDS:
+        return ""
     g, r = given.split()[0], reg_given.split()[0]
     if g[0] == r[0] or g == reg_family or _family(r) == family:
         return ""
-    # A preferred name among several given names ("Zhenyu Chen" for Dave Zhenyu Chen).
-    if g in reg_given.split():
+    # A preferred name among several given names ("Zhenyu Chen" for Dave Zhenyu Chen), also when
+    # registered as an initial ("Tian Qi Chen" for Ricky T. Q. Chen, "Yuan Li" for Christy Y. Li).
+    if g in reg_given.split() or any(part[:1] == g[:1] for part in reg_given.split()[1:]):
         return ""
     # The work's first author named in full anywhere in the entry: the entry read here may be
     # merged with the one before it ("... Haokun Lin ... Quantized LLMs. Ji Lin, Chuang Gan ...").
@@ -820,6 +1194,11 @@ def _title_conflict(own: str, registered: str) -> bool:
     return _credible_title(own, registered) and not _same_title(own, registered)
 
 
+_ORGANIZATION_AUTHOR = re.compile(
+    r"(?:[A-Z][\w&-]*\s+){0,4}(?:AI|Research|Team|Lab|Labs|Inc|Corporation|Foundation|Institute|Group|Consortium|Collaboration|DeepMind|OpenAI|Anthropic|Google|Meta|Microsoft|NVIDIA|Mistral|Qwen|DeepSeek|xAI|Xiaomi|Alibaba|Tencent|Baidu|ByteDance|Moonshot|Kimi|Gemma|Apple|Amazon|IBM|Cohere|Zhipu|MiniMax|StepFun)(?:\s+(?:AI|Research|Team|Lab|Labs|Inc))?[.,]\s"
+)
+
+
 def _prose_problems(text: str, words: set[str], record: dict, title_score: float) -> list[str]:
     """Author and year disagreements between a reference-list entry and the work it matched.
 
@@ -829,10 +1208,19 @@ def _prose_problems(text: str, words: set[str], record: dict, title_score: float
     """
     problems: list[str] = []
     families = _registered_families(record)[:10]
+    # "Meta AI Research. Llama 2: ...": a work cited under the organization that released it
+    # names none of its people, and that is a citation style, not a wrong author list.
+    # ... and a work registered under a team ("Team, Zhang, Wang, ..." for Xiaomi's MiMo-Audio)
+    # has no author list to hold an entry to.
+    organization = bool(_ORGANIZATION_AUTHOR.match(text.strip())) or (bool(families) and families[0] in _TEAM_WORDS)
+    if organization:
+        families = []
     truncated = bool(re.search(r"\bet\s+al\b|\bothers\b", text, re.IGNORECASE))
     # The entry's own title must be the work's: a short registered title can be a subset of a
     # longer one ("On the Difficulty of Membership Inference Attacks").
     own = _prose_title(text)
+    if _not_a_title(own):
+        own = ""
     same_title = _credible_title(own, _title_of(record)) and _same_title(own, _title_of(record))
     if families and not truncated and len(families) >= 2 and title_score >= PROSE_STRONG_TITLE and same_title:
         present = [f for f in families if f in words]
@@ -848,14 +1236,14 @@ def _prose_problems(text: str, words: set[str], record: dict, title_score: float
                 problems.append(f"the entry's co-authors differ from the work's: {listed}")
     listed = _entry_families(text)
     all_registered = set(_registered_families(record))
-    if same_title and not problems and len(listed) >= 3 and all_registered and sum(f in all_registered for f in listed) < PROSE_AUTHOR_SHARE * len(listed):
+    if same_title and not problems and not organization and len(listed) >= 3 and all_registered and sum(f in all_registered for f in listed) < PROSE_AUTHOR_SHARE * len(listed):
         # The names the entry does list, even cut short by "et al.", should be the work's.
         lead = listed[0]
         named = f"of the {len(listed)} authors the entry lists ({', '.join(listed[:4])}{', ...' if len(listed) > 4 else ''}) {sum(f in all_registered for f in listed)} are among the work's"
         problems.append(f"{WRONG_AUTHORS}: {named}" if lead not in all_registered else f"the entry's co-authors differ from the work's: {named}")
     elif families and families[0] not in words and same_title:
         problems.append(f"the entry does not name the registered first author ({families[0]})")
-    if same_title and not any(p.startswith(WRONG_AUTHORS) for p in problems):
+    if same_title and not organization and not any(p.startswith(WRONG_AUTHORS) for p in problems):
         given = _lead_given_conflict(text, record)
         if given:
             # The right surname on another person outranks "the co-authors differ".
@@ -872,6 +1260,8 @@ def match_text(ref: Reference, candidates: list[dict]) -> Lookup:
     # A title of a word or two ("New products") turns up in almost any entry.
     # ... unless the entry's own title, read cleanly, is that short title ("Attention Is All You Need").
     own_title = _prose_title(ref.text)
+    if _not_a_title(own_title):
+        own_title = ""  # misread (a venue, a URL, names): the entry's own title is unknown
     candidates = [c for c in candidates if _is_candidate(c) and (len(_significant_words(_work_title(_title_of(c)))) >= MIN_TITLE_WORDS or _same_title(own_title, _title_of(c)))]
     words = set(_normalize_text(ref.text).split())
     scored = sorted(((_prose_overlap(ref.text, c), c) for c in candidates), key=lambda t: -t[0])
@@ -954,6 +1344,45 @@ def is_web_page_entry(text: str) -> bool:
 # --- the searches -----------------------------------------------------------------------
 
 
+# What a misread reference-list entry yields as its "title": a URL, or a list of people
+# ("Ilya Loshchilov and Frank Hutter").
+_NAME = r"[A-Z][a-z'\u00c0-\u017f-]+(?:\s+[A-Z]\.)*\s+[A-Z][a-z'\u00c0-\u017f-]+"
+_NAME_LIST = re.compile(rf"^{_NAME}(?:\s*,\s*{_NAME})*,?\s+and\s+{_NAME}\.?$")
+
+
+# ... or the venue ("Proceedings of the National Academy of Sciences, 115(34):8505-8510, 2018",
+# read after an author named "Weinan E." whose initial looked like the end of the author list).
+_VENUE_TITLE = re.compile(r"(?i)^(?:in\s+)?(?:proceedings\b|proc\.|advances\s+in\b|journal\s+of\b|transactions\s+on\b|(?:ieee|acm)\b|international\s+conference\b|conference\s+on\b)|\b\d+\s*\(\d+\)\s*:\s*\d+")
+
+
+def _not_a_title(title: str) -> bool:
+    t = title.strip()
+    return bool(re.search(r"(?i)https?:|www\.|arxiv\.org|\bdoi\.org", t)) or bool(_NAME_LIST.match(t)) or bool(_VENUE_TITLE.search(t))
+
+
+def _arxiv_second_look(ref: Reference, lookup: Lookup | None, title: str, svc: _Services, match) -> tuple[Lookup | None, list[dict] | None]:
+    """Search arXiv's titles for a reference Crossref and OpenAlex did not match; the better of
+    the two lookups, and arXiv's answer (None if it did not answer)."""
+    if len(title.split()) < MIN_TITLE_WORDS:
+        return lookup, None
+    arx = datacite_arxiv_title_search(title, svc.datacite) if svc.datacite.available else None
+    if arx is None and svc.arxiv.available:
+        arx = arxiv_title_search(title, svc.arxiv)
+    if arx is None:
+        return lookup, None
+    second = match(ref, arx)
+    # Not "arXiv": that source means the entry cited an arXiv identifier (see search_references).
+    names = [n for n in re.split(r",? and |, ", (lookup.source if lookup is not None else "") or "Crossref") if n] + ["arXiv titles"]
+    source = names[0] if len(names) == 1 else f"{names[0]} and {names[1]}" if len(names) == 2 else ", ".join(names[:-1]) + ", and " + names[-1]
+    if lookup is None or second.status == MATCHED or (second.status == NEAR and lookup.status in (NOT_FOUND, UNKNOWN)):
+        second.source = source
+        return second, arx
+    lookup.source = source
+    if not lookup.candidates and second.candidates:
+        lookup.candidates = second.candidates[:1]
+    return lookup, arx
+
+
 def _search_one(ref: Reference, svc: _Services) -> Lookup:
     if ref.title:
         query = " ".join(x for x in (ref.title, ref.author, ref.year) if x)
@@ -972,8 +1401,11 @@ def _search_one(ref: Reference, svc: _Services) -> Lookup:
                 else:
                     lookup.source = "Crossref and OpenAlex"
                     lookup.candidates += second.candidates[:1]
-        # A miss means something only when both registries answered.
-        if lookup is not None and lookup.status == NOT_FOUND and (items is None or works is None):
+        arx = None
+        if lookup is None or lookup.status != MATCHED:
+            lookup, arx = _arxiv_second_look(ref, lookup, ref.title, svc, match_entry)
+        # A miss means something only when Crossref and a second registry (OpenAlex or arXiv) answered.
+        if lookup is not None and lookup.status == NOT_FOUND and (items is None or (works is None and arx is None)):
             lookup.status = UNKNOWN
         return lookup or Lookup(ref, UNKNOWN)
     items = crossref_search(ref.text, svc.crossref) if svc.crossref.available else None
@@ -984,6 +1416,9 @@ def _search_one(ref: Reference, svc: _Services) -> Lookup:
     # it cannot match is also searched in OpenAlex by its own title. A miss in both, for a
     # cleanly read title, is a confident miss.
     own = _prose_title(ref.text)
+    if _not_a_title(own):
+        own = ""  # misread: neither searched nor counted as a confident miss
+    works = None
     if (lookup is None or lookup.status != MATCHED) and len(own.split()) >= MIN_TITLE_WORDS and svc.openalex.available:
         works = openalex_search(own, svc.openalex)
         if works is not None:
@@ -995,6 +1430,10 @@ def _search_one(ref: Reference, svc: _Services) -> Lookup:
                 lookup.source = "Crossref and OpenAlex"
                 lookup.candidates += second.candidates[:1]
             lookup.confident_miss = lookup.status == NOT_FOUND and items is not None
+        if (lookup is None or lookup.status != MATCHED) and works is None:
+            lookup, arx = _arxiv_second_look(ref, lookup, own, svc, match_text)
+            if arx is not None and lookup is not None:
+                lookup.confident_miss = lookup.status == NOT_FOUND and items is not None
     return lookup or Lookup(ref, UNKNOWN)
 
 
@@ -1006,12 +1445,12 @@ def search_references(refs: list[Reference], *, services: _Services | None = Non
     arxiv_refs = [r for r in refs if not r.doi and r.arxiv_id]
     if arxiv_refs:
         ids = sorted({r.arxiv_id for r in arxiv_refs})
-        records = arxiv_lookup(ids, svc.arxiv)
-        if records is not None:
+        records, checked = _arxiv_records(ids, svc)
+        if checked:
             result.arxiv_records = records
-            result.arxiv_checked = set(ids)
+            result.arxiv_checked = checked
         for r in arxiv_refs:
-            result.lookups.append(match_arxiv(r, records.get(r.arxiv_id)) if records is not None else Lookup(r, UNKNOWN, source="arXiv"))
+            result.lookups.append(match_arxiv(r, records.get(r.arxiv_id)) if r.arxiv_id in checked else Lookup(r, UNKNOWN, source="arXiv"))
 
     # A web page is not in the registries; the link check tells whether it is there.
     todo = [r for r in refs if not r.doi and not r.arxiv_id and not is_web_page_entry(r.text) and (r.text or len(_normalize_text(r.title).split()) >= MIN_TITLE_WORDS)]
@@ -1200,11 +1639,10 @@ def version_findings(
     records = dict(arxiv_records or {})
     checked = set(arxiv_checked)
     missing = sorted({r.arxiv_id for r in arxiv_refs} - checked)
-    if missing and svc.arxiv.available:
-        answer = arxiv_lookup(missing, svc.arxiv)
-        if answer is not None:
-            records.update(answer)
-            checked |= set(missing)
+    if missing:
+        answer, asked = _arxiv_records(missing, svc)
+        records.update(answer)
+        checked |= asked
     searches = 0
     for r in arxiv_refs:
         rec = records.get(r.arxiv_id)

@@ -178,6 +178,9 @@ def _no_network_reference_search(monkeypatch):
     import paperpush.reference_search as reference_search
 
     monkeypatch.setattr(reference_search._Service, "get", lambda self, *a, **k: None)
+    # OpenAlex's paid title search goes around _Service (its 429 must not stop the free endpoints).
+    monkeypatch.setattr(reference_search, "_openalex_paid_get", lambda *a, **k: None)
+    monkeypatch.setattr(reference_search, "_openalex_paid_spent", {})
 
 
 @pytest.fixture(autouse=True)

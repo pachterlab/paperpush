@@ -514,6 +514,11 @@ def _read_pdf_uncached(path: Path) -> PdfRead:
     except Exception:
         logger.debug("could not parse PDF %s for text extraction; skipping", path, exc_info=True)
         return PdfRead("", "not a readable PDF", 0)
+    from .manuscript import pdf_raw_pages
+
+    raw = pdf_raw_pages(path)
+    if raw is not None and len(raw[0]) == len(pages):
+        return PdfRead("\n".join(raw[0]), f"{raw[1]} of {len(pages)} pages could not be read" if raw[1] else None, len(pages))
     parts: list[str] = []
     failed = 0
     for page in pages:

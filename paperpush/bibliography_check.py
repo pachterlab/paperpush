@@ -393,6 +393,10 @@ def entry_year(entry: str) -> re.Match[str] | None:
 def _runs_on(entry: str) -> bool:
     """Whether ``entry`` opens like the rest of a venue name ("Conference on Acoustics, ...") rather than an author list."""
     raw = entry.split()[:3]
+    # The rest of a URL wrapped onto the next line ("Module_Networks_CVPR_2016_paper.html.", ICLR
+    # 14dlTHVxDX), which otherwise opened an entry and swallowed the next one.
+    if raw and ("_" in raw[0] or re.search(r"\.(?:html?|pdf|php)\.?$", raw[0])):
+        return True
     if raw and re.fullmatch(r"[A-Z][\w&-]*\.", raw[0]):
         return False  # a one-word author ("Anthropic. System card: ...")
     words = [w.strip(",.;:()[]") for w in raw]
@@ -504,11 +508,17 @@ def _text_bibliography(doc: document.Document, path: Path) -> Bibliography | Non
         # A real entry opens with its authors and year ("..., Name. 2015.", "Smith, J. (2015).") or,
         # in the natbib styles, with its authors and a year at the end; a line that does neither is
         # the previous entry running on (a venue, "Preprint, arXiv:...").
-        names = (_author_list_head(entry) or bool(_TWO_NAMES.match(entry))) and bool(_YEAR.search(entry))
+        # After an entry closed by its URL, an author list opens the next entry even before its year
+        # has been joined back on (see open_venue below).
+        after_url = bool(entries) and bool(re.search(r"https?://\S*[^/\s-]\.$", entries[-1]))
+        names = (_author_list_head(entry) or bool(_TWO_NAMES.match(entry))) and (bool(_YEAR.search(entry)) or after_url)
         # A volume and pages this early is a venue line, even one in capitals that reads like names
         # ("IEEE Trans. Mob. Comput., 24(5):4053-4071, 2025.", ICLR BtpXep9qxC).
         head = not _runs_on(entry) and not _heading_like(entry) and not _VENUE_OPENING.search(entry[:80]) and not _VOLUME_PAGES.search(entry[:40]) and not _PUBLISHER_LINE.match(entry) and (names or (bool(_AUTHOR_YEAR_HEAD.search(entry[:300])) and not _venue_line(entry)))
-        if entries and (len(entry) < 25 or not head):
+        # An entry with no year that stops on an abbreviation ("... In IEEE Conf. Comput.") ran on into
+        # this one ("Vis. Pattern Recog., 2023.", ICLR iXp4UywUfr), which reads like a one-word author.
+        open_venue = bool(entries) and entry_year(entries[-1]) is None and bool(_ENDS_MID_VENUE.search(entries[-1]))
+        if entries and (len(entry) < 25 or not head or open_venue):
             entries[-1] += " " + entry
         elif entry and not _heading_like(entry):
             entries.append(entry)
@@ -614,6 +624,11 @@ def entry_years(entry: str) -> list[re.Match[str]]:
 _CLOSED_BY_YEAR = re.compile(r"(?:19|20)\d{2}[a-z]?\.\s*$")
 # ... or with an ISBN or ISSN ("Curran Associates Inc. ISBN 9781510860964.", ICLR ta8BKRa1bl), which never follows the authors.
 _CLOSED_BY_ISBN = re.compile(r"\bIS[BS]N:?\s*[\dXx-]{8,17}\.\s*$")
+# ... or with its URL (natbib's ML styles end an entry "..., 2025a. URL https://arxiv.org/abs/2507.13347."):
+# the fabricated "Zihang Wang et al. Uncertainty-aware ensemble nerf ..." after one (ICLR iXp4UywUfr) merged
+# into it, and the real entry's match hid it.
+# The URL must end the line with a full stop: one wrapped after "/" or "-" runs on to the next line.
+_CLOSED_BY_URL = re.compile(r"(?:19|20)\d{2}[a-z]?\.\s+URL\s+https?://\S*[^/\s-]\.\s*$")
 
 
 def _entries_after_a_closed_entry(tail: str, starts: list[int]) -> list[int]:
@@ -631,14 +646,18 @@ def _entries_after_a_closed_entry(tail: str, starts: list[int]) -> list[int]:
         lines = tail[a:b].splitlines(keepends=True)
         for i, line in enumerate(lines):
             offset += len(line)
-            if i + 1 >= len(lines) or not (_CLOSED_BY_YEAR.search(line) or _CLOSED_BY_ISBN.search(line)):
+            by_url = _CLOSED_BY_URL.search(line)
+            if i + 1 >= len(lines) or not (_CLOSED_BY_YEAR.search(line) or _CLOSED_BY_ISBN.search(line) or by_url):
                 continue
             before = re.sub(r"\s+", " ", tail[a:offset]).strip()
             before = _CLOSED_BY_YEAR.sub("", before)
-            if not _CLOSED_BY_ISBN.search(line) and len(_AUTHOR_LIST_END.findall(before)) < 2:
+            # A URL after the year closes an entry in any style; the title-then-year test is for a bare year.
+            if not _CLOSED_BY_ISBN.search(line) and not by_url and len(_AUTHOR_LIST_END.findall(before)) < 2:
                 continue
             rest = re.sub(r"\s+", " ", tail[offset:b]).strip()
-            if not rest or _runs_on(rest) or not (_author_list_head(rest) or _TWO_NAMES.match(rest)) or entry_year(rest) is None:
+            # After a URL the next entry's year can sit in a fragment split off it ("... Conf. Comput." /
+            # "Vis. Pattern Recog., 2023."), which the assembly joins back; a bare year needs it here.
+            if not rest or _runs_on(rest) or not (_author_list_head(rest) or _TWO_NAMES.match(rest)) or (entry_year(rest) is None and not by_url):
                 continue
             start = offset + len(tail[offset:b]) - len(tail[offset:b].lstrip())
             out.append(start)
@@ -659,6 +678,10 @@ _VENUE_OPENING = re.compile(r"^(?:ISSN|ISBN|URL|doi|DOI|https?:|In\b|Proceedings
 
 # A publisher and year alone: "American Mathematical Soc., 2004." (ICLR P8RzsaEN2s).
 _PUBLISHER_LINE = re.compile(r"^[^.]{0,60}?\b(?:Soc\.|Society|Press|Inc\.|Ltd\.?|Publishers?|Publishing|Verlag|Springer|Elsevier|Wiley|Associates)\s*,?\s*(?:19|20)\d{2}[a-z]?\.?\s*$")
+
+
+# An abbreviated venue word at the end of an entry: "Comput.", "Conf.", "Proc." (not an initial, "J.").
+_ENDS_MID_VENUE = re.compile(r"\b[A-Z][a-z]{2,}\.$")
 
 
 def _venue_line(entry: str) -> bool:

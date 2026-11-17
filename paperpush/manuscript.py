@@ -386,18 +386,55 @@ def docx_to_text(path: Path, drop_tables: bool = False) -> str | None:
 # --- PDF -------------------------------------------------------------------
 
 
-def _pdf_pages_pypdf(path: Path) -> list[str] | None:
-    """Per-page text via pypdf, if it is installed. None if unavailable."""
+# Raw pypdf text of each page by (path, mtime, size), shared by every reader of a PDF's text
+# layer (the manuscript text here, the secret and link scans, the anonymity check). Extraction
+# is the slow part: minutes for a PDF of dense vector figures, and it used to run three times.
+_PDF_RAW_CACHE: dict[tuple[str, int, int], tuple[list[str], int] | None] = {}
+
+
+def pdf_raw_pages(path: Path) -> tuple[list[str], int] | None:
+    """(each page's pypdf text, "" for a page that failed; the number that failed), or None when
+    pypdf is not installed or cannot open the file."""
+    try:
+        st = os.stat(path)
+        key = (str(Path(path).resolve()), st.st_mtime_ns, st.st_size)
+    except OSError:
+        key = None
+    if key is not None and key in _PDF_RAW_CACHE:
+        cached = _PDF_RAW_CACHE[key]
+        return None if cached is None else (list(cached[0]), cached[1])
     try:
         from pypdf import PdfReader
     except ImportError:
         return None
+    result: tuple[list[str], int] | None
     try:
         reader = PdfReader(str(path))
-        return [(page.extract_text() or "") for page in reader.pages]
-    except Exception as exc:  # pypdf raises a variety of parse errors
+        pages, failed = [], 0
+        for page in reader.pages:
+            try:
+                pages.append(page.extract_text() or "")
+            except Exception as exc:  # noqa: BLE001 -- pypdf raises a variety of parse errors
+                logger.debug("pypdf failed on a page of %s: %s", path, exc)
+                pages.append("")
+                failed += 1
+        result = (pages, failed)
+    except Exception as exc:  # noqa: BLE001
         logger.debug("pypdf failed to read %s: %s", path, exc)
+        result = None
+    if key is not None:
+        if len(_PDF_RAW_CACHE) >= 16:
+            _PDF_RAW_CACHE.clear()
+        _PDF_RAW_CACHE[key] = None if result is None else (list(result[0]), result[1])
+    return result
+
+
+def _pdf_pages_pypdf(path: Path) -> list[str] | None:
+    """Per-page text via pypdf, if it is installed. None if unavailable or a page failed."""
+    raw = pdf_raw_pages(path)
+    if raw is None or raw[1]:
         return None
+    return raw[0]
 
 
 _OBJ = re.compile(rb"(\d+)\s+0\s+obj\b(.*?)\bendobj", re.DOTALL)
