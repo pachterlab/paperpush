@@ -40,7 +40,7 @@ web = ["fastapi>=0.115", "uvicorn>=0.30", "python-multipart>=0.0.9", "psycopg[bi
 validate = ["pdfminer.six>=20240706", "arxiv_latex_cleaner>=0.1.0", "codespell>=2.2", "tqdm>=4.60"]
 all = ["paperpush[ai,web,validate]"]
 all-no-ai = ["paperpush[mcp,web,validate]"]
-dev = ["paperpush[all-no-ai]", "pytest>=7.0", "bandit", "black", "jsonschema>=4.18", "sphinx", "isort"]
+dev = ["paperpush[all-no-ai]", "pytest>=7.0", "bandit", "gitleaks", "black", "jsonschema>=4.18", "sphinx", "isort"]
 
 [project.scripts]
 paperpush = "paperpush.cli:main"
