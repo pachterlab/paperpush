@@ -1658,7 +1658,7 @@ def _run_manuscript_stages(bar: _Progress, checks: Checks, venue: Venue, values:
         bar.run(label, module.run_checks, checks, venue, values)
 
 
-def _ai_only_report(checks: Checks, subfile: SubFile, venue: Venue, *, ai, subfile_path: str, initial_submission: bool, strict_style: bool = False, progress=None):
+def _ai_only_report(checks: Checks, subfile: SubFile, venue: Venue, *, ai, subfile_path: str, initial_submission: bool, strict_style: bool = False, progress=None, check_anonymous: bool = False):
     """The :func:`validate_report` for ``ai_only``: just the checks that need AI."""
     from . import ai_validate, report
     from .requirements import any_format_initial_rule
@@ -1668,6 +1668,10 @@ def _ai_only_report(checks: Checks, subfile: SubFile, venue: Venue, *, ai, subfi
     # These checks queue the AI tasks that apply (raster figures, a PDF's
     # template, title-page items, ...); their own results are not reported.
     _run_manuscript_stages(bar, checks, venue, values)
+    if check_anonymous:
+        from . import anonymity
+
+        checks.needs_ai(anonymity.ai_task(venue, values))
     checks.results = []
     tasks = bar.run("AI checks", ai_validate.resolve, checks, venue, values, ai)
     bar.finish()
@@ -1943,7 +1947,7 @@ def validate_report(
     if ai_only:
         if not check_manuscript:
             raise ValueError("ai_only needs check_manuscript: the manuscript checks decide which AI checks apply")
-        result = _ai_only_report(checks, subfile, venue, ai=ai, subfile_path=subfile_path, initial_submission=initial_submission, strict_style=strict_style, progress=progress)
+        result = _ai_only_report(checks, subfile, venue, ai=ai, subfile_path=subfile_path, initial_submission=initial_submission, strict_style=strict_style, progress=progress, check_anonymous=check_anonymous)
         _set_scope(result, venue, values, files_only, notes)
         return result
 
@@ -2012,7 +2016,11 @@ def validate_report(
         checks.record("integrity.sensitive", "No secrets or private information in the files", integrity, report.UNCHECKED, detail="switched off (--disable-integrity.sensitive)")
     bar.run("LaTeX source", checks.run, "integrity.latex_cleaner", "Nothing for arxiv_latex_cleaner to strip from the LaTeX source", integrity, _latex_cleaner_issues, venue, values)
     if check_anonymous:
-        bar.run("Anonymity", checks.run, "integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, _anonymity_issues, venue, values)
+        anon = bar.run("Anonymity", checks.run, "integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, _anonymity_issues, venue, values)
+        # A reader catches the self-identification no keyword list covers ("as we showed in [5]", "our lab").
+        from . import anonymity as _anonymity
+
+        checks.needs_ai(_anonymity.ai_task(venue, values, known=[i.message for i in getattr(anon, "issues", []) if not i.unchecked]))
     else:
         checks.record("integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, report.NOT_APPLICABLE, detail="the venue is not double-blind (use --anonymous to check anyway)")
     if check_hidden_text:

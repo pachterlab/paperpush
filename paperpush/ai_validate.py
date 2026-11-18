@@ -42,8 +42,8 @@ logger = logging.getLogger(__name__)
 # AI tasks whose "fail" is reported as a likely error, not a warning: if the AI is
 # right, the submission has a critical problem (a fabricated reference, a modified
 # template, an unregistered clinical trial, human or animal research with no ethics
-# approval). Every other AI fail is a warning.
-CRITICAL_AI_TASKS = frozenset({"ai.unverified_references", "ai.template", "ai.rigor.trial_registration", "ai.details.ethics"})
+# approval, text that identifies the authors of a double-blind submission). Every other AI fail is a warning.
+CRITICAL_AI_TASKS = frozenset({"ai.unverified_references", "ai.template", "ai.rigor.trial_registration", "ai.details.ethics", "ai.anonymity"})
 
 VERDICTS = ("pass", "fail", "suggest", "unclear", "not_applicable")
 

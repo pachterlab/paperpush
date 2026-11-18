@@ -161,5 +161,5 @@ def test_template_edits_split_into_layout_changes_and_spacing_tweaks():
 
 
 def test_only_critical_ai_failures_are_likely_errors():
-    assert {"ai.unverified_references", "ai.template", "ai.rigor.trial_registration", "ai.details.ethics"} == set(ai_validate.CRITICAL_AI_TASKS)
+    assert {"ai.unverified_references", "ai.template", "ai.rigor.trial_registration", "ai.details.ethics", "ai.anonymity"} == set(ai_validate.CRITICAL_AI_TASKS)
     assert "ai.figures.design" not in ai_validate.CRITICAL_AI_TASKS and "ai.prose" not in ai_validate.CRITICAL_AI_TASKS

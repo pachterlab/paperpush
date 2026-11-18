@@ -165,6 +165,15 @@ guess failed.
      describes a different work, with the correct details where you found
      them; a book or web page the registries miss is not fabricated. If you
      cannot search, answer `unclear`.
+   - `ai.anonymity` (double-blind venues, or `--anonymous`) asks whether
+     anything beyond the keyword scan's findings identifies the authors. Read
+     the whole manuscript and supplement as a reviewer would. `fail` quotes
+     each passage that claims the authors' earlier work in the first person
+     ("as we showed in [5]"), reveals a third-person citation as theirs,
+     names or implies their lab or institution, or relies on a resource only
+     they have. A self-citation in the third person is fine, as is "we"
+     meaning the present paper. Don't repeat the findings the task lists as
+     already reported.
    - `ai.figures.content_matches_text` lists each figure's legend and the
      sentences that cite it, tagged with the panels they cite. Look at every
      figure and every named panel and check that it shows what is said about
@@ -230,7 +239,7 @@ guess failed.
    (MCP alternative: `validate_subfile(subfile, ai_results=[...], output=...)`.)
    Your verdicts appear marked "(AI)". A failed AI check never blocks: it is a
    likely error for the checks where a real failure is critical (unverified
-   references, the template, trial registration, ethics approval) and a warning
+   references, the template, trial registration, ethics approval, anonymity) and a warning
    for the rest; a `suggest` verdict is a suggestion.
 
    If the user asks for the AI checks only, add `--ai-only` to both commands

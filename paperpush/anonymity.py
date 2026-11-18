@@ -1018,3 +1018,63 @@ def scan_submission(
             findings.extend(scan_anonymous_repo(repo, terms))
     # One finding per (location, message): a name on every page is one problem.
     return list(dict.fromkeys(findings))
+
+
+# --- the reader's check (ai.anonymity) -------------------------------------------
+
+# At most this many deterministic findings are listed in the task, so it does not repeat them.
+_MAX_KNOWN_FINDINGS = 20
+
+_AI_INSTRUCTIONS = (
+    "This submission goes to double-blind review: reviewers must not be able to tell who wrote it. "
+    "A keyword scan has already searched these files for the authors' names, emails, ORCID/OpenReview IDs and affiliations, "
+    "file metadata, acknowledgments and funding sections, owner-named code links, and fixed first-person phrases such as "
+    "'in our previous work'. Read the files the way a reviewer would and find what such a scan cannot see:\n"
+    "  1. The authors' own earlier work referred to in the first person in any wording: 'we previously showed [12]', "
+    "'as we demonstrated in [5]', 'in [3], we introduced', 'our ICML paper', 'an extended version of our workshop paper', "
+    "'our companion paper (under review)'.\n"
+    "  2. A citation given in the third person that the surrounding text then reveals as the authors' own "
+    "('Smith et al. (2023) proposed X ... In this work we extend our X').\n"
+    "  3. The authors' group or institution named or implied: 'our lab', 'our group', 'our hospital's cohort', "
+    "'data collected at our institution', an institution, ethics board (IRB), or company named as the authors' own, "
+    "'this work was done during an internship at ...'.\n"
+    "  4. Resources only the authors' group could have: a named in-house system, cluster, or private dataset presented as "
+    "theirs, or an unpublished work of theirs cited as such ('Anonymous, in preparation' is fine; naming it is not).\n"
+    "  5. Anything else that would let a reviewer identify the authors (a lab logo in a figure, a personal web page, "
+    "a grant or project name presented as theirs).\n"
+    "These are NOT problems: citing the authors' own papers in the third person like anyone else's work (this is what "
+    "double-blind venues ask for); 'we', 'our method', or 'our results' meaning the present paper; 'our previous section'; "
+    "citations of well-known work by others; anonymized placeholders ('Anonymous, 2024', 'anonymous.4open.science').\n"
+    "Report 'fail' listing each passage (file, page or section, and a short quote) and what it gives away; "
+    "'pass' if nothing beyond the already-reported findings identifies the authors. Do not report the already-reported findings again."
+)
+
+
+def ai_task(venue, values: dict[str, str], known: Iterable[str] = ()):
+    """The ``ai.anonymity`` task: a reader's search for what identifies the authors, beyond the keyword scan.
+
+    Reads the files reviewers see (not the title page or cover letter). The
+    authors' names and institutions are given as context so the reader can tell
+    a third-person self-citation that the text gives away from an ordinary one.
+    ``known`` holds the messages the deterministic pass already reported, listed
+    so the reader does not report them again.
+    """
+    from .ai_validate import AiTask
+    from .validate import _iter_upload_paths
+
+    reviewer_values = {k: v for k, v in values.items() if not EDITOR_ONLY_FIELDS.search(k)}
+    files = [str(p) for p in _iter_upload_paths(venue, reviewer_values)]
+    terms = identity_terms(venue, values)
+    names = [t for label, t in terms if label == "author name"]
+    places = [t for label, t in terms if label == "affiliation"]
+    context = ""
+    if names or places:
+        context = "\n\nFor your judgment only (the reviewers will not see this): the authors are " + (", ".join(names) or "not listed")
+        if places:
+            context += "; their affiliations include " + "; ".join(dict.fromkeys(places))
+        context += ". A citation of these authors is a problem only when the text presents it as the authors' own."
+    known = [m for m in dict.fromkeys(known) if m][:_MAX_KNOWN_FINDINGS]
+    if known:
+        context += "\n\nAlready reported by the keyword scan (do not repeat):\n" + "\n".join(f"  - {m}" for m in known)
+    # Literal id and title: scripts/gen_validation_check_count.py reads them from the source.
+    return AiTask(id="ai.anonymity", title="Nothing in the text reveals who the authors are (double-blind, reader's check)", category="Integrity", instructions=_AI_INSTRUCTIONS + context, files=files)

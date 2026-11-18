@@ -21,11 +21,11 @@
 PaperPush provides the following services:
 - A standardized system to share all metadata submitted to a venue (the .sub file - [see an example here](https://paperpush.readthedocs.io/en/latest/sub-file.html#sub-file-example))
 <!-- BEGIN VALIDATION CHECK COUNT -->
-- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, anonymization, and much, much more — 174 distinct validation check types in total. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html)
+- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, anonymization, and much, much more — 175 distinct validation check types in total. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html)
 <!-- END VALIDATION CHECK COUNT -->
 - A central database of journal/conference [manuscript requirements](https://paperpush.readthedocs.io/en/latest/schemas/manuscript_requirements.html) ([`paperpush/manuscript_requirements.json`](https://github.com/pachterlab/paperpush/blob/main/paperpush/manuscript_requirements.json)) and [submission data](https://paperpush.readthedocs.io/en/latest/schemas/submission_forms.html) ([`paperpush/submission_forms.json`](https://github.com/pachterlab/paperpush/blob/main/paperpush/submission_forms.json))
 - Automated and fast submission portal filling with deterministic scripts - [see an example here](https://paperpush.readthedocs.io/en/latest/submission-portal.html)
-- [AI skills](https://paperpush.readthedocs.io/en/latest/quickstart/ai.html#what-to-ask) with an MCP server, a [website](https://paperpush.onrender.com), and a [command line interface](https://paperpush.readthedocs.io/en/latest/commands/index.html)
+- An AI agent plugin with manuscript preparation [skills](https://paperpush.readthedocs.io/en/latest/quickstart/ai.html#what-to-ask), an MCP server, a [website](https://paperpush.onrender.com), and a [command line interface](https://paperpush.readthedocs.io/en/latest/commands/index.html)
 - Free, open-source, actively-maintained, and never stores your data
 
 ## Install
@@ -45,9 +45,9 @@ playwright install chromium
 
 ## Quickstart
 
-Choose your favorite mode: AI agent skills, website, or command line. All modes support venue-specific metadata collection, venue-tailored checking, and submission portal filling for supported venues. AI agents support additional tasks.
+Choose your favorite mode: AI agent plugin skills, website, or command line. All modes support venue-specific metadata collection, venue-tailored checking, and submission portal filling for supported venues. AI agents support additional tasks.
 
-### AI agent skills
+### AI agent plugin skills
 
 #### Install in Claude Code (other AI agents listed below)
 - `/plugin marketplace add pachterlab/paperpush`
@@ -103,7 +103,7 @@ No installation required.
 
 ## Use with AI
 
-Install the paperpush skills for your agent:
+Install the paperpush plugin for your agent:
 
 **Claude Code** (two separate prompts):
 

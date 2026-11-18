@@ -90,6 +90,7 @@ and the explicit initial-submission override above.
    :widths: 28, 18, 54
    :class: longtable
 
+   "ai.anonymity","likely error / suggestion","Reader judgment on a double-blind submission: fail becomes a likely error (a leak can get the paper desk-rejected, but the AI cannot be sure); uncertain results stay unchecked."
    "ai.consistency","warning / suggestion","Reader judgment: fail becomes warning; optional advice uses suggest; uncertain results stay unchecked."
    "ai.cover_letter_venue","warning / suggestion","Reader judgment: fail becomes warning; optional advice uses suggest; uncertain results stay unchecked."
    "ai.details.abstract_reporting","warning / suggestion","Reader judgment: fail becomes warning; optional advice uses suggest; uncertain results stay unchecked."

@@ -263,7 +263,11 @@ delete anything in the source directory**; every change happens in the copy.
    say that it edits only the copies in the new directory (the formatted
    manuscript, when step 6 made one). If they say yes, invoke it and use its
    final validation in step 8. Under format-free, pass it the same flag and
-   tell it to leave the waived items alone.
+   tell it to leave the waived items alone. If step 6 converted or
+   reformatted the manuscript, tell it so (and which file is the result), so
+   it does not offer `paperpush format` or `paperpush convert` again (its
+   steps 3b and 3c) unless the author asks: layout issues left after the
+   reformat go in its tier 3 instead.
 
 8. **Write `<new-dir>/transfer.txt`** (rewrite it if this is a re-run). Plain
    text, absolute paths, in this order:

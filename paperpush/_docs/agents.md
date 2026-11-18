@@ -514,7 +514,7 @@ API key:
 
 An AI `fail` never blocks: on the tasks where a real failure is critical
 (`ai.unverified_references`, `ai.template`, `ai.rigor.trial_registration`,
-`ai.details.ethics`) it is a likely error, and elsewhere a warning. Do not mark
+`ai.details.ethics`, `ai.anonymity`) it is a likely error, and elsewhere a warning. Do not mark
 a task `pass` you could not verify.
 
 Validate reports three levels of problem, plus one for the outside scans. An **error** is certain and blocks
@@ -542,6 +542,16 @@ camera-ready LaTeX switches, and it fetches every linked
 anonymous.4open.science repository and scans that too, including an expired or
 missing mirror. Warnings start with `anonymity:`; relay each one to the user,
 since a leak can get a paper desk-rejected.
+
+The same pass queues the AI check `ai.anonymity`, for what a keyword scan
+cannot see: the authors' earlier work claimed in the first person in any
+wording ("as we showed in [5]", "our ICML paper"), a third-person citation the
+text then reveals as their own, "our lab" or "our hospital's cohort", and
+in-house resources only their group has. Do it yourself like the other AI
+checks. The task lists the authors (for your judgment only) and the findings
+the keyword scan already reported; don't report those again, and don't flag
+self-citations written in the third person, which is what double-blind
+venues ask for.
 
 ## Other desk-reject checks validate runs
 
