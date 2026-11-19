@@ -266,6 +266,8 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
   display: block; width: 100%; padding: 8px 12px; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer;
 }
 .menu-row:hover { background: var(--accent-weak); }
+a.menu-row { text-decoration: none; }
+.custom-option { margin-top: 6px; }
 .menu-row input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
 .menu-row small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; padding-left: 0; }
 
@@ -761,3 +763,14 @@ body.add-venue #crumb { margin-right: auto; }
   .spinner { animation-duration: 2.4s; }
 }
 .accept-types { margin: 4px 0 0; }
+
+/* ---- privacy page */
+.prose-page { max-width: 760px; }
+.prose-page h2 { margin: 28px 0 8px; }
+.prose-page ul { padding-left: 20px; line-height: 1.55; }
+.prose-page li { margin: 6px 0; }
+.prose-page p { line-height: 1.55; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
+.data-table th, .data-table td { text-align: left; vertical-align: top; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); }
+.data-table th { font-weight: 600; }
+@media (max-width: 560px) { .data-table { font-size: 13px; } .data-table th, .data-table td { padding-right: 6px; } }

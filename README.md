@@ -416,6 +416,14 @@ browser, and you type the password there, never into the chat. Agents that suppo
 to use it.
 
 
+## Security and privacy
+
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+The website's [privacy page](https://paperpush.onrender.com/privacy) covers
+what happens to uploaded files: they are deleted 24 hours after last use, and
+shared forms are end-to-end encrypted. The security program (policy, controls,
+vendors, incident response) is in [security/](security/README.md).
+
 ## License
 
 This project is licensed under the BSD-2 License - see the [LICENSE](LICENSE) file for details.

@@ -1,0 +1,29 @@
+name: Uptime
+
+# A free uptime monitor for paperpush.onrender.com (security/README.md, control
+# SEC-11). Every hour it asks /healthz for an answer, allowing for the free
+# plan's cold start. A failed run makes GitHub email the person who last edited
+# this schedule; follow security/incident-response.md.
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: GET /healthz
+        run: |
+          for attempt in 1 2 3; do
+            if curl -sSf --max-time 120 https://paperpush.onrender.com/healthz; then
+              echo; echo "up (attempt ${attempt})"; exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::paperpush.onrender.com/healthz did not answer after 3 tries"
+          exit 1
