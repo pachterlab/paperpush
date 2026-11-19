@@ -1,0 +1,73 @@
+name: Security
+
+# Security checks on every push and pull request, and weekly, since a new CVE
+# can affect a locked dependency without any change here. Render deploys a
+# commit only after its checks pass (render.yaml: autoDeployTrigger: checksPass),
+# so a failure here holds the deploy. See security/README.md (controls SEC-05,
+# SEC-06).
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "23 7 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  bandit:
+    name: Static analysis (bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: pip install "bandit==1.9.4"
+      # Medium and high severity fail the job. Low-severity findings (bare
+      # except/continue, subprocess use) are reviewed in the full report below.
+      - name: Fail on medium or high severity
+        run: bandit -q -r paperpush -ll
+      - name: Full report (informational)
+        if: always()
+        run: bandit -q -r paperpush --exit-zero
+
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0 # the whole history: a secret removed later is still exposed
+      - name: Install gitleaks (pinned, checksum verified)
+        run: |
+          curl -sSfL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: Scan the git history
+        run: ./gitleaks git --no-banner --redact --config .gitleaks.toml .
+
+  dependencies:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      # Install the way the Dockerfile does, so a lock file that no longer
+      # satisfies pyproject.toml fails here rather than in the deploy.
+      - name: Install from the lock files
+        run: |
+          python -m venv /tmp/lock
+          /tmp/lock/bin/pip install --require-hashes -r requirements/web.txt -r requirements/build.txt
+          /tmp/lock/bin/pip install --no-deps --no-build-isolation .
+          /tmp/lock/bin/pip check
+      - run: pip install "pip-audit==2.10.1"
+      - name: Audit the packages production runs
+        run: pip-audit --require-hashes --disable-pip -r requirements/web.txt -r requirements/build.txt --progress-spinner off

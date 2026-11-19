@@ -166,6 +166,73 @@ def test_stale_workspaces_are_swept(tmp_path):
         assert c.get(f"/api/workspaces/{first}").status_code == 404
 
 
+
+def test_workspaces_expire_on_a_timer_without_new_visitors(tmp_path, monkeypatch):
+    """The 24-hour retention holds even when nobody creates a workspace."""
+    import os
+    import time
+
+    from paperpush.web import app as web_app
+
+    monkeypatch.setattr(web_app, "_SWEEP_EVERY_S", 0.05)
+    settings = Settings(data_dir=tmp_path / "web", ttl_hours=1, network_checks=False)
+    with TestClient(create_app(settings)) as c:
+        ws_dir = settings.data_dir / c.post("/api/workspaces").json()["id"]
+        two_hours_ago = time.time() - 2 * 3600
+        os.utime(ws_dir, (two_hours_ago, two_hours_ago))
+        deadline = time.time() + 5
+        while ws_dir.exists() and time.time() < deadline:
+            time.sleep(0.05)
+        assert not ws_dir.exists()
+
+
+# --- security headers, health, privacy ------------------------------------
+
+
+def test_every_response_carries_the_security_headers(client, ws):
+    for path in ("/", "/privacy", "/static/app.js", f"/api/workspaces/{ws}", "/api/workspaces/nope-nope-nope-nope"):
+        h = client.get(path).headers
+        assert "script-src 'self'" in h["content-security-policy"]
+        assert "frame-ancestors 'none'" in h["content-security-policy"]
+        assert h["x-content-type-options"] == "nosniff"
+        assert h["x-frame-options"] == "DENY"
+        assert h["referrer-policy"] == "no-referrer"
+        assert "strict-transport-security" not in h  # plain HTTP: never on 127.0.0.1
+
+
+def test_api_answers_are_not_cached_and_https_gets_hsts(client, ws):
+    assert client.get(f"/api/workspaces/{ws}").headers["cache-control"] == "no-store"
+    assert client.get("/privacy").headers.get("cache-control") != "no-store"
+    h = client.get("/", headers={"X-Forwarded-Proto": "https"}).headers
+    assert h["strict-transport-security"].startswith("max-age=")
+
+
+def test_streamed_validation_still_carries_the_headers(client, ws):
+    res = client.post(f"/api/workspaces/{ws}/validate", json={"text": _filled_template(), "stream": True})
+    assert res.headers["x-frame-options"] == "DENY"
+
+
+def test_pages_use_no_inline_script_or_style():
+    """The CSP forbids inline script and style, so the pages must not rely on them."""
+    import re
+
+    for page in ("index.html", "add-venue.html", "privacy.html"):
+        html = (STATIC / page).read_text()
+        assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>", html), page
+        assert not re.search(r"\sstyle=\"", html), page
+        assert not re.search(r"\son[a-z]+=\"", html), page
+    for js in STATIC.glob("*.js"):
+        assert not re.search(r"\bstyle:\s*\"", js.read_text()), js.name
+
+
+def test_healthz_and_privacy_page(client):
+    assert client.get("/healthz").json()["ok"] is True
+    page = client.get("/privacy")
+    assert page.status_code == 200
+    assert "24 hours" in page.text and "90 days" in page.text
+    assert 'href="/privacy"' in client.get("/").text
+
+
 # --- validation ------------------------------------------------------------
 
 

@@ -9,16 +9,7 @@
   <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/style.css">
-  <script>
-    // Before first paint, so a dark page never flashes light: the author's
-    // choice (viewer.js's toggle), else the system's.
-    (function () {
-      var t = null;
-      try { t = localStorage.getItem("paperpush:theme"); } catch (e) { /* storage unavailable */ }
-      if (t !== "light" && t !== "dark") t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      document.documentElement.dataset.theme = t;
-    })();
-  </script>
+  <script src="/static/theme.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -33,6 +24,7 @@
         <label class="menu-row"><input type="checkbox" id="key-remember"> Remember API key on this device<small>Otherwise it is forgotten when you close this tab.</small></label>
         <label class="menu-row"><input type="checkbox" id="opt-colorblind"> Colorblind-friendly colors<small>Blue for passed, vermillion for failed, dark yellow for warnings, reddish purple for needs AI (the same as <code>paperpush validate --colorblind</code>).</small></label>
         <button type="button" class="menu-row" id="reset-btn">Clear<small>Forget this venue's form, uploads, and results.</small></button>
+        <a class="menu-row" id="privacy-link" href="/privacy" target="_blank" rel="noopener">Privacy and data<small>What happens to your files and keys, how long they are kept, and which services see them.</small></a>
       </div>
     </div>
     <a class="brand" href="./" aria-label="paperpush home"><img class="logo" src="/static/logo.svg" width="24" height="22" alt="">paperpush</a>

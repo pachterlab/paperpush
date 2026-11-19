@@ -9,14 +9,7 @@
   <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/style.css">
-  <script>
-    (function () {
-      var t = null;
-      try { t = localStorage.getItem("paperpush:theme"); } catch (e) { /* storage unavailable */ }
-      if (t !== "light" && t !== "dark") t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      document.documentElement.dataset.theme = t;
-    })();
-  </script>
+  <script src="/static/theme.js"></script>
 </head>
 <body class="add-venue">
   <header class="topbar">

@@ -1277,7 +1277,7 @@
     filter.addEventListener("input", renderList);
     const extras = [];
     if (f.options_recommended) {
-      const custom = el("input", { class: "input", placeholder: "Add your own and press Enter", style: "margin-top:6px" });
+      const custom = el("input", { class: "input custom-option", placeholder: "Add your own and press Enter" });
       custom.addEventListener("keydown", (e) => {
         if (e.key !== "Enter") return;
         e.preventDefault();
