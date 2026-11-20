@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>paperpush: privacy and data</title>
+<meta name="description" content="What the paperpush website does with your manuscript files, form, and API keys, how long it keeps them, and which services see them.">
+<link rel="icon" href="/static/favicon.ico" sizes="32x32">
+<link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/theme.js"></script>
+</head>
+<body class="privacy">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="paperpush home"><img class="logo" src="/static/logo.svg" width="24" height="22" alt="">paperpush</a>
+    <span class="muted small">/ Privacy and data</span>
+  </header>
+
+  <main class="prose-page">
+    <a class="back" href="/">← Back to preparing a submission</a>
+    <h1>Privacy and data</h1>
+    <p class="intro">
+      This page covers the public website at paperpush.onrender.com. paperpush is open source
+      (<a href="https://github.com/pachterlab/paperpush" target="_blank" rel="noopener">GitHub</a>), so you can check
+      everything said here in its code. If you would rather your files never leave your computer, install paperpush
+      and run <code>paperpush web</code>. It serves this same page on your machine only.
+    </p>
+
+    <h2>Your uploaded files</h2>
+    <ul>
+      <li>Files you upload go into a <strong>workspace</strong> on the server's disk, named by a random 32-character ID.
+        The page keeps that ID in your browser. Anyone who has the ID can read the workspace, and the site never shows
+        or lists it to anyone else.</li>
+      <li>A workspace is <strong>deleted 24 hours after it was last used</strong>. The server checks every 15 minutes.
+        <em>Settings › Clear</em> deletes it at once. Every redeploy also wipes the server's disk.</li>
+      <li>A workspace holds at most 200 MB. The files are read only to run the checks you ask for.</li>
+      <li>The site does not follow links or look up DOIs found in your files. Those checks run only in the installed
+        version.</li>
+    </ul>
+
+    <h2>Your form (the .sub)</h2>
+    <ul>
+      <li>The form you fill in is kept in your browser's storage, not on the server. It is sent to the server only
+        with a request that needs it (validate, autofill, download).</li>
+      <li>A <strong>share link</strong> carries the form inside the link itself, after the <code>#</code>. Browsers never
+        send that part to a server, so nothing is stored.</li>
+      <li><strong>Share for editing</strong> stores one copy for everyone with the link. Your browser encrypts it
+        (AES-GCM) with a key that exists only in the link, after the <code>#</code>, and the server stores only the
+        encrypted copy. Neither the site nor its database host can read it. Changing or deleting it takes a token
+        derived from that key. A shared form nobody has saved for <strong>90 days</strong> is deleted, and anyone
+        with the link can delete it sooner.</li>
+    </ul>
+
+    <h2>Your API keys</h2>
+    <ul>
+      <li>The AI features use <strong>your own key</strong> (Anthropic, OpenAI, Google, Winston AI, Originality.ai,
+        or Pangram). The key is sent only with the request that needs it and used only for that request. The server
+        never stores it, and it is masked in any error message or report.</li>
+      <li>Your browser keeps the key for this tab only, unless you tick <em>Remember API key on this device</em>.</li>
+    </ul>
+
+    <h2>Which services see what</h2>
+    <p>The website uses these services. The ones marked <em>only if you ask</em> receive data only when you use that
+      feature with your own key.</p>
+    <table class="data-table">
+      <thead><tr><th>Service</th><th>What it receives</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td>Render (web host, United States)</td><td>Everything the server handles: uploads, forms sent for checks, server logs</td><td>Always</td></tr>
+        <tr><td>Neon (Postgres database)</td><td>Encrypted shared forms only, which it cannot read</td><td>When you use Share for editing</td></tr>
+        <tr><td>OpenAlex</td><td>Title, abstract, and keywords</td><td>When you use Pick a venue</td></tr>
+        <tr><td>Anthropic, OpenAI, or Google</td><td>Manuscript text, figures, and form fields needed for the task</td><td>Only if you ask: autofill, AI checks, AI venue ranking</td></tr>
+        <tr><td>Winston AI or Originality.ai</td><td>Manuscript text</td><td>Only if you ask: plagiarism scan</td></tr>
+        <tr><td>Pangram</td><td>Manuscript text</td><td>Only if you ask: AI-text detection</td></tr>
+      </tbody>
+    </table>
+    <p>Each AI and scanning service handles your data under its own terms for API customers, through your own account.</p>
+
+    <h2>Logs, cookies, and tracking</h2>
+    <ul>
+      <li>paperpush logs events such as "workspace created" with only the first 6 characters of an ID, and it does
+        not log individual requests. When something fails, the log can include the error message and a file name.
+        Render's platform can record the address of each request it forwards, and those addresses include workspace
+        IDs. Render keeps its logs under its own retention policy.</li>
+      <li>The site sets no cookies and has no analytics, ads, or trackers. Every script and font comes from this
+        site.</li>
+    </ul>
+
+    <h2>Questions and security reports</h2>
+    <p>
+      Ask about this page by opening an
+      <a href="https://github.com/pachterlab/paperpush/issues" target="_blank" rel="noopener">issue</a>. Report a
+      security problem privately, as described in
+      <a href="https://github.com/pachterlab/paperpush/blob/main/SECURITY.md" target="_blank" rel="noopener">SECURITY.md</a>.
+    </p>
+    <p class="muted small">Last updated 18 November 2026.</p>
+  </main>
+</body>
+</html>

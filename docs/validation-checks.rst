@@ -8,7 +8,7 @@ sensitive-data scan (see :ref:`submit-validation`).
 
 .. BEGIN VALIDATION CHECK COUNT
 
-PaperPush currently has **175 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
+PaperPush currently has **180 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
 
 .. END VALIDATION CHECK COUNT
 
@@ -55,205 +55,210 @@ Venue rules marked *not implemented* are excluded.
 16. ``ai.figures.design`` — Figure design: axis labels and units, ticks and scale bars, axis limits, chart type, consistent color meaning
 17. ``ai.figures.raster_lettering`` — Lettering in raster figures (size, typeface, panel labels)
 18. ``ai.figures.raster_panels_cited`` — Every panel of the raster figures is cited
-19. ``ai.notes.abstract`` — Follows the guidelines' other abstract rules (not checked automatically)
-20. ``ai.notes.cover_letter`` — Follows the guidelines' other cover-letter rules (not checked automatically)
-21. ``ai.notes.figures`` — Follows the guidelines' other figure rules (not checked automatically)
-22. ``ai.notes.general`` — Follows the guidelines' other general rules (not checked automatically)
-23. ``ai.notes.keywords`` — Follows the guidelines' other keyword rules (not checked automatically)
-24. ``ai.notes.manuscript`` — Follows the guidelines' other manuscript rules (not checked automatically)
-25. ``ai.notes.references`` — Follows the guidelines' other reference rules (not checked automatically)
-26. ``ai.notes.sections`` — Follows the guidelines' other section rules (not checked automatically)
-27. ``ai.notes.statements`` — Follows the guidelines' other rules for statements and declarations (not checked automatically)
-28. ``ai.notes.supplementary`` — Follows the guidelines' other supplementary-material rules (not checked automatically)
-29. ``ai.notes.tables`` — Follows the guidelines' other table rules (not checked automatically)
-30. ``ai.notes.title_page`` — Follows the guidelines' other title-page rules (not checked automatically)
-31. ``ai.notes.upload`` — Follows the guidelines' other upload rules (not checked automatically)
-32. ``ai.prose`` — Spelling, grammar, and tense (read by AI)
-33. ``ai.reference_format`` — Reference list follows the guidelines' style
-34. ``ai.reference_journal.*`` — Each cited journal is correctly identified and indexed (only run with --reference-check-extended)
-35. ``ai.reference_primary.*`` — Each cited source is the original source of the claims that cite it (only run with --reference-check-extended)
-36. ``ai.reference_source.*`` — Each cited source supports the claims that cite it (only run with --reference-check-extended)
-37. ``ai.rigor.figure_provenance`` — Each figure panel is traced to the code and public data that draw it
-38. ``ai.rigor.reporting_guideline`` — Follows the reporting guideline for its study design (PRISMA for systematic reviews, CONSORT for trials, ...)
-39. ``ai.rigor.trial_registration`` — A clinical trial gives its own registration number
-40. ``ai.tables_editable`` — Tables are editable text, not images
-41. ``ai.template`` — Looks prepared with the venue's template (judged from the layout when the file can't tell)
-42. ``ai.title_page_items`` — Title-page items that need reading (address, footnotes, summary, classification)
-43. ``ai.unverified_references`` — References that could not be verified are real
+19. ``ai.flagged_references`` — References the registry lookups flagged are really wrong
+20. ``ai.notes.abstract`` — Follows the guidelines' other abstract rules (not checked automatically)
+21. ``ai.notes.cover_letter`` — Follows the guidelines' other cover-letter rules (not checked automatically)
+22. ``ai.notes.figures`` — Follows the guidelines' other figure rules (not checked automatically)
+23. ``ai.notes.general`` — Follows the guidelines' other general rules (not checked automatically)
+24. ``ai.notes.keywords`` — Follows the guidelines' other keyword rules (not checked automatically)
+25. ``ai.notes.manuscript`` — Follows the guidelines' other manuscript rules (not checked automatically)
+26. ``ai.notes.references`` — Follows the guidelines' other reference rules (not checked automatically)
+27. ``ai.notes.sections`` — Follows the guidelines' other section rules (not checked automatically)
+28. ``ai.notes.statements`` — Follows the guidelines' other rules for statements and declarations (not checked automatically)
+29. ``ai.notes.supplementary`` — Follows the guidelines' other supplementary-material rules (not checked automatically)
+30. ``ai.notes.tables`` — Follows the guidelines' other table rules (not checked automatically)
+31. ``ai.notes.title_page`` — Follows the guidelines' other title-page rules (not checked automatically)
+32. ``ai.notes.upload`` — Follows the guidelines' other upload rules (not checked automatically)
+33. ``ai.prose`` — Spelling, grammar, and tense (read by AI)
+34. ``ai.reference_format`` — Reference list follows the guidelines' style
+35. ``ai.reference_journal.*`` — Each cited journal is correctly identified and indexed (only run with --reference-check-extended)
+36. ``ai.reference_primary.*`` — Each cited source is the original source of the claims that cite it (only run with --reference-check-extended)
+37. ``ai.reference_source.*`` — Each cited source supports the claims that cite it (only run with --reference-check-extended)
+38. ``ai.rigor.figure_provenance`` — Each figure panel is traced to the code and public data that draw it
+39. ``ai.rigor.reporting_guideline`` — Follows the reporting guideline for its study design (PRISMA for systematic reviews, CONSORT for trials, ...)
+40. ``ai.rigor.trial_registration`` — A clinical trial gives its own registration number
+41. ``ai.tables_editable`` — Tables are editable text, not images
+42. ``ai.template`` — Looks prepared with the venue's template (judged from the layout when the file can't tell)
+43. ``ai.title_page_items`` — Title-page items that need reading (address, footnotes, summary, classification)
+44. ``ai.uncited_claims`` — Statistics, earlier studies, and other claims that need a source cite one
+45. ``ai.unverified_references`` — References that could not be verified are real
 
 **Bibliography**
 
-44. ``bibliography.age`` — Share of references more than 10 years old
-45. ``bibliography.citation_style`` — In-text citations match the reference list's style (numbered or author-year)
-46. ``bibliography.density`` — Citation density (citations per 1,000 words), reported for information
-47. ``bibliography.entries`` — BibTeX entries are complete, closed, and have unique keys, and no work is listed twice
-48. ``bibliography.self_citations`` — Self-citations within limits (at most 15, and at most 80% of references)
-49. ``bibliography.uncited`` — Every reference is cited, and every citation has a reference
+46. ``bibliography.age`` — Share of references more than 10 years old
+47. ``bibliography.citation_style`` — In-text citations match the reference list's style (numbered or author-year)
+48. ``bibliography.density`` — Citation density (citations per 1,000 words), reported for information
+49. ``bibliography.entries`` — BibTeX entries are complete, closed, and have unique keys, and no work is listed twice
+50. ``bibliography.self_citations`` — Self-citations within limits (at most 15, and at most 80% of references)
+51. ``bibliography.uncited`` — Every reference is cited, and every citation has a reference
 
 **Figure and table citations**
 
-50. ``citations.cross_references`` — Cross-references resolve (no “??”)
-51. ``citations.duplicate_captions`` — No two figures or tables share a caption or a number
-52. ``citations.figure`` — Main figures cited in order
-53. ``citations.missing_captions`` — Every figure and table has a caption
-54. ``citations.panels`` — Figure and table panels cited in order
-55. ``citations.supp_figure`` — Supplementary figures cited in order
-56. ``citations.supp_table`` — Supplementary tables cited in order
-57. ``citations.supplementary_attachments`` — Referenced supplementary material is attached
-58. ``citations.table`` — Main tables cited in order
+52. ``citations.cross_references`` — Cross-references resolve (no “??”)
+53. ``citations.duplicate_captions`` — No two figures or tables share a caption or a number
+54. ``citations.figure`` — Main figures cited in order
+55. ``citations.missing_captions`` — Every figure and table has a caption
+56. ``citations.panels`` — Figure and table panels cited in order
+57. ``citations.supp_figure`` — Supplementary figures cited in order
+58. ``citations.supp_table`` — Supplementary tables cited in order
+59. ``citations.supplementary_attachments`` — Referenced supplementary material is attached
+60. ``citations.table`` — Main tables cited in order
 
 **Submission and manuscript consistency**
 
-59. ``consistency.abstract`` — Abstract in the .sub matches the manuscript
-60. ``consistency.authors`` — Authors in the .sub match the manuscript (names, order, emails, ORCIDs)
-61. ``consistency.display_counts`` — Figure and table counts stated on the title page match the manuscript
-62. ``consistency.keywords`` — Keywords in the .sub match the manuscript
-63. ``consistency.statements`` — Statements in the .sub match the manuscript
-64. ``consistency.title`` — Title in the .sub matches the manuscript
-65. ``consistency.word_counts`` — Word counts stated on the title page match the manuscript
+61. ``consistency.abstract`` — Abstract in the .sub matches the manuscript
+62. ``consistency.authors`` — Authors in the .sub match the manuscript (names, order, emails, ORCIDs)
+63. ``consistency.display_counts`` — Figure and table counts stated on the title page match the manuscript
+64. ``consistency.keywords`` — Keywords in the .sub match the manuscript
+65. ``consistency.statements`` — Statements in the .sub match the manuscript
+66. ``consistency.title`` — Title in the .sub matches the manuscript
+67. ``consistency.word_counts`` — Word counts stated on the title page match the manuscript
 
 **Cover letter**
 
-66. ``cover_letter.date`` — Cover letter dated within the last 7 days
-67. ``cover_letter.venue`` — Cover letter addressed to the target venue
+68. ``cover_letter.date`` — Cover letter dated within the last 7 days
+69. ``cover_letter.venue`` — Cover letter addressed to the target venue
 
 **Additional manuscript details**
 
-68. ``details.affiliation_superscripts`` — Affiliation numbers after author names are superscripted
-69. ``details.latex_compiles`` — LaTeX source compiles to a PDF
-70. ``details.placeholders`` — No placeholders, to-do notes, comments, or highlighting left in the files
-71. ``details.reference_order`` — Reference list is alphabetical or follows first citation
-72. ``details.word_cleanliness`` — Word files have no tracked changes or EndNote fields
+70. ``details.affiliation_superscripts`` — Affiliation numbers after author names are superscripted
+71. ``details.latex_compiles`` — LaTeX source compiles to a PDF
+72. ``details.placeholders`` — No placeholders, to-do notes, comments, or highlighting left in the files
+73. ``details.reference_order`` — Reference list is alphabetical or follows first citation
+74. ``details.word_cleanliness`` — Word files have no tracked changes or EndNote fields
 
 **Figures**
 
-73. ``figures.color_mode`` — Figure color mode (RGB, CMYK, grayscale) matches the guidelines
-74. ``figures.colorblind`` — Figure colors distinguishable with red-green color blindness
-75. ``figures.default_colors`` — Figures do not use a plotting tool's default colors
-76. ``figures.dimensions`` — Figures within the guidelines' maximum width and height
-77. ``figures.dpi`` — Figures meet the minimum resolution (dpi)
-78. ``figures.font`` — Figure lettering uses the required typeface
-79. ``figures.font_consistency`` — Figure lettering uses one typeface across the figures
-80. ``figures.grayscale`` — Figure colors stay distinguishable when printed in gray
-81. ``figures.legends`` — Figure legends within the length limit, labeled, and placed where the guidelines ask
-82. ``figures.lettering`` — Figure panels labeled in the required style (e.g., a, b, c)
-83. ``figures.placement`` — Figures placed where the guidelines ask
-84. ``figures.text_size`` — Figure lettering within the guidelines' size range
+75. ``figures.color_mode`` — Figure color mode (RGB, CMYK, grayscale) matches the guidelines
+76. ``figures.colorblind`` — Figure colors distinguishable with red-green color blindness
+77. ``figures.default_colors`` — Figures do not use a plotting tool's default colors
+78. ``figures.dimensions`` — Figures within the guidelines' maximum width and height
+79. ``figures.dpi`` — Figures meet the minimum resolution (dpi)
+80. ``figures.font`` — Figure lettering uses the required typeface
+81. ``figures.font_consistency`` — Figure lettering uses one typeface across the figures
+82. ``figures.grayscale`` — Figure colors stay distinguishable when printed in gray
+83. ``figures.legends`` — Figure legends within the length limit, labeled, and placed where the guidelines ask
+84. ``figures.lettering`` — Figure panels labeled in the required style (e.g., a, b, c)
+85. ``figures.placement`` — Figures placed where the guidelines ask
+86. ``figures.text_size`` — Figure lettering within the guidelines' size range
 
 **Files**
 
-85. ``files.biosample_attributes`` — BioSample attributes file follows its NCBI package (mandatory attributes, allowed values, formats)
-86. ``files.manuscript_length`` — Manuscript within the portal's word/page limits
-87. ``files.total_size`` — Combined upload size within the portal's limit
-88. ``files.uploads`` — Upload files exist and have accepted types and sizes
+87. ``files.biosample_attributes`` — BioSample attributes file follows its NCBI package (mandatory attributes, allowed values, formats)
+88. ``files.manuscript_length`` — Manuscript within the portal's word/page limits
+89. ``files.total_size`` — Combined upload size within the portal's limit
+90. ``files.uploads`` — Upload files exist and have accepted types and sizes
 
 **Submission form**
 
-89. ``form`` — Submission form checked (needs a .sub file)
-90. ``form.authors`` — Author list is complete (names, corresponding author, emails)
-91. ``form.counts`` — Number of entries in list fields (keywords, authors, suggested reviewers, …) within the form's limits
-92. ``form.lengths`` — Text within the form's word/character limits
-93. ``form.options`` — Choices are valid options
-94. ``form.required`` — Required fields are filled and confirmations given
-95. ``form.schema`` — Field values have the right type and known field ids
-96. ``form.subfields`` — Structured entries (funding, reviewers, ...) are complete
-97. ``form.urls`` — Link fields hold http(s) URLs
+91. ``form`` — Submission form checked (needs a .sub file)
+92. ``form.authors`` — Author list is complete (names, corresponding author, emails)
+93. ``form.counts`` — Number of entries in list fields (keywords, authors, suggested reviewers, …) within the form's limits
+94. ``form.lengths`` — Text within the form's word/character limits
+95. ``form.options`` — Choices are valid options
+96. ``form.required`` — Required fields are filled and confirmations given
+97. ``form.schema`` — Field values have the right type and known field ids
+98. ``form.subfields`` — Structured entries (funding, reviewers, ...) are complete
+99. ``form.urls`` — Link fields hold http(s) URLs
 
 **Abstract and front matter**
 
-98. ``front_matter.abstract_citations`` — Abstract cites no references
-99. ``front_matter.contact_email`` — Manuscript gives a contact e-mail address
-100. ``front_matter.institutional_email`` — Author e-mail addresses are institutional, not personal (Gmail, Outlook, ...)
-101. ``front_matter.keywords`` — Keywords given in the .sub or the manuscript
-102. ``front_matter.orcid`` — ORCID iDs given in the .sub or the manuscript
-103. ``front_matter.structured_abstract`` — Abstract structured with the required headings
+100. ``front_matter.abstract_citations`` — Abstract cites no references
+101. ``front_matter.contact_email`` — Manuscript gives a contact e-mail address
+102. ``front_matter.institutional_email`` — Author e-mail addresses are institutional, not personal (Gmail, Outlook, ...)
+103. ``front_matter.keywords`` — Keywords given in the .sub or the manuscript
+104. ``front_matter.orcid`` — ORCID iDs given in the .sub or the manuscript
+105. ``front_matter.structured_abstract`` — Abstract structured with the required headings
 
 **Venue guidelines**
 
-104. ``guidelines`` — Author-guideline checks ran (needs a venue with recorded guidelines)
-105. ``guidelines.abstract_abbreviations`` — Abstract defines its abbreviations
-106. ``guidelines.ai_policy`` — Use of generative AI disclosed where the guidelines ask, and no AI tool listed as an author
-107. ``guidelines.counts`` — Number of figures, tables, and supplementary files within the guidelines' limits
-108. ``guidelines.cover_letter`` — Cover letter provided and within length
-109. ``guidelines.formats`` — Files are in formats the guidelines accept
-110. ``guidelines.length`` — Manuscript within the guidelines' word/page limits
-111. ``guidelines.reference_count`` — Reference count within the limit
-112. ``guidelines.reference_list`` — Reference entries follow the guidelines' rules on DOIs, preprints, and unpublished work
-113. ``guidelines.reference_style`` — Citation style matches the guidelines (numbered or author-year)
-114. ``guidelines.section_length`` — Sections within the guidelines' word limits
-115. ``guidelines.section_order`` — Sections in the guidelines' order
-116. ``guidelines.sections`` — Required section headings present
-117. ``guidelines.sizes`` — Files within the guidelines' size limits
-118. ``guidelines.statements`` — Required statements and declarations present
-119. ``guidelines.supplementary`` — Supplementary material bundled and within length as the guidelines ask
-120. ``guidelines.table_placement`` — Tables placed where the guidelines ask
-121. ``guidelines.template`` — Page layout matches a compiled copy of the venue's template
-122. ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
-123. ``guidelines.title_page`` — Title page carries the required items
-124. ``guidelines.title_page_file`` — Title page uploaded as a separate file
-125. ``guidelines.title_page_own_page`` — Title page on a page of its own, before the abstract
+106. ``guidelines`` — Author-guideline checks ran (needs a venue with recorded guidelines)
+107. ``guidelines.abstract_abbreviations`` — Abstract defines its abbreviations
+108. ``guidelines.ai_policy`` — Use of generative AI disclosed where the guidelines ask, and no AI tool listed as an author
+109. ``guidelines.counts`` — Number of figures, tables, and supplementary files within the guidelines' limits
+110. ``guidelines.cover_letter`` — Cover letter provided and within length
+111. ``guidelines.formats`` — Files are in formats the guidelines accept
+112. ``guidelines.length`` — Manuscript within the guidelines' word/page limits
+113. ``guidelines.reference_count`` — Reference count within the limit
+114. ``guidelines.reference_list`` — Reference entries follow the guidelines' rules on DOIs, preprints, and unpublished work
+115. ``guidelines.reference_style`` — Citation style matches the guidelines (numbered or author-year)
+116. ``guidelines.section_length`` — Sections within the guidelines' word limits
+117. ``guidelines.section_order`` — Sections in the guidelines' order
+118. ``guidelines.sections`` — Required section headings present
+119. ``guidelines.sizes`` — Files within the guidelines' size limits
+120. ``guidelines.statements`` — Required statements and declarations present
+121. ``guidelines.supplementary`` — Supplementary material bundled and within length as the guidelines ask
+122. ``guidelines.table_placement`` — Tables placed where the guidelines ask
+123. ``guidelines.template`` — Page layout matches a compiled copy of the venue's template
+124. ``guidelines.text_fields`` — Title, abstract, and keywords within the guidelines' limits
+125. ``guidelines.title_page`` — Title page carries the required items
+126. ``guidelines.title_page_file`` — Title page uploaded as a separate file
+127. ``guidelines.title_page_own_page`` — Title page on a page of its own, before the abstract
 
 **Integrity and external sources**
 
-126. ``integrity.ai_text`` — Share of the text an AI-text detector reads as AI-generated (AI-detection scan)
-127. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
-128. ``integrity.chatbot_residue`` — No text left over from a chatbot's reply ("As an AI language model", "Regenerate response")
-129. ``integrity.dois`` — Reference DOIs match the works they cite
-130. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
-131. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
-132. ``integrity.links`` — Links cited in the files and URL fields are reachable
-133. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
-134. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
-135. ``integrity.plagiarism`` — The manuscript's text does not match other sources (plagiarism scan)
-136. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
-137. ``integrity.retractions`` — No cited work has been retracted
-138. ``integrity.sensitive`` — No secrets or private information in the files
-139. ``integrity.unmatched_references`` — References without a DOI match a registered work
+128. ``integrity.ai_text`` — Share of the text an AI-text detector reads as AI-generated (AI-detection scan)
+129. ``integrity.anonymity`` — Nothing identifies the authors (double-blind)
+130. ``integrity.chatbot_residue`` — No text left over from a chatbot's reply ("As an AI language model", "Regenerate response")
+131. ``integrity.dois`` — Reference DOIs match the works they cite
+132. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
+133. ``integrity.journal_indexing`` — Each cited journal is in an index OpenAlex tracks (CWTS core, DOAJ, MEDLINE, SciELO)
+134. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
+135. ``integrity.links`` — Links cited in the files and URL fields are reachable
+136. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
+137. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
+138. ``integrity.plagiarism`` — The manuscript's text does not match other sources (plagiarism scan)
+139. ``integrity.reference_details`` — Each reference's authors, journal, year, volume, issue, and pages match the work it cites, and nothing it needs is missing
+140. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
+141. ``integrity.retractions`` — No cited work has been retracted
+142. ``integrity.sensitive`` — No secrets or private information in the files
+143. ``integrity.stale_pdf`` — Each uploaded PDF is up to date with the source file beside it (.tex, .docx, .md)
+144. ``integrity.unmatched_references`` — References without a DOI match a registered work
 
 **Page layout**
 
-140. ``layout.density`` — Main-text pages are full and use the page limit (AI conferences)
-141. ``layout.font`` — Body font matches the guidelines
-142. ``layout.font_size`` — Body text size matches the guidelines
-143. ``layout.footnotes`` — No footnotes or endnotes where the guidelines forbid them
-144. ``layout.forbidden_fonts`` — No fonts the guidelines forbid (e.g., Symbol)
-145. ``layout.heading_levels`` — Headings within the guidelines' number of levels
-146. ``layout.language`` — Spelling follows the required English variant (US or UK)
-147. ``layout.line_numbers`` — Lines numbered continuously
-148. ``layout.line_spacing`` — Text is double-spaced
-149. ``layout.margins`` — Page margins match the guidelines
-150. ``layout.page_numbers`` — Pages are numbered
-151. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
-152. ``layout.section_balance`` — Space split between sections, figures, and equations is typical (AI conferences)
-153. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
+145. ``layout.density`` — Main-text pages are full and use the page limit (AI conferences)
+146. ``layout.font`` — Body font matches the guidelines
+147. ``layout.font_size`` — Body text size matches the guidelines
+148. ``layout.footnotes`` — No footnotes or endnotes where the guidelines forbid them
+149. ``layout.forbidden_fonts`` — No fonts the guidelines forbid (e.g., Symbol)
+150. ``layout.heading_levels`` — Headings within the guidelines' number of levels
+151. ``layout.language`` — Spelling follows the required English variant (US or UK)
+152. ``layout.line_numbers`` — Lines numbered continuously
+153. ``layout.line_spacing`` — Text is double-spaced
+154. ``layout.margins`` — Page margins match the guidelines
+155. ``layout.page_numbers`` — Pages are numbered
+156. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
+157. ``layout.section_balance`` — Space split between sections, figures, and equations is typical (AI conferences)
+158. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
 
 **Prose**
 
-154. ``prose.acronyms`` — Acronyms spelled out at first use
-155. ``prose.brackets`` — Brackets and quotes pair up
-156. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
-157. ``prose.dashes`` — Hyphens, en dashes, em dashes, and quotes used as expected
-158. ``prose.double_spaces`` — No double spaces between words
-159. ``prose.heading_case`` — Headings of the same level capitalized one way
-160. ``prose.number_format`` — Statistics, units, and percent signs written one way
-161. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
-162. ``prose.punctuation_spacing`` — Spacing around punctuation
-163. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
-164. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
-165. ``prose.serial_comma`` — Lists use the serial (Oxford) comma one way
-166. ``prose.spelling`` — Common misspellings (codespell)
-167. ``prose.spelling_variant`` — Spelling uses one English variant (US or UK)
-168. ``prose.usage`` — Agreement, contractions, and very long sentences
+159. ``prose.acronyms`` — Acronyms spelled out at first use
+160. ``prose.brackets`` — Brackets and quotes pair up
+161. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
+162. ``prose.dashes`` — Hyphens, en dashes, em dashes, and quotes used as expected
+163. ``prose.double_spaces`` — No double spaces between words
+164. ``prose.heading_case`` — Headings of the same level capitalized one way
+165. ``prose.number_format`` — Statistics, units, and percent signs written one way
+166. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
+167. ``prose.punctuation_spacing`` — Spacing around punctuation
+168. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
+169. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
+170. ``prose.serial_comma`` — Lists use the serial (Oxford) comma one way
+171. ``prose.spelling`` — Common misspellings (codespell)
+172. ``prose.spelling_variant`` — Spelling uses one English variant (US or UK)
+173. ``prose.usage`` — Agreement, contractions, and very long sentences
 
 **Rigor and reproducibility**
 
-169. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
-170. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
-171. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
-172. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
-173. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
-174. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
-175. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
+174. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
+175. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
+176. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
+177. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
+178. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
+179. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
+180. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
 
 .. END VALIDATION CHECK LIST
 
@@ -290,8 +295,9 @@ the start of its ID, and repeat the flag as often as you like:
        rest of the ``integrity.`` family
    * - ``--disable-references``
      - A group: every reference lookup, which are ``integrity.dois``,
-       ``integrity.retractions``, ``integrity.unmatched_references``, and
-       ``integrity.reference_versions``, plus the online RRID and cell-line
+       ``integrity.retractions``, ``integrity.unmatched_references``,
+       ``integrity.reference_versions``, ``integrity.reference_details``, and
+       ``integrity.journal_indexing``, plus the online RRID and cell-line
        lookups of the rigor checks
    * - ``--disable-manuscript``
      - A group: every check that reads the manuscript against the guidelines
@@ -540,6 +546,10 @@ The passes at a glance
    * - :ref:`Text left over from a chatbot <vc-chatbot-residue>`
      - yes
      - ``--disable-integrity.chatbot_residue``
+     - no
+   * - :ref:`PDF out of date with its source <vc-stale-pdf>`
+     - yes
+     - ``--disable-integrity.stale_pdf``
      - no
    * - :ref:`Page layout <vc-layout>`
      - venues whose guidelines set one
@@ -1631,7 +1641,11 @@ in the prose (``ai.prose``), whether every ``.sub``
 field agrees with the manuscript in meaning, and whether the references the
 registries could not confirm are real (``ai.unverified_references``; an agent
 that can search the web looks each one up, a model that cannot answers
-"unclear"). These are listed as **needs AI** unless one of these runs them:
+"unclear"), whether the references the registry lookups flagged as wrong
+really are (``ai.flagged_references``, which can lower a false positive to a
+warning), and whether the text makes claims that need a source but cite none
+(``ai.uncited_claims``: a statistic that is not the study's own result, an
+earlier study it describes, a quotation, a named dataset or tool). These are listed as **needs AI** unless one of these runs them:
 
 - ``--ai``: one request to an LLM provider, whichever of
   ``ANTHROPIC_API_KEY``, ``OPENAI_API_KEY``, or ``GEMINI_API_KEY`` is set
@@ -1749,6 +1763,19 @@ as unverified, and handed to the AI check ``ai.unverified_references``
 - entries read from a PDF or Word file, whose text is too noisy to accuse;
 - near misses (a similar title, perhaps garbled).
 
+The likely errors themselves rest on string matching, which misfires on a
+title worded unlike the registered one, a conference paper indexed under its
+proceedings, a group author, or an entry garbled by PDF extraction. So every
+DOI mismatch (``integrity.dois``) and every "matches no work" or "looks wrong"
+finding (``integrity.unmatched_references``) is also handed to the AI check
+``ai.flagged_references``, each under a stable id (``ref-`` and 8 hex digits).
+The agent looks each one up and lists the ones it verified as false positives
+in a ``cleared`` array of its verdict; those are lowered to warnings that say
+why, never removed. ``pass`` with no list clears all of them; ``fail`` confirms
+the rest. An unregistered or malformed DOI and a retraction notice are facts of
+the registry and are not offered. The clearing applies on a full validate run
+(not ``--ai-only``, which does not repeat the lookups).
+
 A registry that times out or does not answer leaves its references unverified,
 never accused. At most 60 references are searched per run.
 
@@ -1767,6 +1794,57 @@ to a confirmed work or updating to a newer version is a suggestion: citing an
 older version can be intentional. ``--disable-references`` turns these off with
 the DOI check. The ``.bib`` file itself is checked offline under
 :ref:`vc-bibliography`.
+
+.. _vc-reference-details:
+
+The rest of each reference, and the journals cited
+--------------------------------------------------
+
+The DOI check and the registry search decide which work a reference is, from
+its title, first author, and year. **Reference details**
+(``integrity.reference_details``) then hold the rest of the entry against that
+work's registered record. They read the records those checks already fetched,
+so they make no requests of their own:
+
+- **Authors.** Every author, not only the first: a name the work does not
+  have, a registered author left out (unless the list ends in "and others" or
+  "et al."; lists over 25 registered authors are not held to completeness), and
+  an order different from the registered one. A reference-list entry read from
+  a PDF or Word file that has a DOI gets the same author comparison the search
+  makes for entries without one. An entry whose author list is mostly not the
+  work's is a likely error, offered to ``ai.flagged_references`` like the DOI
+  mismatches; the other differences are warnings.
+- **Journal.** The journal the entry names, against the registered title, its
+  abbreviations ("Nat. Methods", "Proc Natl Acad Sci USA"), and its acronym
+  ("PNAS"). Only journal articles are compared; conference names and book
+  series are cited too many ways.
+- **Year, volume, issue, and pages.** A year more than one away from every
+  registered date (print, online, issue), and a volume, issue, or first page
+  (or article number) different from the registered one. Numbers are read
+  after the journal's name in the entry, so a number in the title is not
+  mistaken for a volume.
+- **Completeness.** A journal named as the author ("Journal of Academic Ethics.
+  (2025). ..."), a journal article with no journal, and a book chapter that
+  does not name its book are warnings. A journal article with no volume or
+  pages, and a book chapter that does not name its editors, are suggestions
+  quoting the registered values to add.
+
+A reference that cites a preprint and was matched (without a DOI) to the
+journal version is left to the publication-version check, not reported as
+naming the wrong journal.
+
+**Journal indexing** (``integrity.journal_indexing``) looks up every cited
+journal article's journal in OpenAlex by its ISSN (from the registered record).
+A warning is raised for a journal that is in none of the indexes OpenAlex
+tracks (the CWTS core list of journals with international peer review, DOAJ,
+MEDLINE, SciELO, the Norwegian register; a journal only on another national
+list is reported, with that list named), and for an ISSN OpenAlex does not
+know. This is a prompt to check the journal's peer review and its Scopus or Web
+of Science indexing, not a verdict: OpenAlex has no list of predatory journals,
+and a young or regional journal can be sound. The ``ai.reference_journal.*``
+tasks of ``--reference-check-extended`` go further, one reference at a time.
+Set ``OPENALEX_API_KEY`` to use your own OpenAlex budget. Both checks are part
+of ``--disable-references``.
 
 .. _vc-sensitive:
 
@@ -1942,6 +2020,31 @@ Each find is a **likely error** with the passage quoted: the author confirms
 it and deletes the leftover. Using an AI tool is not the problem; disclose it
 where the venue asks (``guidelines.ai_policy``). Pass
 ``--disable-integrity.chatbot_residue`` to skip this pass.
+
+.. _vc-stale-pdf:
+
+PDF out of date with its source
+-------------------------------
+
+A PDF uploaded without rebuilding it after the last edit shows the editor an
+old draft. ``integrity.stale_pdf`` looks beside each uploaded PDF for a source
+file with the same name (``main.pdf`` and ``main.tex``; also ``.docx``,
+``.md``, ``.markdown``, ``.Rmd``, and ``.qmd``) and compares the two:
+
+* **Text.** The source is reduced to plain text without compiling it, and
+  each prose sentence is looked for in the PDF's text, with spacing ignored
+  because PDF extraction often runs words together. Sentences with math,
+  code, or markup leftovers are skipped. This survives copying, which resets
+  file times.
+* **Time.** Whether the source, or a file it pulls in with ``\input`` or
+  ``\include``, was saved after the PDF.
+
+A **warning** quotes the sentences missing from the PDF when the source is
+also newer, or when two or more are missing. When the text cannot be compared
+(a scanned PDF, an unreadable source), a newer source is a warning on the time
+alone. A newer source whose prose all appears in the PDF passes with a note:
+the edit did not change the text. It reads no network. Pass
+``--disable-integrity.stale_pdf`` to skip this pass.
 
 .. _vc-template:
 

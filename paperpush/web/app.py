@@ -39,6 +39,7 @@ Every local request carries the session's random token in the
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import logging
 import os
@@ -91,6 +92,24 @@ _CHUNK = 1024 * 1024
 _MAX_SUB_BYTES = 1024 * 1024
 _MAX_ZIP_MEMBERS = 2000
 _WORKSPACE_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
+# How often the server deletes expired workspaces and shared forms on its own,
+# so files are gone within this long of their TTL even when nobody visits.
+_SWEEP_EVERY_S = 900.0
+# Sent with every response (see _SecurityHeaders). No inline script or style:
+# the page's scripts and stylesheet are files under /static.
+_CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
+    "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; "
+    "form-action 'self'; frame-ancestors 'none'"
+)
+_SECURITY_HEADERS = (
+    (b"content-security-policy", _CSP.encode()),
+    (b"x-content-type-options", b"nosniff"),
+    (b"x-frame-options", b"DENY"),
+    (b"referrer-policy", b"no-referrer"),
+    (b"permissions-policy", b"camera=(), microphone=(), geolocation=(), payment=()"),
+)
+_HSTS = (b"strict-transport-security", b"max-age=31536000; includeSubDomains")
 # Characters that would break a .sub line: the filelist column separator, line
 # breaks, and the path separators that would turn a name back into a path.
 _UNSAFE_NAME_CHARS = re.compile(r"[|/\\\x00-\x1f\x7f]")
@@ -355,6 +374,43 @@ def visitor_llm(settings: Settings, provider: Optional[str], api_key: Optional[s
 # ---------------------------------------------------------------------------
 
 
+class _SecurityHeaders:
+    """ASGI middleware adding the security headers to every HTTP response.
+
+    A plain ASGI wrapper rather than ``@app.middleware("http")`` so streamed
+    responses (validate's NDJSON progress) pass through untouched. API answers
+    carry manuscript content, so they are also marked ``no-store``. HSTS is
+    sent only behind HTTPS (Render's proxy says so in ``X-Forwarded-Proto``),
+    never to a page on 127.0.0.1.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        request_headers = dict(scope.get("headers") or [])
+        https = scope.get("scheme") == "https" or request_headers.get(b"x-forwarded-proto", b"").split(b",")[0].strip() == b"https"
+        api = scope.get("path", "").startswith("/api/")
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers") or [])
+                present = {k.lower() for k, _ in headers}
+                extra = list(_SECURITY_HEADERS)
+                if api:
+                    extra.append((b"cache-control", b"no-store"))
+                if https:
+                    extra.append(_HSTS)
+                headers.extend((k, v) for k, v in extra if k not in present)
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
 class Workspaces:
     """Per-author upload directories under ``settings.data_dir``."""
 
@@ -389,7 +445,11 @@ class Workspaces:
     def sweep(self) -> None:
         """Delete workspaces unused for longer than the TTL."""
         cutoff = time.time() - self.settings.ttl_hours * 3600
-        for ws in self.root.iterdir():
+        try:
+            entries = list(self.root.iterdir())
+        except OSError:
+            return
+        for ws in entries:
             try:
                 if ws.is_dir() and ws.stat().st_mtime < cutoff:
                     shutil.rmtree(ws, ignore_errors=True)
@@ -1016,7 +1076,29 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if settings.shared and settings.local is None
         else None
     )
-    app = FastAPI(title="paperpush", version=__version__, docs_url=None, redoc_url=None)
+    @contextlib.asynccontextmanager
+    async def lifespan(_app):
+        # Expire workspaces and shared forms on a timer, not only when someone
+        # creates a workspace, so the stated retention holds on a quiet server.
+        stop = threading.Event()
+
+        def sweeper() -> None:
+            while not stop.wait(_SWEEP_EVERY_S):
+                try:
+                    workspaces.sweep()
+                    if shared_forms is not None:
+                        shared_forms.maybe_sweep()
+                except Exception:  # a failed cleanup must not stop the next one
+                    logger.exception("scheduled sweep failed")
+
+        threading.Thread(target=sweeper, name="paperpush-sweep", daemon=True).start()
+        try:
+            yield
+        finally:
+            stop.set()
+
+    app = FastAPI(title="paperpush", version=__version__, docs_url=None, redoc_url=None, lifespan=lifespan)
+    app.add_middleware(_SecurityHeaders)
 
     def local_session(token: Optional[str]) -> LocalSession:
         local = settings.local
@@ -1642,6 +1724,15 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     @app.get("/apple-touch-icon-precomposed.png", include_in_schema=False)
     def apple_touch_icon() -> FileResponse:
         return FileResponse(STATIC_DIR / "apple-touch-icon.png")
+
+    @app.get("/healthz", include_in_schema=False)
+    def healthz() -> dict[str, Any]:
+        """For the host's health check and the uptime monitor: cheap, no files read."""
+        return {"ok": True, "version": __version__}
+
+    @app.get("/privacy", include_in_schema=False)
+    def privacy_page() -> FileResponse:
+        return FileResponse(STATIC_DIR / "privacy.html")
 
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:

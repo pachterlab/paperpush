@@ -21,7 +21,7 @@
 PaperPush provides the following services:
 - A standardized system to share all metadata submitted to a venue (the .sub file - [see an example here](https://paperpush.readthedocs.io/en/latest/sub-file.html#sub-file-example))
 <!-- BEGIN VALIDATION CHECK COUNT -->
-- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, anonymization, and much, much more — 175 distinct validation check types in total. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html)
+- Extensive venue-specific manuscript guideline checking including section lengths, reference hallucination, figure resolution, link validation, anonymization, and much, much more — 180 distinct validation check types in total. [See the full list](https://paperpush.readthedocs.io/en/latest/validation-checks.html)
 <!-- END VALIDATION CHECK COUNT -->
 - A central database of journal/conference [manuscript requirements](https://paperpush.readthedocs.io/en/latest/schemas/manuscript_requirements.html) ([`paperpush/manuscript_requirements.json`](https://github.com/pachterlab/paperpush/blob/main/paperpush/manuscript_requirements.json)) and [submission data](https://paperpush.readthedocs.io/en/latest/schemas/submission_forms.html) ([`paperpush/submission_forms.json`](https://github.com/pachterlab/paperpush/blob/main/paperpush/submission_forms.json))
 - Automated and fast submission portal filling with deterministic scripts - [see an example here](https://paperpush.readthedocs.io/en/latest/submission-portal.html)
@@ -415,6 +415,14 @@ browser, and you type the password there, never into the chat. Agents that suppo
 [Use with AI](#use-with-ai)); `AGENTS.md` lists what each skill does and when
 to use it.
 
+
+## Security and privacy
+
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+The website's [privacy page](https://paperpush.onrender.com/privacy) covers
+what happens to uploaded files: they are deleted 24 hours after last use, and
+shared forms are end-to-end encrypted. The security program (policy, controls,
+vendors, incident response) is in [security/](security/README.md).
 
 ## License
 

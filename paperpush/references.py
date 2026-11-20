@@ -110,6 +110,10 @@ DOI_UNKNOWN = "unknown"  # offline, blocked, or an agency that won't serve CSL
 RETRACTED = "retracted reference"
 # The Finding category of the per-run DOI budget running out.
 TRUNCATED = "DOI checks truncated"
+# The Finding category of a DOI whose registered title, authors, or year differ from
+# the reference's. It rests on string matching, so ``validate`` offers it to the AI
+# check ``ai.flagged_references`` to confirm or clear.
+DOI_MISMATCH = "DOI metadata mismatch"
 # Crossref ``updated-by`` notice types worth warning about, with how a finding
 # words each. Corrections and errata leave the work citable, so they are left out.
 _RETRACTION_NOTICES = {
@@ -1195,7 +1199,7 @@ def _entry_findings(entry: Entry, status: str, record: dict | None) -> list[Find
             return [
                 Finding(
                     entry.where,
-                    "DOI metadata mismatch",
+                    DOI_MISMATCH,
                     f"{_cite(entry)} does not match the work its DOI ({entry.doi}) " f"points to: {'; '.join(problems)}. Check whether the DOI belongs to " "a different reference",
                     LEVEL_LIKELY,
                 )
@@ -1229,7 +1233,7 @@ def _citation_findings(citation: Citation, status: str, record: dict | None, doi
         return [
             Finding(
                 citation.where,
-                "DOI metadata mismatch",
+                DOI_MISMATCH,
                 f"the reference citing DOI {doi} does not match the work it points " f"to: the DOI is registered to {_describe(record)}, which does not " "appear in the reference. Check whether the DOI belongs to a " "different reference",
                 LEVEL_LIKELY,
             )

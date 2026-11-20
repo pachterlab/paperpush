@@ -165,6 +165,26 @@ guess failed.
      describes a different work, with the correct details where you found
      them; a book or web page the registries miss is not fabricated. If you
      cannot search, answer `unclear`.
+   - `ai.flagged_references` lists the references the lookups themselves
+     reported as likely errors (a DOI registered to a different title or
+     authors, a `.bib` entry that matches no registered work, an author list
+     that is not the work's), each with an id
+     like `ref-0123abcd`. The lookups match strings, so they misfire on a
+     title worded differently, a paper indexed under its proceedings, a group
+     author, or garbled PDF text. Look each one up the same way. Add a
+     `"cleared": [...]` list to this result with the ids you verified as
+     false positives: the work exists and the entry's title, authors, year,
+     and DOI describe it. A real work cited with another paper's DOI or the
+     wrong authors is not cleared. `pass` = every flag is a false positive;
+     `fail` = at least one is right (name it in `details`). Cleared flags are
+     lowered to warnings when you merge with `--ai-results` (a full run, not
+     `--ai-only`). Don't clear a flag you could not verify.
+   - `ai.uncited_claims` asks for the statements that need a source but cite
+     none. Read the whole body text. `fail` quotes each one (a statistic that
+     is not the study's own result, an earlier study or survey it describes,
+     a quotation, a named dataset or tool the authors did not make) with its
+     location and the kind of source it needs. The paper's own methods,
+     results, and reasoning, and common knowledge in the field, need none.
    - `ai.anonymity` (double-blind venues, or `--anonymous`) asks whether
      anything beyond the keyword scan's findings identifies the authors. Read
      the whole manuscript and supplement as a reviewer would. `fail` quotes

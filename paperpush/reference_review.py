@@ -155,8 +155,36 @@ def _extended_tasks(checks: Checks, venue: Venue, values: dict[str, str]) -> Non
                           "An unindexed journal alone does not establish that the cited research is invalid."), files=files))
 
 
+UNCITED_CLAIMS_ID = "ai.uncited_claims"
+UNCITED_CLAIMS_TITLE = "Statistics, earlier studies, and other claims that need a source cite one"
+_UNCITED_CLAIMS = (
+    "Read the manuscript's text (not its reference list, abstract, figure legends, or tables) and find the statements that need a source but cite none. "
+    "A statement needs a source when it reports something this manuscript did not show: a number or statistic about the world ('80% of hospitals ...', "
+    "'students who used the tools scored 6.71 points lower'), an earlier study, survey, trial, report, or review it describes ('a study at the University "
+    "of Bremen found ...', 'recent work has shown ...', 'systematic reviews report ...'), a direct quotation, a claim attributed to a person or "
+    "organization, a specific or contested factual claim, and a dataset, software tool, or method named but not made by the authors. "
+    "These do not need one: the manuscript's own methods, results, and reasoning; knowledge common to the field; and a statement whose citation comes "
+    "later in the same sentence or in the next one when it clearly covers it. Report 'fail' listing each statement that needs a source (up to 15, the "
+    "clearest first) as: the section or page, a short quote, and the kind of source it needs. If there are only borderline cases, report 'suggest' "
+    "listing up to 10 the same way. Else report 'pass'; 'not_applicable' if the files hold no body text."
+)
+
+
+def uncited_claims_task(venue: Venue, values: dict[str, str]):
+    """The AI task for what the citation counts cannot see: a claim that should cite a source and does not."""
+    from .requirements_check import manuscript_files
+
+    files = list(dict.fromkeys(str(p) for _, p in manuscript_files(venue, values)))
+    if not files:
+        return None
+    return AiTask(id=UNCITED_CLAIMS_ID, title=UNCITED_CLAIMS_TITLE, category="References", instructions=_UNCITED_CLAIMS, files=files)
+
+
 def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("bibliography.age", "Share of references more than 10 years old", "References", _age, venue, values)
     checks.run("bibliography.density", "Citation density (citations per 1,000 words), reported for information", "References", _density, venue, values)
     if checks.options.get("reference_check_extended"):
         _extended_tasks(checks, venue, values)
+    task = uncited_claims_task(venue, values)
+    if task is not None:
+        checks.needs_ai(task)

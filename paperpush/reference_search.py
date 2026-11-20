@@ -175,6 +175,11 @@ MIN_TITLE_WORDS = 3
 # How many unverified references the AI task lists.
 MAX_AI_ITEMS = 25
 
+# Finding categories of a reference the search says is wrong. Both rest on matching
+# titles and names, so ``validate`` offers them to ``ai.flagged_references``.
+WRONG_MATCH = "reference does not match a registered work"
+NO_MATCH = "no registered work"
+
 # Entry types a missing Crossref/OpenAlex record says something about. Other
 # types (books, software, theses, reports, web pages) are often unindexed.
 INDEXED_KINDS = {"article", "inproceedings", "conference", "incollection", "inbook", "proceedings"}
@@ -460,7 +465,9 @@ def _services() -> _Services:
 
 # --- registry queries -------------------------------------------------------------------
 
-_CROSSREF_FIELDS = "DOI,title,author,issued,type,relation,container-title,short-container-title,updated-by,update-to"
+# volume ... editor: for the detail check (paperpush.reference_details), which holds a matched
+# entry against the rest of its record.
+_CROSSREF_FIELDS = "DOI,title,author,issued,type,relation,container-title,short-container-title,updated-by,update-to,volume,issue,page,article-number,ISSN,editor,published-print,published-online"
 
 
 def crossref_search(query: str, service: _Service) -> list[dict] | None:
@@ -1474,14 +1481,14 @@ def search_references(refs: list[Reference], *, services: _Services | None = Non
             lk.problems = []
         if lk.status == MATCHED and lk.problems:
             what = f"the closest registered work is {_describe(lk.record)}" if lk.record else ""
-            result.findings.append(Finding(lk.ref.where, "reference does not match a registered work", f"{lk.ref.label} looks wrong: {'; '.join(lk.problems)}" + (f"; {what}" if what and lk.source != "arXiv" else "") + ". Check it against the published work", LEVEL_LIKELY))
+            result.findings.append(Finding(lk.ref.where, WRONG_MATCH, f"{lk.ref.label} looks wrong: {'; '.join(lk.problems)}" + (f"; {what}" if what and lk.source != "arXiv" else "") + ". Check it against the published work", LEVEL_LIKELY))
         elif lk.status == NOT_FOUND and (lk.ref.indexed or (lk.confident_miss and claims_indexed_venue(lk.ref.text))):
             searched = lk.source or "Crossref"
             near = f" (the closest title found was {_describe(lk.candidates[0])})" if lk.candidates else ""
             result.findings.append(
                 Finding(
                     lk.ref.where,
-                    "no registered work",
+                    NO_MATCH,
                     f'{lk.ref.label} ("{(lk.ref.title or _prose_title(lk.ref.text))[:120]}", {lk.ref.author or _entry_lead_author(lk.ref.text) or "no author"}, {lk.ref.year or "no year"}) matches no work in {searched}{near}. Check that it exists and its title is right; a reference that cannot be found may be fabricated',
                     LEVEL_LIKELY,
                 )
@@ -1703,4 +1710,39 @@ def ai_task_instructions(unverified: list[Lookup], skipped: list[Reference]) -> 
         "them. Books, software, web pages, theses, and reports are often unindexed: an entry is not fabricated just because "
         "the search missed it. Report 'pass' if every one checks out, and 'unclear' if you could not verify them (for "
         "example, with no way to search). Do not judge from memory alone.\n" + "\n".join(lines)
+    )
+
+
+def flag_id(detail: str) -> str:
+    """A short id for one flagged reference, the same on every run that reports it the same way.
+
+    The agent names the flags it clears by these ids, in a results file written
+    after one validate run and read by the next, so they come from the finding's
+    text rather than its position.
+    """
+    return "ref-" + hashlib.sha1(detail.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
+
+
+def flagged_task_instructions(flags: dict[str, str]) -> str:
+    """Instructions for ``ai.flagged_references``: confirm or clear what the lookups reported.
+
+    ``flags`` maps each flag's id (:func:`flag_id`) to the message the report shows.
+    """
+    shown = list(flags.items())[:MAX_AI_ITEMS]
+    lines = [f"- {fid}: {message}" for fid, message in shown]
+    if len(flags) > len(shown):
+        lines.append(f"- ... and {len(flags) - len(shown)} more, which stay as reported.")
+    return (
+        "paperpush's registry lookups (doi.org, Crossref, OpenAlex, arXiv) reported these references as likely errors. "
+        "The lookups compare titles and author names as strings, so they misfire on a title written differently from the "
+        "registered one, a conference paper indexed under its proceedings, a group or consortium author, an entry garbled "
+        "by PDF text extraction, and kinds of work the registries index poorly. For each flag, look the reference up (the "
+        "web, Crossref, OpenAlex, DBLP, arXiv, the publisher's page) and compare what you find with the entry in the files. "
+        "A flag is a false positive only when the work exists and the entry's title, authors, year, and DOI (if it gives "
+        "one) describe that work; a real work cited with another paper's DOI, the wrong authors, or the wrong year is "
+        "flagged correctly. Do not judge from memory alone. Report 'pass' if every flag is a false positive, 'fail' if any "
+        "flag is right (name each one, say what is wrong, and give the correct details where you found them), and "
+        "'unclear' if you could not look them up. Whatever the status, add a 'cleared' list with the ids of the flags you "
+        'verified to be false positives (for example "cleared": ["ref-0123abcd"]): the report lowers those to warnings. '
+        "Leave out any flag you could not verify.\n" + "\n".join(lines)
     )

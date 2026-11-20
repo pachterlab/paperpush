@@ -19,7 +19,8 @@ def _run(tmp_path, body, *, full=False):
     path.write_text(body, encoding="utf-8")
     checks = Checks(options={"reference_check_extended": full})
     reference_review.run_checks(checks, VENUE, {"manuscript_file": str(path)})
-    return {r.id: r for r in checks.results}, checks.ai_tasks
+    # ai.uncited_claims is queued for every manuscript (tests/test_reference_details.py); these tests are about the rest.
+    return {r.id: r for r in checks.results}, [t for t in checks.ai_tasks if t.id != reference_review.UNCITED_CLAIMS_ID]
 
 
 def test_age_and_density_are_local_checks(tmp_path):

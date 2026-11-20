@@ -862,7 +862,7 @@ def _link_issues(venue: Venue, values: dict[str, str]) -> Outcome:
     return Outcome(issues, f"probed {probed} link(s)" if probed else "found no links in the files")
 
 
-def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | None = None, resolved: dict | None = None, coverage: dict | None = None) -> list[Issue]:
+def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | None = None, resolved: dict | None = None, coverage: dict | None = None, flagged: dict | None = None) -> list[Issue]:
     """Flag references whose DOI does not match the work they cite.
 
     Reads the submission's bibliography whichever way it ships it -- the ``.bib``
@@ -877,6 +877,7 @@ def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | No
     ``resolved`` is filled with the registry records of the DOIs that check out,
     for :func:`_reference_version_issues`. ``coverage`` is filled with how many
     DOIs got an answer: none is unchecked, some is a note saying which were not.
+    ``flagged`` is filled with the DOI mismatches, for ``ai.flagged_references``.
     """
     from . import references
 
@@ -886,8 +887,26 @@ def _reference_issues(venue: Venue, values: dict[str, str], retracted: list | No
     findings = references.scan_references(paths, resolved_out=resolved, coverage_out=coverage)
     if retracted is not None:
         retracted.extend(f for f in findings if f.category == references.RETRACTED)
-    issues = _findings_to_issues([f for f in findings if f.category not in (references.RETRACTED, references.TRUNCATED)])
+    reported = [f for f in findings if f.category not in (references.RETRACTED, references.TRUNCATED)]
+    issues = _findings_to_issues(reported)
+    _note_flags("integrity.dois", reported, issues, flagged, {references.DOI_MISMATCH})
     return _with_coverage(issues, coverage)
+
+
+def _note_flags(check_id: str, findings: list, issues: list[Issue], flagged: dict | None, categories: set[str]) -> None:
+    """Record the findings of ``categories`` in ``flagged``, by flag id, for ``ai.flagged_references``.
+
+    ``issues`` are ``findings`` turned into issues by :func:`_findings_to_issues`
+    (one each, in order); the issue's message is what the AI is shown and what
+    :func:`_clear_reference_flags` finds the issue by afterwards.
+    """
+    from .reference_search import flag_id
+
+    if flagged is None:
+        return
+    for finding, issue in zip(findings, issues):
+        if finding.category in categories and issue.is_likely_error:
+            flagged[flag_id(issue.message)] = (check_id, issue.message)
 
 
 def _with_coverage(issues: list[Issue], coverage: dict | None) -> list[Issue]:
@@ -925,6 +944,8 @@ class _ReferenceContext:
     files: list[str] = field(default_factory=list)
     search: object = None
     ai_tasks: list = field(default_factory=list)
+    # Likely errors the AI may clear: flag id -> (check id, issue message).
+    flagged: dict = field(default_factory=dict)
 
 
 # How many references a message lists by name.
@@ -994,7 +1015,9 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
     moved = [f for f in result.findings if retracted is not None and f.category == references.RETRACTED]
     if retracted is not None:
         retracted.extend(moved)
-    issues = _findings_to_issues([f for f in result.findings if f not in moved])
+    kept = [f for f in result.findings if f not in moved]
+    issues = _findings_to_issues(kept)
+    _note_flags("integrity.unmatched_references", kept, issues, ctx.flagged, {reference_search.WRONG_MATCH, reference_search.NO_MATCH})
 
     suggestions = result.suggestions
     if suggestions:
@@ -1035,6 +1058,97 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
         raise Unchecked("the registries (Crossref, OpenAlex, arXiv) did not answer")
     matched = len(result.by_status(reference_search.MATCHED))
     return Outcome(issues, f"looked up {searched} of {len(without_doi)} reference(s) without a DOI: {matched} matched a registered work")
+
+
+FLAGGED_REFERENCES_TASK = "ai.flagged_references"
+# What a cleared flag's message says after it.
+_CLEARED_SUFFIX = " [lowered from a likely error: the AI check ai.flagged_references found the work and that the entry describes it, so the registry match probably misfired; confirm it]"
+
+
+def _flagged_reference_task(checks: Checks, venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> dict[str, str]:
+    """Queue ``ai.flagged_references`` for the reference likely errors a reader can overturn; return them by flag id.
+
+    The lookups match titles and names as strings, so a title worded unlike the
+    registered one, a paper indexed under its proceedings, or a group author can
+    be reported as wrong or missing when it is not. An unregistered or malformed
+    DOI and a retraction notice are facts of the registry, and are not offered.
+    Flags from a check that is switched off are left out.
+    """
+    from . import ai_validate, reference_search
+
+    flags = {fid: message for fid, (check_id, message) in ctx.flagged.items() if not checks.disabled_by(check_id)}
+    if not flags:
+        return {}
+    files = ctx.files
+    if not files:
+        try:
+            files = [str(p) for p in _upload_paths_or_skip(venue, values)]
+        except NotApplicable:
+            files = []
+    ctx.ai_tasks.append(
+        ai_validate.AiTask(
+            id="ai.flagged_references",
+            title="References the registry lookups flagged are really wrong",
+            category="Integrity",
+            instructions=reference_search.flagged_task_instructions(flags),
+            files=_ai_files(files),
+        )
+    )
+    return flags
+
+
+def _cleared_ids(value) -> set[str]:
+    """The flag ids in a verdict's ``cleared``: a list of ids (or of objects with an ``id``), or a comma-separated string."""
+    if isinstance(value, str):
+        value = re.split(r"[\s,]+", value)
+    if not isinstance(value, list):
+        return set()
+    out = set()
+    for item in value:
+        if isinstance(item, dict):
+            item = item.get("id", "")
+        if isinstance(item, str) and item.strip():
+            out.add(item.strip())
+    return out
+
+
+def _clear_reference_flags(checks: Checks, flags: dict[str, str]) -> int:
+    """Lower to warnings the reference likely errors the AI verdict on ``ai.flagged_references`` cleared; return how many.
+
+    A ``pass`` clears the ids in ``cleared``, or every flag it was shown when
+    that list is missing or empty (``pass`` means all were false positives); a
+    ``fail`` clears only the ids in ``cleared``. ``unclear`` and ``not_applicable`` clear
+    nothing. An AI verdict is not certain, so a cleared flag stays in the report
+    as a warning saying why it was lowered.
+    """
+    verdict = checks.ai_verdicts.get(FLAGGED_REFERENCES_TASK) if flags else None
+    if not verdict or verdict.get("status") not in ("pass", "fail"):
+        return 0
+    cleared = _cleared_ids(verdict.get("cleared")) & set(flags)
+    if verdict["status"] == "pass" and not cleared:
+        from .reference_search import MAX_AI_ITEMS
+
+        # Only the flags the task listed were judged.
+        cleared = set(list(flags)[:MAX_AI_ITEMS])
+    messages = {flags[fid] for fid in cleared}
+    if not messages:
+        return 0
+    from dataclasses import replace
+
+    lowered = 0
+    for result in checks.results:
+        if result.id not in ("integrity.dois", "integrity.unmatched_references", "integrity.reference_details") or not result.issues:
+            continue
+        issues = []
+        for issue in result.issues:
+            if issue.is_likely_error and issue.message in messages:
+                issue = replace(issue, level=WARNING, message=issue.message + _CLEARED_SUFFIX)
+                lowered += 1
+            issues.append(issue)
+        if issues != result.issues:
+            result.issues = issues
+            result.status = _status_for(issues)
+    return lowered
 
 
 def _reference_version_issues(venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> Outcome:
@@ -1079,6 +1193,89 @@ def _reference_version_issues(venue: Venue, values: dict[str, str], ctx: _Refere
     _MINOR = ("older preprint version", "preprint has been published")
     issues = [replace(i, level=SUGGESTION) if f.category in _MINOR else i for f, i in zip(findings, issues)]
     return Outcome(issues, f"checked {len(cited) + len(arxiv_refs)} cited work(s) for a newer version")
+
+
+REFERENCE_DETAILS_TITLE = "Each reference's authors, journal, year, volume, issue, and pages match the work it cites, and nothing it needs is missing"
+JOURNAL_INDEXING_TITLE = "Each cited journal is in an index OpenAlex tracks (CWTS core, DOAJ, MEDLINE, SciELO)"
+
+
+def _matched_references(venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> list:
+    """Every reference whose registered record is known: by its DOI, or matched by the registry search.
+
+    A ``.bib`` entry is compared field by field; an entry of the manuscript's
+    own reference list by its text. A reference-list entry the search matched
+    by its text already had its authors compared there, so they are not compared
+    again.
+    """
+    from . import reference_details, reference_search, references
+
+    refs = _bibliography_refs(venue, values, ctx)
+    search = ctx.search
+    matched_lookups = [lk for lk in (search.by_status(reference_search.MATCHED) if search is not None else []) if lk.record and not lk.problems and lk.source != "arXiv"]
+    out: list = []
+    paths = _upload_paths_or_skip(venue, values)
+    entries = references.printed_entries(paths)
+    if entries:
+        by_label: dict[str, object] = {}
+        for e in entries:
+            label = reference_search._cite(e)
+            by_label.setdefault(label, e)
+            if e.doi and e.doi in ctx.resolved and label not in {m.label for m in out}:
+                out.append(reference_details.Matched(label, e.where, ctx.resolved[e.doi], entry=e, doi=e.doi))
+        for lk in matched_lookups:
+            entry = by_label.get(lk.ref.label)
+            if entry is not None and lk.ref.label not in {m.label for m in out}:
+                out.append(reference_details.Matched(lk.ref.label, lk.ref.where, lk.record, entry=entry))
+        return out
+    for r in refs or []:
+        if r.doi and r.doi in ctx.resolved and r.text:
+            out.append(reference_details.Matched(r.label, r.where, ctx.resolved[r.doi], text=r.text, doi=r.doi))
+    for lk in matched_lookups:
+        if lk.ref.text:
+            out.append(reference_details.Matched(lk.ref.label, lk.ref.where, lk.record, text=lk.ref.text, check_authors=False))
+    return out
+
+
+def _reference_detail_issues(venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> Outcome:
+    """Hold each reference against the whole of its registered record (see :mod:`paperpush.reference_details`).
+
+    Reads the records the DOI check and the registry search fetched, so it makes
+    no requests. A reference that names other people than the work's authors is
+    a likely error, offered to ``ai.flagged_references``; other differences are
+    warnings, and a journal article's missing volume or pages a suggestion.
+    """
+    from . import reference_details
+
+    matched = _matched_references(venue, values, ctx)
+    if not matched:
+        raise NotApplicable("no reference was matched to a registered work (by its DOI or a registry search)")
+    findings = reference_details.detail_findings(matched)
+    issues = _findings_to_issues(findings)
+    _note_flags("integrity.reference_details", findings, issues, ctx.flagged, {reference_details.WRONG_AUTHORS})
+    return Outcome(issues, f"compared {len(matched)} reference(s) with their registered records")
+
+
+def _journal_indexing_issues(venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> Outcome:
+    """Look up the cited journals in OpenAlex by ISSN and report the ones in no index it tracks."""
+    from . import reference_details
+    from .reference_search import _Service
+
+    journals = reference_details.cited_journals(_matched_references(venue, values, ctx))
+    if not journals:
+        raise NotApplicable("no cited journal article has an ISSN on its registered record")
+    issns = list(dict.fromkeys(i for j in journals for i in j.issns))
+    service = _Service("OpenAlex", 2 * (len(issns) // reference_details.OPENALEX_SOURCE_BATCH + 1))
+    sources, complete = reference_details.lookup_sources(issns, service)
+    if not sources and not complete:
+        raise Unchecked("OpenAlex did not answer (set OPENALEX_API_KEY if its shared free budget is used up)")
+    findings, found = reference_details.journal_indexing_findings(journals, sources)
+    if not complete:
+        # A journal missing from an unanswered batch is not "unknown to OpenAlex".
+        findings = [f for f in findings if f.category != reference_details.UNKNOWN_JOURNAL]
+    issues = _findings_to_issues(findings)
+    if not complete:
+        issues.append(incomplete("", "OpenAlex did not answer for some of the cited journals, so they were not looked up; run validate again later"))
+    return Outcome(issues, f"looked up {len(journals)} cited journal(s) in OpenAlex: {found} found")
 
 
 def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
@@ -1286,6 +1483,20 @@ def _chatbot_residue_issues(venue: Venue, values: dict[str, str]) -> "Outcome":
     return chatbot_residue.check(venue, values)
 
 
+STALE_PDF_TITLE = "Each uploaded PDF is up to date with the source file beside it (.tex, .docx, .md)"
+
+
+def _stale_pdf_issues(venue: Venue, values: dict[str, str]) -> "Outcome":
+    """A PDF older than the same-named source beside it (see :mod:`paperpush.stale_pdf`).
+
+    Runs by default (disable with ``--disable-integrity.stale_pdf``);
+    deterministic, no network, never compiles. Each find is a WARNING.
+    """
+    from . import stale_pdf
+
+    return stale_pdf.check(venue, values)
+
+
 def _manuscript_requirement_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     """Measure the uploads against the venue's author guidelines.
 
@@ -1458,6 +1669,9 @@ class Checks:
         self.enabled: tuple[str, ...] = tuple(check_ids.expand_enabled(enabled))
         self.results: list = []
         self.ai_tasks: list = []
+        # The AI's verdicts by task id, raw (with any extra keys, such as
+        # ``cleared``), set by paperpush.ai_validate.resolve.
+        self.ai_verdicts: dict = {}
         # Settings the check modules read (e.g. ``cover_letter_max_age_days``).
         self.options: dict = dict(options or {})
         # Set by use_publisher_fallback when the venue's rules include its
@@ -1956,11 +2170,13 @@ def validate_report(
         (check_links, "Links"),
         (check_references, "Reference DOIs"),
         (check_references, "Reference search"),
+        (check_references, "Journal indexing"),
         (check_sensitive, "Sensitive information"),
         (True, "LaTeX source"),
         (check_anonymous, "Anonymity"),
         (check_hidden_text, "Hidden text"),
         (True, "Chatbot leftovers"),
+        (True, "Stale PDFs"),
         (openreview_applies and check_openreview, "OpenReview profiles"),
         (plagiarism is not None, "Plagiarism"),
         (ai_detection is not None, "AI-text detection"),
@@ -1994,21 +2210,25 @@ def validate_report(
     else:
         _record_switched_off(checks, "integrity.links", "Links cited in the files and URL fields are reachable", integrity, venue, values, "switched off (--disable-integrity.links)")
     retractions_title = "No cited work has been retracted"
+    ref_flags: dict[str, str] = {}
     unmatched_title = "References without a DOI match a registered work"
     versions_title = "References cite the journal article, or the latest preprint"
     if check_references:
         retracted: list = []
         ref_ctx = _ReferenceContext()
-        dois = bar.run("Reference DOIs", checks.run, "integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values, retracted, ref_ctx.resolved, ref_ctx.coverage)
+        dois = bar.run("Reference DOIs", checks.run, "integrity.dois", "Reference DOIs match the works they cite", integrity, _reference_issues, venue, values, retracted, ref_ctx.resolved, ref_ctx.coverage, ref_ctx.flagged)
         unmatched = bar.run("Reference search", checks.run, "integrity.unmatched_references", unmatched_title, integrity, _unmatched_reference_issues, venue, values, ref_ctx, retracted)
         # With no DOI to look up, the title search is all the retraction check has to go on.
         looked_up = dois.status != report.UNCHECKED and (unmatched.status != report.UNCHECKED or ref_ctx.coverage.get("total"))
         checks.run("integrity.retractions", retractions_title, integrity, _retraction_issues, venue, values, retracted if looked_up else None, ref_ctx.coverage)
         checks.run("integrity.reference_versions", versions_title, integrity, _reference_version_issues, venue, values, ref_ctx)
+        checks.run("integrity.reference_details", REFERENCE_DETAILS_TITLE, integrity, _reference_detail_issues, venue, values, ref_ctx)
+        bar.run("Journal indexing", checks.run, "integrity.journal_indexing", JOURNAL_INDEXING_TITLE, integrity, _journal_indexing_issues, venue, values, ref_ctx)
+        ref_flags = _flagged_reference_task(checks, venue, values, ref_ctx)
         for task in ref_ctx.ai_tasks:
             checks.needs_ai(task)
     else:
-        for check_id, title in (("integrity.dois", "Reference DOIs match the works they cite"), ("integrity.retractions", retractions_title), ("integrity.unmatched_references", unmatched_title), ("integrity.reference_versions", versions_title)):
+        for check_id, title in (("integrity.dois", "Reference DOIs match the works they cite"), ("integrity.retractions", retractions_title), ("integrity.unmatched_references", unmatched_title), ("integrity.reference_versions", versions_title), ("integrity.reference_details", REFERENCE_DETAILS_TITLE), ("integrity.journal_indexing", JOURNAL_INDEXING_TITLE)):
             _record_switched_off(checks, check_id, title, integrity, venue, values, "switched off (--disable-references)")
     if check_sensitive:
         bar.run("Sensitive information", checks.run, "integrity.sensitive", "No secrets or private information in the files", integrity, _sensitive_issues, venue, values)
@@ -2028,6 +2248,7 @@ def validate_report(
     else:
         checks.record("integrity.hidden_text", "No hidden text or prompts aimed at AI reviewers", integrity, report.UNCHECKED, detail="switched off (--disable-integrity.hidden_text)")
     bar.run("Chatbot leftovers", checks.run, "integrity.chatbot_residue", CHATBOT_RESIDUE_TITLE, integrity, _chatbot_residue_issues, venue, values)
+    bar.run("Stale PDFs", checks.run, "integrity.stale_pdf", STALE_PDF_TITLE, integrity, _stale_pdf_issues, venue, values)
     pdf_reader = _pdf_reader_issues(venue, values, check_hidden_text=check_hidden_text and not checks.disabled_by("integrity.hidden_text"), check_manuscript=check_manuscript)
     if pdf_reader:
         checks.record("integrity.pdf_reader", "PDF text extractor (pdfminer.six) installed, which the PDF-based checks need", integrity, report.UNCHECKED, issues=[replace_unchecked(i) for i in pdf_reader])
@@ -2061,6 +2282,7 @@ def validate_report(
     from . import ai_validate
 
     tasks = bar.run("AI checks", ai_validate.resolve, checks, venue, values, ai) if check_manuscript else []
+    _clear_reference_flags(checks, ref_flags)
     bar.finish()
 
     from .requirements import any_format_initial_rule

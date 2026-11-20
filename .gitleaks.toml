@@ -1,0 +1,13 @@
+# gitleaks configuration (run in CI by .github/workflows/security.yml).
+# Uses gitleaks' built-in rules; the allowlist holds only test fixtures that are
+# fake credentials on purpose (they test paperpush's own secret scanner) and
+# the git-ignored benchmark corpus of third-party LaTeX.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Deliberate fake credentials in tests, and the ignored benchmark corpus"
+paths = [
+  '''^tests/test_sensitive\.py$''',
+  '''^manuscript/benchmark/runs/''',
+]

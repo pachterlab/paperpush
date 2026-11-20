@@ -7,8 +7,10 @@ services:
     runtime: docker
     plan: free
     branch: main
-    healthCheckPath: /
-    autoDeploy: true
+    healthCheckPath: /healthz
+    # Deploy a commit to main only after its GitHub checks (CI, security)
+    # pass. main itself only takes reviewed pull requests (branch protection).
+    autoDeployTrigger: checksPass
     envVars:
       # Visitors supply their own API keys for AI features.
       - key: PAPERPUSH_WEB_AI

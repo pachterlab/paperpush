@@ -414,7 +414,7 @@ def repeated_words(paragraph: str, *, pdf: bool = False) -> list[str]:
             continue  # a heading followed by a sentence that starts with the same word
         if pdf and _table_cells(paragraph, m):
             continue
-        found.append(_snippet(paragraph, m.start(), m.end()))
+        found.append(_snippet(paragraph, m.start(), m.end(), _mark))
     return found
 
 

@@ -1,0 +1,34 @@
+# Dependabot keeps the pinned dependencies current (security/README.md,
+# control SEC-06). Each update arrives as a pull request, so it goes through
+# review and CI like any other change.
+version: 2
+updates:
+  # pyproject.toml and the hashed lock files in requirements/ that the
+  # Docker image installs.
+  - package-ecosystem: pip
+    directories: ["/", "/requirements"]
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      python-minor-and-patch:
+        update-types: [minor, patch]
+
+  # The SHA-pinned actions in .github/workflows/.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The digest-pinned base image in the Dockerfile.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+    # New digests for python:3.12-slim only; moving to 3.13 is a deliberate change.
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

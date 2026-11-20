@@ -46,6 +46,8 @@ NETWORK_CHECKS = [
     "integrity.dois",
     "integrity.unmatched_references",
     "integrity.reference_versions",
+    "integrity.reference_details",
+    "integrity.journal_indexing",
     "integrity.retractions",
     "integrity.openreview",
     "integrity.plagiarism",

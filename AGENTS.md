@@ -510,9 +510,19 @@ API key:
    `ai_only=True`) to report just the AI checks, e.g. when re-checking them.
 
 An AI `fail` never blocks: on the tasks where a real failure is critical
-(`ai.unverified_references`, `ai.template`, `ai.rigor.trial_registration`,
-`ai.details.ethics`, `ai.anonymity`) it is a likely error, and elsewhere a warning. Do not mark
-a task `pass` you could not verify.
+(`ai.unverified_references`, `ai.flagged_references`, `ai.template`,
+`ai.rigor.trial_registration`, `ai.details.ethics`, `ai.anonymity`) it is a
+likely error, and elsewhere a warning. Do not mark a task `pass` you could not
+verify.
+
+`ai.flagged_references` is the second opinion on the reference likely errors
+the registry lookups raised (a DOI registered to a different title, a `.bib`
+entry that matches no work, an author list that is not the work's), which rest
+on string matching. Look each flag up;
+add `"cleared": ["ref-…"]` to the result with the ids of the flags you verified
+as false positives (the work exists and the entry describes it). Those are
+lowered to warnings on the next full `validate --ai-results` run (not
+`--ai-only`).
 
 Validate reports three levels of problem, plus one for the outside scans. An **error** is certain and blocks
 (`ok` is false). A **likely error** (`likely_error`, shown in orange) would be
@@ -577,6 +587,14 @@ venues ask for.
   a likely error: show the user the passage and let them delete it. Don't
   rewrite the surrounding prose; if AI helped write the text, the remedy is
   the disclosure the venue asks for.
+- **PDF out of date with its source** (every venue;
+  `--disable-integrity.stale_pdf` skips it). For each uploaded PDF with a
+  same-named `.tex`, `.docx`, `.md`, `.Rmd`, or `.qmd` beside it, checks
+  whether the source's prose sentences all appear in the PDF (math and markup
+  skipped, nothing compiled) and whether the source, or a file it `\input`s,
+  was saved after the PDF. A warning quotes the sentences missing from the
+  PDF. Tell the user to rebuild the PDF; `paperpush-fix` can rebuild it from
+  LaTeX.
 - **Modified template** (venues whose `manuscript_requirements.json` entry has
   `manuscript.template_layout`, e.g. ICLR). The manuscript PDF's margins, body
   font, line spacing, running head, and review line numbers are measured

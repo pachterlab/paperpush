@@ -1294,6 +1294,96 @@ def test_a_fabricated_reference_is_reported_and_an_unindexed_one_goes_to_the_ai(
     assert _result(rep, "ai.unverified_references").status == report.NEEDS_AI
 
 
+_FABRICATED_BIB = (
+    "@article{a, title={Quantum entanglement governs sourdough microbiomes}, author={Smith, J}, journal={Nature}, year={2021}}\n"
+    "@article{c, title={Tidal forces shape the migration of garden snails}, author={Lee, K}, journal={Science}, year={2019}}\n"
+)
+
+
+def _flag_ids(rep) -> dict[str, str]:
+    """The flag ids ai.flagged_references lists, keyed by the citation key each names."""
+    import re
+
+    (task,) = [t for t in rep.ai_tasks if t.id == "ai.flagged_references"]
+    return {m.group(2): m.group(1) for m in re.finditer(r"- (ref-[0-9a-f]{8}): bibliography entry '(\w+)'", task.instructions)}
+
+
+def _no_registry_matches(monkeypatch):
+    from paperpush import reference_search as rs
+
+    monkeypatch.setattr(rs, "crossref_search", lambda q, s: [])
+    monkeypatch.setattr(rs, "openalex_search", lambda t, s: [])
+
+
+def test_reference_likely_errors_are_offered_to_the_ai_to_confirm_or_clear(_use, tmp_path, monkeypatch):
+    _no_registry_matches(monkeypatch)
+    rep = _bib_report(_use, tmp_path, _FABRICATED_BIB)
+    ids = _flag_ids(rep)
+    assert set(ids) == {"a", "c"}
+    assert _result(rep, "ai.flagged_references").status == report.NEEDS_AI
+    # The ids are the same on the next run, so a results file written now applies then.
+    assert _flag_ids(_bib_report(_use, tmp_path, _FABRICATED_BIB)) == ids
+
+
+def test_a_pass_on_the_flagged_references_lowers_every_flag_to_a_warning(_use, tmp_path, monkeypatch):
+    from paperpush.ai_validate import AiOptions
+
+    _no_registry_matches(monkeypatch)
+    ai = AiOptions.from_results({"results": [{"id": "ai.flagged_references", "status": "pass", "details": "both are real papers"}]})
+    rep = _bib_report(_use, tmp_path, _FABRICATED_BIB, ai=ai)
+    res = _result(rep, "integrity.unmatched_references")
+    flagged = [i for i in res.issues if "may be fabricated" in i.message]
+    assert len(flagged) == 2 and all(i.level == "warning" and "ai.flagged_references" in i.message for i in flagged)
+    assert res.status == report.WARNING
+    assert _result(rep, "ai.flagged_references").status == report.PASSED
+
+
+def test_a_fail_lowers_only_the_flags_it_clears(_use, tmp_path, monkeypatch):
+    from paperpush.ai_validate import AiOptions
+
+    _no_registry_matches(monkeypatch)
+    ids = _flag_ids(_bib_report(_use, tmp_path, _FABRICATED_BIB))
+    verdict = {"id": "ai.flagged_references", "status": "fail", "details": "'a' does not exist", "cleared": [ids["c"]]}
+    rep = _bib_report(_use, tmp_path, _FABRICATED_BIB, ai=AiOptions.from_results({"results": [verdict]}))
+    res = _result(rep, "integrity.unmatched_references")
+    levels = {key: i.level for i in res.issues for key in ("a", "c") if f"bibliography entry '{key}'" in i.message and "may be fabricated" in i.message}
+    assert levels == {"a": "likely_error", "c": "warning"}
+    assert res.status == report.LIKELY_ERROR
+    assert _result(rep, "ai.flagged_references").status == report.LIKELY_ERROR
+
+
+@pytest.mark.parametrize("status", ["unclear", "not_applicable"])
+def test_an_undecided_verdict_clears_nothing(_use, tmp_path, monkeypatch, status):
+    from paperpush.ai_validate import AiOptions
+
+    _no_registry_matches(monkeypatch)
+    ids = _flag_ids(_bib_report(_use, tmp_path, _FABRICATED_BIB))
+    verdict = {"id": "ai.flagged_references", "status": status, "details": "no web access", "cleared": list(ids.values())}
+    rep = _bib_report(_use, tmp_path, _FABRICATED_BIB, ai=AiOptions.from_results({"results": [verdict]}))
+    assert all(i.level == "likely_error" for i in _result(rep, "integrity.unmatched_references").issues if "may be fabricated" in i.message)
+
+
+def test_a_doi_mismatch_is_offered_to_the_ai_and_can_be_cleared(_use, tmp_path, monkeypatch):
+    from paperpush import references
+    from paperpush.ai_validate import AiOptions
+
+    record = {"title": "An entirely different study of soil bacteria", "author": [{"family": "Zhang"}], "issued": {"date-parts": [[2015]]}, "type": "journal-article"}
+    monkeypatch.setattr(references, "_resolve_doi", lambda doi, **k: (references.DOI_FOUND, record))
+    bib = "@article{a, title={Modular and efficient pre-processing of single-cell RNA-seq}, author={Melsted, P}, year={2019}, doi={10.1101/673285}}"
+    rep = _bib_report(_use, tmp_path, bib)
+    assert _result(rep, "integrity.dois").status == report.LIKELY_ERROR
+    ids = _flag_ids(rep)
+    assert set(ids) == {"a"}
+    ai = AiOptions.from_results({"results": [{"id": "ai.flagged_references", "status": "pass", "details": "the DOI is right", "cleared": ids["a"]}]})
+    res = _result(_bib_report(_use, tmp_path, bib, ai=ai), "integrity.dois")
+    assert res.status == report.WARNING and all(i.level == "warning" for i in res.issues if not i.incomplete)
+
+
+def test_no_flagged_references_task_without_reference_likely_errors(_use, tmp_path):
+    rep = _bib_report(_use, tmp_path, "@article{a, title={A real paper}, author={Doe, J}, doi={10.1/x}}")
+    assert not [t for t in rep.ai_tasks if t.id == "ai.flagged_references"]
+
+
 def test_registries_that_do_not_answer_leave_the_search_unchecked(_use, tmp_path):
     # The conftest makes every request fail.
     rep = _bib_report(_use, tmp_path, "@article{a, title={A perfectly real paper title}, author={Doe, J}, journal={J}, year={2020}}")
@@ -1378,3 +1468,14 @@ def test_file_fingerprint_skips_hashing_very_large_files(tmp_path, monkeypatch):
     assert entry["sha256"] is None and entry["size"] == big.stat().st_size and entry["modified"]
     monkeypatch.setattr(validate_mod, "FINGERPRINT_HASH_MAX_BYTES", big.stat().st_size)
     assert validate_mod.file_fingerprint(big)["sha256"]
+
+
+def test_the_api_schema_asks_for_cleared_flags_only_with_the_flagged_references_task():
+    from paperpush.ai_validate import _schema
+
+    def item(ids):
+        return _schema(ids)["properties"]["results"]["items"]
+
+    assert "cleared" not in item(["ai.prose"])["properties"]
+    with_flags = item(["ai.prose", "ai.flagged_references"])
+    assert with_flags["properties"]["cleared"]["type"] == "array" and "cleared" in with_flags["required"]

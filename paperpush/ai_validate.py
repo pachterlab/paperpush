@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 # right, the submission has a critical problem (a fabricated reference, a modified
 # template, an unregistered clinical trial, human or animal research with no ethics
 # approval, text that identifies the authors of a double-blind submission). Every other AI fail is a warning.
-CRITICAL_AI_TASKS = frozenset({"ai.unverified_references", "ai.template", "ai.rigor.trial_registration", "ai.details.ethics", "ai.anonymity"})
+CRITICAL_AI_TASKS = frozenset({"ai.unverified_references", "ai.flagged_references", "ai.template", "ai.rigor.trial_registration", "ai.details.ethics", "ai.anonymity"})
 
 VERDICTS = ("pass", "fail", "suggest", "unclear", "not_applicable")
 
@@ -294,6 +294,9 @@ def resolve(checks, venue: Venue, values: dict[str, str], ai: Optional[AiOptions
             ai.error = message
             logger.warning("AI checks could not run: %s", message)
             reason = f"the AI request failed: {message}"
+    # Kept whole: a verdict can carry more than its status (ai.flagged_references names the flags it clears).
+    if hasattr(checks, "ai_verdicts"):
+        checks.ai_verdicts = {t.id: verdicts[t.id] for t in tasks if t.id in verdicts}
     for task in tasks:
         verdict = verdicts.get(task.id)
         if verdict is None:
@@ -327,23 +330,28 @@ def resolve(checks, venue: Venue, values: dict[str, str], ai: Optional[AiOptions
     return tasks
 
 
+# Tasks whose verdict also lists the ids of the flags it clears.
+_CLEARING_TASKS = frozenset({"ai.flagged_references"})
+
+
 def _schema(task_ids: list[str]) -> dict:
+    properties = {
+        "id": {"type": "string", "enum": task_ids},
+        "status": {"type": "string", "enum": list(VERDICTS)},
+        "details": {"type": "string"},
+        "evidence": {"type": "string"},
+    }
+    required = ["id", "status", "details", "evidence"]
+    if _CLEARING_TASKS & set(task_ids):
+        # Strict structured output needs every property required, so the other tasks return [].
+        properties["cleared"] = {"type": "array", "items": {"type": "string"}, "description": "ids of the flags verified to be false positives; [] for tasks that list no flag ids"}
+        required.append("cleared")
     return {
         "type": "object",
         "properties": {
             "results": {
                 "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "string", "enum": task_ids},
-                        "status": {"type": "string", "enum": list(VERDICTS)},
-                        "details": {"type": "string"},
-                        "evidence": {"type": "string"},
-                    },
-                    "required": ["id", "status", "details", "evidence"],
-                    "additionalProperties": False,
-                },
+                "items": {"type": "object", "properties": properties, "required": required, "additionalProperties": False},
             }
         },
         "required": ["results"],
