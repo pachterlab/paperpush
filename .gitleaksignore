@@ -1,0 +1,4 @@
+# Reviewed gitleaks false positives (security/README.md, SEC-05): commit:file:rule:line.
+# ai_text_check.py:125 is 'threshold=DEFAULT_THRESHOLD'; test_ai_text_check.py:182 is the fake key 'secret2'.
+a894d00dafb8233fb906891c50b0173c7cd1e2f0:paperpush/ai_text_check.py:generic-api-key:125
+a894d00dafb8233fb906891c50b0173c7cd1e2f0:tests/test_ai_text_check.py:generic-api-key:182

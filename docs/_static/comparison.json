@@ -39,7 +39,7 @@
     ],
     "num_checks": [
       "yes",
-      "170"
+      "175"
     ],
     "tailored_checks": [
       "yes",
@@ -48,7 +48,7 @@
     ],
     "non_ai_checks": [
       "yes",
-      "128"
+      "132"
     ],
     "chk_references": [
       "yes",
@@ -96,7 +96,7 @@
     ],
     "skills": [
       "yes",
-      "11"
+      "12"
     ],
     "ai_agent": [
       "yes",
