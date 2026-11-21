@@ -95,8 +95,11 @@ def test_input_file_newer_than_pdf_counts(tmp_path):
     (tmp_path / "main.tex").write_text("\\documentclass{article}\n\\begin{document}\n\\input{body}\n\\end{document}\n", encoding="utf-8")
     (tmp_path / "body.tex").write_text("\n\n".join(SENTENCES + [NEW_SENTENCE]), encoding="utf-8")
     pdf = _pdf(tmp_path / "main.pdf", SENTENCES)
-    _age(pdf, 600)
-    _age(tmp_path / "main.tex", 1200)
+    # Pin the times: body.tex was written before the PDF, so aging only the PDF can leave a gap just under 10 minutes.
+    now = pdf.stat().st_mtime
+    os.utime(tmp_path / "body.tex", (now, now))
+    os.utime(pdf, (now - 600, now - 600))
+    os.utime(tmp_path / "main.tex", (now - 1200, now - 1200))
     result = _check(pdf)
     assert result.status == report.WARNING
     assert "saved 10 minutes after" in result.issues[0].message
