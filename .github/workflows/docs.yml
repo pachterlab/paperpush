@@ -38,8 +38,7 @@ jobs:
           python -m pip install --upgrade pip
           # Install the package so autodoc can import it (Playwright and
           # the LLM SDKs are mocked in docs/conf.py, so no browsers/keys needed).
-          pip install .
-          pip install -r docs/requirements.txt
+          pip install ".[docs]"
 
       - name: Build HTML (warnings as errors)
         run: python -m sphinx -b html -W --keep-going docs docs/_build/html

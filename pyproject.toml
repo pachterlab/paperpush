@@ -4,11 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paperpush"
-version = "0.5.4"
+dynamic = ["version"]
 description = "A Python library for automating the submission of manuscripts to academic venues."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "BSD-2-Clause"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Text Processing :: Markup :: LaTeX",
+]
 authors = [
     {name = "Joseph Rich", email = "josephrich98@gmail.com"}
 ]
@@ -27,7 +40,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/pachterlab/paperpush"
 Repository = "https://github.com/pachterlab/paperpush"
-Documentation = "https://github.com/pachterlab/paperpush#readme"
+Documentation = "https://paperpush.readthedocs.io"
 Issues = "https://github.com/pachterlab/paperpush/issues"
 
 [project.optional-dependencies]
@@ -40,7 +53,8 @@ web = ["fastapi>=0.115", "uvicorn>=0.30", "python-multipart>=0.0.9", "psycopg[bi
 validate = ["pdfminer.six>=20240706", "arxiv_latex_cleaner>=0.1.0", "codespell>=2.2", "tqdm>=4.60"]
 all = ["paperpush[ai,web,validate]"]
 all-no-ai = ["paperpush[mcp,web,validate]"]
-dev = ["paperpush[all-no-ai]", "pytest>=7.0", "bandit", "pip-audit", "black", "jsonschema>=4.18", "sphinx", "isort"]
+docs = ["sphinx>=7.0", "myst-parser>=2.0", "sphinx-rtd-theme>=2.0"]
+dev = ["paperpush[all-no-ai,docs]", "pytest>=7.0", "bandit>=1.9.4", "pip-audit>=2.10.1", "black>=26.1,<27", "jsonschema>=4.18", "isort>=9.0"]
 
 [project.scripts]
 paperpush = "paperpush.cli:main"
@@ -52,6 +66,9 @@ paperpush-web = "paperpush.web.app:main"
 # (e.g. `from tests.conftest import ...`) regardless of whether pytest is invoked
 # as `pytest` or `python -m pytest`.
 pythonpath = ["."]
+# Only collect the real suite: manuscript/ and build/ hold benchmark repos with
+# their own (unrunnable here) tests.
+testpaths = ["tests"]
 markers = [
     "portal: test hits a real submission portal; skipped unless --run-portal (or PAPERPUSH_RUN_PORTAL=1) is given",
 ]
@@ -60,6 +77,11 @@ markers = [
 # drops any venue package that isn't added here, which breaks non-editable
 # installs (the missing module imports fine in an editable checkout but is
 # absent from the built wheel).
+# The version lives only in paperpush/__init__.py; setuptools reads it from there
+# statically (no import), so bump __version__ alone.
+[tool.setuptools.dynamic]
+version = {attr = "paperpush.__version__"}
+
 [tool.setuptools.packages.find]
 include = ["paperpush*"]
 

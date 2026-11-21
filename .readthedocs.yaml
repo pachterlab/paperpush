@@ -22,4 +22,5 @@ python:
     # the LLM SDKs are mocked in conf.py, so their browsers/keys aren't needed here.
     - method: pip
       path: .
-    - requirements: docs/requirements.txt
+      extra_requirements:
+        - docs

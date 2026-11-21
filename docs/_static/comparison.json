@@ -39,7 +39,7 @@
     ],
     "num_checks": [
       "yes",
-      "175"
+      "186"
     ],
     "tailored_checks": [
       "yes",
@@ -48,7 +48,7 @@
     ],
     "non_ai_checks": [
       "yes",
-      "132"
+      "140"
     ],
     "chk_references": [
       "yes",

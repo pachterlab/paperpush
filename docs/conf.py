@@ -1,7 +1,7 @@
 # Configuration file for the Sphinx documentation builder.
 #
 # Build locally with:
-#   pip install -r docs/requirements.txt
+#   pip install -e ".[docs]"
 #   sphinx-build -b html docs docs/_build/html
 # or, from inside docs/:  make html
 
@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath("_ext"))
 try:
     from paperpush import __version__ as _version
 except Exception:  # pragma: no cover - docs should build even if import fails
-    _version = "0.5.4"
+    _version = "0.6.0"
 
 # -- Project information ------------------------------------------------------
 
