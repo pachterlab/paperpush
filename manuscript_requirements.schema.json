@@ -792,6 +792,17 @@
           ],
           "description": "Whether lists take the serial (Oxford) comma: yes for 'A, B, and C', no for 'A, B and C'. Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent."
         },
+        "significant_statistical_only": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True when the guidelines reserve 'significant' (and 'significantly', 'significance') for statistical significance, as many statistics and biomedical journals do. `validate` then reports any other use ('a significant role') as a warning; when empty, it is a warning only if the manuscript reports statistical tests."
+        },
         "footnotes_allowed": {
           "anyOf": [
             {
@@ -1693,6 +1704,28 @@
           ],
           "description": "The word figure captions must start with, as the guidelines spell it (e.g. 'Fig' for 'Fig 1', 'Fig.' for 'Fig. 1', 'Figure')."
         },
+        "citation_order": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True when the guidelines require figures to be numbered (or cited) in the order the text first cites them. Without it, citations.figure reports an out-of-order figure as a suggestion, not a warning."
+        },
+        "all_cited": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True when the guidelines require every figure (including Extended Data figures) to be cited in the text. Without it, citations.figure_cited reports a never-cited figure as a suggestion, not a warning; a citation of a figure that does not exist is a warning either way."
+        },
         "notes": {
           "anyOf": [
             {
@@ -1766,6 +1799,28 @@
             }
           ],
           "description": "Where tables go for the initial submission."
+        },
+        "citation_order": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True when the guidelines require tables to be numbered (or cited) in the order the text first cites them. Without it, citations.table reports an out-of-order table as a suggestion, not a warning."
+        },
+        "all_cited": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True when the guidelines require every table (including Extended Data tables) to be cited in the text. Without it, citations.table_cited reports a never-cited table as a suggestion, not a warning; a citation of a table that does not exist is a warning either way."
         },
         "notes": {
           "anyOf": [
@@ -1844,6 +1899,17 @@
             }
           ],
           "description": "Maximum pages of each supplementary file (a PDF, or a Word file's saved page count)."
+        },
+        "all_cited": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "True when the guidelines require every supplementary item to be cited in the main text. Without it, citations.supp_figure_cited / supp_table_cited report a never-cited supplementary figure or table as a suggestion, not a warning."
         },
         "notes": {
           "anyOf": [
