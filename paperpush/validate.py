@@ -2036,7 +2036,7 @@ def validate_report(
     manuscript gives a contact e-mail (:mod:`paperpush.front_matter_check`),
     whether every reference is cited and how many are self-citations
     (:mod:`paperpush.bibliography_check`), and the manuscript's prose
-    for double spaces, repeated words, punctuation spacing, unbalanced
+    for double spaces, doubled words, punctuation spacing, unbalanced
     brackets and quotes, common misspellings, and repetitive word choice
     (:mod:`paperpush.prose_check`).
 

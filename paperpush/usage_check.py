@@ -25,6 +25,13 @@ code, citations, URLs, and the reference list are already left out.
   "a criteria", "the results shows", "there is several", "each sample were"),
   "data" used as both singular and plural, contractions ("don't", "it's"),
   and sentences of more than 50 words.
+* ``prose.significant`` -- "significant", "significantly", or "significance"
+  used where it can only mean large or important ("a significant role",
+  "significantly more expensive", "the significance of this work") rather than
+  statistically significant. A warning when the venue's
+  ``manuscript.significant_statistical_only`` is set or the manuscript reports
+  statistical tests, else a suggestion. Uses the pattern cannot sort go to the
+  AI task ``ai.significant``.
 * ``prose.spelling_variant`` -- when the guidelines name no English variant
   (otherwise ``layout.language`` checks it): American and British spellings
   mixed, or spelling that is the opposite of where the corresponding author
@@ -36,6 +43,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import Counter
+from dataclasses import dataclass, field
 from typing import Optional
 
 from . import document
@@ -525,6 +533,166 @@ def _spelling_variant_check(venue: Venue, values: dict[str, str]) -> Outcome:
     return Outcome(issues, "; ".join(details))
 
 
+# --- "significant" --------------------------------------------------------------------------
+
+_SIGNIFICANT = re.compile(r"(?<![\w-])((?:in|non-?)?significan(?:t|tly|ce))(?![\w-])", re.I)
+# Directly before the word, these make it a statistical (or a defined clinical) term.
+_STAT_QUALIFIER = re.compile(r"(?:statistically|clinically|nominally|marginally|borderline|genome-wide|not)\s+$", re.I)
+# Technical senses that have nothing to do with size or importance.
+_TECHNICAL_AFTER = re.compile(r"\s+(?:figures?|digits?|bits?|places|statements?)\b", re.I)
+_TECHNICAL_BEFORE = re.compile(r"\bstatement\s+of\s+$", re.I)
+# A test, P value, or threshold in the same sentence ties the word to statistics.
+_STAT_CONTEXT = re.compile(
+    r"(?<![\w-])[Pp](?:[- ]?values?)?\s*[=<>≤≥]|\b[Pp][- ]values?\b|\bq[- ]values?\b|\bFDR\b|\bfalse\s+discovery\b"
+    r"|\bBonferroni\b|\bBenjamini\b|\bHolm\b|\bTukey\b|\bDunnett?'?s?\b|\b(?:adjusted|corrected)\s+for\s+multiple\b|\bmultiple[- ]testing\b|\bmultiple\s+comparisons?\b"
+    r"|α\s*=|\balpha\s*(?:=|level)|\bconfidence\s+intervals?\b|\b\d+\s?%\s*CI\b|\bCIs?\b|\bodds\s+ratios?\b|\bhazard\s+ratios?\b"
+    r"|\b(?:t|z|F|exact|rank[- ]sum|signed[- ]rank|log[- ]rank|chi[- ]squared?|paired|unpaired|Student'?s?|Welch'?s?|statistical|permutation|hypothesis|two[- ]sided|one[- ]sided|two[- ]tailed|one[- ]tailed)\s+tests?\b"
+    r"|\bt[- ]tests?\b|\bANOVA\b|\bWilcoxon\b|\bMann[-– ]Whitney\b|\bKruskal\b|\bFisher'?s?\b|\bchi[- ]squared?\b|χ²|χ2"
+    r"|\b(?:two|one)[- ](?:sided|tailed)\b|\bpost[- ]hoc\b|\bnull\s+hypothes[ie]s\b|\bstatistic(?:s|al|ally)?\b|\bn\.s\.|\blevel\s+of\s+significance\b"
+    r"|\bsignificance\s+(?:level|threshold|cut-?off)s?\b|\bat\s+the\s+0?\.\d+\s+level\b|\bthreshold\s+of\s+0?\.\d+",
+    re.I,
+)
+# Collocations where the word can only mean large, important, or notable.
+_PLAIN_NOUNS = (
+    r"roles?|challenges?|amounts?|portions?|proportions?|fractions?|part|share|numbers?\s+of|attention|interest|efforts?|contributions?|advances?|advancements?"
+    r"|progress|implications?|impacts?|potential|costs?|time|burdens?|concerns?|sources?\s+of|barriers?|steps?\s+(?:forward|toward|towards)|insights?|milestones?"
+    r"|investments?|resources|opportunit(?:y|ies)|problems?|issues?|limitations?|drawbacks?|benefits?|advantages?|threats?|gaps?|hurdles?|obstacles?|breakthroughs?"
+    r"|influence|importance|body\s+of|overhead|speed-?ups?|room\s+for|headroom|leaps?|strides|promise|expertise|attention"
+)
+_PLAIN_AFTER = re.compile(rf"\s+(?:{_PLAIN_NOUNS})\b", re.I)
+_PLAIN_ADVERB_AFTER = re.compile(
+    r"\s+(?:(?:more|less)\s+(?:expensive|difficult|challenging|complex|complicated|costly|important|convenient|accessible|demanding)"
+    r"|cheaper|easier|harder|simpler|advanc(?:e|es|ed|ing)|expand(?:s|ed|ing)?|simplif(?:y|ies|ied|ying)|complicat(?:e|es|ed|ing)"
+    r"|hamper(?:s|ed|ing)?|hinder(?:s|ed|ing)?|facilitat(?:e|es|ed|ing)|shap(?:e|es|ed|ing))\b",
+    re.I,
+)
+_PLAIN_SIGNIFICANCE = re.compile(r"\b(?:great|major|particular|considerable|broad|broader|wide|little|enormous|tremendous|high|substantial|scientific|societal|historical|real-world)\s+$", re.I)
+_THE_BEFORE = re.compile(r"\b(?:the|its|their)\s+$", re.I)
+_SIGNIFICANCE_OF_WORK = re.compile(r"\s+of\s+(?:this|our|these|the|their|such)\s+(?:work|study|studies|findings?|results?|research|contributions?|approach|method|paper|discovery|discoveries)\b", re.I)
+
+
+@dataclass
+class SignificantUses:
+    """Each use of "significant" in the prose, sorted by what the sentence shows."""
+
+    statistical: list[str] = field(default_factory=list)
+    plain: list[str] = field(default_factory=list)
+    unclear: list[str] = field(default_factory=list)
+
+
+def significant_uses(body: list[str]) -> SignificantUses:
+    """Sort the uses of significant/significantly/significance (and in-/non-) into statistical, plainly non-statistical, and unclear.
+
+    Statistical: qualified ("statistically significant") or in a sentence that
+    names a test, P value, or threshold. Plain: a collocation that can only
+    mean large or important ("a significant role", "significantly more
+    expensive", "the significance of this work"). Unclear: the rest, for a
+    reader (``ai.significant``) to judge from the context.
+    """
+    from .prose_check import _sentences
+    from .style_check import _is_heading
+
+    out = SignificantUses()
+    for p in body:
+        if _is_heading(p):
+            continue
+        for sentence in _sentences(p):
+            stat = bool(_STAT_CONTEXT.search(sentence))
+            for m in _SIGNIFICANT.finditer(sentence):
+                word, before, after = m.group(1).lower(), sentence[: m.start()], sentence[m.end() :]
+                if _TECHNICAL_AFTER.match(after) or _TECHNICAL_BEFORE.search(before):
+                    continue
+                snip = _snip(sentence, m.start(), m.end())
+                if _STAT_QUALIFIER.search(before) or stat:
+                    out.statistical.append(snip)
+                elif word.endswith("significance"):
+                    plain = bool(_PLAIN_SIGNIFICANCE.search(before) or (_THE_BEFORE.search(before) and _SIGNIFICANCE_OF_WORK.match(after)))
+                    (out.plain if plain else out.unclear).append(snip)
+                elif word.endswith("ly"):
+                    (out.plain if _PLAIN_ADVERB_AFTER.match(after) else out.unclear).append(snip)
+                else:
+                    (out.plain if _PLAIN_AFTER.match(after) else out.unclear).append(snip)
+    return out
+
+
+def reports_statistics(body: list[str]) -> bool:
+    """Whether the prose reports a statistical test (a P value, a named test, a threshold)."""
+    return any(_P_VALUE.search(p) or _STAT_CONTEXT.search(p) for p in body)
+
+
+def _significant_rule(venue: Venue, values: dict[str, str]) -> Optional[bool]:
+    rules = _rules(venue, values)
+    return getattr(rules, "significant_statistical_only", None) if rules is not None else None
+
+
+_SIGNIFICANT_ADVICE = "keep 'significant' for statistical significance and write 'substantial', 'considerable', 'marked', 'important', or 'notable' instead, or give the test and P value if one was meant"
+
+
+def _significant_check(venue: Venue, values: dict[str, str], unclear: list[str] | None = None, stats: list[bool] | None = None) -> Outcome:
+    rule = _significant_rule(venue, values)
+
+    def fn(body: list[str], kind: str, path):
+        uses = significant_uses(body)
+        has_stats = reports_statistics(body)
+        if unclear is not None:
+            unclear.extend(uses.unclear)
+        if stats is not None:
+            stats.append(has_stats)
+        found = []
+        if uses.plain:
+            level = WARNING if rule or has_stats else SUGGESTION
+            why = "the guidelines reserve it for statistical significance" if rule else "the manuscript reports statistical tests, so a reader may take it as one" if has_stats else "it can be read as statistical significance"
+            found.append((level, f"{len(uses.plain)} use(s) of 'significant' that mean large or important, not statistically significant ({why}): {_list(uses.plain)}; {_SIGNIFICANT_ADVICE}"))
+        total = len(uses.statistical) + len(uses.plain) + len(uses.unclear)
+        if not total:
+            return found, "'significant' not used"
+        detail = f"{len(uses.statistical)} of {total} use(s) of 'significant' tied to a test, P value, or 'statistically'"
+        if uses.unclear:
+            detail += f"; {len(uses.unclear)} left to the AI check ai.significant"
+        return found, detail
+
+    return _run(venue, values, fn)
+
+
+AI_SIGNIFICANT_ID = "ai.significant"
+_AI_SIGNIFICANT = (
+    "Judge whether each use of 'significant', 'significantly', or 'significance' (and 'insignificant', 'non-significant') in the manuscript means statistical significance. "
+    "The passages below use the word with no test, P value, or qualifier ('statistically') in the same sentence; a pattern could not tell what they mean. "
+    "For each, read its context: the paragraph, the figure legend or table it cites, and the Methods' statistics section. It is statistical when it reports the result "
+    "of a hypothesis test that the manuscript gives for that comparison, here or in the cited figure, table, or Methods ('expression was significantly higher in mutants "
+    "(Fig. 2b)' with a test in the legend). It is not when it is a synonym for large, important, notable, substantial, considerable, marked, noticeable, or meaningful "
+    "('a significant improvement in usability', 'significant interest in the field'). 'Clinically significant' as a defined term is fine. {already}"
+    "Report 'fail' listing each non-statistical use (up to 25) as: the section or page, a short quote, and the fix: a plain word ('substantial', 'considerable', "
+    "'marked', 'important', 'notable'), or, when a test was meant but none is reported for that comparison, the test and P value to add. "
+    "{strictness}Else report 'pass'.\n\nPassages:\n{passages}"
+)
+_AI_SIGNIFICANT_MAX_PASSAGES = 40
+
+
+def ai_significant_task(venue: Venue, values: dict[str, str], unclear: list[str], has_stats: bool):
+    """The AI task for the uses of "significant" the pattern could not sort."""
+    from .ai_validate import AiTask
+    from .requirements_check import manuscript_files
+
+    files = [str(p) for _, p in manuscript_files(venue, values)]
+    if not unclear or not files:
+        return None
+    rule = _significant_rule(venue, values)
+    unclear = list(dict.fromkeys(unclear))  # a re-run without the publisher's rules adds them again
+    shown = unclear[:_AI_SIGNIFICANT_MAX_PASSAGES]
+    passages = "\n".join(f"- {s}" for s in shown)
+    if len(unclear) > len(shown):
+        passages += f"\n- ... and {len(unclear) - len(shown)} more: find them in the files"
+    if rule:
+        strictness = "The guidelines reserve the word for statistical significance. "
+    elif has_stats:
+        strictness = ""
+    else:
+        strictness = "The manuscript seems to report no statistical tests; if so, there is nothing a reader could confuse the word with, so report 'suggest' instead of 'fail' with the same list. "
+    already = "Uses that plainly mean large or important ('a significant role') are reported by prose.significant; do not list them again. "
+    return AiTask(id="ai.significant", title="'Significant' means statistically significant, not large or important (read by AI)", category="Prose", instructions=_AI_SIGNIFICANT.format(already=already, strictness=strictness, passages=passages), files=files)
+
+
 # --- registration -------------------------------------------------------------------------------
 
 
@@ -535,7 +703,13 @@ def run_checks(checks, venue: Venue, values: dict[str, str]) -> None:
     checks.run("prose.dashes", "Hyphens, en dashes, em dashes, and quotes used as expected", PROSE, _dashes_check, venue, values)
     checks.run("prose.number_format", "Statistics, units, and percent signs written one way", PROSE, _number_format_check, venue, values)
     checks.run("prose.usage", "Agreement, contractions, and very long sentences", PROSE, _usage_check, venue, values)
-    title = "Spelling uses one English variant (US or UK)"
+    unclear: list[str] = []
+    stats: list[bool] = []
+    checks.run("prose.significant", "'Significant' used only for statistical significance", PROSE, _significant_check, venue, values, unclear, stats)
+    task = ai_significant_task(venue, values, unclear, any(stats))
+    if task is not None:
+        checks.needs_ai(task)
+    title ="Spelling uses one English variant (US or UK)"
     rules = _rules(venue, values)
     language = ((rules.language if rules is not None else None) or "").strip()
     if language and language.lower() != "english":

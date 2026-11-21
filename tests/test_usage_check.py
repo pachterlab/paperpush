@@ -189,3 +189,56 @@ def test_spelling_variant_defers_to_the_venues_rule(monkeypatch, tmp_path):
     monkeypatch.setattr(r, "get_requirements", lambda slug: base)
     status, _, detail = _run(_md(tmp_path, "The colour."))["prose.spelling_variant"]
     assert status == report.NOT_APPLICABLE and "layout.language" in detail
+
+
+# --- "significant" ---------------------------------------------------------------------------
+
+
+def test_significant_uses_sorts_statistical_plain_and_unclear():
+    uses = u.significant_uses(
+        [
+            "Gene X plays a significant role and has attracted significant interest.",
+            "Expression was significantly higher in mutants (P < 0.01, two-sided t-test).",
+            "The difference was statistically significant.",
+            "Our method yields a significant improvement over the baseline (Fig. 2).",
+            "This approach is significantly more expensive than sequencing.",
+            "We discuss the significance of these findings, which are of great significance.",
+        ]
+    )
+    assert len(uses.statistical) == 2
+    assert len(uses.plain) == 5
+    assert uses.unclear == ["Our method yields a »significant« improvement over the..."]
+
+
+def test_significant_skips_technical_senses_and_headings():
+    uses = u.significant_uses(["Values are rounded to three significant figures.", "Significance Statement", "The least significant bits are dropped."])
+    assert uses.statistical == uses.plain == uses.unclear == []
+
+
+def test_significant_plain_use_is_a_warning_when_the_paper_reports_tests(tmp_path):
+    doc = _md(tmp_path, "Gene X plays a significant role in growth.\n\nMutants grew faster (P < 0.05, t-test).")
+    checks = Checks()
+    run_checks(checks, VENUE, {"manuscript_file": str(doc)})
+    [result] = [r for r in checks.results if r.id == "prose.significant"]
+    assert result.status == report.WARNING and "a »significant« role" in result.issues[0].message
+    assert not [t for t in checks.ai_tasks if t.id == u.AI_SIGNIFICANT_ID]
+
+
+def test_significant_plain_use_is_a_suggestion_without_statistics(tmp_path):
+    status, message, _ = _run(_md(tmp_path, "This library plays a significant role in the ecosystem."))["prose.significant"]
+    assert status == report.SUGGESTION and "role" in message
+
+
+def test_significant_unclear_uses_go_to_the_ai_check(tmp_path):
+    doc = _md(tmp_path, "Our method gives a significant improvement over the baseline.\n\nGroups differed (P = 0.03, Wilcoxon test).")
+    checks = Checks()
+    run_checks(checks, VENUE, {"manuscript_file": str(doc)})
+    [result] = [r for r in checks.results if r.id == "prose.significant"]
+    assert result.status == report.PASSED and "ai.significant" in result.detail
+    [task] = [t for t in checks.ai_tasks if t.id == u.AI_SIGNIFICANT_ID]
+    assert "»significant« improvement" in task.instructions and "report 'suggest'" not in task.instructions
+
+
+def test_significant_not_used(tmp_path):
+    status, _, detail = _run(_md(tmp_path, "The cells grew quickly."))["prose.significant"]
+    assert status == report.PASSED and "not used" in detail

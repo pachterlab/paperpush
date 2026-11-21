@@ -298,7 +298,7 @@ def test_repeated_words_in_pdf_tables(tmp_path):
     lines = ["Table 1 Baseline characteristics of the cohort", "Age NA NA 34", "Sex Female Female Male", "Status yes yes 12", "We used the the model here"]
     pdf = write_pdf(tmp_path / "t.pdf", ["".join(text_line(72, 700 - 14 * i, line) for i, line in enumerate(lines))])
     out = pc._check("repeated_words", VENUE, {"manuscript_file": str(pdf)})
-    assert len(out.issues) == 1 and "1 repeated word(s)" in out.issues[0].message and "the the" in out.issues[0].message
+    assert len(out.issues) == 1 and "1 doubled word(s)" in out.issues[0].message and "the the" in out.issues[0].message
     assert pc.repeated_words("a log log plot") == []
     assert pc.repeated_words("we used the the model")
     assert pc.repeated_words("The Female Female row")  # not a PDF

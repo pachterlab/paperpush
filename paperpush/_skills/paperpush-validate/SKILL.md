@@ -24,7 +24,7 @@ layout (margins, font, size, spacing, line/page numbers, template), figures
 (resolution, lettering size and typeface in vector figures, panel labels),
 figure/table citation order, whether the title, abstract, authors,
 keywords, and statements in the `.sub` match the manuscript, and mechanical
-prose checks (double spaces, repeated words, punctuation spacing, unbalanced
+prose checks (double spaces, doubled words, punctuation spacing, unbalanced
 brackets and quotes, common misspellings, numbers, abbreviations, acronyms).
 
 Some checks need someone to *look* at the files. Without an API key they come

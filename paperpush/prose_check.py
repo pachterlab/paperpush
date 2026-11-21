@@ -1,7 +1,7 @@
 """Mechanical proofreading of the manuscript's prose.
 
 Not a grammar checker: each check here looks for one kind of slip that a
-pattern can find with few false alarms. A slip (a repeated word, a misspelling,
+pattern can find with few false alarms. A slip (a doubled word, a misspelling,
 an unbalanced bracket) is a WARNING; a point of style an editor could leave as
 it is (double spaces, repetitive word choice) is a SUGGESTION, which
 ``--strict-style`` reports as a warning.
@@ -38,7 +38,7 @@ What can be checked depends on the file. A Word file, Markdown, or plain text
 is read as written, so every check runs. LaTeX source is read with its math,
 commands, citations, and URLs masked; double spaces are not checked there
 because LaTeX does not print them. Text extracted from a PDF has spacing
-artefacts of its own (justified lines, rejoined line breaks), so only repeated
+artefacts of its own (justified lines, rejoined line breaks), so only doubled
 words and spelling are checked in a PDF. The reference list is skipped
 throughout.
 """
@@ -601,7 +601,7 @@ _CHECKS = {
         "double space(s) mid-sentence",
         double_spaces,
     ),
-    REPEATED: ("No accidentally doubled words (e.g., 'the the')", "repeated word(s)", repeated_words),
+    REPEATED: ("No accidentally doubled words (e.g., 'the the')", "doubled word(s)", repeated_words),
     PUNCTUATION: (
         "Spacing around punctuation",
         "spacing problem(s) around punctuation",

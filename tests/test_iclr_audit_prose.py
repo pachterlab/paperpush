@@ -139,7 +139,7 @@ def test_abstract_undefined_still_fires_on_a_real_abstract():
     assert found.abstract_undefined == ["'GAN'"]
 
 
-# --- repeated words ------------------------------------------------------------------------------
+# --- doubled words -------------------------------------------------------------------------------
 
 
 def test_algorithm_block_terminators_are_not_repeats():

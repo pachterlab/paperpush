@@ -96,6 +96,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `group_four_digit_numbers` | boolean or null | Whether four-digit numbers take the thousands separator too: yes for 1,000, no for 1000 (SI and some house styles). Empty when the guidelines do not say. |
 | `et_al_period` | boolean or null | Whether 'et al' takes a full stop: yes for 'et al.', no for 'et al' (AMA and RSNA house style). Empty when the guidelines do not say; `validate` then asks for 'et al.'. |
 | `serial_comma` | boolean or null | Whether lists take the serial (Oxford) comma: yes for 'A, B, and C', no for 'A, B and C'. Empty when the guidelines do not say; `validate` then only checks that the manuscript is consistent. |
+| `significant_statistical_only` | boolean or null | True when the guidelines reserve 'significant' (and 'significantly', 'significance') for statistical significance, as many statistics and biomedical journals do. `validate` then reports any other use ('a significant role') as a warning; when empty, it is a warning only if the manuscript reports statistical tests. |
 | `footnotes_allowed` | boolean or null | False when the guidelines forbid footnotes (and endnotes) in the manuscript text. Title-page author notes made with LaTeX's \thanks are not counted. |
 | `max_heading_levels` | integer or null | Deepest heading level the manuscript may use (3: sections, subsections, and sub-subsections). The title is not a level. |
 | `forbidden_fonts` | list of string or null | Fonts the manuscript must not use anywhere (e.g. Symbol), matched by family name. |
@@ -188,6 +189,8 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `placement` | `separate_files` \| `end_of_manuscript` \| `inline` \| `end_or_inline` \| `combined_file` or null | Where figures go for the initial submission. combined_file: every figure in one document (Word or PDF), in citation order, each legend after its figure. |
 | `embedded_forbidden` | boolean or null | True when the guidelines forbid figures inside the manuscript file, even when each figure is also uploaded separately. |
 | `caption_label` | string or null | The word figure captions must start with, as the guidelines spell it (e.g. 'Fig' for 'Fig 1', 'Fig.' for 'Fig. 1', 'Figure'). |
+| `citation_order` | boolean or null | True when the guidelines require figures to be numbered (or cited) in the order the text first cites them. Without it, citations.figure reports an out-of-order figure as a suggestion, not a warning. |
+| `all_cited` | boolean or null | True when the guidelines require every figure (including Extended Data figures) to be cited in the text. Without it, citations.figure_cited reports a never-cited figure as a suggestion, not a warning; a citation of a figure that does not exist is a warning either way. |
 | `notes` | list of string or null | Rules with no structured key. |
 
 ## tables
@@ -198,6 +201,8 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `editable` | boolean or null | Tables must be editable text, not images. |
 | `max_count` | integer or null | Maximum number of main-text tables. |
 | `placement` | `separate_files` \| `end_of_manuscript` \| `inline` \| `end_or_inline` \| `combined_file` or null | Where tables go for the initial submission. |
+| `citation_order` | boolean or null | True when the guidelines require tables to be numbered (or cited) in the order the text first cites them. Without it, citations.table reports an out-of-order table as a suggestion, not a warning. |
+| `all_cited` | boolean or null | True when the guidelines require every table (including Extended Data tables) to be cited in the text. Without it, citations.table_cited reports a never-cited table as a suggestion, not a warning; a citation of a table that does not exist is a warning either way. |
 | `notes` | list of string or null | Rules with no structured key. |
 
 ## supplementary
@@ -209,6 +214,7 @@ The same section keys as a venue entry (plus `notes`); used as the value of each
 | `max_count` | integer or null | Maximum number of supplementary files. |
 | `combined_single_pdf` | boolean or null | Supplementary text, figures, and tables must be combined into one PDF. |
 | `max_pages` | integer or null | Maximum pages of each supplementary file (a PDF, or a Word file's saved page count). |
+| `all_cited` | boolean or null | True when the guidelines require every supplementary item to be cited in the main text. Without it, citations.supp_figure_cited / supp_table_cited report a never-cited supplementary figure or table as a suggestion, not a warning. |
 | `notes` | list of string or null | Rules with no structured key. |
 
 ## references

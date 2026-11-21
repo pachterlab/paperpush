@@ -1361,6 +1361,7 @@
         "CMYK"
       ],
       "placement": "inline",
+      "citation_order": true,
       "notes": [
         "No NAR-specific dpi/format/dimension requirement is stated for ordinary in-text manuscript figures on the guideline pages retrieved; high-resolution images are required, preferably at initial submission but no later than revision.",
         "Generic OUP-wide (not NAR-specific) figure-prep guidance: min 300 dpi colour half-tones, min 600 dpi greyscale half-tones, 600-900 dpi combination/line art, min 1200 dpi monochrome line art; RGB or CMYK; Arial/Times New Roman/Courier/Symbol fonts; text no smaller than 7pt at intended print size; line thickness 0.25-1pt. Treat as recommended defaults pending journal-specific confirmation, not a stated NAR rule.",
@@ -3171,6 +3172,7 @@
       "font": "Arial, Times, or Symbol only",
       "multipanel_labels": "lettered labels (A, B, C)",
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "Resolution must be between 300 and 600 dpi.",
         "Width must be 789-2250 pixels (at 300 dpi); maximum height is 2625 pixels (at 300 dpi).",
@@ -3181,7 +3183,8 @@
         "Figures must be cited in ascending numeric order at first appearance (e.g., Fig 1, Fig 2).",
         "Figure text must not include author names, article title, or the figure number/title/caption itself.",
         "No maximum figure count is stated for standard Research, Methods or Software articles."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "editable": true,
@@ -3882,6 +3885,7 @@
       "font": "Arial or Helvetica (Courier permitted for monospaced text); all fonts must be embedded",
       "legend_max_words": 300,
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "Accepted formats: EPS, PDF, Microsoft Word, PowerPoint, TIFF, JPEG, PNG, BMP, CDX -- confirmed on the live general submission-guidelines page.",
         "Individual figure files should not exceed 10 MB.",
@@ -5077,7 +5081,8 @@
         "Supplementary figures and tables (with legends) are uploaded as a single Word (.docx) file, not PowerPoint or PDF, at initial submission; the inserted-figure resolution in this file should be 300-600 dpi.",
         "Supplementary Material should be limited to information not essential for general understanding of the research presented in the main text.",
         "Every Supplementary Materials item and every panel of a Supplementary figure must be cited at least once in the main manuscript."
-      ]
+      ],
+      "all_cited": true
     },
     "references": {
       "numbered": true,
@@ -5592,6 +5597,7 @@
     },
     "tables": {
       "editable": true,
+      "citation_order": true,
       "notes": [
         "Submit tables as editable text, not images; place next to the relevant text or on separate page(s) at the end; number consecutively per their appearance in the text; avoid vertical rules and shading; place table notes below the table body."
       ]
@@ -6578,6 +6584,7 @@
       "font": "Arial",
       "multipanel_labels": "capital letters",
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "At initial submission, figures may be in a wide variety of formats/sizes/resolutions and may be interspersed with the text or uploaded as separate files; keep files small (1-2 MB) where possible.",
         "For production, main figures must be uploaded individually as high-resolution files (not embedded in the manuscript), with all panels of a figure on a single page; each figure should be no larger than about 6.5 x 8 in (16.5 x 20 cm), with a 1.5-column width of 11.4 cm (114 mm) in addition to the 1- and 2-column widths.",
@@ -6587,7 +6594,8 @@
         "Cell Press does not permit generative AI/AI-assisted tools to create or alter research or data images.",
         "Reproduced or adapted figures from prior publications require proof of copyright-holder permission.",
         "A graphical abstract is required for Cell Reports (only Cell Systems, Current Biology, Patterns, Neuron and Newton are exempt): single panel, 1200 x 1200 px at 300 dpi per the shared Cell Press guidance."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "formats": [
@@ -7082,6 +7090,7 @@
       "editable": true,
       "max_count": 5,
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "Tables numbered in Arabic numerals with a title, cited in order, understandable on their own, with abbreviations defined in footnotes; it is advisable that a table including legend take no more than one page; no colored letters or highlighted cells."
       ]
@@ -7523,6 +7532,7 @@
       "legend_max_words": 300,
       "legends_location": "with_figure",
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "Figure titles (max 15 words) and legends (max 300 words) go in the main manuscript, not the graphic file.",
         "Image resolution of about 300 dpi at final size; fonts embedded; lines wider than 0.25 pt.",
@@ -7684,7 +7694,8 @@
         "Supplemental Material is peer-reviewed; preferably a single PDF with a table of contents.",
         "Name files Supplemental_Fig_S1.pdf, Supplemental_Table_S1.xls, Supplemental_Movie_S1.mov, Supplemental_Methods.pdf, etc.; every supplemental item must be cited in the main text.",
         "Related papers in press or under consideration and permission letters go in as Supplemental Material at first submission."
-      ]
+      ],
+      "all_cited": true
     },
     "references": {
       "style": "Genome Research author-year style, alphabetical list: Surname Initials. Year. Title. Abbrev journal Volume: pages",
@@ -8293,6 +8304,7 @@
       "editable": true,
       "placement": "end_of_manuscript",
       "max_count": 5,
+      "citation_order": true,
       "notes": [
         "Place all tables at the end of the manuscript file using Word table tools (not images or separate files); single spacing, 10- or 12-point font; number in citation order with a title of about 10 to 15 words.",
         "Use NA for missing/not applicable, 'No. (%)' for frequencies, and include numerators and denominators."
@@ -9628,7 +9640,8 @@
         "All figures must be cited in sequence in the main text as Fig. 1, Fig. 2; use scale bars rather than magnification factors; do not flatten labelling or scale/error bars onto images.",
         "Figure legends need a brief title and a short description of each panel, should avoid methodological detail, and should not exceed the word limit of the article type; they should give centre values, error bars, n, statistical test and P values.",
         "Up to 10 Extended Data display items are permitted; they are online-only and are not copy-edited."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "placement": "end_of_manuscript",
@@ -9641,7 +9654,8 @@
       "notes": [
         "Supplementary text, figures, simple tables and legends go in a single combined PDF; complex tables in one Excel workbook (or .csv); software in a .zip or .tar archive.",
         "Each item is designated Supplementary Equation, Discussion, Notes, Figure, Table, Video, Audio, Data or Software and numbered separately from main and Extended Data items; every item must be cited in the text."
-      ]
+      ],
+      "all_cited": true
     },
     "cover_letter": {
       "required": true,
@@ -10052,7 +10066,8 @@
         "Do not flatten labelling or scale/error bars onto images; use scale bars rather than magnification factors.",
         "Legends: brief title plus panel descriptions, not exceeding the word limit of the article type, avoiding methodological detail, and stating centre values, error bars, n and statistical test.",
         "Colour charges apply for print figures in Nature Portfolio print journals."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "placement": "end_of_manuscript",
@@ -10201,7 +10216,8 @@
         "All figures must be cited in sequence in the main text as Fig. 1, Fig. 2; use scale bars rather than magnification factors; do not flatten labelling or scale/error bars onto images.",
         "Figure legends need a brief title and a short description of each panel, should avoid methodological detail, and should not exceed the word limit of the article type; they should give centre values, error bars, n, statistical test and P values.",
         "Up to 10 Extended Data display items are permitted; they are online-only and are not copy-edited."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "placement": "end_of_manuscript",
@@ -10214,7 +10230,8 @@
       "notes": [
         "Supplementary text, figures, simple tables and legends go in a single combined PDF; complex tables in one Excel workbook (or .csv); software in a .zip or .tar archive.",
         "Each item is designated Supplementary Equation, Discussion, Notes, Figure, Table, Video, Audio, Data or Software and numbered separately from main and Extended Data items; every item must be cited in the text."
-      ]
+      ],
+      "all_cited": true
     },
     "cover_letter": {
       "required": true,
@@ -10356,7 +10373,8 @@
         "All figures must be cited in sequence in the main text as Fig. 1, Fig. 2; use scale bars rather than magnification factors; do not flatten labelling or scale/error bars onto images.",
         "Figure legends need a brief title and a short description of each panel, should avoid methodological detail, and should not exceed the word limit of the article type; they should give centre values, error bars, n, statistical test and P values.",
         "Up to 10 Extended Data display items are permitted; they are online-only and are not copy-edited."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "placement": "end_of_manuscript",
@@ -10369,7 +10387,8 @@
       "notes": [
         "Supplementary text, figures, simple tables and legends go in a single combined PDF; complex tables in one Excel workbook (or .csv); software in a .zip or .tar archive.",
         "Each item is designated Supplementary Equation, Discussion, Notes, Figure, Table, Video, Audio, Data or Software and numbered separately from main and Extended Data items; every item must be cited in the text."
-      ]
+      ],
+      "all_cited": true
     },
     "cover_letter": {
       "required": true,
@@ -10978,6 +10997,7 @@
       "font": "Arial",
       "multipanel_labels": "capital letters",
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "At initial submission, figures may be in a wide variety of formats/sizes/resolutions and may be interspersed with the text or uploaded as separate files; keep files small (1-2 MB) where possible.",
         "For production, main figures must be uploaded individually as high-resolution files (not embedded in the manuscript), with all panels of a figure on a single page; each figure should be no larger than about 6.5 x 8 in (16.5 x 20 cm), with a 1.5-column width of 11.4 cm (114 mm) in addition to the 1- and 2-column widths.",
@@ -10987,7 +11007,8 @@
         "Cell Press does not permit generative AI/AI-assisted tools to create or alter research or data images.",
         "Reproduced or adapted figures from prior publications require proof of copyright-holder permission.",
         "A graphical abstract is optional for Neuron."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "formats": [
@@ -12743,6 +12764,7 @@
       "legends_location": "with_figure",
       "embedded_forbidden": true,
       "caption_label": "Fig",
+      "citation_order": true,
       "notes": [
         "Resolution must be 300-600 dpi.",
         "Width 789-2250 pixels at 300 dpi (6.68-19.05 cm); maximum height 2625 pixels at 300 dpi (22.23 cm).",
@@ -12759,6 +12781,7 @@
     "tables": {
       "editable": true,
       "placement": "inline",
+      "citation_order": true,
       "notes": [
         "Tables must be editable, cell-based objects; tables as graphic objects cannot be typeset.",
         "Place each table directly after the paragraph in which it is first cited; do not submit tables in separate files.",
@@ -14026,6 +14049,7 @@
       "max_height_mm": 225,
       "legend_max_words": 300,
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "Figure titles (max 15 words) and legends (max 300 words) go in the main manuscript, not the graphic file.",
         "Image resolution of approximately 300 dpi at final size; all fonts embedded; lines wider than 0.25 pt; the 225 mm maximum height covers figure and legend.",
@@ -14367,6 +14391,7 @@
       "max_height_mm": 225,
       "legend_max_words": 300,
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "Figure titles (max 15 words) and legends (max 300 words) go in the main manuscript, not the graphic file.",
         "Image resolution of approximately 300 dpi at final size; all fonts embedded; lines wider than 0.25 pt; the 225 mm maximum height covers figure and legend.",
@@ -14798,6 +14823,7 @@
       "max_height_mm": 225,
       "legend_max_words": 300,
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "Figure titles (max 15 words) and legends (max 300 words) go in the main manuscript, not the graphic file.",
         "Image resolution of approximately 300 dpi at final size; all fonts embedded; lines wider than 0.25 pt; the 225 mm maximum height covers figure and legend.",
@@ -15201,7 +15227,8 @@
         "Legends: brief title plus a description of each panel in sequence, within the article type's word limit, without methodological detail, stating centre values, error bars, sample size, statistical test and P values.",
         "Colour charges apply for print figures of primary subscription content in Nature Portfolio print journals.",
         "Up to 10 Extended Data figures, each fitting on a single PDF page, with legends in the Inventory of Supporting Information document."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "placement": "end_of_manuscript",
@@ -15471,7 +15498,8 @@
         "Legends: brief title plus a description of each panel in sequence, within the article type's word limit, without methodological detail, stating centre values, error bars, sample size, statistical test and P values.",
         "Colour charges apply for print figures of primary subscription content in Nature Portfolio print journals.",
         "Up to 10 Extended Data figures, each fitting on a single PDF page, with legends in the Inventory of Supporting Information document."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "placement": "end_of_manuscript",
@@ -15736,7 +15764,8 @@
         "Legends: brief title plus a description of each panel in sequence, within the article type's word limit, without methodological detail, stating centre values, error bars, sample size, statistical test and P values.",
         "Colour charges apply for print figures of primary subscription content in Nature Portfolio print journals.",
         "Up to 10 Extended Data figures, each fitting on a single PDF page, with legends in the Inventory of Supporting Information document."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "placement": "end_of_manuscript",
@@ -16011,7 +16040,8 @@
         "Legends: brief title plus a description of each panel in sequence, within the article type's word limit, without methodological detail, stating centre values, error bars, sample size, statistical test and P values.",
         "Colour charges apply for print figures of primary subscription content in Nature Portfolio print journals.",
         "Up to 10 Extended Data figures, each fitting on a single PDF page, with legends in the Inventory of Supporting Information document."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "placement": "end_of_manuscript",
@@ -16385,6 +16415,7 @@
       "legend_max_words": 350,
       "legends_location": "after_references",
       "multipanel_labels": "lower-case bold a, b, c",
+      "citation_order": true,
       "notes": [
         "At initial submission figures may be uploaded as separate files or included in the manuscript file, legible enough for review; revised manuscripts must upload every figure as a separate file.",
         "Final figures: each complete (multi-panel) figure as a single image file; digitized images at 300 DPI if possible; line art, graphs and schematics in vector format (EPS or AI); photographic/bitmap images as TIFF, JPG or PSD; RGB or CMYK (not converted).",
@@ -16422,7 +16453,8 @@
         "Items are designated Supplementary Table, Figure, Video, Audio, Note, Data, Discussion, Equations or Methods; tables and figures are numbered e.g. 'Supplementary Table S1', separately from the main items.",
         "Every item is cited in the main text with the word 'Supplementary'; individual panels of supplementary figures should not be cited.",
         "Supplementary files should be at most 50 MB each; the first page of the Supplementary Information file carries the manuscript title and author list (revisions)."
-      ]
+      ],
+      "all_cited": true
     },
     "references": {
       "style": "Standard Nature referencing style: numerical, sequential, citations in square brackets",
@@ -16622,6 +16654,7 @@
       "legends_location": "after_references",
       "multipanel_labels": "lower-case a, b, c",
       "placement": "inline",
+      "citation_order": true,
       "notes": [
         "Figures are placed within the body of the text and also supplied as separate files (one per figure, e.g. Fig1.eps), each fitting on one page.",
         "Preferred formats are PDF, EPS, AI or PS; PSD, EPC, TIFF, JPG, GIF, PPT, PPTX, PNG, BMP, VSD, CDX and EMF are also acceptable.",
@@ -16916,6 +16949,7 @@
       "legends_location": "end_of_manuscript",
       "multipanel_labels": "(A), (B), (C), (D) -- not embedded over any part of the image",
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "Figures must be submitted individually, in the order referred to in the manuscript; they are then automatically embedded at the end of the submitted manuscript.",
         "For LaTeX files, figures should be included in the provided PDF; on acceptance, high-resolution EPS, JPEG, or TIF/TIFF files may be required.",
@@ -16932,6 +16966,7 @@
     "tables": {
       "editable": true,
       "placement": "end_of_manuscript",
+      "citation_order": true,
       "notes": [
         "Tables should be inserted at the end of the manuscript in an editable format (built in Word for Word manuscripts, in LaTeX for LaTeX manuscripts), with an empty line before and after each table.",
         "Table captions are placed immediately before the table, preceded by a label such as 'Table 1.', and are a single paragraph.",
@@ -17325,6 +17360,7 @@
       "legends_location": "end_of_manuscript",
       "multipanel_labels": "(A), (B), (C), (D) -- not embedded over any part of the image",
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "Figures must be submitted individually, in the order referred to in the manuscript; they are then automatically embedded at the end of the submitted manuscript.",
         "For LaTeX files, figures should be included in the provided PDF; on acceptance, high-resolution EPS, JPEG, or TIF/TIFF files may be required.",
@@ -17341,6 +17377,7 @@
     "tables": {
       "editable": true,
       "placement": "end_of_manuscript",
+      "citation_order": true,
       "notes": [
         "Tables should be inserted at the end of the manuscript in an editable format (built in Word for Word manuscripts, in LaTeX for LaTeX manuscripts), with an empty line before and after each table.",
         "Table captions are placed immediately before the table, preceded by a label such as 'Table 1.', and are a single paragraph.",
@@ -17694,6 +17731,7 @@
       "legends_location": "end_of_manuscript",
       "multipanel_labels": "(A), (B), (C), (D) -- not embedded over any part of the image",
       "placement": "separate_files",
+      "citation_order": true,
       "notes": [
         "Figures must be submitted individually, in the order referred to in the manuscript; they are then automatically embedded at the end of the submitted manuscript.",
         "For LaTeX files, figures should be included in the provided PDF; on acceptance, high-resolution EPS, JPEG, or TIF/TIFF files may be required.",
@@ -17710,6 +17748,7 @@
     "tables": {
       "editable": true,
       "placement": "end_of_manuscript",
+      "citation_order": true,
       "notes": [
         "Tables should be inserted at the end of the manuscript in an editable format (built in Word for Word manuscripts, in LaTeX for LaTeX manuscripts), with an empty line before and after each table.",
         "Table captions are placed immediately before the table, preceded by a label such as 'Table 1.', and are a single paragraph.",
@@ -18093,13 +18132,15 @@
       ]
     },
     "figures": {
+      "citation_order": true,
       "notes": [
         "At initial submission it is often useful to include the figures and their titles/legends in the main text near where they are referenced; after acceptance, main-text figures must be uploaded as separate high-resolution image files rather than embedded in the manuscript.",
         "Figure titles and legends go in a single 'figures' section within the main-text manuscript; each figure has a brief title describing the whole figure (without citing panels) followed by a legend describing each panel.",
         "Main and supplemental legends must state the statistical tests used, define the p values indicated by asterisks, state the number of biological and technical replicates, and define all measures and error bars.",
         "All scale bars must be defined in the image file or the legend, and each legend refers to supporting supplemental items (e.g. 'See also Figure S1').",
         "All figures/schemes must be cited in the main text in numerical order."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "editable": true,
@@ -18109,7 +18150,8 @@
         "Tables are black and white with no colored text or shading (small embedded color graphics are OK), with no tabs or spaces separating items within a cell and discrete data in each cell.",
         "Tables are numbered Table 1, Table 2, etc., never subdivided into panels, and include a title; legends and footnotes are optional, and footnotes use superscript lowercase letters.",
         "All main-text tables must be cited in the main text."
-      ]
+      ],
+      "all_cited": true
     },
     "references": {
       "style": "Numbered superscript, e.g. 'Smith et al.1'",
@@ -18264,13 +18306,15 @@
       ]
     },
     "figures": {
+      "citation_order": true,
       "notes": [
         "At initial submission it is often useful to include the figures and their titles/legends in the main text near where they are referenced; after acceptance, main-text figures must be uploaded as separate high-resolution image files rather than embedded in the manuscript.",
         "Figure titles and legends go in a single 'figures' section within the main-text manuscript; each figure has a brief title describing the whole figure (without citing panels) followed by a legend describing each panel.",
         "Main and supplemental legends must state the statistical tests used, define the p values indicated by asterisks, state the number of biological and technical replicates, and define all measures and error bars.",
         "All scale bars must be defined in the image file or the legend, and each legend refers to supporting supplemental items (e.g. 'See also Figure S1').",
         "All figures/schemes must be cited in the main text in numerical order."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "editable": true,
@@ -18280,7 +18324,8 @@
         "Tables are black and white with no colored text or shading (small embedded color graphics are OK), with no tabs or spaces separating items within a cell and discrete data in each cell.",
         "Tables are numbered Table 1, Table 2, etc., never subdivided into panels, and include a title; legends and footnotes are optional, and footnotes use superscript lowercase letters.",
         "All main-text tables must be cited in the main text."
-      ]
+      ],
+      "all_cited": true
     },
     "references": {
       "style": "Numbered superscript, e.g. 'Smith et al.1'",
@@ -18422,13 +18467,15 @@
       ]
     },
     "figures": {
+      "citation_order": true,
       "notes": [
         "At initial submission it is often useful to include the figures and their titles/legends in the main text near where they are referenced; after acceptance, main-text figures must be uploaded as separate high-resolution image files rather than embedded in the manuscript.",
         "Figure titles and legends go in a single 'figures' section within the main-text manuscript; each figure has a brief title describing the whole figure (without citing panels) followed by a legend describing each panel.",
         "Main and supplemental legends must state the statistical tests used, define the p values indicated by asterisks, state the number of biological and technical replicates, and define all measures and error bars.",
         "All scale bars must be defined in the image file or the legend, and each legend refers to supporting supplemental items (e.g. 'See also Figure S1').",
         "All figures/schemes must be cited in the main text in numerical order."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "editable": true,
@@ -18438,7 +18485,8 @@
         "Tables are black and white with no colored text or shading (small embedded color graphics are OK), with no tabs or spaces separating items within a cell and discrete data in each cell.",
         "Tables are numbered Table 1, Table 2, etc., never subdivided into panels, and include a title; legends and footnotes are optional, and footnotes use superscript lowercase letters.",
         "All main-text tables must be cited in the main text."
-      ]
+      ],
+      "all_cited": true
     },
     "references": {
       "style": "Numbered superscript, e.g. 'Smith et al.1'",
@@ -18586,13 +18634,15 @@
       ]
     },
     "figures": {
+      "citation_order": true,
       "notes": [
         "At initial submission it is often useful to include the figures and their titles/legends in the main text near where they are referenced; after acceptance, main-text figures must be uploaded as separate high-resolution image files rather than embedded in the manuscript.",
         "Figure titles and legends go in a single 'figures' section within the main-text manuscript; each figure has a brief title describing the whole figure (without citing panels) followed by a legend describing each panel.",
         "Main and supplemental legends must state the statistical tests used, define the p values indicated by asterisks, state the number of biological and technical replicates, and define all measures and error bars.",
         "All scale bars must be defined in the image file or the legend, and each legend refers to supporting supplemental items (e.g. 'See also Figure S1').",
         "All figures/schemes must be cited in the main text in numerical order."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "editable": true,
@@ -18602,7 +18652,8 @@
         "Tables are black and white with no colored text or shading (small embedded color graphics are OK), with no tabs or spaces separating items within a cell and discrete data in each cell.",
         "Tables are numbered Table 1, Table 2, etc., never subdivided into panels, and include a title; legends and footnotes are optional, and footnotes use superscript lowercase letters.",
         "All main-text tables must be cited in the main text."
-      ]
+      ],
+      "all_cited": true
     },
     "references": {
       "style": "Numbered superscript, e.g. 'Smith et al.1'",
@@ -18787,6 +18838,7 @@
       "legends_location": "with_figure",
       "color_charge": false,
       "placement": "end_or_inline",
+      "citation_order": true,
       "notes": [
         "All figures and their captions are embedded in the text to facilitate reviewing; high-resolution images are also required, preferably at initial submission but no later than revision.",
         "Figures are numbered consecutively in the order cited; multipanel figures are submitted as one composite image clearly labelled with its figure number.",
@@ -18993,13 +19045,15 @@
       ]
     },
     "figures": {
+      "citation_order": true,
       "notes": [
         "At initial submission it is often useful to include the figures and their titles/legends in the main text near where they are referenced; after acceptance, main-text figures must be uploaded as separate high-resolution image files rather than embedded in the manuscript.",
         "Figure titles and legends go in a single 'figures' section within the main-text manuscript; each figure has a brief title describing the whole figure (without citing panels) followed by a legend describing each panel.",
         "Main and supplemental legends must state the statistical tests used, define the p values indicated by asterisks, state the number of biological and technical replicates, and define all measures and error bars.",
         "All scale bars must be defined in the image file or the legend, and each legend refers to supporting supplemental items (e.g. 'See also Figure S1').",
         "All figures/schemes must be cited in the main text in numerical order."
-      ]
+      ],
+      "all_cited": true
     },
     "tables": {
       "editable": true,
@@ -19009,7 +19063,8 @@
         "Tables are black and white with no colored text or shading (small embedded color graphics are OK), with no tabs or spaces separating items within a cell and discrete data in each cell.",
         "Tables are numbered Table 1, Table 2, etc., never subdivided into panels, and include a title; legends and footnotes are optional, and footnotes use superscript lowercase letters.",
         "All main-text tables must be cited in the main text."
-      ]
+      ],
+      "all_cited": true
     },
     "references": {
       "style": "Numbered superscript, e.g. 'Smith et al.1'",
@@ -19189,6 +19244,7 @@
       "legends_location": "with_figure",
       "color_charge": false,
       "placement": "end_or_inline",
+      "citation_order": true,
       "notes": [
         "All figures and their captions are embedded in the text to facilitate reviewing; high-resolution images are also required, preferably at initial submission but no later than revision.",
         "Figures are numbered consecutively in the order cited; multipanel figures are submitted as one composite image clearly labelled with its figure number.",
@@ -19378,6 +19434,7 @@
     },
     "tables": {
       "editable": true,
+      "citation_order": true,
       "notes": [
         "Tables are numbered with Arabic numerals, cited in consecutive order, and each has a caption (title); previously published material is cited at the end of the caption.",
         "Table footnotes use superscript lower-case letters (or asterisks for significance values) beneath the table body."

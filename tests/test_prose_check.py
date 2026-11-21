@@ -1,4 +1,4 @@
-"""paperpush.prose_check: double spaces, repeated words, punctuation spacing, brackets, spelling."""
+"""paperpush.prose_check: double spaces, doubled words, punctuation spacing, brackets, spelling."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ MANUSCRIPT = Field(id="manuscript_file", label="Manuscript", type="file")
 VENUE = Venue(slug="testj", name="Test Venue", fields=[MANUSCRIPT])
 IDS = [f"prose.{name}" for name in pc._CHECKS]
 ALL_IDS = set(IDS) | {f"prose.{pc.REPETITION}", "prose.numbers", "prose.conventions", "prose.acronyms", "prose.heading_case",
-           "prose.serial_comma", "prose.dashes", "prose.number_format", "prose.usage", "prose.spelling_variant"}
+           "prose.serial_comma", "prose.dashes", "prose.number_format", "prose.usage", "prose.significant", "prose.spelling_variant"}
 
 needs_codespell = pytest.mark.skipif(
     pc.misspellings() is None, reason="codespell is not installed"
@@ -161,7 +161,7 @@ def test_findings_are_capped(tmp_path):
     )
     status, message, _ = _run(doc)["prose.repeated_words"]
     assert status == report.WARNING
-    assert "8 repeated word(s)" in message and "(and 3 more)" in message
+    assert "8 doubled word(s)" in message and "(and 3 more)" in message
 
 
 def test_markdown_skips_code_and_tables(tmp_path):

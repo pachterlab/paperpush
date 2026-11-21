@@ -18,7 +18,7 @@ def test_status_for_ranks_suggestion_below_warning_and_above_unchecked():
 
 def test_checks_run_records_a_suggestion():
     checks = Checks()
-    result = checks.run("prose.x", "Style", "Prose", lambda: [Issue(SUGGESTION, "manuscript", "4 repeated words")])
+    result = checks.run("prose.x", "Style", "Prose", lambda: [Issue(SUGGESTION, "manuscript", "4 doubled words")])
     assert result.status == report.SUGGESTION
     assert result.issues[0].check == "prose.x"
 

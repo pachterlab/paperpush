@@ -775,7 +775,7 @@ def validate_subfile(
     cover letter is recently dated and names this venue, whether the abstract
     cites references (or lacks the structure the venue asks for), whether the
     manuscript gives a contact e-mail, whether every reference is cited and how
-    many are self-citations, and the prose (double spaces, repeated words,
+    many are self-citations, and the prose (double spaces, doubled words,
     punctuation spacing, unbalanced brackets and quotes, common misspellings,
     repetitive word choice).
     Where the venue's own guidelines are silent, its publisher's house rules

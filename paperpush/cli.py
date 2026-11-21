@@ -1695,7 +1695,8 @@ checks that run without AI:
 
   Figure and table citations
     Main, supplementary, and Extended Data figures and tables are first cited
-    in order, all are cited, and none is cited that is missing. Panels are
+    in order (a warning only where the venue requires citation order, else a
+    suggestion), all are cited, and none is cited that is missing. Panels are
     cited in order too. Every figure and table has a caption, no two share a
     caption or number, and cross-references resolve (no "??").
 

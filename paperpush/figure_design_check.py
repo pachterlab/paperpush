@@ -181,15 +181,21 @@ def _default_colors_check(drawings: list, unread: list[str], inv) -> Outcome:
 
 
 _DESIGN_RULES = """\
-- Axis labels: every axis and color bar names the quantity, with its unit in parentheses when it has one ("Time (s)", "Expression (log2 TPM)"). Fail bare "x"/"y", a column name left in ("df$time", "value"), or a unit missing from a physical quantity.
-- Ticks and scale bars: plot axes keep their numeric tick labels; an image or micrograph has a scale bar (with its length stated) instead of axes.
-- Axis limits: bar charts start at zero; an axis zoomed onto clustered values (accuracies of 0.95-0.98 drawn to fill the panel) fails unless an axis break or the legend makes the zoom plain.
-- Chart type (optional style advice): consider a bar or dot plot instead of a pie or donut chart; consider a scatter plot for two quantities measured on the same items. A defensible chart choice alone is not a failure.
-- Color meaning: each color means one thing across every panel and figure. Fail a color that stands for treatment in one panel and cell type in the next, or a group (e.g. Control) drawn in different colors in different figures.
-- Color as the only channel: where color alone tells series or groups apart, a second channel (marker shape, line style, or a direct label) should too, so the figure survives gray printing and color-blind readers."""
+These are failures:
+- Axis labels: every axis and color bar names the quantity, with its unit in parentheses when it has one ("Time (s)", "Expression (log2 TPM)"). Fail bare "x"/"y", a column name left in ("df$time", "value"), a label that names a different quantity than the one plotted, or a unit missing from a physical quantity. A dimensionless score (accuracy, F1, a ratio, a percentage) needs no unit, and a missing % sign is not a failure.
+- Ticks and scale bars: plot axes keep their numeric tick labels; a micrograph, or another image whose physical size matters to the claim, has a scale bar (with its length stated). Example inputs, renderings, and qualitative outputs (a sample image, a segmentation mask, an attention map) need none.
+- Axis limits: bar charts start at zero, unless an axis break or the legend makes the cut plain. A line or scatter plot may zoom onto its data when its tick labels show the range.
+- Color meaning within a figure: one color stands for one thing in every panel of the same figure. Fail a color that stands for treatment in one panel and cell type in the next.
+These are optional style advice (report them as 'suggest', never 'fail'):
+- Chart type: consider a bar or dot plot instead of a pie or donut chart; consider a scatter plot for two quantities measured on the same items.
+- Color meaning across figures: the same group or method drawn in different colors in different figures.
+- Color as the only channel: where color alone tells series or groups apart, a second channel (marker shape, line style, or a direct label) helps gray printing and color-blind readers."""
 
 
-def _design_task(checks: Checks, venue: "Venue", values: dict[str, str], inv) -> None:
+_GRAY_NOTE = "This venue prints figures in gray, so color as the only channel is a failure here, not advice.\n"
+
+
+def _design_task(checks: Checks, venue: "Venue", values: dict[str, str], inv, gray: bool = False) -> None:
     """Queue the AI check of the figure design rules a reader has to judge."""
     from .ai_validate import AiTask
     from .requirements_check import manuscript_files
@@ -212,7 +218,7 @@ def _design_task(checks: Checks, venue: "Venue", values: dict[str, str], inv) ->
             id="ai.figures.design",
             title=DESIGN_TITLE,
             category=FIGURES,
-            instructions=(f"{where} Look at every figure and panel and check these design rules:\n{_DESIGN_RULES}\n" + ("\n".join(lines) + "\n" if lines else "") + "Judge only these rules, not whether the content matches the legend, nor lettering size or typeface; other checks cover those. " "Photographs and micrographs are judged only on the scale bar. Report 'fail' naming each figure and panel, what is wrong, and the fix " "(e.g. 'Figure 2b: y axis labeled \"value\" with no unit'). Return 'suggest' when only optional chart-type or styling advice remains, else 'pass'."),
+            instructions=(f"{where} Look at every figure and panel and check these design rules:\n{_DESIGN_RULES}\n" + (_GRAY_NOTE if gray else "") + ("\n".join(lines) + "\n" if lines else "") + "Judge only these rules, not whether the content matches the legend, nor lettering size or typeface; other checks cover those. " "Photographs and micrographs are judged only on the scale bar, and only where their physical size matters. Report 'fail' naming each figure and panel, what is wrong, and the fix " "(e.g. 'Figure 2b: y axis labeled \"value\" with no unit'). Return 'suggest' when only the optional advice applies, else 'pass'."),
             files=files,
         )
     )
@@ -246,4 +252,4 @@ def run_design_checks(checks: Checks, venue: "Venue", values: dict[str, str], in
         checks.record("figures.grayscale", GRAYSCALE_TITLE, FIGURES, NOT_APPLICABLE, detail="the venue does not print figures in gray (no print_grayscale or color_charge in its guidelines)")
     checks.run("figures.default_colors", DEFAULT_COLORS_TITLE, FIGURES, lambda: _default_colors_check(*drawings(), inv))
     if inv.figures:
-        _design_task(checks, venue, values, inv)
+        _design_task(checks, venue, values, inv, gray=prints_in_gray(rules))

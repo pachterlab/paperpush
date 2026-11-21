@@ -648,6 +648,45 @@ def test_panel_order_check_runs_on_the_manuscript(_use, tmp_path):
     assert "Fig. 1c is first cited before Fig. 1b" in result.issues[0].message
 
 
+def test_figure_order_is_a_warning_only_where_the_venue_requires_it(_use, tmp_path):
+    doc = tmp_path / "ms.docx"
+    _build_docx(doc, ["Intro", "See Fig. 2, then Fig. 1. Table 1 is below.", "Figure 1. One.", "Figure 2. Two.", "Figure 3. Three.", "Table 1. A table."])
+    _use({"testj": {}})
+    rep = _report(_venue(MANUSCRIPT), {"manuscript_file": str(doc)})
+    order = _result(rep, "citations.figure")
+    assert order.status == "suggestion" and order.issues[0].level == "suggestion"
+    assert "Figure 2 is cited before Figure 1" in order.issues[0].message and "do not require" in order.issues[0].message
+    cited = _result(rep, "citations.figure_cited")
+    assert cited.status == "suggestion" and "Figure 3 is never cited" in cited.issues[0].message and "do not require" in cited.issues[0].message
+    assert _result(rep, "citations.table_cited").status == "passed"
+    _use({"testj": {"figures": {"citation_order": True, "all_cited": True}}})
+    rep = _report(_venue(MANUSCRIPT), {"manuscript_file": str(doc)})
+    order = _result(rep, "citations.figure")
+    assert order.status == "warning" and "do not require" not in order.issues[0].message
+    cited = _result(rep, "citations.figure_cited")
+    assert cited.status == "warning" and "do not require" not in cited.issues[0].message
+
+
+def test_citing_a_missing_figure_is_a_warning_at_every_venue(_use, tmp_path):
+    doc = tmp_path / "ms.docx"
+    _build_docx(doc, ["Intro", "See Fig. 1 and Fig. 4.", "Figure 1. One.", "Figure 2. Two."])
+    _use({"testj": {}})
+    rep = _report(_venue(MANUSCRIPT), {"manuscript_file": str(doc)})
+    cited = _result(rep, "citations.figure_cited")
+    assert cited.status == "warning"
+    assert any(i.level == "suggestion" and "Figure 2 is never cited" in i.message for i in cited.issues)
+    assert any(i.level == "warning" and "no such figure" in i.message for i in cited.issues)
+
+
+def test_sequence_and_coverage_problems_split_order_problems():
+    found = citation_check.mentions(_TEXT + "\nAs Fig. 4 shows.")
+    order, _ = citation_check.sequence_problems(found, "figure")
+    coverage, _ = citation_check.coverage_problems(found, "figure")
+    assert order == ["Figure 2 is cited before Figure 1; number figures in the order the text first cites them"]
+    assert "Figure 3 is never cited" in coverage[0] and "cites Figure 4, but no such figure" in coverage[1]
+    assert citation_check.order_problems(found, "figure")[0] == order + coverage
+
+
 def test_caption_panels_reads_the_letters_a_legend_names():
     assert citation_check.caption_panels("Figure 1: Overview. (a) One. (b) Two. (c) Three.") == ["a", "b", "c"]
     assert citation_check.caption_panels("Figure 2 | Setup. a, The rig. b, Its output.") == ["a", "b"]

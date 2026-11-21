@@ -410,13 +410,14 @@ figures, tables, and figure panels are cited in order, and that the title, abstr
 keywords, and statements in the `.sub` match the manuscript; that the abstract
 cites no references (and is structured when the venue asks), the manuscript
 gives a contact e-mail, every reference is cited, and self-citations are not
-excessive; and proofreads the prose mechanically (double spaces, repeated
+excessive; and proofreads the prose mechanically (double spaces, doubled
 words, punctuation spacing, unbalanced brackets and quotes, common
 misspellings, repetitive word choice, numbers of 10 or more in digits,
 abbreviations written one way, acronyms spelled out at first use and their
 full terms not written out before or after it, the serial comma used one
 way, hyphens and dashes, P values, units, and spacing around `=` written one
-way, agreement slips such as "these data is", contractions, sentences over
+way, agreement slips such as "these data is", "significant" used to mean
+large or important rather than statistically significant, contractions, sentences over
 50 words, and American and British spelling mixed or opposite to the
 corresponding author's country), queuing
 spelling, grammar, and tense as the AI check `ai.prose`. Warnings from this

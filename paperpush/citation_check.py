@@ -57,7 +57,7 @@ from pathlib import Path
 from . import document
 from .database import Venue
 from .requirements import get_requirements, resolve
-from .validate import LIKELY_ERROR, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
+from .validate import LIKELY_ERROR, SUGGESTION, WARNING, Checks, Issue, NotApplicable, Outcome, Unchecked
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,15 @@ SERIES = [
     ("ed_table", "Extended Data Table", "Extended Data tables cited in order"),
 ]
 _NAMES = {key: name for key, name, _ in SERIES}
+# ``citations.<series>_cited``: every captioned item is cited, and every cited item exists.
+CITED_TITLES = {
+    "figure": "Every main figure cited and present",
+    "table": "Every main table cited and present",
+    "supp_figure": "Every supplementary figure cited and present",
+    "supp_table": "Every supplementary table cited and present",
+    "ed_figure": "Every Extended Data figure cited and present",
+    "ed_table": "Every Extended Data table cited and present",
+}
 PANEL_TITLE = "Figure and table panels cited in order"
 
 # An item, with the panels that can follow its letter ("1a-c", "1a, b and d").
@@ -394,9 +403,8 @@ def tex_mentions(source: str) -> list[Mention]:
 # --- order ------------------------------------------------------------------------------
 
 
-def order_problems(found: list[Mention], series: str, defined_extra: set[int] | None = None) -> tuple[list[str], str]:
-    """Out-of-order, uncited, and undefined items of one series, as sentences."""
-    name = _NAMES[series]
+def _first_citations(found: list[Mention], series: str, defined_extra: set[int] | None = None):
+    """Where each item of one series is first cited, and which items are captioned or attached."""
     first: dict[int, int] = {}
     first_in_appendix: dict[int, int] = {}
     defined: set[int] = set(defined_extra or ())
@@ -416,12 +424,19 @@ def order_problems(found: list[Mention], series: str, defined_extra: set[int] | 
             first.setdefault(m.number, m.pos)
             if m.appendix:
                 first_in_appendix.setdefault(m.number, m.pos)
+    return first, first_in_appendix, defined, appendix, also_cited
+
+
+def sequence_problems(found: list[Mention], series: str, defined_extra: set[int] | None = None) -> tuple[list[str], str]:
+    """An item of one series first cited before a lower-numbered one, as a sentence (``citations.<series>``)."""
+    name = _NAMES[series]
+    first, first_in_appendix, _defined, appendix, _also = _first_citations(found, series, defined_extra)
     problems: list[str] = []
     cited_order = sorted(first, key=first.get)
     # The main text may point ahead to an appendix figure ("see Figure 27") without misnumbering
     # anything: main-text items are ordered by their first citation, appendix items by their first
     # citation within the appendix.
-    # An item never cited is reported as such, not as also out of order ("Figure 2 is cited before Figure 1").
+    # An item never cited is reported by coverage_problems, not as also out of order ("Figure 2 is cited before Figure 1").
     main_known = set(first) - appendix
     for order, known in (([n for n in cited_order if n not in appendix], main_known), (sorted((n for n in first_in_appendix if n in appendix), key=first_in_appendix.get), appendix & set(first_in_appendix))):
         seen: set[int] = set()
@@ -433,6 +448,15 @@ def order_problems(found: list[Mention], series: str, defined_extra: set[int] | 
             seen.add(number)
         if problems:
             break
+    detail = f"{len(first)} cited in order ({', '.join(map(str, cited_order[:12]))}{', ...' if len(cited_order) > 12 else ''})" if first and not problems else ""
+    return problems, detail
+
+
+def coverage_problems(found: list[Mention], series: str, defined_extra: set[int] | None = None) -> tuple[list[str], str]:
+    """Items of one series never cited, and citations of items that do not exist (``citations.<series>_cited``)."""
+    name = _NAMES[series]
+    first, _fa, defined, _appendix, also_cited = _first_citations(found, series, defined_extra)
+    problems: list[str] = []
     if defined:
         uncited = sorted(defined - set(first) - also_cited)
         if uncited:
@@ -440,8 +464,15 @@ def order_problems(found: list[Mention], series: str, defined_extra: set[int] | 
         missing = sorted(n for n in first if n not in defined)
         if missing:
             problems.append(f"the text cites {name} {', '.join(map(str, missing))}, but no such {name.lower()} was found (captions or files: {', '.join(map(str, sorted(defined)))})")
-    detail = f"{len(first)} cited in order ({', '.join(map(str, cited_order[:12]))}{', ...' if len(cited_order) > 12 else ''})" if first and not problems else ""
+    detail = f"all {len(defined)} cited, and every cited {name.lower()} exists" if defined and not problems else ""
     return problems, detail
+
+
+def order_problems(found: list[Mention], series: str, defined_extra: set[int] | None = None) -> tuple[list[str], str]:
+    """Out-of-order, uncited, and undefined items of one series, as sentences (both checks together)."""
+    order, detail = sequence_problems(found, series, defined_extra)
+    coverage, _ = coverage_problems(found, series, defined_extra)
+    return order + coverage, detail if not coverage else ""
 
 
 def _attached_count(venue: Venue, values: dict[str, str], role: str) -> int:
@@ -794,30 +825,80 @@ def run_checks(checks: Checks, venue: Venue, values: dict[str, str]) -> None:
         status = NOT_APPLICABLE if isinstance(exc, NotApplicable) else UNCHECKED
         for key, _name, title in SERIES[:4]:
             checks.record(f"citations.{key}", title, CITATIONS, status, detail=str(exc))
+            checks.record(f"citations.{key}_cited", CITED_TITLES[key], CITATIONS, status, detail=str(exc))
         checks.record("citations.panels", PANEL_TITLE, CITATIONS, status, detail=str(exc))
         _legend_checks(checks, venue, values, None, "")
         return
     found = found + _supplement_captions(venue, values) + _attached_captions(venue, values)
     attached = {"figure": _attached_count(venue, values, "figures"), "table": _attached_count(venue, values, "tables")}
+    order_required = _citation_order_required(venue, values)
+    all_cited_required = _all_cited_required(venue, values)
     for key, name, title in SERIES:
         present = any(m.series == key for m in found)
         if not present and key.startswith("ed_"):
             continue  # Extended Data is a Nature-family convention; silent elsewhere
         if not present and not attached.get(key):
             checks.record(f"citations.{key}", title, CITATIONS, NOT_APPLICABLE, detail=f"no {name.lower()}s cited or captioned")
+            checks.record(f"citations.{key}_cited", CITED_TITLES[key], CITATIONS, NOT_APPLICABLE, detail=f"no {name.lower()}s cited or captioned")
             continue
         extra = set(range(1, attached[key] + 1)) if attached.get(key) and not any(m.series == key and m.caption for m in found) else None
         # A combined file with no captions says nothing about which numbers exist.
         if extra and _combines_items(venue, values, "figures" if key == "figure" else "tables", max((m.number for m in found if m.series == key), default=0)):
             extra = None
-        checks.run(f"citations.{key}", title, CITATIONS, _order_check, found, key, extra, field_id)
+        checks.run(f"citations.{key}", title, CITATIONS, _order_check, found, key, extra, field_id, order_required.get(key.rpartition("_")[2], False))
+        checks.run(f"citations.{key}_cited", CITED_TITLES[key], CITATIONS, _cited_check, found, key, extra, field_id, all_cited_required.get(key, False))
     checks.run("citations.panels", PANEL_TITLE, CITATIONS, _panel_check, venue, values, field_id)
     _legend_checks(checks, venue, values, found, field_id)
 
 
-def _order_check(found: list[Mention], series: str, extra: set[int] | None, field_id: str) -> Outcome:
-    problems, detail = order_problems(found, series, extra)
-    return Outcome([Issue(WARNING, field_id, p) for p in problems], detail)
+def _citation_order_required(venue: Venue, values: dict[str, str]) -> dict[str, bool]:
+    """Whether the venue's guidelines require figures / tables numbered in citation order.
+
+    Biomedical journals usually do; ML and CS venues (ICLR, NeurIPS, ACL) do not
+    say so, and their papers routinely cite a teaser figure late or an appendix
+    figure early. Without the rule, an out-of-order item is only a suggestion.
+    """
+    base = get_requirements(venue.slug)
+    if base is None:
+        return {"figure": False, "table": False}
+    reqs = resolve(base, values)
+    return {"figure": bool(reqs.figures.citation_order), "table": bool(reqs.tables.citation_order)}
+
+
+def _all_cited_required(venue: Venue, values: dict[str, str]) -> dict[str, bool]:
+    """Per series, whether the venue's guidelines require every item to be cited in the text.
+
+    Cell Press and Nature-family journals say so ("All figures must be cited in
+    the main text"); ML and CS venues (ICLR, NeurIPS, ACL) do not, and their
+    papers often leave an appendix figure uncited. Without the rule, a
+    never-cited item is only a suggestion.
+    """
+    base = get_requirements(venue.slug)
+    if base is None:
+        return {}
+    reqs = resolve(base, values)
+    fig, tab, sup = bool(reqs.figures.all_cited), bool(reqs.tables.all_cited), bool(reqs.supplementary.all_cited)
+    return {"figure": fig, "table": tab, "ed_figure": fig, "ed_table": tab, "supp_figure": sup, "supp_table": sup}
+
+
+def _order_check(found: list[Mention], series: str, extra: set[int] | None, field_id: str, required: bool = True) -> Outcome:
+    problems, detail = sequence_problems(found, series, extra)
+    if problems and not required:
+        problems = [f"{p} (the venue's guidelines do not require citation order)" for p in problems]
+    return Outcome([Issue(WARNING if required else SUGGESTION, field_id, p) for p in problems], detail)
+
+
+def _cited_check(found: list[Mention], series: str, extra: set[int] | None, field_id: str, required: bool = True) -> Outcome:
+    """A citation of an item that does not exist is always a warning (a broken reference);
+    an item never cited is a warning only where the venue requires every item cited."""
+    problems, detail = coverage_problems(found, series, extra)
+    issues = []
+    for p in problems:
+        if "never cited" in p and not required:
+            issues.append(Issue(SUGGESTION, field_id, f"{p} (the venue's guidelines do not require every item to be cited)"))
+        else:
+            issues.append(Issue(WARNING, field_id, p))
+    return Outcome(issues, detail)
 
 
 def _panel_check(venue: Venue, values: dict[str, str], field_id: str) -> Outcome:
