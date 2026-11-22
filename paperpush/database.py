@@ -511,11 +511,12 @@ class VenueInfo:
     ] = "journal"
     # Double-blind review: reviewers must not learn who the authors are. When
     # set, ``paperpush validate`` scans the attachments (and any linked
-    # anonymous.4open.science mirror) for identifying information; see
+    # anonymous.4open.science mirror, and the records and pages other links
+    # lead to) for identifying information; see
     # :mod:`paperpush.anonymity`.
     anonymous: Annotated[
         bool,
-        PField(description="Anonymous (double-blind) review: validate checks the " "attached files and linked anonymous.4open.science repositories " "for information identifying the authors."),
+        PField(description="Anonymous (double-blind) review: validate checks the " "attached files, linked anonymous.4open.science repositories, " "and the records and pages other links lead to " "for information identifying the authors."),
     ] = False
     # Deprecated venues stay in the database (their sign-in/login wiring still
     # works via get_venue) but are hidden from list_venues, so they no longer

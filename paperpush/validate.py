@@ -946,6 +946,8 @@ class _ReferenceContext:
     ai_tasks: list = field(default_factory=list)
     # Likely errors the AI may clear: flag id -> (check id, issue message).
     flagged: dict = field(default_factory=dict)
+    # A reference's label -> the Open Library record of the book its ISBN belongs to.
+    books: dict = field(default_factory=dict)
 
 
 # How many references a message lists by name.
@@ -1137,7 +1139,7 @@ def _clear_reference_flags(checks: Checks, flags: dict[str, str]) -> int:
 
     lowered = 0
     for result in checks.results:
-        if result.id not in ("integrity.dois", "integrity.unmatched_references", "integrity.reference_details") or not result.issues:
+        if result.id not in ("integrity.dois", "integrity.unmatched_references", "integrity.isbns", "integrity.reference_details") or not result.issues:
             continue
         issues = []
         for issue in result.issues:
@@ -1162,7 +1164,7 @@ def _reference_version_issues(venue: Venue, values: dict[str, str], ctx: _Refere
     for r in refs:
         record = ctx.resolved.get(r.doi) if r.doi else None
         if record is not None:
-            cited.append(reference_search.Cited(r.label, r.where, r.doi, record))
+            cited.append(reference_search.Cited(r.label, r.where, r.doi, record, preprint_version=r.preprint_version))
             labelled.add(r.doi)
     for doi, record in ctx.resolved.items():
         if doi not in labelled:
@@ -1195,8 +1197,35 @@ def _reference_version_issues(venue: Venue, values: dict[str, str], ctx: _Refere
     return Outcome(issues, f"checked {len(cited) + len(arxiv_refs)} cited work(s) for a newer version")
 
 
-REFERENCE_DETAILS_TITLE = "Each reference's authors, journal, year, volume, issue, and pages match the work it cites, and nothing it needs is missing"
+REFERENCE_DETAILS_TITLE = "Each reference's authors, journal, year, volume, issue, pages, and (for a book) edition and publisher match the work it cites, and nothing it needs is missing"
+ISBNS_TITLE = "Reference ISBNs are valid and belong to the books cited"
 JOURNAL_INDEXING_TITLE = "Each cited journal is in an index OpenAlex tracks (CWTS core, DOAJ, MEDLINE, SciELO)"
+
+
+def _isbn_issues(venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> Outcome:
+    """Check every ISBN the references give: its check digit, then the book Open Library files under it.
+
+    An invalid ISBN (a wrong check digit, or not 10 or 13 digits) is a warning,
+    found offline. A valid one that Open Library files under a plainly different
+    title is a likely error, offered to ``ai.flagged_references``. The books
+    found are kept in ``ctx.books`` for :func:`_reference_detail_issues`, which
+    then compares their edition and publisher.
+    """
+    from . import reference_search
+
+    refs = _bibliography_refs(venue, values, ctx)
+    if not refs:
+        raise NotApplicable("found no .bib file or reference list to read")
+    if not any(r.isbns for r in refs):
+        raise NotApplicable("no reference gives an ISBN")
+    result = reference_search.isbn_findings(refs)
+    ctx.books.update(result.records)
+    issues = _findings_to_issues(result.findings)
+    _note_flags("integrity.isbns", result.findings, issues, ctx.flagged, {reference_search.WRONG_ISBN})
+    looked_up = result.valid if result.answered else 0
+    if not result.answered and result.valid:
+        issues.append(incomplete("", f"Open Library did not answer, so the {result.valid} valid ISBN(s) were not looked up; run validate again later"))
+    return Outcome(issues, f"checked {result.read} ISBN(s): {result.valid} valid" + (f", {result.found} of {looked_up} found in Open Library" if looked_up else ""))
 
 
 def _matched_references(venue: Venue, values: dict[str, str], ctx: _ReferenceContext) -> list:
@@ -1213,6 +1242,7 @@ def _matched_references(venue: Venue, values: dict[str, str], ctx: _ReferenceCon
     search = ctx.search
     matched_lookups = [lk for lk in (search.by_status(reference_search.MATCHED) if search is not None else []) if lk.record and not lk.problems and lk.source != "arXiv"]
     out: list = []
+
     paths = _upload_paths_or_skip(venue, values)
     entries = references.printed_entries(paths)
     if entries:
@@ -1226,13 +1256,40 @@ def _matched_references(venue: Venue, values: dict[str, str], ctx: _ReferenceCon
             entry = by_label.get(lk.ref.label)
             if entry is not None and lk.ref.label not in {m.label for m in out}:
                 out.append(reference_details.Matched(lk.ref.label, lk.ref.where, lk.record, entry=entry))
-        return out
+        # A book found by its ISBN, when neither its DOI nor the search placed it.
+        for label, record in ctx.books.items():
+            entry = by_label.get(label)
+            if entry is not None and label not in {m.label for m in out}:
+                out.append(reference_details.Matched(label, entry.where, record, entry=entry))
+        return _with_book_details(out, ctx.books)
     for r in refs or []:
         if r.doi and r.doi in ctx.resolved and r.text:
             out.append(reference_details.Matched(r.label, r.where, ctx.resolved[r.doi], text=r.text, doi=r.doi))
     for lk in matched_lookups:
         if lk.ref.text:
             out.append(reference_details.Matched(lk.ref.label, lk.ref.where, lk.record, text=lk.ref.text, check_authors=False))
+    placed = {m.label for m in out}
+    for r in refs or []:
+        if r.label in ctx.books and r.label not in placed and r.text:
+            out.append(reference_details.Matched(r.label, r.where, ctx.books[r.label], text=r.text, check_authors=False))
+    return _with_book_details(out, ctx.books)
+
+
+def _with_book_details(matched: list, books: dict) -> list:
+    """``matched``, each book's record given the publisher and edition Open Library has under its ISBN when it lacks them.
+
+    Crossref records no edition for a book, and not always its publisher.
+    """
+    from dataclasses import replace
+
+    out = []
+    for m in matched:
+        book = books.get(m.label)
+        if book is not None and book is not m.record:
+            extra = {k: book[k] for k in ("publisher", "publishers", "edition") if book.get(k) and not m.record.get(k)}
+            if extra:
+                m = replace(m, record={**m.record, **extra})
+        out.append(m)
     return out
 
 
@@ -1292,8 +1349,9 @@ def _sensitive_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
 
     Findings never block a submission. Credentials and study participants'
     personal data are LIKELY_ERRORs (a leak would be serious, but the patterns
-    can match harmless text); the rest are WARNINGs. This is opt-in because reading and text-extracting every
-    attachment is more work than the generic field checks.
+    can match harmless text); the rest are WARNINGs. Runs by default in
+    ``paperpush validate`` (``--dont-check-for-sensitive-info`` skips it); the
+    validation ``paperpush submit`` runs first leaves it out.
     """
     from . import sensitive
 
@@ -1317,9 +1375,17 @@ def _anonymity_issues(venue: Venue, values: dict[str, str], *, check_repos: bool
     free-text values, and every anonymous.4open.science repository they link
     for the authors' names, emails, ORCID/OpenReview IDs and affiliations (taken
     from the author list), author metadata, home-directory paths, an
-    acknowledgments section, and camera-ready LaTeX switches (see
-    :mod:`paperpush.anonymity`). ``check_repos`` fetches the linked mirrors,
-    which needs network access. Findings are advisory WARNINGs.
+    acknowledgments section, camera-ready LaTeX switches, and an author's handle
+    or surname in any link (see :mod:`paperpush.anonymity`). ``check_repos``
+    fetches the linked mirrors and the records and pages the other links lead
+    to (Zenodo/Figshare/OSF/DOI creators, GitHub and Hugging Face READMEs, a
+    page presented as the authors' own), which needs network access. Findings
+    never block: LaTeX in camera-ready
+    mode and an author named in a file's metadata are ERRORs; an author's
+    name, email, ORCID or OpenReview ID in the text, a link naming an author,
+    people named in image or comment metadata, a copyright holder in a linked
+    repository, and an author found in a linked record or page are
+    LIKELY_ERRORs; the rest are WARNINGs.
     """
     from . import anonymity
 
@@ -1647,7 +1713,7 @@ class PublisherFallback:
 
 
 # Disabled alone, these still run, unreported: the checks after them read what they find.
-_REFERENCE_CHECK_IDS = ("integrity.dois", "integrity.unmatched_references", "integrity.retractions", "integrity.reference_versions")
+_REFERENCE_CHECK_IDS = ("integrity.dois", "integrity.unmatched_references", "integrity.retractions", "integrity.reference_versions", "integrity.isbns")
 _FEEDS_LATER_CHECKS = frozenset(_REFERENCE_CHECK_IDS[:2])
 
 
@@ -1925,6 +1991,7 @@ def validate(
     check_anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
     check_openreview: bool = True,
+    network: bool = True,
     initial_submission: bool = False,
     strict_style: bool = False,
     cover_letter_max_age_days: int = 7,
@@ -1958,6 +2025,7 @@ def validate(
         check_anonymous=check_anonymous,
         check_hidden_text=check_hidden_text,
         check_openreview=check_openreview,
+        network=network,
         initial_submission=initial_submission,
         strict_style=strict_style,
         cover_letter_max_age_days=cover_letter_max_age_days,
@@ -1985,6 +2053,7 @@ def validate_report(
     check_anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
     check_openreview: bool = True,
+    network: bool = True,
     initial_submission: bool = False,
     strict_style: bool = False,
     cover_letter_max_age_days: int = 7,
@@ -2003,14 +2072,16 @@ def validate_report(
 ):
     """Run every check on ``subfile`` and return a :class:`~paperpush.report.ValidationReport`.
 
-    The report holds one entry per check -- passed, failed, warning,
-    suggestion, could not run, needs AI, not implemented, or not applicable -- so the author sees what
-    was verified as well as what is wrong.
+    The report holds one entry per check -- passed, failed, likely error,
+    similarity, warning, suggestion, incomplete, could not run, needs AI, not
+    implemented, or not applicable -- so the author sees what was verified as
+    well as what is wrong.
 
     When ``check_sensitive`` is set (the default), the referenced upload files
     are scanned for information that was never meant to be shared -- secrets, GPS
     metadata, editable-document links, and LaTeX source comments (see
-    :func:`_sensitive_issues`) -- and reported as advisory WARNINGs. When
+    :func:`_sensitive_issues`) -- and reported as WARNINGs or, for credentials
+    and participants' personal data, LIKELY_ERRORs; none blocks. When
     ``check_links`` is set (also the default), the URLs those files cite are
     probed and any that are unreachable (404/gone, including a still-private
     GitHub repo) are likewise flagged. When ``check_references`` is set (also
@@ -2042,8 +2113,10 @@ def validate_report(
     (:mod:`paperpush.prose_check`).
 
     ``check_anonymous`` scans the submission for information identifying its
-    authors, including every linked anonymous.4open.science repository (see
-    :func:`_anonymity_issues`; network access is needed for the repositories).
+    authors, including every linked anonymous.4open.science repository and the
+    records and pages its other links lead to (see :func:`_anonymity_issues`).
+    Those fetches run only when ``check_links`` is set too; without it the
+    files are still scanned offline.
     It defaults to the venue's ``anonymous`` flag, so double-blind venues are
     always checked; pass True to check any venue.
 
@@ -2115,9 +2188,26 @@ def validate_report(
     ``progress``, if given, is called as ``progress(done, total, label)`` when
     each stage starts (``label`` names it) and once at the end with
     ``done == total``; the CLI's progress bar and the web page's use it.
+
+    ``network=False`` (``--disable-network-checks``) makes no network request
+    at all: the link, reference, OpenReview, registry (RRID, cell line), and
+    repository lookups, the anonymity check's fetches of linked mirrors,
+    records, and pages, and the BioSample package download (a cached copy is
+    still used) are all skipped, and reported as not checked. The plagiarism
+    and AI-text scans send the text to an outside service, so asking for one
+    with ``network=False`` is a ValueError.
     """
     from . import openreview_profiles, report
 
+    if not network:
+        if plagiarism is not None or ai_detection is not None:
+            raise ValueError("the plagiarism and AI-text scans send the manuscript's text to an outside service; they cannot run with the network checks disabled")
+        check_links = check_references = check_openreview = False
+        reproduce_figures = False  # downloads the linked code and data
+    # Why a network check did not run, for the report.
+    links_off = "network checks disabled (--disable-network-checks)" if not network else "switched off (--disable-integrity.links)"
+    references_off = "network checks disabled (--disable-network-checks)" if not network else "switched off (--disable-references)"
+    openreview_off = "network checks disabled (--disable-network-checks)" if not network else "switched off (--disable-integrity.openreview)"
     if check_anonymous is None:
         check_anonymous = venue.anonymous
     disable, enable = check_ids.select(disable, enable)
@@ -2201,7 +2291,7 @@ def validate_report(
             _field_checks(checks, venue, form_values)
         checks.run("files.total_size", "Combined upload size within the portal's limit", "Files", _total_size_check, venue, values)
         if not files_only and any(f.id == "biosample_attributes_file" for f in venue.fields):
-            checks.run("files.biosample_attributes", "BioSample attributes file follows its NCBI package (mandatory attributes, allowed values, formats)", "Files", _biosample_attributes_issues, venue, values)
+            checks.run("files.biosample_attributes", "BioSample attributes file follows its NCBI package (mandatory attributes, allowed values, formats)", "Files", _biosample_attributes_issues, venue, values, offline=not network)
 
     bar.run("Submission form", _form_checks)
 
@@ -2209,7 +2299,7 @@ def validate_report(
     if check_links:
         bar.run("Links", checks.run, "integrity.links", "Links cited in the files and URL fields are reachable", integrity, _link_issues, venue, values)
     else:
-        _record_switched_off(checks, "integrity.links", "Links cited in the files and URL fields are reachable", integrity, venue, values, "switched off (--disable-integrity.links)")
+        _record_switched_off(checks, "integrity.links", "Links cited in the files and URL fields are reachable", integrity, venue, values, links_off)
     retractions_title = "No cited work has been retracted"
     ref_flags: dict[str, str] = {}
     unmatched_title = "References without a DOI match a registered work"
@@ -2223,21 +2313,23 @@ def validate_report(
         looked_up = dois.status != report.UNCHECKED and (unmatched.status != report.UNCHECKED or ref_ctx.coverage.get("total"))
         checks.run("integrity.retractions", retractions_title, integrity, _retraction_issues, venue, values, retracted if looked_up else None, ref_ctx.coverage)
         checks.run("integrity.reference_versions", versions_title, integrity, _reference_version_issues, venue, values, ref_ctx)
+        bar.run("Reference ISBNs", checks.run, "integrity.isbns", ISBNS_TITLE, integrity, _isbn_issues, venue, values, ref_ctx)
         checks.run("integrity.reference_details", REFERENCE_DETAILS_TITLE, integrity, _reference_detail_issues, venue, values, ref_ctx)
         bar.run("Journal indexing", checks.run, "integrity.journal_indexing", JOURNAL_INDEXING_TITLE, integrity, _journal_indexing_issues, venue, values, ref_ctx)
         ref_flags = _flagged_reference_task(checks, venue, values, ref_ctx)
         for task in ref_ctx.ai_tasks:
             checks.needs_ai(task)
     else:
-        for check_id, title in (("integrity.dois", "Reference DOIs match the works they cite"), ("integrity.retractions", retractions_title), ("integrity.unmatched_references", unmatched_title), ("integrity.reference_versions", versions_title), ("integrity.reference_details", REFERENCE_DETAILS_TITLE), ("integrity.journal_indexing", JOURNAL_INDEXING_TITLE)):
-            _record_switched_off(checks, check_id, title, integrity, venue, values, "switched off (--disable-references)")
+        for check_id, title in (("integrity.dois", "Reference DOIs match the works they cite"), ("integrity.retractions", retractions_title), ("integrity.unmatched_references", unmatched_title), ("integrity.reference_versions", versions_title), ("integrity.isbns", ISBNS_TITLE), ("integrity.reference_details", REFERENCE_DETAILS_TITLE), ("integrity.journal_indexing", JOURNAL_INDEXING_TITLE)):
+            _record_switched_off(checks, check_id, title, integrity, venue, values, references_off)
     if check_sensitive:
         bar.run("Sensitive information", checks.run, "integrity.sensitive", "No secrets or private information in the files", integrity, _sensitive_issues, venue, values)
     else:
         checks.record("integrity.sensitive", "No secrets or private information in the files", integrity, report.UNCHECKED, detail="switched off (--disable-integrity.sensitive)")
     bar.run("LaTeX source", checks.run, "integrity.latex_cleaner", "Nothing for arxiv_latex_cleaner to strip from the LaTeX source", integrity, _latex_cleaner_issues, venue, values)
     if check_anonymous:
-        anon = bar.run("Anonymity", checks.run, "integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, _anonymity_issues, venue, values)
+        # The linked mirrors, records, and pages are fetched only with the network checks (check_links).
+        anon = bar.run("Anonymity", checks.run, "integrity.anonymity", "Nothing identifies the authors (double-blind)", integrity, _anonymity_issues, venue, values, check_repos=check_links)
         # A reader catches the self-identification no keyword list covers ("as we showed in [5]", "our lab").
         from . import anonymity as _anonymity
 
@@ -2260,7 +2352,7 @@ def validate_report(
     elif check_openreview:
         bar.run("OpenReview profiles", checks.run, "integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, _openreview_profile_issues, venue, values)
     else:
-        checks.record("integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, report.UNCHECKED, detail="switched off (--disable-integrity.openreview)")
+        checks.record("integrity.openreview", "Each author has an active OpenReview profile matching their name and email domain", integrity, report.UNCHECKED, detail=openreview_off)
     plagiarism_title = "The manuscript's text does not match other sources (plagiarism scan)"
     if plagiarism is not None:
         bar.run("Plagiarism", checks.run, "integrity.plagiarism", plagiarism_title, integrity, _plagiarism_issues, venue, values, plagiarism)
@@ -2466,8 +2558,11 @@ def _total_size_check(venue: Venue, values: dict[str, str]) -> list[Issue]:
     return issues
 
 
-def _biosample_attributes_issues(venue: Venue, values: dict[str, str]) -> Outcome:
-    """Hold an NCBI BioSample attributes file to its package's attribute definitions (see :mod:`paperpush.biosample`)."""
+def _biosample_attributes_issues(venue: Venue, values: dict[str, str], *, offline: bool = False) -> Outcome:
+    """Hold an NCBI BioSample attributes file to its package's attribute definitions (see :mod:`paperpush.biosample`).
+
+    ``offline`` uses only a cached copy of the package's definitions, never downloading one.
+    """
     from . import biosample
 
     package = str(values.get("biosample_package") or "").strip()
@@ -2492,7 +2587,7 @@ def _biosample_attributes_issues(venue: Venue, values: dict[str, str]) -> Outcom
             if "sample_name" in header:
                 samples = [row.get("sample_name", "") for row in rows if not row.get("biosample_accession")]
     try:
-        issues, pkg = biosample.check_attributes(path, package, metadata_samples=samples)
+        issues, pkg = biosample.check_attributes(path, package, metadata_samples=samples, offline=offline)
     except (ValueError, UnicodeDecodeError) as exc:
         return Outcome([Issue(ERROR, "biosample_attributes_file", f"could not be read ({exc}); save it as tab-delimited text or .xlsx")], biosample.template_links(package))
     detail = f"{pkg.display_name if pkg else package}: {biosample.template_links(package)}"

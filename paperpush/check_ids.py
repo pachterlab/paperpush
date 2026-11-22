@@ -17,13 +17,13 @@ from typing import Iterable
 
 # Switches wider than an ID prefix: what they cover is not one family of IDs.
 GROUPS = {
-    "references": "the reference lookups (DOIs, registry searches, retractions, preprint versions, reference details, journal indexing, RRIDs, cell lines)",
+    "references": "the reference lookups (DOIs, registry searches, retractions, preprint versions, ISBNs, reference details, journal indexing, RRIDs, cell lines)",
     "manuscript": "every check that reads the manuscript against the guidelines, and the AI checks",
 }
 
 # The families that do not read the manuscript against the guidelines.
 NON_MANUSCRIPT_FAMILIES = ("form", "files", "integrity")
-_REFERENCE_IDS = ("integrity.dois", "integrity.unmatched_references", "integrity.retractions", "integrity.reference_versions", "integrity.reference_details", "integrity.journal_indexing", "rigor.rrids", "rigor.cell_lines")
+_REFERENCE_IDS = ("integrity.dois", "integrity.unmatched_references", "integrity.retractions", "integrity.reference_versions", "integrity.isbns", "integrity.reference_details", "integrity.journal_indexing", "rigor.rrids", "rigor.cell_lines")
 
 
 @lru_cache(maxsize=1)

@@ -10,7 +10,8 @@ searched for:
 * a ``.bib`` entry by its title, first author, and year, in Crossref
   (``query.bibliographic``) and, when Crossref has nothing, in OpenAlex, which
   also indexes conference papers and arXiv;
-* an entry citing an arXiv identifier, by the DOI arXiv registers for every
+* an entry citing an arXiv identifier (an arxiv.org or alphaxiv.org link, an
+  ``eprint`` field, ...), by the DOI arXiv registers for every
   paper (10.48550/arXiv.<id>) in DataCite, which says outright whether the
   identifier exists (arXiv's own API when DataCite does not answer);
 * an entry of a manuscript's own reference list (a PDF or Word file with no
@@ -25,6 +26,13 @@ are listed as unverified instead, and handed to the AI check
 (``ai.unverified_references``) when one runs. An entry that does match a
 registered work but has no DOI is told the DOI, so it can be added.
 
+**Books** (:func:`isbn_findings`, and the search). Crossref and OpenAlex
+miss many books, so a book they cannot match is searched in Open Library by
+its title and author; a match takes it off the unverified list, and a miss
+still accuses nothing. Every ISBN a reference gives is checked offline for its
+check digit (:mod:`paperpush.isbn`), then looked up in Open Library: one filed
+under a plainly different title points at another book, which is reported.
+
 **Publication versions** (:func:`version_findings`). Cite the journal article
 when one exists, otherwise the latest preprint version:
 
@@ -33,7 +41,8 @@ when one exists, otherwise the latest preprint version:
   or arXiv's journal DOI and journal reference);
 * a preprint cited alongside its own journal article, which lists one work
   twice;
-* an arXiv identifier pinned to an older version (``v1`` when ``v3`` exists).
+* an arXiv identifier, or a bioRxiv/medRxiv DOI written with its version
+  (``...613029v1``), pinned to an older version (``v1`` when ``v3`` exists).
 
 All lookups are advisory and silent when inconclusive: a service that is down
 or blocks the request leaves the reference unverified rather than accused. Each
@@ -56,6 +65,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
+from .isbn import isbns_in_field, isbns_in_text
 from .sensitive import LEVEL_LIKELY
 from .references import (
     MAX_TEXT_BYTES,
@@ -195,6 +205,16 @@ MIN_TITLE_WORDS = 3
 # How many unverified references the AI task lists.
 MAX_AI_ITEMS = 25
 
+# Open Library requests a run spends: two per batch of ISBNs (data and details), and one per book
+# title searched when Crossref and OpenAlex did not match it.
+OPENLIBRARY_REQUESTS = 30
+OPENLIBRARY_ISBN_BATCH = 40
+# Book titles searched in Open Library per run.
+MAX_BOOK_SEARCHES = 15
+# Finding categories of the ISBN check.
+INVALID_ISBN = "invalid ISBN"
+WRONG_ISBN = "ISBN belongs to another book"
+
 # Finding categories of a reference the search says is wrong. Both rest on matching
 # titles and names, so ``validate`` offers them to ``ai.flagged_references``.
 WRONG_MATCH = "reference does not match a registered work"
@@ -210,7 +230,8 @@ _NOT_WORK_TYPES = {"dataset", "component", "peer-review", "grant", "journal-issu
 
 # arXiv identifiers: new style (2101.00001v2) and old style (hep-th/9901001v1).
 _ARXIV_ID = r"(\d{4}\.\d{4,5}|[a-z][a-z.-]+(?:\.[A-Z]{2})?/\d{7})(?:v(\d+))?"
-_ARXIV_IN_TEXT = re.compile(r"(?:arxiv\s*[:.]?\s*(?:abs/)?|arxiv\s?\.\s?org/\s?(?:abs|pdf)/\s?|10\.48550/arxiv\.)" + _ARXIV_ID, re.IGNORECASE)
+# alphaXiv (alphaxiv.org/abs/<id>, /overview/<id>) is a discussion site over arXiv that uses arXiv's ids.
+_ARXIV_IN_TEXT = re.compile(r"(?:arxiv\s*[:.]?\s*(?:abs/)?|(?:arxiv|alphaxiv)\s?\.\s?org/\s?(?:abs|pdf|html|overview)/\s?|10\.48550/arxiv\.)" + _ARXIV_ID, re.IGNORECASE)
 _ARXIV_BARE = re.compile(r"^\s*" + _ARXIV_ID + r"\s*$", re.IGNORECASE)
 _PREPRINT_DOI_PREFIXES = ("10.1101/",)  # bioRxiv and medRxiv
 # A venue that is the preprint server itself: "arXiv preprint arXiv:...", "CoRR", "ArXiv", "arXiv e-prints".
@@ -258,6 +279,10 @@ class Reference:
     doi: str = ""
     arxiv_id: str = ""
     arxiv_version: int | None = None
+    # The version a bioRxiv/medRxiv DOI was cited with ("...613029v2"), None when unpinned.
+    preprint_version: int | None = None
+    # The ISBNs the entry gives, as written (see :mod:`paperpush.isbn`).
+    isbns: list[str] = field(default_factory=list)
 
     @property
     def indexed(self) -> bool:
@@ -470,6 +495,7 @@ class _Services:
     arxiv: _Service
     biorxiv: _Service
     datacite: _Service = field(default_factory=lambda: _Service("DataCite", DATACITE_REQUESTS))
+    openlibrary: _Service = field(default_factory=lambda: _Service("Open Library", OPENLIBRARY_REQUESTS))
     semanticscholar: _Service = field(default_factory=lambda: _Service("Semantic Scholar", S2_REQUESTS, delay=S2_DELAY, shared_pace=True))
 
 
@@ -488,7 +514,7 @@ def _services() -> _Services:
 
 # volume ... editor: for the detail check (paperpush.reference_details), which holds a matched
 # entry against the rest of its record.
-_CROSSREF_FIELDS = "DOI,title,author,issued,type,relation,container-title,short-container-title,updated-by,update-to,volume,issue,page,article-number,ISSN,editor,published-print,published-online"
+_CROSSREF_FIELDS = "DOI,title,author,issued,type,relation,container-title,short-container-title,updated-by,update-to,volume,issue,page,article-number,ISSN,editor,published-print,published-online,publisher,ISBN"
 
 
 # Semantic Scholar's title match, the last look for a reference no other registry matched: it
@@ -915,6 +941,18 @@ def datacite_arxiv_title_search(title: str, service: _Service) -> list[dict] | N
     return out
 
 
+def biorxiv_latest_version(doi: str, service: _Service) -> int | None:
+    """The latest version of a bioRxiv/medRxiv preprint, or None if unknown."""
+    for server in ("biorxiv", "medrxiv"):
+        data = service.get_json(f"https://api.biorxiv.org/details/{server}/{urllib.parse.quote(doi, safe='/.')}")
+        if not isinstance(data, dict):
+            return None
+        versions = [int(v) for item in data.get("collection") or [] if str((item or {}).get("version") or "").isdigit() for v in [item["version"]]]
+        if versions:
+            return max(versions)
+    return None
+
+
 def biorxiv_published_doi(doi: str, service: _Service) -> str | None:
     """The journal DOI a bioRxiv/medRxiv preprint was published as, "" if none, None if unknown."""
     for server in ("biorxiv", "medrxiv"):
@@ -928,6 +966,203 @@ def biorxiv_published_doi(doi: str, service: _Service) -> str | None:
         if data.get("collection"):
             return ""
     return ""
+
+
+# --- books (Open Library) ------------------------------------------------------------------
+
+# Entry kinds the Open Library title search is for: a whole book (a chapter's title is not in it).
+BOOK_KINDS = {"book", "booklet", "manual", "mvbook", "collection", "proceedings"}
+# A reference-list entry that reads like a book: a publisher, an edition, or an ISBN.
+_BOOKISH = re.compile(
+    r"\b(?:press|publish(?:ing|ers?)|verlag|springer|wiley|elsevier|academic|routledge|sage|pearson|mcgraw|"
+    r"prentice|addison|o'reilly|crc|taylor\s*&\s*francis|\d+(?:st|nd|rd|th)\s+edn?\.?|edition|isbn)\b",
+    re.IGNORECASE,
+)
+
+
+def _openlibrary_year(date: str) -> int | None:
+    years = re.findall(r"(?<!\d)(1[5-9]\d\d|20\d\d)(?!\d)", date or "")
+    return int(years[-1]) if years else None
+
+
+def _openlibrary_book(data: dict, details: dict, isbn: str = "") -> dict:
+    """An Open Library edition (``jscmd=data`` and ``jscmd=details``) in the CSL shape the comparisons read."""
+    title = str(data.get("title") or details.get("title") or "").strip()
+    subtitle = str(data.get("subtitle") or details.get("subtitle") or "").strip()
+    authors = [_openalex_author(str(a.get("name"))) for a in data.get("authors") or [] if isinstance(a, dict) and a.get("name")]
+    publishers = [str(p.get("name") if isinstance(p, dict) else p).strip() for p in data.get("publishers") or details.get("publishers") or []]
+    year = _openlibrary_year(str(data.get("publish_date") or details.get("publish_date") or ""))
+    ids = data.get("identifiers") or {}
+    isbns = [*(ids.get("isbn_13") or details.get("isbn_13") or []), *(ids.get("isbn_10") or details.get("isbn_10") or [])]
+    record = {
+        "title": [f"{title}: {subtitle}" if subtitle else title],
+        "short-title": [title],
+        "author": authors,
+        "issued": {"date-parts": [[year]]} if year else {},
+        "type": "book",
+        "publisher": publishers[0] if publishers else "",
+        "publishers": [p for p in publishers if p],
+        "edition": str(details.get("edition_name") or ""),
+        "ISBN": [i for i in isbns if i] or ([isbn] if isbn else []),
+        "URL": str(data.get("url") or ""),
+        "source": "Open Library",
+    }
+    return record
+
+
+def openlibrary_isbn_records(isbns: list[str], service: _Service) -> dict[str, dict] | None:
+    """Open Library's edition record for each ISBN-13 it knows (absent: it does not), or None if it did not answer."""
+    out: dict[str, dict] = {}
+    for start in range(0, len(isbns), OPENLIBRARY_ISBN_BATCH):
+        batch = isbns[start : start + OPENLIBRARY_ISBN_BATCH]
+        keys = ",".join(f"ISBN:{i}" for i in batch)
+        data = service.get_json(f"https://openlibrary.org/api/books?{urllib.parse.urlencode({'bibkeys': keys, 'jscmd': 'data', 'format': 'json'})}")
+        if not isinstance(data, dict):
+            return out or None
+        details = service.get_json(f"https://openlibrary.org/api/books?{urllib.parse.urlencode({'bibkeys': keys, 'jscmd': 'details', 'format': 'json'})}")
+        details = details if isinstance(details, dict) else {}
+        for isbn in batch:
+            found = data.get(f"ISBN:{isbn}")
+            if isinstance(found, dict) and (found.get("title")):
+                more = (details.get(f"ISBN:{isbn}") or {}).get("details") or {}
+                out[isbn] = _openlibrary_book(found, more if isinstance(more, dict) else {}, isbn)
+    return out
+
+
+def openlibrary_search(title: str, author: str, year: str, service: _Service) -> list[dict] | None:
+    """Open Library's books with this title (and author), CSL-shaped, or None if it did not answer.
+
+    A work in Open Library spans its editions, so each candidate is dated by the
+    edition year nearest the reference's, not by the first edition.
+    """
+    params = {"title": title[:200], "fields": "key,title,subtitle,author_name,first_publish_year,publish_year,publisher,isbn", "limit": 5}
+    if author:
+        params["author"] = author
+    data = service.get_json("https://openlibrary.org/search.json?" + urllib.parse.urlencode(params))
+    if not isinstance(data, dict):
+        return None
+    want = _year_value(year)
+    out: list[dict] = []
+    for doc in data.get("docs") or []:
+        if not isinstance(doc, dict) or not doc.get("title"):
+            continue
+        years = [int(y) for y in doc.get("publish_year") or [] if isinstance(y, int) or str(y).isdigit()]
+        chosen = min(years, key=lambda y: abs(y - want)) if years and want else doc.get("first_publish_year")
+        subtitle = str(doc.get("subtitle") or "").strip()
+        out.append(
+            {
+                "title": [f"{doc['title']}: {subtitle}" if subtitle else str(doc["title"])],
+                "short-title": [str(doc["title"])],
+                "author": [_openalex_author(str(n)) for n in doc.get("author_name") or [] if n],
+                "issued": {"date-parts": [[chosen]]} if chosen else {},
+                "type": "book",
+                "publishers": [str(p) for p in doc.get("publisher") or [] if p],
+                "publisher": "",
+                "ISBN": [str(i) for i in doc.get("isbn") or []][:20],
+                "URL": f"https://openlibrary.org{doc['key']}" if doc.get("key") else "",
+                "source": "Open Library",
+            }
+        )
+    return out
+
+
+def _is_book_reference(ref: Reference) -> bool:
+    if ref.title:
+        return ref.kind in BOOK_KINDS
+    return bool(ref.isbns) or bool(_BOOKISH.search(ref.text))
+
+
+def _book_titles(record: dict) -> list[str]:
+    return [t for key in ("title", "short-title") for t in (record.get(key) or []) if isinstance(t, str) and t.strip()]
+
+
+def _isbn_title_match(ref: Reference, record: dict) -> str:
+    """Whether the book an ISBN belongs to is the one the reference cites: "same", "other", or "unsure"."""
+    titles = _book_titles(record)
+    if not titles:
+        return "unsure"
+    if ref.title:
+        score = max(title_similarity(ref.title, t) for t in titles)
+        overlap = max(word_overlap(ref.title, t) for t in titles)
+        if score >= TITLE_MATCH_RATIO:
+            return "same"
+        return "other" if score < NEAR_TITLE_RATIO and overlap < NEAR_WORD_OVERLAP else "unsure"
+    words = set(_normalize_text(ref.text).split())
+    shares = []
+    for t in titles:
+        significant = _significant_words(_work_title(t))
+        if significant:
+            shares.append(sum(1 for w in significant if w in words) / len(significant))
+    if not shares:
+        return "unsure"
+    best = max(shares)
+    return "same" if best >= PROSE_TITLE_OVERLAP else "other" if best < 0.34 else "unsure"
+
+
+@dataclass
+class IsbnResult:
+    """What :func:`isbn_findings` found, for ``integrity.isbns``."""
+
+    findings: list[Finding] = field(default_factory=list)
+    # The reference's label -> the Open Library record of the book its ISBN belongs to (when it is that book).
+    records: dict[str, dict] = field(default_factory=dict)
+    # ISBNs read, valid ones, valid ones Open Library answered for, and whether it answered at all.
+    read: int = 0
+    valid: int = 0
+    found: int = 0
+    answered: bool = True
+
+
+def isbn_findings(refs: list[Reference], *, services: _Services | None = None) -> IsbnResult:
+    """Check every ISBN the references give: its check digit (offline), then the book Open Library has under it.
+
+    An ISBN that fails its check digit, or has the wrong number of digits, is a
+    warning. A valid ISBN that Open Library files under a plainly different
+    title is a likely error, offered to ``ai.flagged_references``, because it
+    points at another book (copied from another entry, or made up). One Open
+    Library does not know is not reported: its catalogue has gaps.
+    """
+    from .isbn import isbn_problem, to_isbn13
+
+    svc = services or _services()
+    result = IsbnResult()
+    wanted: dict[str, list[tuple[Reference, str]]] = {}
+    for ref in refs:
+        for raw in ref.isbns:
+            result.read += 1
+            problem = isbn_problem(raw)
+            if problem:
+                result.findings.append(Finding(ref.where, INVALID_ISBN, f"{ref.label} gives the ISBN {raw}, which is not a valid ISBN: {problem}. Check it against the book's copyright page or the publisher's site"))
+                continue
+            result.valid += 1
+            wanted.setdefault(to_isbn13(raw), []).append((ref, raw))
+    if not wanted:
+        return result
+    records = openlibrary_isbn_records(sorted(wanted), svc.openlibrary) if svc.openlibrary.available else None
+    if records is None:
+        result.answered = False
+        return result
+    for isbn, cited in wanted.items():
+        record = records.get(isbn)
+        if record is None:
+            continue
+        result.found += 1
+        for ref, raw in cited:
+            verdict = _isbn_title_match(ref, record)
+            if verdict == "same":
+                result.records.setdefault(ref.label, record)
+            elif verdict == "other":
+                own = ref.title or _prose_title(ref.text) or ref.text[:80]
+                publisher = record.get("publisher") or ""
+                result.findings.append(
+                    Finding(
+                        ref.where,
+                        WRONG_ISBN,
+                        f'{ref.label} ("{own[:100]}") gives the ISBN {raw}, which Open Library lists as {_describe(record)}{f", {publisher}" if publisher else ""}. Check the ISBN: it may be another book\'s, or made up',
+                        LEVEL_LIKELY,
+                    )
+                )
+    return result
 
 
 # --- reading the references -------------------------------------------------------------
@@ -985,15 +1220,28 @@ def references_from_entries(entries: Iterable[Entry]) -> list[Reference]:
                 doi=e.doi,
                 arxiv_id=arxiv_id,
                 arxiv_version=version,
+                preprint_version=_preprint_version_of(e),
+                isbns=isbns_in_field(_strip_latex(e.fields.get("isbn", ""))),
             )
         )
     return refs
 
 
+def _preprint_version_of(entry: Entry) -> int | None:
+    """The bioRxiv/medRxiv version a ``.bib`` entry cites, from its DOI or its URL."""
+    from .references import _DOI_IN_TEXT, preprint_doi_version
+
+    for value in (entry.raw_doi, entry.fields.get("url", ""), entry.fields.get("note", ""), entry.fields.get("howpublished", "")):
+        m = _DOI_IN_TEXT.search(_strip_latex(value or "")) if value else None
+        if m and (version := preprint_doi_version(m.group(0))):
+            return version
+    return None
+
+
 def references_from_text(path: Path) -> list[Reference]:
     """One :class:`Reference` per entry of the manuscript's own reference list (no ``.bib``)."""
     from .bibliography_check import read_bibliography
-    from .references import _DOI_IN_TEXT
+    from .references import _DOI_IN_TEXT, preprint_doi_version
 
     bib = read_bibliography(path)
     if bib is None or (bib.mode == "keys" and bib.printed_only_cited):
@@ -1015,6 +1263,8 @@ def references_from_text(path: Path) -> list[Reference]:
                 doi=normalize_doi(doi_match.group(0)) if doi_match else "",
                 arxiv_id=_arxiv_key(arxiv.group(1)) if arxiv else "",
                 arxiv_version=int(arxiv.group(2)) if arxiv and arxiv.group(2) else None,
+                preprint_version=preprint_doi_version(doi_match.group(0)) if doi_match else None,
+                isbns=isbns_in_text(text),
             )
         )
     return refs
@@ -1755,6 +2005,8 @@ def search_references(refs: list[Reference], *, services: _Services | None = Non
             break
         result.lookups.append(_search_one(ref, svc))
 
+    _book_second_look(result, svc)
+
     for lk in result.lookups:
         if lk.status == MATCHED and lk.problems and lk.source != "arXiv" and not lk.ref.indexed and not any(p.startswith(WRONG_AUTHORS) for p in lk.problems):
             # A book, a web page, a prose entry: the "match" may be a review or
@@ -1781,6 +2033,37 @@ def search_references(refs: list[Reference], *, services: _Services | None = Non
     return result
 
 
+def _book_second_look(result: SearchResult, svc: _Services) -> None:
+    """Search Open Library for the books Crossref and OpenAlex did not match.
+
+    A match takes a book off the unverified list. A miss changes nothing: a book
+    is never accused for want of a record.
+    """
+    searched = 0
+    for i, lk in enumerate(result.lookups):
+        ref = lk.ref
+        if lk.status == MATCHED or lk.source == "arXiv" or not _is_book_reference(ref):
+            continue
+        if searched >= MAX_BOOK_SEARCHES or not svc.openlibrary.available:
+            break
+        if ref.title:
+            title, author, match = ref.title, ref.author, match_entry
+        else:
+            title, author, match = _prose_title(ref.text), _entry_lead_author(ref.text), match_text
+            if _not_a_title(title):
+                continue
+        if len(_normalize_text(title).split()) < MIN_TITLE_WORDS:
+            continue
+        searched += 1
+        books = openlibrary_search(title, author, ref.year, svc.openlibrary)
+        if not books:
+            continue
+        second = match(ref, books)
+        if second.status == MATCHED and not second.problems:
+            second.source = f"{lk.source}, then Open Library" if lk.source else "Open Library"
+            result.lookups[i] = second
+
+
 # --- publication versions ---------------------------------------------------------------
 
 
@@ -1794,6 +2077,7 @@ class Cited:
     record: dict
     arxiv_id: str = ""
     arxiv_version: int | None = None
+    preprint_version: int | None = None
 
 
 def _published_as(record: dict) -> str:
@@ -1925,6 +2209,11 @@ def version_findings(
             journal = biorxiv_published_doi(c.doi, svc.biorxiv) or ""
         if journal and journal != c.doi:
             published(c.label, c.where, f"(DOI {c.doi})", journal)
+        elif c.preprint_version and c.doi.startswith(_PREPRINT_DOI_PREFIXES) and svc.biorxiv.available:
+            latest = biorxiv_latest_version(c.doi, svc.biorxiv)
+            if latest and c.preprint_version < latest:
+                done.add(c.label)
+                findings.append(Finding(c.where, "older preprint version", f"{c.label} cites version {c.preprint_version} of the preprint {c.doi}, but the latest version is {latest}; cite the latest version (or drop the version number)"))
 
     records = dict(arxiv_records or {})
     checked = set(arxiv_checked)
@@ -2016,13 +2305,13 @@ def flagged_task_instructions(flags: dict[str, str]) -> str:
     if len(flags) > len(shown):
         lines.append(f"- ... and {len(flags) - len(shown)} more, which stay as reported.")
     return (
-        "paperpush's registry lookups (doi.org, Crossref, OpenAlex, arXiv) reported these references as likely errors. "
+        "paperpush's registry lookups (doi.org, Crossref, OpenAlex, arXiv, Open Library) reported these references as likely errors. "
         "The lookups compare titles and author names as strings, so they misfire on a title written differently from the "
         "registered one, a conference paper indexed under its proceedings, a group or consortium author, an entry garbled "
         "by PDF text extraction, and kinds of work the registries index poorly. For each flag, look the reference up (the "
         "web, Crossref, OpenAlex, DBLP, arXiv, the publisher's page) and compare what you find with the entry in the files. "
         "A flag is a false positive only when the work exists and the entry's title, authors, year, and DOI (if it gives "
-        "one) describe that work; a real work cited with another paper's DOI, the wrong authors, or the wrong year is "
+        "one) describe that work; a real work cited with another paper's DOI or another book's ISBN, the wrong authors, or the wrong year is "
         "flagged correctly. Do not judge from memory alone. Report 'pass' if every flag is a false positive, 'fail' if any "
         "flag is right (name each one, say what is wrong, and give the correct details where you found them), and "
         "'unclear' if you could not look them up. Whatever the status, add a 'cleared' list with the ids of the flags you "

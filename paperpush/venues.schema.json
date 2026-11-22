@@ -33,7 +33,7 @@
           "type": "string"
         },
         "anonymous": {
-          "description": "Anonymous (double-blind) review: validate checks the attached files and linked anonymous.4open.science repositories for information identifying the authors.",
+          "description": "Anonymous (double-blind) review: validate checks the attached files, linked anonymous.4open.science repositories, and the records and pages other links lead to for information identifying the authors.",
           "type": "boolean"
         },
         "deprecated": {

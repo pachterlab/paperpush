@@ -65,7 +65,7 @@ open the `SKILL.md` and follow it as written.
 | `paperpush-autofill` | Reads the manuscript directory, writes `values.json`, and applies it with `paperpush autofill --engine manual`. Leaves `never` fields for the author. On an already-filled `.sub` it updates instead: takes the venue and file paths from the file, previews with `--keep-existing`, and asks before replacing any value the new draft contradicts. | wants a `.sub` filled from their files, or refreshed after the manuscript changed, and nothing else yet. |
 | `paperpush-validate` | Runs `paperpush validate`, then does the checks that need a reader (lettering in raster figures, panel labels, figure and panel content vs. legends and text, free-text guideline rules, `.sub` vs manuscript) through `--ai-tasks` / `--ai-results`. Optionally saves the report. For a venue paperpush does not support yet, builds a temporary entry with `paperpush-add-venue-validate` (temporary mode) and validates against it. | asks whether a manuscript or `.sub` is ready, meets a venue's guidelines, or passes validation, or wants the AI checks or a saved report. |
 | `paperpush-fix` | Backs up the files, runs `paperpush validate --json`, finds the editable source behind each file (the `.tex`/`.docx` behind a PDF), fixes the mechanical issues and trims text over a limit by at most 100 words and 50% of the limit, rebuilds the PDF, and validates again, for up to three rounds. For page-layout issues it offers `paperpush format` first (the venue's template, applied to a new copy), and for a file type the venue does not accept it offers `paperpush convert`. Reports what it fixed, what needs the author's decision, and what it can't fix. Never ticks a confirmation or invents content. | asks to fix what validate found, to make a `.sub` pass validation, or to clean up the errors and warnings. |
-| `paperpush-transfer` | Moves a manuscript prepared for one venue to another: copies the files into `<source-dir>/<venue>/` (never touching the originals), creates the new `.sub`, runs `autofill` reusing the values in earlier `.sub` files, converts the manuscript copy with `paperpush convert` when the new venue does not accept its file type, reformats it for the new venue with `paperpush format` (its template when one is found, else its layout rules), runs `validate` (offering `fix`), and writes `transfer.txt` listing every change. For a venue paperpush does not support yet, builds a draft entry with `paperpush-add-venue-validate` (temporary mode), kept in the transfer's `venue_draft/`, and never submits. | wants to transfer, resubmit, or move a manuscript from one venue to another, e.g. after a rejection. |
+| `paperpush-transfer` | Moves a manuscript prepared for one venue to another: copies the files into `<source-dir>/<venue>/` (never touching the originals), creates the new `.sub`, runs `autofill` reusing the values in earlier `.sub` files, converts the manuscript copy with `paperpush convert` when the new venue does not accept its file type, reformats it for the new venue with `paperpush format` (its template when one is found, else its layout rules), runs `validate` (offering `fix`) and saves its report in the new directory, and writes `transfer.txt` listing every change. For a venue paperpush does not support yet, builds a draft entry with `paperpush-add-venue-validate` (temporary mode), kept in the transfer's `venue_draft/`, and never submits. | wants to transfer, resubmit, or move a manuscript from one venue to another, e.g. after a rejection. |
 | `paperpush-respond-to-reviewers` | Two phases. Phase 1: makes `<manuscript-dir>/revisionN/` (N = one more than the existing revisions), copies the manuscript files and the reviews into it, drafts the response document (comments verbatim in italics, responses in plain text), and proposes a plan per comment, then stops for the author. Phase 2, once approved: revises the copy, writes the responses, builds the marked manuscript (`revision.marked_manuscript` from the venue's guidelines unless the user overrides it; default red text; or highlight, Word Track Changes, or none), and runs `validate`. Never touches the originals or submits. | has received reviews or a decision letter and wants a revision, a response to reviewers, or a rebuttal letter. |
 | `paperpush-login` | Gets a working, stored login for one venue without the password passing through the chat: runs `paperpush login <venue> --browser` in the background, which opens a one-time sign-in page on 127.0.0.1 where the author types their credentials; paperpush checks them against the venue and stores them in the OS keyring. Also reports (`--status`), re-checks (`--check`), and removes (`--logout`) a login. | wants to sign in to a venue, store or switch a login, or check one still works, with or without a submission to follow. `paperpush-submit` and `prepare-submission` call it for a missing login. |
 | `paperpush-submit` | Takes a filled `.sub` to the portal: re-checks the login (`paperpush login <venue> --check`, signing in through `paperpush-login` when it fails), confirms with the user, runs `submit` (or `submit(skip_validate=true)` when asked to skip validation), and follows the run, handing a failed step to `paperpush-portal-debug`. Stops before the final submit. | has a `.sub` ready and wants the portal filled in, e.g. "fill out the submission portal to nature", optionally "skip validation". |
@@ -426,6 +426,11 @@ corresponding author's country), queuing
 spelling, grammar, and tense as the AI check `ai.prose`. Warnings from this
 pass are heuristics over extracted text and images: relay them to the user as
 things to confirm, not as blockers. `--disable-manuscript` skips the pass.
+`--disable-network-checks` (MCP: `disable_network_checks=true`; on the web page,
+the *disable network checks* box) makes validate send no network request: the
+link, DOI, reference, OpenReview, registry, and repository lookups and the
+anonymity check's fetches are reported as not checked. Use it when the user
+asks for an offline run, not to hide what a lookup found.
 
 Files can be validated without a `.sub`: `paperpush validate --manuscript FILE
 [--title-page FILE] [--cover-letter FILE] [--figures FILE ...] [--tables FILE
@@ -521,8 +526,8 @@ verify.
 
 `ai.flagged_references` is the second opinion on the reference likely errors
 the registry lookups raised (a DOI registered to a different title, a `.bib`
-entry that matches no work, an author list that is not the work's), which rest
-on string matching. Look each flag up;
+entry that matches no work, an author list that is not the work's, an ISBN that
+Open Library files under another book), which rest on string matching. Look each flag up;
 add `"cleared": ["ref-…"]` to the result with the ids of the flags you verified
 as false positives (the work exists and the entry describes it). Those are
 lowered to warnings on the next full `validate --ai-results` run (not
@@ -549,10 +554,17 @@ anonymity pass on every `validate`; `paperpush validate --anonymous` (MCP:
 attached files and the `.sub`'s text fields for the authors' names, emails,
 ORCID/OpenReview IDs and affiliations (from the author list), author metadata
 (PDF, Office, EXIF), home-directory paths, an acknowledgments section, and
-camera-ready LaTeX switches, and it fetches every linked
+camera-ready LaTeX switches, and for an author's handle or surname in any
+link outside the reference list (`huggingface.co/<handle>`, `wandb.ai/<handle>`,
+`<surname>lab.org`, a `~user` page). It fetches every linked
 anonymous.4open.science repository and scans that too, including an expired or
-missing mirror. Warnings start with `anonymity:`; relay each one to the user,
-since a leak can get a paper desk-rejected.
+missing mirror. It also opens what the other links lead to: the creators of a
+linked Zenodo, Figshare, or OSF record and of any other DOI, the README and
+LICENSE of a linked GitHub or Hugging Face repository (and the Zenodo or
+Figshare record's), a GitHub account's display name, and a page the text
+presents as the authors' own ("Project page: ..."). Warnings start with
+`anonymity:`; relay each one to the user, since a leak can get a paper
+desk-rejected.
 
 The same pass queues the AI check `ai.anonymity`, for what a keyword scan
 cannot see: the authors' earlier work claimed in the first person in any

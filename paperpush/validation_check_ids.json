@@ -136,6 +136,7 @@
  "integrity.chatbot_residue",
  "integrity.dois",
  "integrity.hidden_text",
+ "integrity.isbns",
  "integrity.journal_indexing",
  "integrity.latex_cleaner",
  "integrity.links",

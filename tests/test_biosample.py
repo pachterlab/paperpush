@@ -50,7 +50,7 @@ GOOD = [
 @pytest.fixture
 def package(monkeypatch):
     parsed = biosample.parse_package_xml(PACKAGE_XML, PACKAGE)
-    monkeypatch.setattr(biosample, "fetch_package", lambda name: parsed)
+    monkeypatch.setattr(biosample, "fetch_package", lambda name, **k: parsed)
     return parsed
 
 

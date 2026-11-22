@@ -168,14 +168,15 @@ guess failed.
    - `ai.flagged_references` lists the references the lookups themselves
      reported as likely errors (a DOI registered to a different title or
      authors, a `.bib` entry that matches no registered work, an author list
-     that is not the work's), each with an id
+     that is not the work's, an ISBN that Open Library files under another
+     book), each with an id
      like `ref-0123abcd`. The lookups match strings, so they misfire on a
      title worded differently, a paper indexed under its proceedings, a group
      author, or garbled PDF text. Look each one up the same way. Add a
      `"cleared": [...]` list to this result with the ids you verified as
      false positives: the work exists and the entry's title, authors, year,
-     and DOI describe it. A real work cited with another paper's DOI or the
-     wrong authors is not cleared. `pass` = every flag is a false positive;
+     and DOI (or ISBN) describe it. A real work cited with another paper's DOI,
+     another book's ISBN, or the wrong authors is not cleared. `pass` = every flag is a false positive;
      `fail` = at least one is right (name it in `details`). Cleared flags are
      lowered to warnings when you merge with `--ai-results` (a full run, not
      `--ai-only`). Don't clear a flag you could not verify.

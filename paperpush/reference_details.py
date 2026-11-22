@@ -16,7 +16,15 @@ module does that with the records those checks already fetched, so
   abbreviation, and its acronym ("Proc. Natl. Acad. Sci. USA" and "PNAS" are
   both the Proceedings of the National Academy of Sciences);
 * **year, volume, issue, pages**: against the registered values (the first
-  page or the article number; a year within one of any registered date);
+  page or the article number, and the last page; a year within one of any
+  registered date);
+* **books**: the edition, against the registered one, and the publisher,
+  against the registered publisher(s), loosely ("Springer" is "Springer-Verlag
+  New York"; a publisher that differs is a suggestion, since imprints merge
+  and are renamed). The records come from Crossref or, for a book with no
+  DOI, Open Library (see :mod:`paperpush.reference_search`), whose author
+  lists mix in editors and translators, so their authors are not compared
+  name by name;
 * **completeness**: a journal article with no journal, a book chapter with no
   book title or editors, a journal named as the author, and a journal article
   with no volume or pages, quoting the registered values to add.
@@ -55,6 +63,7 @@ INCOMPLETE = "incomplete reference"
 MISSING_NUMBERS = "reference without volume or pages"
 UNINDEXED = "cited journal not indexed"
 UNKNOWN_JOURNAL = "cited journal not in OpenAlex"
+PUBLISHER = "reference publisher differs from the registered one"
 
 # Of an entry's listed authors, below this share among the registered ones the list is another work's.
 AUTHOR_SHARE = 0.5
@@ -180,6 +189,115 @@ def _digits(value: str) -> str:
     """The number in a page, volume, or article number ("e1007820" -> "1007820", "S12" -> "12")."""
     found = re.findall(r"\d+", value or "")
     return found[0].lstrip("0") or "0" if found else ""
+
+
+# --- books: publisher and edition -----------------------------------------------------------
+
+_BOOK_KINDS = frozenset({"book", "monograph", "edited-book", "reference-book", "book-set", "book-chapter", "book-section", "book-part"})
+# Words that say a name is a publisher's rather than which one: "Springer-Verlag New York" is
+# Springer, "Cambridge University Press" is Cambridge University. Places an imprint adds are here
+# too; "University" is kept, but never matches on its own.
+_PUBLISHER_GENERIC = frozenset(
+    "the of and a press publishing publishers publisher publications publication pub pubs inc incorporated ltd limited llc "
+    "co company corp corporation group gmbh verlag ag sa bv plc imprint books book media international intl global "
+    "new york london berlin heidelberg cham dordrecht boston oxford-uk singapore usa uk us nature science business "
+    "springerlink online service".split()
+)
+
+
+def record_publishers(record: dict) -> list[str]:
+    names = [record.get("publisher")] + list(record.get("publishers") or [])
+    return list(dict.fromkeys(_clean(n) for n in names if isinstance(n, str) and n.strip()))
+
+
+def _publisher_words(name: str) -> list[str]:
+    """A publisher's name's distinctive words, in order."""
+    tokens = _normalize_text(name.replace("&", " and ").replace("-", " ")).split()
+    tokens = ["university" if t in ("univ", "u") else t for t in tokens]
+    return [t for t in tokens if t not in _PUBLISHER_GENERIC and len(t) > 1]
+
+
+def publisher_tokens(name: str) -> set[str]:
+    return set(_publisher_words(name))
+
+
+def _publisher_acronym(name: str) -> str:
+    """ "Massachusetts Institute of Technology Press" -> "mit"."""
+    words = _publisher_words(name)
+    return "".join(w[0] for w in words) if len(words) > 1 else ""
+
+
+def same_publisher(cited: str, record: dict) -> bool | None:
+    """Whether ``cited`` names one of the record's publishers (None: nothing to compare)."""
+    own = publisher_tokens(cited)
+    registered = [(name, publisher_tokens(name)) for name in record_publishers(record)]
+    registered = [(name, tokens) for name, tokens in registered if tokens]
+    if not registered or not own:
+        return None
+    for name, tokens in registered:
+        if (own & tokens) - {"university"}:
+            return True
+        # "MIT Press" for "Massachusetts Institute of Technology Press", and the reverse.
+        if own == {_publisher_acronym(name)} or tokens == {_publisher_acronym(cited)}:
+            return True
+    return False
+
+
+def publisher_named_in(text: str, record: dict) -> bool | None:
+    """Whether reference-list ``text`` names one of the record's publishers (None: nothing to compare)."""
+    registered = [publisher_tokens(n) - {"university"} for n in record_publishers(record)]
+    registered = [r for r in registered if r]
+    if not registered:
+        return None
+    words = set(_normalize_text(text.replace("-", " ")).split())
+    return any(names & words for names in registered)
+
+
+_ORDINAL_WORDS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10, "eleventh": 11, "twelfth": 12}
+_EDITION_NUMBER = re.compile(r"^\s*(\d{1,2})(?:st|nd|rd|th)?\b", re.IGNORECASE)
+_EDITION_IN_TEXT = re.compile(r"\b(?:(\d{1,2})(?:st|nd|rd|th)|(" + "|".join(_ORDINAL_WORDS) + r"))\s+(?:rev(?:ised)?\.?\s+|expanded\s+)?(?:edn?\b\.?|edition\b)", re.IGNORECASE)
+
+
+def edition_number(value: str) -> int | None:
+    """The number of an edition as a .bib or a registry writes it ("2", "2nd", "Second", "2nd ed.")."""
+    value = _strip_latex(value or "").strip()
+    if not value:
+        return None
+    m = _EDITION_NUMBER.match(value)
+    if m:
+        return int(m.group(1))
+    word = _normalize_text(value).split()
+    return _ORDINAL_WORDS.get(word[0]) if word else None
+
+
+def edition_in_text(text: str) -> int | None:
+    m = _EDITION_IN_TEXT.search(text)
+    if not m:
+        return None
+    return int(m.group(1)) if m.group(1) else _ORDINAL_WORDS[m.group(2).lower()]
+
+
+def record_edition(record: dict) -> int | None:
+    return edition_number(_one(record.get("edition")) or _one(record.get("edition-number")))
+
+
+def _ordinal(n: int) -> str:
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def _book_problems(cited_edition: int | None, record: dict) -> list[str]:
+    registered = record_edition(record)
+    if cited_edition and registered and cited_edition != registered:
+        return [f"it cites the {_ordinal(cited_edition)} edition but the work is the {_ordinal(registered)} edition"]
+    return []
+
+
+def _is_book_record(record: dict) -> bool:
+    return record_kind(record) in _BOOK_KINDS
+
+
+def _from_open_library(record: dict) -> bool:
+    return record.get("source") == "Open Library"
 
 
 # --- journal names --------------------------------------------------------------------------
@@ -383,7 +501,7 @@ _LINKS = re.compile(r"https?://\S+|\bdoi\s*:?\s*10\.\S+|\b10\.\d{4,9}/\S+|\b(?:P
 _VOL_PAGES = re.compile(r"(?<![\d.])(\d{1,5})\s*(?:\(\s*([^()]{1,15}?)\s*\))?\s*[,:]\s*(?:pp?\.\s*)?([A-Za-z]{0,2}\d{1,8})(?:\s*[-–—]\s*([A-Za-z]{0,2}\d{1,8}))?(?!\d)")
 _VOL_WORD = re.compile(r"\bvol(?:ume)?\.?\s*(\d{1,5})", re.IGNORECASE)
 _ISSUE_WORD = re.compile(r"\b(?:no|num|number|issue)\.?\s*(\d{1,5})\b", re.IGNORECASE)
-_PAGES_WORD = re.compile(r"\bpp?\.\s*([A-Za-z]{0,2}\d{1,8})", re.IGNORECASE)
+_PAGES_WORD = re.compile(r"\bpp?\.\s*([A-Za-z]{0,2}\d{1,8})(?:\s*[-–—]+\s*([A-Za-z]{0,2}\d{1,8}))?", re.IGNORECASE)
 _YEARISH = re.compile(r"^(?:1[89]|20)\d\d$")
 
 
@@ -392,6 +510,7 @@ class CitedNumbers:
     volume: str = ""
     issue: str = ""
     first_page: str = ""
+    last_page: str = ""
     numbers: set = field(default_factory=set)
 
 
@@ -408,6 +527,7 @@ def cited_numbers(tail: str) -> CitedNumbers:
     m = _PAGES_WORD.search(tail)
     if m:
         out.first_page = m.group(1)
+        out.last_page = m.group(2) or ""
     if out.volume and out.first_page:
         return out
     pos = 0
@@ -423,7 +543,8 @@ def cited_numbers(tail: str) -> CitedNumbers:
         out.volume = out.volume or volume
         if issue and not _YEARISH.match(issue.strip()):
             out.issue = out.issue or issue.strip()
-        out.first_page = out.first_page or first
+        if not out.first_page:
+            out.first_page, out.last_page = first, last or ""
         break
     return out
 
@@ -446,6 +567,11 @@ def _number_problems(cited: CitedNumbers, record: dict, *, tail_known: bool) -> 
     shown = f"{first}-{last}" if first and last else first or article
     if registered_pages and cited.first_page and _digits(cited.first_page) not in registered_pages:
         problems.append(f"pages start at {cited.first_page} but the work is {'on pages ' + shown if first else 'article ' + shown}")
+    elif first and last and cited.first_page and cited.last_page and _digits(cited.first_page) == _digits(first):
+        # The first page agrees, so the range is the work's; the end is held against the record's.
+        cited_end, registered_end = full_last_page(cited.first_page, cited.last_page), full_last_page(first, last)
+        if cited_end and registered_end and cited_end != registered_end and int(cited_end) >= int(_digits(first)):
+            problems.append(f"pages end at {cited_end} but the work ends on page {registered_end}")
     elif registered_pages and not cited.first_page and tail_known and not registered_pages & cited.numbers:
         missing.append(f"pages {shown}" if first else f"article number {shown}")
     return problems, missing
@@ -454,9 +580,19 @@ def _number_problems(cited: CitedNumbers, record: dict, *, tail_known: bool) -> 
 def _bib_numbers(entry: Entry) -> CitedNumbers:
     f = entry.fields
     pages = _strip_latex(f.get("pages", "")).strip()
-    first = re.split(r"\s*[-–—]+\s*", pages, maxsplit=1)[0] if pages else ""
-    first = first or _strip_latex(f.get("eid", "") or f.get("articleno", "") or f.get("article-number", "")).strip()
-    return CitedNumbers(volume=_strip_latex(f.get("volume", "")).strip(), issue=_strip_latex(f.get("number", "") or f.get("issue", "")).strip(), first_page=first)
+    parts = re.split(r"\s*[-–—]+\s*", pages, maxsplit=1) if pages else [""]
+    first, last = parts[0], (parts[1] if len(parts) > 1 else "")
+    if not first:
+        first, last = _strip_latex(f.get("eid", "") or f.get("articleno", "") or f.get("article-number", "")).strip(), ""
+    return CitedNumbers(volume=_strip_latex(f.get("volume", "")).strip(), issue=_strip_latex(f.get("number", "") or f.get("issue", "")).strip(), first_page=first, last_page=last)
+
+
+def full_last_page(first: str, last: str) -> str:
+    """A last page written short ("1234-9", "261-72") in full ("1239", "272"); as written otherwise."""
+    a, b = _digits(first), _digits(last)
+    if a and b and len(b) < len(a) and last.strip().isdigit():
+        return a[: len(a) - len(b)] + b
+    return b
 
 
 # --- comparison ----------------------------------------------------------------------------
@@ -465,8 +601,8 @@ def _bib_numbers(entry: Entry) -> CitedNumbers:
 _PREPRINT = re.compile(r"\barxiv\b|\bbiorxiv\b|\bmedrxiv\b|\bpreprint\b|\bssrn\b|\bresearch\s*square\b", re.IGNORECASE)
 
 
-def _bib_comparison(m: Matched) -> tuple[list[str], list[str], list[str], list[str], bool]:
-    """(differences, incomplete, missing numbers, author problems, wrong authors) for a .bib entry."""
+def _bib_comparison(m: Matched) -> tuple[list[str], list[str], list[str], list[str], bool, list[str]]:
+    """(differences, incomplete, missing numbers, author problems, wrong authors, publisher notes) for a .bib entry."""
     entry, record = m.entry, m.record
     assert entry is not None
     differences: list[str] = []
@@ -477,9 +613,10 @@ def _bib_comparison(m: Matched) -> tuple[list[str], list[str], list[str], list[s
     kind = record_kind(record)
     journal = record_journal(record)
     cited_journal = entry.fields.get("journal", "") or entry.fields.get("journaltitle", "")
+    notes: list[str] = []
     if journal_as_author(entry.author, record):
         incomplete.append(f"its author is the journal ({_strip_latex(entry.author).strip()}); the work's authors are {_listed([_registered_name(p) for p in _people(record)])}")
-    elif m.check_authors and entry.author and "author" not in entry.unresolved:
+    elif m.check_authors and entry.author and "author" not in entry.unresolved and not _from_open_library(record):
         authors, wrong = bib_author_problems(entry.author, record)
     if kind == "journal-article" and entry.kind == "article":
         if cited_journal.strip():
@@ -497,11 +634,17 @@ def _bib_comparison(m: Matched) -> tuple[list[str], list[str], list[str], list[s
         editors = _people(record, "editor")
         if editors and not entry.fields.get("editor", "").strip():
             missing.append(f"editors {_listed([_registered_name(p) for p in editors])}")
-    return differences, incomplete, missing, authors, wrong
+    if _is_book_record(record) and entry.kind in ("book", "inbook", "incollection", "booklet", "manual", "mvbook", "collection", "proceedings", "misc"):
+        if "edition" not in entry.unresolved:
+            differences += _book_problems(edition_number(entry.fields.get("edition", "")), record)
+        cited_publisher = _strip_latex(entry.fields.get("publisher", "")).strip()
+        if cited_publisher and "publisher" not in entry.unresolved and same_publisher(cited_publisher, record) is False:
+            notes.append(f"its publisher is {cited_publisher} but the work's is {' / '.join(record_publishers(record)[:3])}")
+    return differences, incomplete, missing, authors, wrong, notes
 
 
-def _text_comparison(m: Matched) -> tuple[list[str], list[str], list[str], list[str], bool]:
-    """(differences, incomplete, missing numbers, author problems, wrong authors) for a reference-list entry."""
+def _text_comparison(m: Matched) -> tuple[list[str], list[str], list[str], list[str], bool, list[str]]:
+    """(differences, incomplete, missing numbers, author problems, wrong authors, publisher notes) for a reference-list entry."""
     text, record = re.sub(r"(\w)-\s+(\w)", r"\1\2", m.text), m.record
     differences: list[str] = []
     incomplete: list[str] = []
@@ -510,10 +653,11 @@ def _text_comparison(m: Matched) -> tuple[list[str], list[str], list[str], list[
     wrong = False
     kind = record_kind(record)
     journal = record_journal(record)
+    notes: list[str] = []
     lead = _lead(text)
     if journal_as_author(lead, record):
         incomplete.append(f"its author is the journal ({lead.strip(' .,')}); the work's authors are {_listed([_registered_name(p) for p in _people(record)])}")
-    elif m.check_authors:
+    elif m.check_authors and not _from_open_library(record):
         authors, wrong = prose_author_problems(text, record)
     if m.doi:
         # The search already held the year of an entry it matched by its text.
@@ -538,7 +682,11 @@ def _text_comparison(m: Matched) -> tuple[list[str], list[str], list[str], list[
         editors = _people(record, "editor")
         if editors and not any(_matches_person(set(_normalize_text(text).split()), p) for p in editors):
             missing.append(f"editors {_listed([_registered_name(p) for p in editors])}")
-    return differences, incomplete, missing, authors, wrong
+    if _is_book_record(record):
+        differences += _book_problems(edition_in_text(text), record)
+        if publisher_named_in(_LINKS.sub(" ", text), record) is False:
+            notes.append(f"it does not name the work's publisher, {' / '.join(record_publishers(record)[:3])} (it gives another, or none)")
+    return differences, incomplete, missing, authors, wrong, notes
 
 
 def _describe(record: dict) -> str:
@@ -557,7 +705,7 @@ def detail_findings(matched: list[Matched]) -> list[Finding]:
         except Exception:  # noqa: BLE001 -- an odd record leaves the entry unchecked, never accused
             logger.debug("could not compare %s with its record", m.label, exc_info=True)
             continue
-        differences, incomplete, missing, authors, wrong = parts
+        differences, incomplete, missing, authors, wrong, notes = parts
         work = f"the work {'its DOI points to' if m.doi else 'it matches'} ({_describe(m.record)})"
         if wrong:
             findings.append(Finding(m.where, WRONG_AUTHORS, f"{m.label} names other authors than {work}: {'; '.join(authors)}. Check the author list against the published work", LEVEL_LIKELY))
@@ -569,6 +717,8 @@ def detail_findings(matched: list[Matched]) -> list[Finding]:
             findings.append(Finding(m.where, INCOMPLETE, f"{m.label} is incomplete: {'; '.join(incomplete)}", LEVEL_WARNING))
         if missing:
             findings.append(Finding(m.where, MISSING_NUMBERS, f"{m.label} could add the {', '.join(missing)} of {work}", LEVEL_SUGGESTION))
+        if notes:
+            findings.append(Finding(m.where, PUBLISHER, f"{m.label} names another publisher than {work}: {'; '.join(notes)}. Imprints merge and are renamed, so confirm the publisher the edition you used names", LEVEL_SUGGESTION))
     return findings
 
 

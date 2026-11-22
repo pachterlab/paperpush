@@ -5,7 +5,7 @@ Anonymous-review venues (ICLR, AAAI, ...; ``"anonymous": true`` in
 is the back end for that check in ``paperpush validate``, which runs it for those
 venues automatically and for any other venue with ``--anonymous``.
 
-Two sources are scanned:
+Three sources are scanned:
 
 * **The attached files** (every ``file``/``filelist`` upload, archive members
   included) and the ``.sub``'s own free-text values (title, abstract, TL;DR,
@@ -16,6 +16,12 @@ Two sources are scanned:
   ``github.com/<author>`` URL slips through. The mirror's files are fetched
   through the service's public API and scanned the same way; an expired or
   missing mirror is reported too, since reviewers will not be able to open it.
+* **What the other links lead to** (outside the reference list; see
+  :func:`scan_linked_records`). A URL that names nobody can open a page that
+  does: the creators of a Zenodo, Figshare, or OSF record or of any other DOI,
+  the README and LICENSE of a GitHub or Hugging Face repository or of a Zenodo
+  or Figshare record, a GitHub account's display name, and a page the text
+  presents as the authors' own ("Project page: ...").
 
 What counts as identifying:
 
@@ -34,13 +40,18 @@ What counts as identifying:
 * any non-anonymized ``github.com/<owner>/<repo>`` link outside the reference
   list, since its owner (often a lab or organization account) identifies the
   authors; a link whose owner or repository name contains an author's handle
-  or surname (``pachterlab`` for Pachter) is worded more firmly.
+  or surname (``pachterlab`` for Pachter) is worded more firmly. The same
+  goes for GitLab, Gitee, Bitbucket, Codeberg, and ``<owner>.github.io``.
+* any other link whose host or path has a segment that is an author's handle,
+  surname, or surname plus "lab"/"group" (``huggingface.co/<handle>``,
+  ``wandb.ai/<handle>``, ``pachter.caltech.edu``, ``~jrich``).
 * in a linked anonymous repository, a LICENSE copyright line naming a holder.
 
 Findings never block on a guess: LaTeX in camera-ready mode and an author named in a
 file's metadata are errors; an author's name, email, ORCID or OpenReview ID in the text,
-a GitHub link carrying an author's handle, image/comment metadata naming someone, and a
-copyright holder in a linked repository are likely errors (serious if real, but the
+a link carrying an author's handle or surname, image/comment metadata naming someone, a
+copyright holder in a linked repository, and an author found in a linked record or page
+are likely errors (serious if real, but the
 check is heuristic); the rest are warnings. All are reported through the same
 :class:`~paperpush.sensitive.Finding` shape as the other scans. A file that could
 not be read is reported too, so that a scan that did not happen is not a pass.
@@ -54,6 +65,7 @@ import html
 import io
 import json
 import logging
+import os
 import re
 import urllib.parse
 import zipfile
@@ -454,7 +466,11 @@ def scan_text(
             continue
         seen.add((host, owner.lower()))
         url = f"{host}/{owner}" + (f"/{repo}" if repo else "")
-        yield Finding(where, "identifying information", f"anonymity: non-anonymized link {url} shows its owner ('{owner}'); if it is your or your lab's code, link an anonymous mirror instead (ignore this if it is third-party software you cite)")
+        hit = _identifying_part(owner, repo, handles, surnames)
+        if hit:
+            yield Finding(where, "identifying information", f"anonymity: link {url} contains an author's name or handle ('{hit}'); link an anonymous mirror instead", LEVEL_LIKELY)
+        else:
+            yield Finding(where, "identifying information", f"anonymity: non-anonymized link {url} shows its owner ('{owner}'); if it is your or your lab's code, link an anonymous mirror instead (ignore this if it is third-party software you cite)")
     # <owner>.github.io: a personal or lab web page (a project page usually lives there).
     for match in _GITHUB_PAGES_RE.finditer(link_text):
         if any(a <= match.start() < b for a, b in ref_spans):
@@ -463,7 +479,26 @@ def scan_text(
         if ("pages", owner.lower()) in seen:
             continue
         seen.add(("pages", owner.lower()))
-        yield Finding(where, "identifying information", f"anonymity: link to the GitHub Pages site {owner}.github.io names its owner ('{owner}'); if it is your or your lab's page, remove it or use an anonymous host (ignore this if it is a third-party page)")
+        hit = _identifying_part(owner, "", handles, surnames)
+        if hit:
+            yield Finding(where, "identifying information", f"anonymity: link to the GitHub Pages site {owner}.github.io contains an author's name or handle ('{hit}'); remove it or use an anonymous host for review", LEVEL_LIKELY)
+        else:
+            yield Finding(where, "identifying information", f"anonymity: link to the GitHub Pages site {owner}.github.io names its owner ('{owner}'); if it is your or your lab's page, remove it or use an anonymous host (ignore this if it is a third-party page)")
+    # Every other link: an author's handle or surname anywhere in its host or path
+    # (a personal site, huggingface.co/<handle>, wandb.ai/<handle>, a university ~user page).
+    for match in _ANY_URL.finditer(link_text):
+        if any(a <= match.start() < b for a, b in ref_spans):
+            continue
+        url = match.group(0).rstrip(_URL_TRAILING)
+        host, parts = _url_parts(url)
+        if not host or _SPECIFIC_HOSTS.match(host) or ("url", url.lower()) in seen:
+            continue
+        seen.add(("url", url.lower()))
+        hit = next((h for h in (_segment_hit(part, handles, surnames) for part in parts) if h), None)
+        if hit:
+            shown = re.sub(r"(?i)^(?:https?://)?(?:www\.)?", "", url)
+            shown = shown if len(shown) <= 100 else shown[:97] + "..."
+            yield Finding(where, "identifying information", f"anonymity: link {shown} contains an author's name or handle ('{hit}'); reviewers who see it can tell who wrote the paper, so remove it or use an anonymous host for review", LEVEL_LIKELY)
     yield from _home_path_findings(where, text)
     if not is_manuscript:
         return
@@ -556,6 +591,49 @@ def _author_surnames(terms: list[tuple[str, str]]) -> set[str]:
             if len(parts) >= 2 and len(parts[-1]) >= MIN_SURNAME_CHARS:
                 surnames.add(parts[-1].lower())
     return surnames
+
+
+# Any web link (with a scheme, or starting "www."), and what to trim off its end.
+_ANY_URL = re.compile(r"(?i)\b(?:https?://|www\.)[^\s<>\"'`{}|\\^\[\]]+")
+_URL_TRAILING = ".,;:)]}'\"\u201d\u2019"
+# Hosts the checks above already handle with their own wording, and the anonymous mirror.
+_SPECIFIC_HOSTS = re.compile(r"(?i)^(?:www\.)?(?:github\.com|[a-z0-9-]+\.github\.io|gitlab\.com|gitee\.com|bitbucket\.org|codeberg\.org|anonymous\.4open\.science)$")
+# What a group's account or site adds to a surname: "pachterlab", "smithgroup", "labsmith".
+_GROUP_SUFFIXES = ("lab", "labs", "group", "team", "research")
+_PAGE_EXTENSION = re.compile(r"\.(?:s?html?|php|aspx?|md)$")
+
+
+def _url_parts(url: str) -> tuple[str, list[str]]:
+    """``(host, parts)``: the host, and its labels (without "www" and the top-level domain) followed by the path segments."""
+    try:
+        split = urllib.parse.urlsplit(url if "://" in url else "http://" + url)
+        host = (split.hostname or "").lower()
+    except ValueError:
+        return "", []
+    labels = [label for label in host.split(".") if label and label != "www"][:-1]
+    segments = [urllib.parse.unquote(seg) for seg in split.path.split("/") if seg]
+    return host, labels + segments
+
+
+def _segment_hit(segment: str, handles: set[str], surnames: set[str]) -> str | None:
+    """The author handle or surname one host label or path segment of a link is, if any.
+
+    Stricter than :func:`_identifying_part`, which may find a surname anywhere in a GitHub
+    owner: in an arbitrary link the whole segment must be the handle ("~jrich",
+    "josephrich.html"), the surname, or the surname with a group word ("pachterlab").
+    A surname inside a longer word ("rich-text", "enrichment") is not a hit.
+    """
+    low = _PAGE_EXTENSION.sub("", segment.lower())
+    flat = re.sub(r"[^a-z0-9]", "", low)
+    if not flat:
+        return None
+    if any(flat == re.sub(r"[^a-z0-9]", "", handle) for handle in handles):
+        return flat
+    letters = re.sub(r"[^a-z]", "", low)
+    for surname in sorted(surnames):
+        if letters == surname or letters in {surname + w for w in _GROUP_SUFFIXES} or letters == "lab" + surname:
+            return surname
+    return None
 
 
 def _identifying_part(owner: str, repo: str, handles: set[str], surnames: set[str]) -> str | None:
@@ -845,12 +923,12 @@ def find_anonymous_repos(texts: Iterable[str]) -> list[str]:
     return list(repos)
 
 
-def _http_get(url: str, timeout: float = REPO_FETCH_TIMEOUT) -> tuple[int, bytes]:
+def _http_get(url: str, timeout: float = REPO_FETCH_TIMEOUT, headers: dict[str, str] | None = None) -> tuple[int, bytes]:
     """``(status, body)`` for a GET of ``url``; ``(0, b"")`` on a transport failure."""
     import urllib.error
     import urllib.request
 
-    req = urllib.request.Request(url, headers={"User-Agent": "paperpush-validate"})
+    req = urllib.request.Request(url, headers={"User-Agent": "paperpush-validate", **(headers or {})})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:  # fixed https host  # nosec B310
             return resp.status, resp.read(MAX_REPO_FILE_BYTES + 1)
@@ -970,6 +1048,300 @@ def scan_anonymous_repo(repo: str, terms: list[tuple[str, str]]) -> list[Finding
     return findings
 
 
+# --- records and pages the submission links ------------------------------------
+#
+# A link whose URL names nobody can still open a page that does: a Zenodo or
+# Figshare record lists its creators, a dataset DOI resolves to a record with
+# authors, a GitHub or Hugging Face README carries a citation block, a project
+# page prints the author list. These are fetched and searched for the authors'
+# names, emails, ORCID and OpenReview IDs (affiliations are left out: a dataset
+# from the authors' university is not theirs).
+
+# At most this many linked records and pages are fetched per run; the rest are reported.
+MAX_LINKED_LOOKUPS = 25
+LINK_FETCH_TIMEOUT = 10.0
+# Identity terms specific enough to search fetched pages for.
+_PAGE_LABELS = {"author name", "email", "ORCID iD", "OpenReview ID"}
+_CSL = {"Accept": "application/vnd.citationstyles.csl+json"}
+
+_DOI_LINK = re.compile(r"(?i)\b(10\.\d{4,9}/[^\s<>\"'{}|\\^`\[\]]+)")
+_ZENODO_DOI = re.compile(r"(?i)^10\.5281/zenodo\.(\d+)$")
+_FIGSHARE_DOI = re.compile(r"(?i)^10\.6084/m9\.figshare\.(\d+)(?:\.v\d+)?$")
+_ZENODO_RECORD = re.compile(r"(?i)\bzenodo\.org/(?:records?|deposit|uploads)/(\d+)")
+_FIGSHARE_ARTICLE = re.compile(r"(?i)\bfigshare\.com/articles/(?:[^/\s?#]+/){0,2}?(\d{5,})\b")
+_OSF_NODE = re.compile(r"(?i)\bosf\.io/([a-z0-9]{5})(?=[/?#\s.,;)]|$)[^\s<>\"']*")
+_HF_REPO = re.compile(r"(?i)\bhuggingface\.co/(datasets/|spaces/)?([A-Za-z0-9][\w.-]*)/([A-Za-z0-9][\w.-]*)")
+_HF_RESERVED = {"docs", "papers", "blog", "models", "datasets", "spaces", "learn", "api", "settings", "join", "login", "pricing", "organizations", "collections", "tasks", "posts", "chat"}
+_README = ("README.md", "README.rst", "README.txt", "README")
+_LICENSE = ("LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING")
+# Text of an HTML page, for searching: scripts and styles dropped, tags to spaces.
+_HTML_DROP = re.compile(r"(?is)<(script|style|noscript)\b.*?</\1\s*>")
+_HTML_TAG = re.compile(r"(?s)<[^>]+>")
+# Hosts not worth fetching as a page: registries handled above, preprint servers, and the like.
+_NO_PAGE_FETCH = re.compile(r"(?i)(?:^|\.)(?:doi\.org|zenodo\.org|figshare\.com|osf\.io|huggingface\.co|github\.com|gitlab\.com|anonymous\.4open\.science|arxiv\.org|openreview\.net|biorxiv\.org|medrxiv\.org|wikipedia\.org|youtube\.com|youtu\.be|twitter\.com|x\.com)$")
+
+# What to do instead, by kind of record.
+_ADVICE = {
+    "zenodo": "Zenodo records cannot be anonymized; share the files through an anonymous host for review and give the Zenodo DOI in the camera-ready version",
+    "figshare": "use a Figshare private link (figshare.com/s/...) for review",
+    "osf": "use an OSF view-only link with 'Anonymize' ticked for review",
+}
+
+
+def _html_text(body: bytes) -> str:
+    text = body.decode("utf-8", errors="replace")
+    return html.unescape(_HTML_TAG.sub(" ", _HTML_DROP.sub(" ", text)))
+
+
+def _json(body: bytes):
+    try:
+        return json.loads(body.decode("utf-8", errors="replace"))
+    except ValueError:
+        return None
+
+
+def _page_hits(text: str, terms: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """The (label, term) pairs among the authors' names, emails, ORCID and OpenReview IDs that ``text`` contains."""
+    folded = document.fold(text)
+    return [(label, term) for label, term in terms if label in _PAGE_LABELS and _term_pattern(term, label).search(folded)]
+
+
+def _person(name: str, orcid: str = "") -> str:
+    """One creator as "Given Family [ORCID]" (registries write "Family, Given")."""
+    name = " ".join(str(name or "").split())
+    if name.count(",") == 1:
+        family, given = (part.strip() for part in name.split(","))
+        name = f"{given} {family}".strip()
+    return f"{name} {orcid}".strip()
+
+
+def _without_references(text: str) -> str:
+    """``text`` with its reference list blanked out (positions kept): links there are citations."""
+    for start, end in reversed(_reference_spans(text)):
+        text = text[:start] + " " * (end - start) + text[end:]
+    return text
+
+
+def find_linked_records(texts: Iterable[str]) -> list[tuple[str, str, str]]:
+    """``(kind, key, url)`` for each record or page worth fetching that ``texts`` link, in order.
+
+    Kinds: ``zenodo`` (record id), ``figshare`` (article id), ``osf`` (node id; a
+    view-only link is skipped), ``doi`` (any other DOI), ``huggingface``
+    ("<owner>/<repo>", "datasets/<owner>/<repo>", ...), ``github`` ("<owner>/<repo>"), and ``page``:
+    any other link the sentence around it presents as the authors' own ("Project
+    page: ..."), whose page may print the author list. ``texts`` should have their
+    reference lists removed (see :func:`_without_references`).
+    """
+    found: dict[tuple[str, str], str] = {}
+
+    def add(kind: str, key: str, url: str) -> None:
+        found.setdefault((kind, key.lower()), url.rstrip(_URL_TRAILING))
+
+    for text in texts:
+        claimed: list[tuple[int, int]] = []
+        for match in _DOI_LINK.finditer(text):
+            doi = match.group(1).rstrip(_URL_TRAILING)
+            claimed.append(match.span())
+            if (m := _ZENODO_DOI.match(doi)):
+                add("zenodo", m.group(1), "https://doi.org/" + doi)
+            elif (m := _FIGSHARE_DOI.match(doi)):
+                add("figshare", m.group(1), "https://doi.org/" + doi)
+            else:
+                add("doi", doi.lower(), "https://doi.org/" + doi)
+        for match in _ZENODO_RECORD.finditer(text):
+            claimed.append(match.span())
+            add("zenodo", match.group(1), match.group(0))
+        for match in _FIGSHARE_ARTICLE.finditer(text):
+            claimed.append(match.span())
+            add("figshare", match.group(1), match.group(0))
+        for match in _OSF_NODE.finditer(text):
+            claimed.append(match.span())
+            if "view_only=" not in match.group(0).lower():
+                add("osf", match.group(1), match.group(0))
+        for match in _HF_REPO.finditer(text):
+            claimed.append(match.span())
+            prefix, owner, repo = match.group(1) or "", match.group(2), match.group(3).rstrip(".")
+            if owner.lower() not in _HF_RESERVED:
+                add("huggingface", f"{prefix}{owner}/{repo}", match.group(0))
+        for match in _GITHUB_RE.finditer(text):
+            claimed.append(match.span())
+            for owner, repo in _find_github_repos(match.group(0)):
+                add("github", f"{owner}/{repo}", f"github.com/{owner}/{repo}")
+        for match in _ANY_URL.finditer(text):
+            if any(a <= match.start() < b or match.start() <= a < match.end() for a, b in claimed):
+                continue
+            url = match.group(0).rstrip(_URL_TRAILING)
+            host, _ = _url_parts(url)
+            if host and not _NO_PAGE_FETCH.search(host) and _presented_as_own(text, match.start(), match.end()):
+                add("page", url if "://" in url else "https://" + url, url)
+    return [(kind, key, url) for (kind, key), url in found.items()]
+
+
+def _creator_lines_csl(record: dict) -> list[str]:
+    people = (record.get("author") or []) + (record.get("editor") or [])
+    return [_person(p.get("literal") or f"{p.get('given', '')} {p.get('family', '')}", str(p.get("ORCID") or "")) for p in people if isinstance(p, dict)]
+
+
+def _fetch_files(files: list[tuple[str, int, str]]) -> list[tuple[str, str]]:
+    """``(name, text)`` of the README and LICENSE files among ``(name, size, url)``, if small enough."""
+    out = []
+    for name, size, url in files:
+        base = name.rsplit("/", 1)[-1]
+        if re.match(r"(?i)^(readme|licen[cs]e|copying)(\.\w+)?$", base) and size <= MAX_REPO_FILE_BYTES and url:
+            status, body = _http_get(url, LINK_FETCH_TIMEOUT)
+            if status == 200 and (text := _decode(body)) is not None:
+                out.append((name, text))
+    return out
+
+
+def _lookup(kind: str, key: str) -> tuple[str, list[str], list[tuple[str, str]], bool]:
+    """``(what, creators, texts, reached)`` for one linked record.
+
+    ``what`` names the record in a message, ``creators`` are its people as text
+    lines, ``texts`` are ``(label, text)`` of its description, README, LICENSE, or
+    page, and ``reached`` says whether the service answered at all.
+    """
+    if kind == "zenodo":
+        status, body = _http_get(f"https://zenodo.org/api/records/{key}", LINK_FETCH_TIMEOUT)
+        data = _json(body) if status == 200 else None
+        if not isinstance(data, dict):
+            return f"Zenodo record {key}", [], [], status in (404, 410)
+        meta = data.get("metadata") or {}
+        people = (meta.get("creators") or []) + (meta.get("contributors") or [])
+        creators = [_person(p.get("name", ""), p.get("orcid", "")) for p in people if isinstance(p, dict)]
+        texts = [("description", _html_text(str(meta.get("description") or "").encode()))]
+        entries = data.get("files") or []
+        if isinstance(entries, dict):
+            entries = entries.get("entries") or []
+            entries = list(entries.values()) if isinstance(entries, dict) else entries
+        files = [(str(f.get("key", "")), int(f.get("size") or 0), str((f.get("links") or {}).get("content") or (f.get("links") or {}).get("self") or "")) for f in entries if isinstance(f, dict)]
+        texts += _fetch_files(files)
+        return f"Zenodo record {key}", creators, texts, True
+    if kind == "figshare":
+        status, body = _http_get(f"https://api.figshare.com/v2/articles/{key}", LINK_FETCH_TIMEOUT)
+        data = _json(body) if status == 200 else None
+        if not isinstance(data, dict):
+            return f"Figshare item {key}", [], [], status in (404, 410)
+        creators = [_person(a.get("full_name", ""), a.get("orcid_id", "")) for a in data.get("authors") or [] if isinstance(a, dict)]
+        texts = [("description", _html_text(str(data.get("description") or "").encode()))]
+        files = [(str(f.get("name", "")), int(f.get("size") or 0), str(f.get("download_url") or "")) for f in data.get("files") or [] if isinstance(f, dict)]
+        texts += _fetch_files(files)
+        return f"Figshare item {key}", creators, texts, True
+    if kind == "osf":
+        status, body = _http_get(f"https://api.osf.io/v2/nodes/{key}/contributors/?embed=users", LINK_FETCH_TIMEOUT)
+        data = _json(body) if status == 200 else None
+        if not isinstance(data, dict):
+            # A file or preprint id, or a private project: nothing a reviewer would see listed.
+            return f"OSF project {key}", [], [], status in (401, 403, 404, 410)
+        creators = []
+        for item in data.get("data") or []:
+            user = (((item or {}).get("embeds") or {}).get("users") or {}).get("data") or {}
+            name = (user.get("attributes") or {}).get("full_name")
+            if name:
+                creators.append(_person(name))
+        return f"OSF project {key}", creators, [], True
+    if kind == "doi":
+        status, body = _http_get("https://doi.org/" + urllib.parse.quote(key, safe="/:._-();+<>[]#"), LINK_FETCH_TIMEOUT, headers=_CSL)
+        data = _json(body) if status == 200 else None
+        if not isinstance(data, dict):
+            # An unregistered DOI is the DOI check's to report.
+            return f"DOI {key}", [], [], status in (404, 406, 410)
+        return f"DOI {key}", _creator_lines_csl(data), [], True
+    if kind == "huggingface":
+        status, body = _http_get(f"https://huggingface.co/{key}/raw/main/README.md", LINK_FETCH_TIMEOUT)
+        if status == 200 and (text := _decode(body)) is not None:
+            return f"huggingface.co/{key}", [], [("README.md", text)], True
+        return f"huggingface.co/{key}", [], [], status in (401, 403, 404)
+    if kind == "github":
+        owner, repo = key.split("/", 1)
+        texts: list[tuple[str, str]] = []
+        reached = False
+        for group in (_README, _LICENSE):
+            for name in group:
+                status, body = _http_get(f"https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{name}", LINK_FETCH_TIMEOUT)
+                reached = reached or status in (200, 404)
+                if status == 200 and (text := _decode(body)) is not None:
+                    texts.append((name, text))
+                    break
+        creators = []
+        token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+        status, body = _http_get(f"https://api.github.com/users/{owner}", LINK_FETCH_TIMEOUT, headers={"Authorization": f"Bearer {token}"} if token else None)
+        data = _json(body) if status == 200 else None
+        if isinstance(data, dict) and data.get("name"):
+            creators.append(str(data["name"]))
+        return f"github.com/{key}", creators, texts, reached
+    # page
+    status, body = _http_get(key, LINK_FETCH_TIMEOUT)
+    if status == 200 and body:
+        return key, [], [("page", _html_text(body))], True
+    return key, [], [], status in (401, 403, 404, 410)
+
+
+def scan_linked_records(texts: Iterable[str], terms: list[tuple[str, str]]) -> list[Finding]:
+    """Fetch the records and pages ``texts`` link (see :func:`find_linked_records`) and search them for the authors."""
+    if not any(label in _PAGE_LABELS for label, _ in terms):
+        return []
+    links = find_linked_records(texts)
+    if not links:
+        return []
+    wanted, skipped = links[:MAX_LINKED_LOOKUPS], links[MAX_LINKED_LOOKUPS:]
+    logger.info("Checking %d linked record(s) and page(s) for the authors' names", len(wanted))
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def run(link: tuple[str, str, str]):
+        kind, key, url = link
+        try:
+            return link, _lookup(kind, key)
+        except Exception:  # noqa: BLE001 -- an odd response leaves the link unchecked, never fails the scan
+            logger.debug("could not look up %s", url, exc_info=True)
+            return link, (url, [], [], False)
+
+    with ThreadPoolExecutor(max_workers=REPO_FETCH_WORKERS, thread_name_prefix="paperpush-anonlinks") as pool:
+        results = list(pool.map(run, wanted))
+
+    findings: list[Finding] = []
+    missed: list[str] = []
+    for (kind, key, url), (what, creators, page_texts, reached) in results:
+        if not reached:
+            missed.append(url)
+            continue
+        if kind == "github":
+            # The account's display name: the whole name is a likely error, the surname alone (a lab account) a warning.
+            for name in creators:
+                hits = _page_hits(name, terms)
+                if hits:
+                    findings.append(Finding("submission", "identifying information", f"anonymity: the GitHub account behind {what} is named '{name}', which is author {hits[0][1]}; reviewers who open the link see it, so link an anonymous.4open.science mirror instead", LEVEL_LIKELY))
+                elif (surname := next((s for s in _author_surnames(terms) if s in document.tokens(name)), None)):
+                    findings.append(Finding("submission", "identifying information", f"anonymity: the GitHub account behind {what} is named '{name}', which contains an author's surname ('{surname}'); if it is your lab's, link an anonymous.4open.science mirror instead"))
+        else:
+            for label, term in _page_hits("\n".join(creators), terms):
+                advice = _ADVICE.get(kind, "remove it for review, or link an anonymized copy")
+                findings.append(Finding("submission", "identifying information", f"anonymity: linked {what} lists the {label} '{term}' among its creators; reviewers who open it see who wrote the paper ({advice})", LEVEL_LIKELY))
+        for part, text in page_texts:
+            for label, term in _page_hits(text, terms):
+                findings.append(Finding("submission", "identifying information", f"anonymity: the {part} of linked {what} names the {label} '{term}'; reviewers who open the link see it, so remove the link or point it at an anonymized copy for review", LEVEL_LIKELY))
+    missed += [url for _, _, url in skipped]
+    if missed:
+        shown = ", ".join(missed[:3]) + (", ..." if len(missed) > 3 else "")
+        why = f" (only the first {MAX_LINKED_LOOKUPS} links are looked up)" if skipped else ""
+        findings.append(Finding("submission", NOT_FETCHED, f"anonymity: {len(missed)} linked record(s) or page(s) could not be fetched, so they were not checked for the authors' names{why}: {shown}; open them and check"))
+    return findings
+
+
+def _body_link_texts(paths: list[Path]) -> Iterator[str]:
+    """The text of each attachment without its reference list, and a PDF's hyperlinks before its references."""
+    from .sensitive import _iter_text_blobs
+
+    for path in paths:
+        for _, text in _iter_text_blobs(path):
+            yield _without_references(text)
+        if path.suffix.lower() == ".pdf":
+            pages, links = _pdf_pages_and_links(path)
+            ref_page = next((i for i, page in enumerate(pages) if _REFERENCE_START.search(page)), len(pages))
+            yield "\n".join(uri for i, uri in links if i < ref_page)
+
+
 # --- entry point -----------------------------------------------------------------
 
 
@@ -995,7 +1367,11 @@ def scan_submission(
     :func:`identity_terms`); ``field_texts`` the ``.sub``'s free-text values by
     field label, which reviewers also see. With ``check_repos`` (the default)
     every anonymous.4open.science mirror linked from either is fetched and
-    scanned too, which needs network access.
+    scanned too, and so are the records and pages linked outside the reference
+    list (see :func:`scan_linked_records`): Zenodo, Figshare, and OSF creators,
+    the authors of any other DOI, GitHub and Hugging Face READMEs and LICENSEs,
+    a GitHub account's display name, and a page presented as the authors' own.
+    That needs network access.
     """
     paths = _dedup_paths(paths)
     findings: list[Finding] = []
@@ -1016,6 +1392,7 @@ def scan_submission(
         logger.info("Checking %d linked anonymous.4open.science repositor%s", len(repos), "y" if len(repos) == 1 else "ies")
         for repo in repos:
             findings.extend(scan_anonymous_repo(repo, terms))
+        findings.extend(scan_linked_records([*field_texts.values(), *_body_link_texts(paths)], terms))
     # One finding per (location, message): a name on every page is one problem.
     return list(dict.fromkeys(findings))
 
@@ -1028,7 +1405,8 @@ _MAX_KNOWN_FINDINGS = 20
 _AI_INSTRUCTIONS = (
     "This submission goes to double-blind review: reviewers must not be able to tell who wrote it. "
     "A keyword scan has already searched these files for the authors' names, emails, ORCID/OpenReview IDs and affiliations, "
-    "file metadata, acknowledgments and funding sections, owner-named code links, and fixed first-person phrases such as "
+    "file metadata, acknowledgments and funding sections, owner-named code links, author handles in any link, the creators "
+    "and READMEs of linked Zenodo/Figshare/OSF/DOI records and GitHub/Hugging Face repositories, and fixed first-person phrases such as "
     "'in our previous work'. Read the files the way a reviewer would and find what such a scan cannot see:\n"
     "  1. The authors' own earlier work referred to in the first person in any wording: 'we previously showed [12]', "
     "'as we demonstrated in [5]', 'in [3], we introduced', 'our ICML paper', 'an extended version of our workshop paper', "

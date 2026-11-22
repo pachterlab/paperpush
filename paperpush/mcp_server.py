@@ -728,6 +728,7 @@ def validate_subfile(
     anonymous: Optional[bool] = None,
     check_hidden_text: bool = True,
     check_openreview: bool = True,
+    disable_network_checks: bool = False,
     ai_results: Optional[list[dict[str, Any]]] = None,
     output: Optional[str] = None,
     colorblind: bool = False,
@@ -759,7 +760,11 @@ def validate_subfile(
     DOIs in the submission's bibliography -- its .bib files, and the
     manuscript's own reference list -- and reports references whose title,
     author, or year does not match the work the DOI points to (also needs
-    network);
+    network); `disable_network_checks=true` (CLI `--disable-network-checks`)
+    makes no network request at all: those lookups, OpenReview, registries,
+    repositories, and the anonymity check's fetches of linked records are
+    skipped and reported as not checked (not with `plagiarism` or
+    `ai_detection`);
     `check_sensitive` scans the referenced files for API keys, passwords,
     private keys, GPS data in figures, and LaTeX source comments.
     `check_manuscript` measures the uploads against the venue's author
@@ -907,7 +912,7 @@ def validate_subfile(
         from . import ai_text_check
 
         ai_detection_opts = ai_text_check.options(None, None, ai_detection_threshold)
-    result = _run_validate_report(sub, venue_def, plagiarism=plagiarism_opts, ai_detection=ai_detection_opts, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, reproduce_figures=reproduce_figures, reproduce_minutes=reproduce_minutes, reproduce_download_gb=reproduce_download_gb, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, disable=disable or (), enable=enable or (), initial_submission=initial_submission, strict_style=strict_style, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
+    result = _run_validate_report(sub, venue_def, plagiarism=plagiarism_opts, ai_detection=ai_detection_opts, check_sensitive=check_sensitive, check_links=check_links, check_references=check_references, reference_check_extended=reference_check_extended, reproduce_figures=reproduce_figures, reproduce_minutes=reproduce_minutes, reproduce_download_gb=reproduce_download_gb, references_alphabetical=references_alphabetical, references_citation_order=references_citation_order, check_manuscript=check_manuscript, check_anonymous=anonymous, check_hidden_text=check_hidden_text, check_openreview=check_openreview, network=not disable_network_checks, disable=disable or (), enable=enable or (), initial_submission=initial_submission, strict_style=strict_style, cover_letter_max_age_days=cover_letter_max_age_days, ai=ai, subfile_path=str(path or ""), ai_only=ai_only, files_only=files_only, notes=notes)
     out: dict[str, Any] = {
         "path": str(path or ""),
         # When it ran and a fingerprint of each input, to tell later whether the result is stale.

@@ -35,8 +35,12 @@
       <li>A workspace is <strong>deleted 24 hours after it was last used</strong>. The server checks every 15 minutes.
         <em>Settings › Clear</em> deletes it at once. Every redeploy also wipes the server's disk.</li>
       <li>A workspace holds at most 200 MB. The files are read only to run the checks you ask for.</li>
-      <li>The site does not follow links or look up DOIs found in your files. Those checks run only in the installed
-        version.</li>
+      <li>When you validate, the server <strong>follows the links and looks up the DOIs found in your files</strong>:
+        it checks that links work, that references match their registered records, and, for a double-blind venue,
+        whether the records and pages you link (Zenodo, Figshare, OSF, GitHub, Hugging Face, a project page) name
+        the authors. Only the link or identifier is sent to each service, never your files. Links in your reference
+        list are not opened for the double-blind check. The server refuses to fetch internal or private network
+        addresses. Tick <em>disable network checks</em> next to Validate to skip all of these lookups.</li>
     </ul>
 
     <h2>Your form (the .sub)</h2>
@@ -68,7 +72,9 @@
       <tbody>
         <tr><td>Render (web host, United States)</td><td>Everything the server handles: uploads, forms sent for checks, server logs</td><td>Always</td></tr>
         <tr><td>Neon (Postgres database)</td><td>Encrypted shared forms only, which it cannot read</td><td>When you use Share for editing</td></tr>
-        <tr><td>OpenAlex</td><td>Title, abstract, and keywords</td><td>When you use Pick a venue</td></tr>
+        <tr><td>OpenAlex</td><td>Title, abstract, and keywords; the journals and titles of your references</td><td>When you use Pick a venue; when you validate</td></tr>
+        <tr><td>Crossref, DataCite, doi.org, arXiv, PubMed</td><td>The DOIs, titles, and authors of your references</td><td>When you validate</td></tr>
+        <tr><td>The sites your files link to (including anonymous.4open.science, Zenodo, Figshare, OSF, GitHub, Hugging Face)</td><td>A request for each link or record ID</td><td>When you validate</td></tr>
         <tr><td>Anthropic, OpenAI, or Google</td><td>Manuscript text, figures, and form fields needed for the task</td><td>Only if you ask: autofill, AI checks, AI venue ranking</td></tr>
         <tr><td>Winston AI or Originality.ai</td><td>Manuscript text</td><td>Only if you ask: plagiarism scan</td></tr>
         <tr><td>Pangram</td><td>Manuscript text</td><td>Only if you ask: AI-text detection</td></tr>
@@ -93,7 +99,7 @@
       security problem privately, as described in
       <a href="https://github.com/pachterlab/paperpush/blob/main/SECURITY.md" target="_blank" rel="noopener">SECURITY.md</a>.
     </p>
-    <p class="muted small">Last updated 18 November 2026.</p>
+    <p class="muted small">Last updated 21 November 2026.</p>
   </main>
 </body>
 </html>

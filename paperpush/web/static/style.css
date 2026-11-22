@@ -13,8 +13,8 @@
   --rule: #e6e8e3;
   --text: #1a2129;
   --muted: #5c636b;
-  --accent: #283b7a;
-  --accent-weak: #e9ecf5;
+  --accent: #de5c00;
+  --accent-weak: #fcefe5;
   --serif: "STIX Two Text", "STIX Two", Charter, "Iowan Old Style", Georgia, serif;
   --sans: "Source Sans 3", "Source Sans Pro", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   --radius: 3px;
@@ -43,7 +43,7 @@
   --chip-bg: #f1f3f5;
   --input-bg: #ffffff;
   --review-input-bg: #fffdf0;
-  --accent-hover: #1c2b5e;
+  --accent-hover: #b84c00;
   --on-accent: #ffffff;
   --tooltip-bg: #1f2933;
   --tooltip-fg: #ffffff;
@@ -61,8 +61,8 @@ html[data-theme="dark"] {
   --rule: #2a2d32;
   --text: #e4e6e2;
   --muted: #9ba1a8;
-  --accent: #a3b3ea;
-  --accent-weak: #232a40;
+  --accent: #f08a4b;
+  --accent-weak: #3a2414;
   --st-passed: #4cc38a;
   --st-passed-bg: #14281e;
   --st-failed: #ff7b72;
@@ -87,7 +87,7 @@ html[data-theme="dark"] {
   --chip-bg: #262a31;
   --input-bg: #15181c;
   --review-input-bg: #2b2611;
-  --accent-hover: #c3cef3;
+  --accent-hover: #f5a978;
   --on-accent: #0d1117;
   --tooltip-bg: #e6e8eb;
   --tooltip-fg: #121417;

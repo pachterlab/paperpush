@@ -106,7 +106,21 @@
     const t = e.target.closest("[data-filter], .toc-item, .jump, #desc-toggle, .copy");
     if (!t) return;
     if (t.matches("[data-filter]")) {
+      // Keep the page still: hiding cards would otherwise shift or clamp the
+      // scroll position. With the toolbar stuck under the top bar, show the
+      // start of the filtered list just below it; otherwise keep the clicked
+      // control where it was on screen.
+      const bar = $("#toolbar");
+      const list = $("#field-groups");
+      const barBox = bar && bar.getBoundingClientRect();
+      const stuck = bar && list && bar.contains(t) && list.getBoundingClientRect().top < barBox.bottom - 1;
+      const before = t.getBoundingClientRect().top;
       setFilter(filter === t.dataset.filter && t.classList.contains("stat") ? "all" : t.dataset.filter);
+      if (stuck) {
+        window.scrollBy(0, list.getBoundingClientRect().top - bar.getBoundingClientRect().bottom);
+      } else if (t.isConnected && t.offsetParent !== null) {
+        window.scrollBy(0, t.getBoundingClientRect().top - before);
+      }
     } else if (t.matches(".toc-item, .jump")) {
       // Not a plain #anchor jump: on the live page the hash is the router.
       e.preventDefault();

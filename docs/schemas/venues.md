@@ -22,7 +22,7 @@ The keys of one venue entry (the value under a slug).
 | `name` | string | Display name. Defaults to the slug when omitted. |
 | `full_name` | string | Full, unabbreviated venue name. |
 | `venue_type` | `preprint` \| `journal` \| `conference` \| `data_repository` | Kind of venue: a preprint server, a journal, a conference, or a data repository (a database that takes data deposits, such as Zenodo or GEO). |
-| `anonymous` | boolean | Anonymous (double-blind) review: validate checks the attached files and linked anonymous.4open.science repositories for information identifying the authors. |
+| `anonymous` | boolean | Anonymous (double-blind) review: validate checks the attached files, linked anonymous.4open.science repositories, and the records and pages other links lead to for information identifying the authors. |
 | `deprecated` | boolean | Hidden from listings but still reachable by get_venue. |
 | `publisher` | string | Slug of the venue's publisher, as listed under $publishers in manuscript_requirements.json (e.g. elsevier, springer_nature). Its house rules (the publisher:<slug> entry) back the venue's own: a rule the venue's guidelines do not state falls back to the publisher's, reported as a warning. Empty for a venue with no publisher, or one whose publisher is not listed. |
 | `site_url` | string | Public homepage URL. |

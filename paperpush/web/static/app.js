@@ -74,6 +74,7 @@
     llm: { key: "", provider: "", remember: false },
     plagiarism: null, // {provider, key, accept, threshold} while the plagiarism box is ticked
     aiDetection: null, // {key, threshold} while the AI-text scan box is ticked
+    noNetwork: false, // the "disable network checks" box
     info: null,
     venues: [],
     venue: null, // venue detail from /api/venues/<slug>
@@ -2020,7 +2021,7 @@
     };
     state.showRequired = true;
     try {
-      const body = { text: state.text, ai: withAi, initial_submission: state.initialSubmission };
+      const body = { text: state.text, ai: withAi, initial_submission: state.initialSubmission, network: !state.noNetwork };
       const headers = withAi ? llmHeaders() : {};
       if (plagiarism) {
         Object.assign(body, { plagiarism: true, plagiarism_accept: plagiarism.accept, plagiarism_threshold: plagiarism.threshold });
@@ -2038,7 +2039,7 @@
       state.touched = true;
       const c = res.counts;
       const notes = [];
-      if (!res.network_checks) notes.push("link and DOI checks are switched off on this server");
+      if (!res.network_checks) notes.push(state.noNetwork ? "network checks disabled" : "network checks are switched off on this server");
       if (res.ai_error) notes.push(`AI checks failed: ${res.ai_error}`);
       const plag = plagiarism && (res.checks || []).find((ch) => ch.id === "integrity.plagiarism");
       if (plag && plag.status === "unchecked") notes.push(`plagiarism scan did not run: ${plag.detail}`);
@@ -2194,6 +2195,27 @@
     $("#aidet-close").addEventListener("click", () => dialog.close());
     $("#aidet-key").addEventListener("input", renderAiDetectionKeyNote);
     $("#ai-detection-form").addEventListener("submit", (e) => { e.preventDefault(); saveAiDetection(); });
+  }
+
+  // ------------------------------------------------------- network checks
+  // "Disable network checks": validate makes no request outside the server (links, DOIs,
+  // references, registries, the double-blind check's linked records and pages). The plagiarism
+  // and AI-text scans send the text to an outside service, so ticking it unticks them and keeps
+  // them off until it is unticked.
+  function wireNoNetwork() {
+    const box = $("#no-network-check");
+    const scans = [[$("#plagiarism-check"), "plagiarism"], [$("#ai-detection-check"), "aiDetection"]];
+    box.checked = false;
+    box.addEventListener("change", () => {
+      state.noNetwork = box.checked;
+      for (const [scan, key] of scans) {
+        if (box.checked && scan.checked) {
+          scan.checked = false;
+          state[key] = null;
+        }
+        scan.disabled = box.checked;
+      }
+    });
   }
 
   function focusField(fid) {
@@ -2911,6 +2933,7 @@
     $("#validate-ai-btn").addEventListener("click", () => runValidate(true));
     wirePlagiarism();
     wireAiDetection();
+    wireNoNetwork();
     $("#initial-submission").addEventListener("change", (e) => setInitialSubmission(e.target.checked));
     $("#download-sub").addEventListener("click", downloadSub);
     $("#download-zip").addEventListener("click", downloadBundle);

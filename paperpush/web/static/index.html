@@ -179,6 +179,7 @@
           <span class="ai-button-wrap initial-wrap" id="initial-wrap" tabindex="0"><label class="initial-check"><input type="checkbox" id="initial-submission" disabled> initial submission (any format)</label></span>
           <label class="initial-check" title="Also check the manuscript's text against published sources with Winston AI or Originality.ai when validating (your own API key; costs credits)"><input type="checkbox" id="plagiarism-check"> plagiarism scan</label>
           <label class="initial-check" title="Also estimate how much of the manuscript's text reads as AI-generated, with Pangram, when validating (your own API key; costs credits)"><input type="checkbox" id="ai-detection-check"> AI-text scan</label>
+          <label class="initial-check" title="Validate without any request outside this server: skip the link, DOI, reference, OpenReview, and registry lookups, and the double-blind check's fetches of linked records and pages. The skipped checks are reported as not checked. The plagiarism and AI-text scans need the network, so they are off while this is ticked."><input type="checkbox" id="no-network-check"> disable network checks</label>
           <span id="validate-status" role="status" class="small"></span>
         </div>
         <div class="stats" id="check-stats" hidden></div>

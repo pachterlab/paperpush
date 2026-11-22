@@ -239,8 +239,9 @@ class Settings:
     data_dir: Path
     ttl_hours: float = DEFAULT_TTL_HOURS
     max_workspace_mb: float = DEFAULT_MAX_WORKSPACE_MB
-    # Link and DOI checks make the server fetch URLs taken from uploaded
-    # files. A public deployment may want them off.
+    # Link, DOI, and anonymity lookups make the server fetch URLs taken from
+    # uploaded files. A public server (no ``local`` session) fetches them through
+    # :mod:`paperpush.net_guard`, which refuses internal addresses.
     network_checks: bool = True
     # Allow visitors to run autofill and AI checks with their own API key.
     ai: bool = True
@@ -949,6 +950,7 @@ _AI_DETECTION_OFF = re.compile(r"^off by default: run with --ai-detection.*$")
 def _web_detail(detail: str, files: Path) -> str:
     detail = _AI_DETECTION_OFF.sub("off by default: tick AI-text scan next to Validate (sends the manuscript's text to Pangram; costs credits on your account)", detail)
     detail = _PLAGIARISM_OFF.sub("off by default: tick Plagiarism scan next to Validate (sends the manuscript's text to Winston AI or Originality.ai; costs credits on your account)", detail)
+    detail = detail.replace("network checks disabled (--disable-network-checks)", "network checks disabled (the box next to Validate)")
     return _SWITCHED_OFF.sub("switched off on this server", _scrub(detail, files))
 
 
@@ -1045,6 +1047,8 @@ class ValidateRequest(BaseModel):
     ai: bool = False
     check_links: bool = True
     check_references: bool = True
+    # False: the page's "disable network checks" box (paperpush validate --disable-network-checks).
+    network: bool = True
     anonymous: Optional[bool] = None
     # Report every formatting error as a warning; integrity errors stay (paperpush validate --initial-submission).
     initial_submission: bool = False
@@ -1069,6 +1073,11 @@ class ValidateRequest(BaseModel):
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
     settings = settings or Settings.from_env()
+    if settings.network_checks and settings.local is None:
+        # The checks fetch URLs from visitors' files: never let one reach the server's own network.
+        from .. import net_guard
+
+        net_guard.install()
     workspaces = Workspaces(settings)
     # Not for --web: a form shared from this computer would be out of reach.
     shared_forms = (
@@ -1484,6 +1493,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     ) -> Any:
         files, local = workspace(ws_id, x_paperpush_token)
         sub, venue = _localized_sub(req.text, files, local)
+        if not req.network and (req.plagiarism or req.ai_detection):
+            raise HTTPException(400, "the plagiarism and AI-text scans send the manuscript's text to an outside service; untick 'disable network checks' to run them")
         plagiarism = visitor_plagiarism(settings, req, x_plagiarism_provider, x_plagiarism_key, local=local is not None)
         ai_detection = visitor_ai_detection(settings, req, x_ai_detection_key, local=local is not None)
         ai = None
@@ -1492,7 +1503,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             from ..ai_validate import AiOptions
 
             ai = AiOptions.api(provider=provider, api_key=api_key)
-        network = settings.network_checks
+        network = settings.network_checks and req.network
 
         def run(progress=None) -> dict[str, Any]:
             report = validate_report(
@@ -1503,7 +1514,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                 check_anonymous=req.anonymous,
                 # Uses the server's own stored OpenReview login: the author's only
                 # when paperpush runs on their machine.
-                check_openreview=local is not None,
+                check_openreview=local is not None and network,
+                # The visitor's box: no request at all. A server with network checks off
+                # skips the lookups above but keeps its own wording ("switched off on this server").
+                network=req.network,
                 initial_submission=req.initial_submission,
                 strict_style=req.strict_style,
                 ai=ai,

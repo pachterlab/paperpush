@@ -693,4 +693,4 @@ placed by neither. After editing either file, run
 `python scripts/gen_subfile_templates.py` to refresh
 `paperpush/subfile_templates/` (the pre-commit hook and CI check this).
 
-Every venue also declares `anonymous` (`true` for double-blind review, `false` otherwise; an entry without it counts as `false`). An anonymous venue gets the identifying-information check (`paperpush/anonymity.py`) on every `paperpush validate`: the attachments and any linked anonymous.4open.science repositories are searched for the authors' details. Set it for a new venue from its reviewing policy.
+Every venue also declares `anonymous` (`true` for double-blind review, `false` otherwise; an entry without it counts as `false`). An anonymous venue gets the identifying-information check (`paperpush/anonymity.py`) on every `paperpush validate`: the attachments, any linked anonymous.4open.science repositories, and the records and pages its other links lead to (Zenodo/Figshare/OSF/DOI creators, READMEs, project pages) are searched for the authors' details. Set it for a new venue from its reviewing policy.

@@ -15,9 +15,11 @@ services:
       # Visitors supply their own API keys for AI features.
       - key: PAPERPUSH_WEB_AI
         value: "1"
-      # Stop the server fetching links and DOIs found in uploaded files.
+      # Check links, DOIs, references, and (double-blind) the records and pages
+      # linked from uploaded files. Fetches go through paperpush.net_guard,
+      # which refuses internal addresses.
       - key: PAPERPUSH_WEB_NETWORK_CHECKS
-        value: "0"
+        value: "1"
       - key: PAPERPUSH_WEB_TTL_HOURS
         value: "24"
       - key: PAPERPUSH_WEB_MAX_WORKSPACE_MB

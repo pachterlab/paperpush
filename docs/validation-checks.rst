@@ -8,7 +8,7 @@ sensitive-data scan (see :ref:`submit-validation`).
 
 .. BEGIN VALIDATION CHECK COUNT
 
-PaperPush currently has **186 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
+PaperPush currently has **187 distinct validation check types** across its bundled venues. This count is generated from check IDs in validation reports for empty and representative file submissions, plus declarations for conditional paths; it excludes rules marked *not implemented*. The checks in any one report depend on the venue, supplied files, and selected options. Regenerate it with ``python scripts/gen_validation_check_count.py``.
 
 .. END VALIDATION CHECK COUNT
 
@@ -207,64 +207,65 @@ Venue rules marked *not implemented* are excluded.
 135. ``integrity.chatbot_residue`` — No text left over from a chatbot's reply ("As an AI language model", "Regenerate response")
 136. ``integrity.dois`` — Reference DOIs match the works they cite
 137. ``integrity.hidden_text`` — No hidden text or prompts aimed at AI reviewers
-138. ``integrity.journal_indexing`` — Each cited journal is in an index OpenAlex tracks (CWTS core, DOAJ, MEDLINE, SciELO)
-139. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
-140. ``integrity.links`` — Links cited in the files and URL fields are reachable
-141. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
-142. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
-143. ``integrity.plagiarism`` — The manuscript's text does not match other sources (plagiarism scan)
-144. ``integrity.reference_details`` — Each reference's authors, journal, year, volume, issue, and pages match the work it cites, and nothing it needs is missing
-145. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
-146. ``integrity.retractions`` — No cited work has been retracted
-147. ``integrity.sensitive`` — No secrets or private information in the files
-148. ``integrity.stale_pdf`` — Each uploaded PDF is up to date with the source file beside it (.tex, .docx, .md)
-149. ``integrity.unmatched_references`` — References without a DOI match a registered work
+138. ``integrity.isbns`` — Reference ISBNs are valid and belong to the books cited
+139. ``integrity.journal_indexing`` — Each cited journal is in an index OpenAlex tracks (CWTS core, DOAJ, MEDLINE, SciELO)
+140. ``integrity.latex_cleaner`` — Nothing for arxiv_latex_cleaner to strip from the LaTeX source
+141. ``integrity.links`` — Links cited in the files and URL fields are reachable
+142. ``integrity.openreview`` — Each author has an active OpenReview profile matching their name and email domain
+143. ``integrity.pdf_reader`` — PDF text extractor (pdfminer.six) installed, which the PDF-based checks need
+144. ``integrity.plagiarism`` — The manuscript's text does not match other sources (plagiarism scan)
+145. ``integrity.reference_details`` — Each reference's authors, journal, year, volume, issue, pages, and (for a book) edition and publisher match the work it cites, and nothing it needs is missing
+146. ``integrity.reference_versions`` — References cite the journal article, or the latest preprint
+147. ``integrity.retractions`` — No cited work has been retracted
+148. ``integrity.sensitive`` — No secrets or private information in the files
+149. ``integrity.stale_pdf`` — Each uploaded PDF is up to date with the source file beside it (.tex, .docx, .md)
+150. ``integrity.unmatched_references`` — References without a DOI match a registered work
 
 **Page layout**
 
-150. ``layout.density`` — Main-text pages are full and use the page limit (AI conferences)
-151. ``layout.font`` — Body font matches the guidelines
-152. ``layout.font_size`` — Body text size matches the guidelines
-153. ``layout.footnotes`` — No footnotes or endnotes where the guidelines forbid them
-154. ``layout.forbidden_fonts`` — No fonts the guidelines forbid (e.g., Symbol)
-155. ``layout.heading_levels`` — Headings within the guidelines' number of levels
-156. ``layout.language`` — Spelling follows the required English variant (US or UK)
-157. ``layout.line_numbers`` — Lines numbered continuously
-158. ``layout.line_spacing`` — Text is double-spaced
-159. ``layout.margins`` — Page margins match the guidelines
-160. ``layout.page_numbers`` — Pages are numbered
-161. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
-162. ``layout.section_balance`` — Space split between sections, figures, and equations is typical (AI conferences)
-163. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
+151. ``layout.density`` — Main-text pages are full and use the page limit (AI conferences)
+152. ``layout.font`` — Body font matches the guidelines
+153. ``layout.font_size`` — Body text size matches the guidelines
+154. ``layout.footnotes`` — No footnotes or endnotes where the guidelines forbid them
+155. ``layout.forbidden_fonts`` — No fonts the guidelines forbid (e.g., Symbol)
+156. ``layout.heading_levels`` — Headings within the guidelines' number of levels
+157. ``layout.language`` — Spelling follows the required English variant (US or UK)
+158. ``layout.line_numbers`` — Lines numbered continuously
+159. ``layout.line_spacing`` — Text is double-spaced
+160. ``layout.margins`` — Page margins match the guidelines
+161. ``layout.page_numbers`` — Pages are numbered
+162. ``layout.page_size`` — Page size matches the guidelines (e.g., A4 or Letter)
+163. ``layout.section_balance`` — Space split between sections, figures, and equations is typical (AI conferences)
+164. ``layout.template`` — Uses the venue's Word template or LaTeX class (detected from the file)
 
 **Prose**
 
-164. ``prose.acronyms`` — Acronyms spelled out at first use
-165. ``prose.brackets`` — Brackets and quotes pair up
-166. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
-167. ``prose.dashes`` — Hyphens, en dashes, em dashes, and quotes used as expected
-168. ``prose.double_spaces`` — No double spaces between words
-169. ``prose.heading_case`` — Headings of the same level capitalized one way
-170. ``prose.number_format`` — Statistics, units, and percent signs written one way
-171. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
-172. ``prose.punctuation_spacing`` — Spacing around punctuation
-173. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
-174. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
-175. ``prose.serial_comma`` — Lists use the serial (Oxford) comma one way
-176. ``prose.significant`` — 'Significant' used only for statistical significance
-177. ``prose.spelling`` — Common misspellings (codespell)
-178. ``prose.spelling_variant`` — Spelling uses one English variant (US or UK)
-179. ``prose.usage`` — Agreement, contractions, and very long sentences
+165. ``prose.acronyms`` — Acronyms spelled out at first use
+166. ``prose.brackets`` — Brackets and quotes pair up
+167. ``prose.conventions`` — Abbreviations and compounds written one way (i.e., e.g., et al., vs., Fig.)
+168. ``prose.dashes`` — Hyphens, en dashes, em dashes, and quotes used as expected
+169. ``prose.double_spaces`` — No double spaces between words
+170. ``prose.heading_case`` — Headings of the same level capitalized one way
+171. ``prose.number_format`` — Statistics, units, and percent signs written one way
+172. ``prose.numbers`` — Numbers of 10 or more in digits, thousands grouped one way
+173. ``prose.punctuation_spacing`` — Spacing around punctuation
+174. ``prose.repeated_words`` — No accidentally doubled words (e.g., 'the the')
+175. ``prose.repetition`` — Varied word choice (no heavily repeated adjectives or adverbs)
+176. ``prose.serial_comma`` — Lists use the serial (Oxford) comma one way
+177. ``prose.significant`` — 'Significant' used only for statistical significance
+178. ``prose.spelling`` — Common misspellings (codespell)
+179. ``prose.spelling_variant`` — Spelling uses one English variant (US or UK)
+180. ``prose.usage`` — Agreement, contractions, and very long sentences
 
 **Rigor and reproducibility**
 
-180. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
-181. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
-182. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
-183. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
-184. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
-185. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
-186. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
+181. ``rigor.cell_lines`` — Cell lines authenticated, tested for mycoplasma, and not known to be misidentified
+182. ``rigor.code_availability`` — Code behind the analysis is public, archived, licensed, and declares its environment
+183. ``rigor.data_accessions`` — GEO and BioProject accessions given in the manuscript are public
+184. ``rigor.design`` — Blinding, randomization, sample size, exclusions, and sex reported for animal and human studies
+185. ``rigor.rrids`` — Antibodies, cell lines, and organisms carry RRIDs that resolve
+186. ``rigor.statistics`` — Reported test statistics agree with their p values (statcheck)
+187. ``rigor.trial_registration`` — A clinical trial gives a trial registry ID
 
 .. END VALIDATION CHECK LIST
 

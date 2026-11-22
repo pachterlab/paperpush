@@ -38,7 +38,8 @@
   conference entries with no title or author, and one arXiv preprint under two
   keys (see :func:`paperpush.references.bib_structure_findings`).
 
-All are WARNINGs: references are read from extracted text.
+All are WARNINGs, since references are often read from extracted text,
+except an excessive share of self-citations, which is a SUGGESTION.
 """
 
 from __future__ import annotations

@@ -1879,6 +1879,15 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             print(f"error: {args.subfile} is for {venue}, not {requested_venue}; drop --venue, or make a .sub for {requested_venue} with 'paperpush subfile {requested_venue}'", file=sys.stderr)
             return 1
 
+    if getattr(args, "no_network", False):
+        needs = [flag for flag, on in (("--plagiarism", check_flags.get("plagiarism") is not None), ("--ai-detection", check_flags.get("ai_detection") is not None), ("--issn", getattr(args, "issn", None)), ("--journal", getattr(args, "journal", None)), ("--reproduce-figures", getattr(args, "reproduce_figures", False))) if on]
+        if needs:
+            print(f"error: {', '.join(needs)} need{'s' if len(needs) == 1 else ''} the network, so {'it' if len(needs) == 1 else 'they'} cannot be combined with --disable-network-checks", file=sys.stderr)
+            return 1
+        if getattr(args, "web", False):
+            print("error: --disable-network-checks is not supported with --web; open the page and tick its 'Disable network checks' box", file=sys.stderr)
+            return 1
+
     house = _publisher_target(args, venue)
     if isinstance(house, int):
         return house
@@ -1923,6 +1932,9 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
     rerun += "".join(f" --disable-{name}" for name in disable)
     rerun += "".join(f" --enable-{name}" for name in enable)
+    network = not getattr(args, "no_network", False)
+    if not network:
+        rerun += " --disable-network-checks"
 
     ai_only = getattr(args, "ai_only", False)
     no_manuscript = not check_ids.reads_manuscript(disable, enable)
@@ -2019,6 +2031,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             reproduce_figures=getattr(args, "reproduce_figures", False),
             reproduce_minutes=getattr(args, "reproduce_minutes", 30),
             reproduce_download_gb=getattr(args, "reproduce_download_gb", 5.0),
+            network=network,
             **check_flags,
             ai_only=ai_only,
         )
@@ -3500,7 +3513,7 @@ def _add_check_options(parser: argparse.ArgumentParser, *, documented: bool = Tr
         "--disable-CHECK",
         dest="_disable_help",
         action="store_true",
-        help="skip a check; repeat for more. CHECK is any check ID listed at https://paperpush.readthedocs.io/en/latest/validation-checks.html (--disable-ai.consistency, --disable-bibliography.age), or the start of one, for that whole family (--disable-prose, --disable-ai.notes). Two names cover wider sets: --disable-references skips every reference lookup (DOIs, registry searches, retractions, preprint versions, reference details, journal indexing, RRIDs, cell lines; with --disable-integrity.links, validate runs offline), and --disable-manuscript skips everything that reads the manuscript against the guidelines, and the AI checks. A skipped check is reported as not checked, never as passed. CHECK can also be comma-separated names (--disable-prose,ai.notes) or a text file listing them, comma- or whitespace-separated, with # for comments (--disable-checks.txt).",
+        help="skip a check; repeat for more. CHECK is any check ID listed at https://paperpush.readthedocs.io/en/latest/validation-checks.html (--disable-ai.consistency, --disable-bibliography.age), or the start of one, for that whole family (--disable-prose, --disable-ai.notes). Two names cover wider sets: --disable-references skips every reference lookup (DOIs, registry searches, retractions, preprint versions, reference details, journal indexing, RRIDs, cell lines; --disable-network-checks makes validate run fully offline), and --disable-manuscript skips everything that reads the manuscript against the guidelines, and the AI checks. A skipped check is reported as not checked, never as passed. CHECK can also be comma-separated names (--disable-prose,ai.notes) or a text file listing them, comma- or whitespace-separated, with # for comments (--disable-checks.txt).",
     )
     add(
         "--enable-CHECK",
@@ -3748,6 +3761,12 @@ def build_parser() -> argparse.ArgumentParser:
     files_group.add_argument("--supplement", nargs="+", metavar="FILE", help="supplementary files")
     p_validate.add_argument("--web", action="store_true", help="show the checks in the paperpush web page on this computer instead of the terminal, where you can fix the fields and re-validate; edits are saved to the .sub (with --ai, the AI checks run too). Needs pip install 'paperpush[web]'")
     _add_check_options(p_validate)
+    p_validate.add_argument(
+        "--disable-network-checks",
+        dest="no_network",
+        action="store_true",
+        help="make no network requests: skip the link, DOI, reference, retraction, journal-indexing, RRID, cell-line, repository, and OpenReview lookups, the anonymity check's fetches of linked mirrors, records, and pages, and the BioSample package download (a cached copy is still used). The skipped checks are reported as not checked. Cannot be combined with --plagiarism, --ai-detection, --issn, --journal, or --reproduce-figures, which need the network; --ai still calls its LLM provider.",
+    )
     p_validate.add_argument(
         "--reference-check-extended",
         action="store_true",
@@ -4218,7 +4237,7 @@ def _expand_check_flags(argv: list[str]) -> list[str]:
             out.append(f"--disable={name}")
         elif arg == "--arxiv-latex-cleaner":
             print("note: --arxiv-latex-cleaner no longer does anything: validate never changes your files. It reports what the cleaner would change by default, and the paperpush-fix skill applies it.", file=sys.stderr)
-        elif arg == "--enable-network-checks":
+        elif arg in ("--enable-network-checks", "--disable-network-checks"):
             out.append(arg)
         elif arg.startswith(("--disable-", "--enable-")):
             flag, name = arg[2:].split("-", 1)

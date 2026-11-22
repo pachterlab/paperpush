@@ -1,4 +1,5 @@
 {
+  "alphaxiv": "2026-11-20",
   "arxiv": "2026-11-03",
   "bioinformatics": "2026-11-03",
   "biorxiv": "2026-11-03",
@@ -14,12 +15,18 @@
   "medrxiv": "2026-11-03",
   "naacl_2027_demo": "2026-11-11",
   "nature": "2026-11-03",
+  "nature_biomedical_engineering": "2026-11-20",
   "nature_biotech": "2026-11-03",
+  "nature_machine_intelligence": "2026-11-20",
   "nature_methods": "2026-11-03",
   "nucleic_acids_research": "2026-11-03",
   "plos_compbio": "2026-11-03",
   "science": "2026-11-03",
+  "science_advances": "2026-11-20",
+  "science_immunology": "2026-11-20",
   "science_robotics": "2026-11-03",
   "science_signaling": "2026-11-03",
+  "science_translational_medicine": "2026-11-20",
+  "sra": "2026-11-20",
   "zenodo": "2026-11-15"
 }

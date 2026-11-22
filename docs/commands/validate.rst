@@ -9,6 +9,7 @@ check manuscript files without a ``.sub``, with or without a venue (see
 .. code-block:: text
 
    usage: paperpush validate [-h] [-v] [-q] [--disable-CHECK ...] [--enable-CHECK ...] [--anonymous]
+                             [--disable-network-checks]
                              [--initial-submission] [--strict-style]
                              [-o [OUT]] [--overwrite] [--cover-letter-max-age DAYS]
                              [--show-errors-only] [--hide-warnings]
@@ -366,8 +367,21 @@ Arguments
    Check the submission for information that identifies its authors, as for a
    double-blind venue. Venues marked ``anonymous`` in ``venues.json`` (ICLR,
    AAAI) get this check automatically. Linked anonymous.4open.science
-   repositories are fetched and scanned too, which needs network access. See
+   repositories, and the Zenodo, Figshare, OSF, DOI, GitHub, and Hugging Face
+   records and project pages the files link outside their reference list, are
+   fetched and searched too, which needs network access. See
    :ref:`vc-anonymity`.
+
+``--disable-network-checks``
+   Make no network requests. The link, DOI, reference, retraction,
+   journal-indexing, RRID, cell-line, repository, and OpenReview lookups are
+   skipped, and so are the anonymity check's fetches of linked mirrors,
+   records, and pages and the BioSample package download (a cached copy is
+   still used). Each skipped check is listed as not checked. The offline
+   checks all still run. It cannot be combined with ``--plagiarism``,
+   ``--ai-detection``, ``--issn``, ``--journal``, or ``--reproduce-figures``,
+   which need the network. ``--ai`` still calls its LLM provider. On the web
+   page, tick **disable network checks** next to **Validate** instead.
 
 ``--initial-submission``
    Validate the file as an initial submission: every formatting error and
@@ -561,11 +575,11 @@ Fail a CI job if the submission isn't ready:
 
    paperpush validate biorxiv.sub.txt || exit 1
 
-Run the field and file checks alone, with no network access:
+Run every check that needs no network access:
 
 .. code-block:: bash
 
-   paperpush validate biorxiv.sub.txt --disable-integrity.links --disable-references
+   paperpush validate biorxiv.sub.txt --disable-network-checks
 
 Skip the prose checks and one check that does not apply to your paper:
 

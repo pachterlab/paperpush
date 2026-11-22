@@ -174,21 +174,23 @@ def _download(url: str) -> bytes:
         return resp.read()
 
 
-def fetch_package(package: str) -> Package:
+def fetch_package(package: str, *, offline: bool = False) -> Package:
     """The package's attribute definitions: the cached copy when under a week old, else downloaded.
 
     Falls back to a stale cached copy when the download fails. Raises
     :class:`OSError` when there is no copy at all, and :class:`ValueError` when
-    NCBI does not know the package.
+    NCBI does not know the package. ``offline`` (like ``PAPERPUSH_OFFLINE``)
+    uses only the cached copy.
     """
     if not re.fullmatch(r"[A-Za-z0-9._-]+", package):
         raise ValueError(f"{package!r} is not a BioSample package id")
     path = cache_dir() / f"{package}.xml"
     data = None
-    if path.exists() and (_offline() or time.time() - path.stat().st_mtime < MAX_AGE_SECONDS):
+    offline = offline or _offline()
+    if path.exists() and (offline or time.time() - path.stat().st_mtime < MAX_AGE_SECONDS):
         data = path.read_bytes()
-    elif _offline():
-        raise OSError(f"no cached definition of {package} (PAPERPUSH_OFFLINE is set)")
+    elif offline:
+        raise OSError(f"no cached definition of {package} (network checks are disabled)")
     else:
         try:
             data = _download(package_xml_url(package))
@@ -521,17 +523,18 @@ def package_issues(package: Package, header: list[str], rows: list[dict[str, str
     return issues
 
 
-def check_attributes(path: Path, package_name: str, *, metadata_samples: list[str] | None = None, today: _dt.date | None = None) -> tuple[list[Issue], Package | None]:
+def check_attributes(path: Path, package_name: str, *, metadata_samples: list[str] | None = None, today: _dt.date | None = None, offline: bool = False) -> tuple[list[Issue], Package | None]:
     """Check a filled BioSample attributes file against its package. Returns the issues and the package (None when it could not be loaded).
 
     ``metadata_samples`` are the sample_name values of the SRA metadata, when
-    known: each needs a row here.
+    known: each needs a row here. ``offline`` uses only a cached copy of the
+    package's definitions.
     """
     header, rows = read_table(path)
     issues = generic_issues(header, rows)
     package = None
     try:
-        package = fetch_package(package_name)
+        package = fetch_package(package_name, offline=offline)
     except ValueError as exc:
         issues.append(Issue(ERROR, "biosample_package", str(exc)))
     except OSError as exc:

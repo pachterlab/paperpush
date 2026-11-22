@@ -19,8 +19,8 @@ description: >-
 
 Moves a manuscript that was already prepared for (or submitted to) one venue
 over to a new one. You copy the files, create and fill the new venue's `.sub`,
-reformat the manuscript, validate it, and write `transfer.txt`, a plain-text
-record of every change. The other skills and commands do the real work:
+reformat the manuscript, validate it (saving the validation report in the new
+directory), and write `transfer.txt`, a plain-text record of every change. The other skills and commands do the real work:
 `paperpush-autofill` fills the `.sub`, `paperpush format` reformats the
 manuscript copy for the new venue, `paperpush-validate` checks it, and `paperpush-fix` (only if the user agrees)
 fixes what validate finds. This skill sequences them and carries values over
@@ -258,6 +258,17 @@ delete anything in the source directory**; every change happens in the copy.
    using the list in step 3: treat those that still apply as errors, and the
    rest as waived.
 
+   **Save the report.** Tell `paperpush-validate` to save it in the new
+   directory as `<new-dir>/<sub stem>_validation.pdf` (validate's default
+   path, so the merge run in its step 3 needs no `-o`). Don't ask the user
+   where to save it, and never pass `--no-report` or `-o none`. If the user
+   asked for another format or place, pass `-o <abs path>` instead (adding
+   `--overwrite` on a re-run). The saved report must match the last
+   validation: if `paperpush-fix` runs, finish with a full (not `--ai-only`)
+   `paperpush validate <abs .sub> --ai-results <its final results file>`
+   with the same flags, so the saved report is the one after the fixes and
+   includes the AI verdicts. Check that the file exists before step 8.
+
    Do not run `paperpush-fix` yourself: if validate finds errors or warnings
    (under format-free, only those that still apply), ask whether to run it, and
    say that it edits only the copies in the new directory (the formatted
@@ -321,6 +332,7 @@ delete anything in the source directory**; every change happens in the copy.
       Could not remove: <file>: <what and why>, ...
 
    5. Validation
+      Report: <abs path to the saved validation report>
       <n> errors, <n> warnings, <n> not checked
       <each error and warning, one line each>
       (format-free: "Still apply: <each>" and "Waived at initial submission:
@@ -345,8 +357,8 @@ delete anything in the source directory**; every change happens in the copy.
    long values (abstracts, statements) to their first 80 characters, with
    `...`, instead of pasting them whole.
 
-9. **Report to the user.** Give the new directory, the `.sub`, and the path to
-   `transfer.txt`, then a short summary: how many fields were carried over,
+9. **Report to the user.** Give the new directory, the `.sub`, the path to
+   `transfer.txt`, and the path to the saved validation report, then a short summary: how many fields were carried over,
    updated, and new; the guideline differences that matter most (a lower word
    limit, a different reference style); whether the manuscript was reformatted
    and with which template (or the layout rules); the validation counts; and

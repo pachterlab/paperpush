@@ -374,15 +374,42 @@ class Citation:
 # --- DOI shapes ------------------------------------------------------------
 
 
+# bioRxiv and medRxiv register one DOI per preprint, but their pages put the version (and the
+# page's view) after it: ".../content/10.1101/2024.09.14.613029v2.full.pdf". doi.org knows only
+# the bare DOI and answers 404 for the rest, so a link pasted from the preprint page would read as
+# a citation that points at nothing. Both the dated DOIs (since December 2019) and the older
+# six-digit ones (10.1101/012345) are matched; the journals sharing the 10.1101 prefix (Genome
+# Research's 10.1101/gr.275569.121, Genes & Development's 10.1101/gad...) are not.
+_PREPRINT_DOI_VERSION = re.compile(
+    r"^(10\.1101/(?:\d{4}\.\d{2}\.\d{2}\.)?\d{6})(?:v(\d{1,3}))?"
+    r"(?:\.(?:full|abstract|article-info|article-metrics|supplementary-material)(?:\.pdf(?:\+html)?|-text)?)?$"
+)
+
+
+def preprint_doi_version(raw: str) -> int | None:
+    """The version a bioRxiv/medRxiv DOI was written with (``...613029v2`` -> 2), or None."""
+    m = _PREPRINT_DOI_VERSION.match(_normalize_doi_text(raw))
+    return int(m.group(2)) if m and m.group(2) else None
+
+
 def normalize_doi(raw: str) -> str:
     """Reduce a written DOI to its bare, comparable form.
 
     Strips a resolver prefix (``https://doi.org/``, ``doi:``), surrounding
     whitespace and BibTeX braces, and trailing sentence punctuation, then
     lower-cases the result: DOIs are case-insensitive, so two entries citing the
-    same work in different cases must compare equal. Returns ``""`` for a value
-    that holds no DOI-ish text at all.
+    same work in different cases must compare equal. A bioRxiv/medRxiv DOI
+    loses the version and page suffix its preprint page adds (see
+    :data:`_PREPRINT_DOI_VERSION`; :func:`preprint_doi_version` reads the
+    version). Returns ``""`` for a value that holds no DOI-ish text at all.
     """
+    value = _normalize_doi_text(raw)
+    m = _PREPRINT_DOI_VERSION.match(value)
+    return m.group(1) if m else value
+
+
+def _normalize_doi_text(raw: str) -> str:
+    """:func:`normalize_doi` without dropping a preprint's version."""
     # NFKC: a PDF's ligatures ("2023.\ufb01ndings-acl") are two letters in the registered DOI.
     value = _DOI_WRAPPER.sub("", unicodedata.normalize("NFKC", raw).strip()).strip("{}").strip()
     while prefix := _DOI_PREFIX.match(value):

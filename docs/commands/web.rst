@@ -85,7 +85,7 @@ manuscript's text (without its reference list) to that service and costs
 credits on your account, so the box starts unticked whenever the page loads.
 The website never uses a key of its own. On a ``--web`` page, leave the key
 empty to use ``WINSTON_API_KEY`` or ``ORIGINALITY_API_KEY`` from your
-environment. A server started with link checks switched off
+environment. A server started with network checks switched off
 (``PAPERPUSH_WEB_NETWORK_CHECKS=0``) switches the scan off too.
 
 The AI-text scan
@@ -100,6 +100,19 @@ validate requests, never stored on the server, and forgotten when the tab
 closes unless you ask to remember it. Each scan costs credits on your Pangram
 account, so the box starts unticked whenever the page loads. On a ``--web``
 page, leave the key empty to use ``PANGRAM_API_KEY`` from your environment.
+
+Disabling network checks
+------------------------
+
+Tick **disable network checks**, next to **Validate**, to validate without
+any request leaving the server (``paperpush validate
+--disable-network-checks``). The link, DOI, reference, OpenReview, and
+registry lookups, and the double-blind check's fetches of linked records and
+pages, are skipped and listed as not checked. The plagiarism and AI-text scans
+need the network, so ticking it unticks them and keeps them off until you
+untick it. The box starts unticked whenever the page loads. A server started
+with ``PAPERPUSH_WEB_NETWORK_CHECKS=0`` never makes these requests, ticked or
+not.
 
 The buttons at the bottom of the page
 -------------------------------------

@@ -13,6 +13,7 @@ import json
 import zipfile
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from paperpush import anonymity
@@ -269,6 +270,118 @@ def test_expired_anonymous_repo_reported(monkeypatch):
     assert "has expired" in _details(anonymity.scan_anonymous_repo("R3", TERMS))
 
 
+
+# --- any link: names and handles in the URL --------------------------------------
+
+LINK_TERMS = [("author name", "Joseph Rich"), ("author name", "Lior Pachter"), ("email", "jrich@example.edu")]
+
+
+@pytest.mark.parametrize(
+    "url, hit",
+    [
+        ("https://huggingface.co/josephrich/model", "josephrich"),
+        ("https://huggingface.co/datasets/pachterlab/x", "pachter"),
+        ("https://wandb.ai/jrich/project", "jrich"),
+        ("www.cs.example.edu/~jrich/index.html", "jrich"),
+        ("https://pachter.caltech.edu/", "pachter"),
+        ("https://gitlab.com/pachterlab/foo", "pachter"),
+        ("https://pachterlab.github.io/", "pachter"),
+    ],
+)
+def test_any_link_naming_an_author_is_a_likely_error(url, hit):
+    (f,) = [f for f in anonymity.scan_text("m.tex", f"See {url} for details.", LINK_TERMS) if "contains an author's name" in f.detail]
+    assert f.level == "likely_error"
+    assert f"('{hit}')" in f.detail
+
+
+@pytest.mark.parametrize("url", ["https://example.com/rich-text-editor", "https://enrichment.org/", "https://zenodo.org/records/123456", "https://pytorch.org/docs"])
+def test_link_with_surname_inside_a_longer_word_is_quiet(url):
+    assert "contains an author's name" not in _details(anonymity.scan_text("m.tex", f"See {url}.", LINK_TERMS))
+
+
+def test_any_link_in_reference_list_skipped():
+    text = "Body text.\nReferences\n[1] Model card. https://huggingface.co/pachterlab/model\n"
+    assert "pachterlab" not in _details(anonymity.scan_text("m.pdf", text, LINK_TERMS))
+
+
+# --- linked records and pages (fake services) -----------------------------------
+
+LINKED = """Data: https://doi.org/10.5281/zenodo.111 and https://figshare.com/articles/dataset/My_data/2222222/1.
+Shared at https://osf.io/abcde/?view_only=xyz and https://osf.io/fghij/. See also 10.1234/foo.bar.
+Code: https://github.com/pachterlab/gget. Model: https://huggingface.co/someone/model.
+Project page: https://myproject.example.com/ . We use https://pytorch.org/ as is.
+References
+[1] https://doi.org/10.9999/cited and https://zenodo.org/records/999
+"""
+RESPONSES = {
+    "https://zenodo.org/api/records/111": {"metadata": {"creators": [{"name": "Rich, Joseph"}], "description": "<p>data</p>"}, "files": [{"key": "README.md", "size": 30, "links": {"self": "https://files.example/readme"}}]},
+    "https://files.example/readme": b"Contact jrich@example.edu",
+    "https://api.figshare.com/v2/articles/2222222": {"authors": [{"full_name": "Someone Else"}], "files": []},
+    "https://api.osf.io/v2/nodes/fghij/contributors/?embed=users": {"data": [{"embeds": {"users": {"data": {"attributes": {"full_name": "Lior Pachter"}}}}}]},
+    "https://doi.org/10.1234/foo.bar": {"author": [{"given": "Joseph", "family": "Rich"}]},
+    "https://raw.githubusercontent.com/pachterlab/gget/HEAD/README.md": b"# gget\nBy Lior Pachter",
+    "https://api.github.com/users/pachterlab": {"name": "Pachter Lab"},
+    "https://myproject.example.com/": b"<html><script>var a='Lior Pachter'</script><body>Joseph Rich<sup>1</sup></body></html>",
+}
+
+
+def _fake_get(responses):
+    requested = []
+
+    def get(url, timeout=None, headers=None):
+        requested.append(url)
+        if url not in responses:
+            return 404, b""
+        body = responses[url]
+        return 200, body if isinstance(body, bytes) else json.dumps(body).encode()
+
+    return get, requested
+
+
+def test_find_linked_records_skips_references_view_only_and_third_party_pages():
+    links = anonymity.find_linked_records([anonymity._without_references(LINKED)])
+    kinds = {(kind, key) for kind, key, _ in links}
+    assert ("zenodo", "111") in kinds and ("figshare", "2222222") in kinds and ("osf", "fghij") in kinds
+    assert ("doi", "10.1234/foo.bar") in kinds and ("github", "pachterlab/gget") in kinds and ("huggingface", "someone/model") in kinds
+    assert ("page", "https://myproject.example.com/") in kinds
+    assert ("osf", "abcde") not in kinds  # view-only link
+    assert not any("999" in key or "cited" in key for _, key, _ in links)  # reference list
+    assert not any("pytorch" in key for _, key, _ in links)  # not presented as the authors' own
+
+
+def test_linked_records_searched_for_authors(monkeypatch):
+    get, requested = _fake_get(RESPONSES)
+    monkeypatch.setattr(anonymity, "_http_get", get)
+    findings = anonymity.scan_linked_records([anonymity._without_references(LINKED)], LINK_TERMS)
+    details = _details(findings)
+    assert "Zenodo record 111 lists the author name 'Joseph Rich' among its creators" in details
+    assert "Zenodo records cannot be anonymized" in details
+    assert "README.md of linked Zenodo record 111 names the email 'jrich@example.edu'" in details
+    assert "OSF project fghij lists the author name 'Lior Pachter'" in details
+    assert "DOI 10.1234/foo.bar lists the author name 'Joseph Rich'" in details
+    assert "README.md of linked github.com/pachterlab/gget names the author name 'Lior Pachter'" in details
+    assert "named 'Pachter Lab', which contains an author's surname ('pachter')" in details
+    assert "page of linked https://myproject.example.com/ names the author name 'Joseph Rich'" in details
+    assert "'Lior Pachter'" not in details.split("myproject")[-1]  # script text is not the page
+    assert "Figshare" not in details  # creators are someone else
+    assert "huggingface.co/someone/model" not in details  # a 404 README is an answer, not an unfetched link
+    assert not any("10.9999" in url or "/999" in url for url in requested)
+
+
+def test_unreachable_records_reported_as_not_fetched(monkeypatch):
+    monkeypatch.setattr(anonymity, "_http_get", lambda *a, **k: (0, b""))
+    (f,) = anonymity.scan_linked_records(["Data: https://zenodo.org/records/5"], LINK_TERMS)
+    assert f.category == anonymity.NOT_FETCHED
+    assert "zenodo.org/records/5" in f.detail
+
+
+def test_linked_records_need_author_details(monkeypatch):
+    get, requested = _fake_get(RESPONSES)
+    monkeypatch.setattr(anonymity, "_http_get", get)
+    assert anonymity.scan_linked_records(["Data: https://zenodo.org/records/111"], [("affiliation", "Caltech University")]) == []
+    assert requested == []
+
+
 # --- validate wiring -------------------------------------------------------------
 
 
@@ -285,10 +398,22 @@ def _anonymity_warnings(issues) -> list[str]:
 def test_validate_runs_anonymity_check_for_anonymous_venue(tmp_path):
     venue = _venue(AUTHORS, PDF, anonymous=True)
     sub = SubFile(venue="testj", values={"authors": AUTHOR_LINE, "pdf_file": str(_leaky_pdf(tmp_path))})
-    warnings = _anonymity_warnings(validate(sub, venue, check_links=False, check_references=False, check_manuscript=False, check_sensitive=False))
+    warnings = _anonymity_warnings(validate(sub, venue, check_links=True, check_references=False, check_manuscript=False, check_sensitive=False))
     assert any("Ada Lovelace" in w for w in warnings)
     # The linked mirror was looked up (offline stub -> reported as uncheckable).
     assert any("anonymous.4open.science/r/R1" in w for w in warnings)
+
+
+def test_validate_without_network_checks_fetches_nothing_for_anonymity(tmp_path, monkeypatch):
+    def no_fetch(*a, **k):
+        raise AssertionError("fetched with the network checks off")
+
+    monkeypatch.setattr(anonymity, "_http_get", no_fetch)
+    venue = _venue(AUTHORS, PDF, anonymous=True)
+    sub = SubFile(venue="testj", values={"authors": AUTHOR_LINE, "pdf_file": str(_leaky_pdf(tmp_path))})
+    warnings = _anonymity_warnings(validate(sub, venue, check_links=False, check_references=False, check_manuscript=False, check_sensitive=False))
+    assert any("Ada Lovelace" in w for w in warnings)  # the offline scan still runs
+    assert not any("anonymous.4open.science/r/R1" in w for w in warnings)
 
 
 def test_validate_skips_anonymity_for_regular_venue_unless_asked(tmp_path):

@@ -86,6 +86,19 @@ def _no_network_link_checks(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _restore_urllib_opener():
+    """Undo :func:`paperpush.net_guard.install` (run by a public ``create_app``) after each test."""
+    import urllib.request
+
+    from paperpush import net_guard
+
+    saved = urllib.request._opener
+    yield
+    urllib.request.install_opener(saved)
+    net_guard._installed = False
+
+
+@pytest.fixture(autouse=True)
 def _no_network_anonymous_repos(monkeypatch):
     """Keep the suite offline: anonymous.4open.science fetches fail as "unreachable".
 
