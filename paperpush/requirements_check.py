@@ -622,8 +622,10 @@ def _template_issues(field: Field, path: Path, reqs: ManuscriptRequirements) -> 
     if measured is None:
         logger.debug("could not measure the layout of %s", pdf)
         return [unchecked(field.id, f"template: could not measure the layout of {path.name} (a PDF with no extractable text, or pdfminer.six not installed), so it was not compared with the venue's template")]
-    issues = [Issue(WARNING, field.id, f"template: {path.name}: {problem}") for problem in template_check.layout_problems(measured, layout, reqs.manuscript.font_size_pt)]
-    if issues:
+    problems = list(template_check.layout_problems(measured, layout, reqs.manuscript.font_size_pt))
+    issues = [Issue(WARNING, field.id, f"template: {path.name}: {problem}") for problem in problems]
+    # A few overfull pages are not a modified template; they stay warnings on their own.
+    if any(not template_check.is_minor_layout_problem(p) for p in problems):
         style = f"'{reqs.manuscript.latex_class}' style" if reqs.manuscript.latex_class else "template"
         issues.append(Issue(LIKELY_ERROR, field.id, f"template: {path.name} does not match the venue's {style} as distributed; papers that modify it can be desk-rejected"))
     return issues

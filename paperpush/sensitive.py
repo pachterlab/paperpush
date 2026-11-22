@@ -262,10 +262,17 @@ def _iter_personal_findings(where: str, text: str) -> Iterator[Finding]:
             if label == "phone number" and re.search(r"(?i)\b(?:corresponding|correspondence|e-?mail|fax)\b", text[max(0, match.start() - 120):match.start()]):
                 continue  # an author's contact line, not a participant's data
             raw = match.group(1)
+            # Numbers from a table ("Phone 7.5 12.25 30.1"): a phone number has 8 digits or more and
+            # is not a row of decimals.
+            if label == "phone number" and (sum(c.isdigit() for c in raw) < 8 or len(re.findall(r"(?<![\d.])\d{1,3}\.\d{1,3}(?![\d.])", raw)) >= 2):
+                continue
             if raw in seen:
                 continue
             seen.add(raw)
-            yield Finding(where, "personal data", f"possible personal data: {label} ({_mask(raw)}); remove identifying details of study participants before submitting", LEVEL_LIKELY)
+            # "born on 4 August 1961" in prose is most often a public figure in an example, so a
+            # bare "born" warns; a labeled date of birth ("DOB:") is a participant's record.
+            level = LEVEL_WARNING if label == "date of birth" and match.group(0).lower().startswith("born") else LEVEL_LIKELY
+            yield Finding(where, "personal data", f"possible personal data: {label} ({_mask(raw)}); remove identifying details of study participants before submitting", level)
 
 
 def _iter_secret_findings(where: str, text: str) -> Iterator[Finding]:

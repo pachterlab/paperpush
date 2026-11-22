@@ -77,7 +77,7 @@ def _ref(title):
 
 
 def _arxiv_answers(monkeypatch, body):
-    def get(self, url, accept="application/json"):
+    def get(self, url, accept="application/json", missing_ok=False):
         if "export.arxiv.org" in url:
             return body
         return None
@@ -230,7 +230,7 @@ def test_registered_middle_initial_is_the_same_person():
 def test_arxiv_title_search_uses_the_longest_words_then_fewer(monkeypatch):
     urls = []
 
-    def get(self, url, accept="application/json"):
+    def get(self, url, accept="application/json", missing_ok=False):
         urls.append(urllib.parse.unquote_plus(url))
         return _atom() if len(urls) <= 1 else _atom("Faster Diffusion via Temporal Attention Decomposition")
 

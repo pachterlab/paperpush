@@ -69,6 +69,7 @@ from .references import (
     _normalize_text,
     _retraction_finding,
     _significant_words,
+    _strip_accents,
     _strip_latex,
     _title_of,
     _work_title,
@@ -137,9 +138,28 @@ def _lookup_cache_read(url: str, accept: str) -> bytes | None:
         return None
 
 
+def _empty_search_answer(body: bytes) -> bool:
+    """Whether a response is a search that found nothing (OpenAlex ``"count": 0``, DataCite ``"data": []``).
+
+    Not cached: OpenAlex's free and paid searches both answered empty for days at a time (November
+    2026) for titles they hold, and a cached empty answer would turn every later run's lookup into
+    a confident miss.
+    """
+    if b'"count":0' not in body.replace(b" ", b"") and b'"data":[]' not in body.replace(b" ", b""):
+        return False
+    try:
+        data = json.loads(body.decode("utf-8", "replace"))
+    except ValueError:
+        return False
+    if not isinstance(data, dict):
+        return False
+    meta = data.get("meta")
+    return (isinstance(meta, dict) and meta.get("count") == 0 and not data.get("results")) or data.get("data") == []
+
+
 def _lookup_cache_write(url: str, accept: str, body: bytes) -> None:
     path = _lookup_cache_path(url, accept)
-    if path is None:
+    if path is None or _empty_search_answer(body):
         return
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -190,7 +210,7 @@ _NOT_WORK_TYPES = {"dataset", "component", "peer-review", "grant", "journal-issu
 
 # arXiv identifiers: new style (2101.00001v2) and old style (hep-th/9901001v1).
 _ARXIV_ID = r"(\d{4}\.\d{4,5}|[a-z][a-z.-]+(?:\.[A-Z]{2})?/\d{7})(?:v(\d+))?"
-_ARXIV_IN_TEXT = re.compile(r"(?:arxiv\s*[:.]?\s*(?:abs/)?|arxiv\.org/(?:abs|pdf)/|10\.48550/arxiv\.)" + _ARXIV_ID, re.IGNORECASE)
+_ARXIV_IN_TEXT = re.compile(r"(?:arxiv\s*[:.]?\s*(?:abs/)?|arxiv\s?\.\s?org/\s?(?:abs|pdf)/\s?|10\.48550/arxiv\.)" + _ARXIV_ID, re.IGNORECASE)
 _ARXIV_BARE = re.compile(r"^\s*" + _ARXIV_ID + r"\s*$", re.IGNORECASE)
 _PREPRINT_DOI_PREFIXES = ("10.1101/",)  # bioRxiv and medRxiv
 # A venue that is the preprint server itself: "arXiv preprint arXiv:...", "CoRR", "ArXiv", "arXiv e-prints".
@@ -450,6 +470,7 @@ class _Services:
     arxiv: _Service
     biorxiv: _Service
     datacite: _Service = field(default_factory=lambda: _Service("DataCite", DATACITE_REQUESTS))
+    semanticscholar: _Service = field(default_factory=lambda: _Service("Semantic Scholar", S2_REQUESTS, delay=S2_DELAY, shared_pace=True))
 
 
 def _services() -> _Services:
@@ -468,6 +489,48 @@ def _services() -> _Services:
 # volume ... editor: for the detail check (paperpush.reference_details), which holds a matched
 # entry against the rest of its record.
 _CROSSREF_FIELDS = "DOI,title,author,issued,type,relation,container-title,short-container-title,updated-by,update-to,volume,issue,page,article-number,ISSN,editor,published-print,published-online"
+
+
+# Semantic Scholar's title match, the last look for a reference no other registry matched: it
+# indexes the machine-learning venues Crossref and OpenAlex miss (PMLR, MLSys, USENIX, CoRL,
+# OpenReview). Keyless use shares one pool, so it is paced at one request a second across processes.
+S2_REQUESTS = 60
+S2_DELAY = 1.1
+
+
+def semantic_scholar_match(title: str, service: _Service) -> list[dict] | None:
+    """Semantic Scholar's paper whose title best matches ``title`` (CSL-shaped), [] if it has none, or None if it did not answer."""
+    query = _autocomplete_text(title)
+    if len(query.split()) < MIN_TITLE_WORDS:
+        return None
+    url = "https://api.semanticscholar.org/graph/v1/paper/search/match?" + urllib.parse.urlencode({"query": query[:300], "fields": "title,year,authors,venue,externalIds"})
+    body = service.get(url, missing_ok=True)
+    if body is None:
+        return None
+    if not body:
+        return []  # 404: "Title match not found"
+    try:
+        data = json.loads(body.decode("utf-8", "replace")).get("data") or []
+    except (ValueError, AttributeError):
+        return None
+    out = []
+    for item in data:
+        if not isinstance(item, dict) or not item.get("title"):
+            continue
+        authors = []
+        for a in item.get("authors") or []:
+            name = (a or {}).get("name") or ""
+            parts = name.split()
+            if parts:
+                authors.append({"family": parts[-1], "given": " ".join(parts[:-1]), "literal": name})
+        rec = {"title": item["title"], "author": authors, "type": "article", "container-title": item.get("venue") or ""}
+        if item.get("year"):
+            rec["issued"] = {"date-parts": [[int(item["year"])]]}
+        doi = ((item.get("externalIds") or {}).get("DOI")) or ""
+        if doi:
+            rec["DOI"] = normalize_doi(doi)
+        out.append(rec)
+    return out
 
 
 def crossref_search(query: str, service: _Service) -> list[dict] | None:
@@ -830,7 +893,8 @@ def datacite_arxiv_title_search(title: str, service: _Service) -> list[dict] | N
         queries.append("titles.title:(" + " AND ".join(words[:3]) + ")")
     data = None
     for query in queries:
-        params = {"query": query, "client-id": "arxiv.content", "page[size]": 5}
+        # Ten, not five: a title's own record can rank below newer papers quoting it.
+        params = {"query": query, "client-id": "arxiv.content", "page[size]": 10}
         body = service.get("https://api.datacite.org/dois?" + urllib.parse.urlencode(params), accept="application/vnd.api+json")
         if body is None:
             return None
@@ -980,12 +1044,20 @@ def _is_candidate(record: dict) -> bool:
 _PERSON_ENTRY_TITLE = re.compile(r"^[A-Z][\w'\u00c0-\u017f-]+(?:\s+[A-Z][\w'\u00c0-\u017f-]+)?,\s*[A-Z][\w.'\u00c0-\u017f-]*(?:\s+[A-Z][\w.'\u00c0-\u017f-]*){0,3}$")
 
 
+def _umlaut_spelled(word: str) -> str:
+    """A normalized name with a spelled-out umlaut folded back ("gloeckler" and "glockler" agree)."""
+    return re.sub(r"([aou])e", r"\1", word)
+
+
 def _prose_overlap(text: str, record: dict) -> float:
     words = set(_normalize_text(text).split())
     title_words = _significant_words(_work_title(_title_of(record)))
     if not title_words:
         return 0.0
-    return sum(1 for w in title_words if w in words) / len(title_words)
+    # A word the extraction glued to its neighbor where a line-break hyphen fell ("selfsupervised",
+    # "visionlanguage") is still in the entry, read without spaces.
+    squashed = re.sub(r"\W", "", _normalize_text(text))
+    return sum(1 for w in title_words if w in words or (len(w) >= 4 and w in squashed)) / len(title_words)
 
 
 def _family(name: str) -> str:
@@ -1069,20 +1141,86 @@ def _registered_families(record: dict) -> list[str]:
     return out
 
 
-_PROSE_AUTHORS_END = re.compile(r"(?<![A-Z])\.\s+(?=\S)")
+def _registered_name_words(record: dict) -> set[str]:
+    """Every word of every registered author's name, family and given alike.
+
+    Registries swap the two (OpenAlex's "Stefano Fiorini" as family "Stefano") and entries
+    write the family name first without a comma ("Chen Siyu, Sheen Heejune"), so a name is
+    known by any of its words.
+    """
+    out: set[str] = set()
+    for a in record.get("author") or []:
+        if isinstance(a, dict):
+            for key in ("family", "given", "literal", "name"):
+                out.update(w for w in _normalize_text(a.get(key) or "").split() if len(w) > 1)
+    return out
+
+
+def _registered_given_names(record: dict) -> list[str]:
+    """The last word of each registered author's given name (where a swapped record keeps the family name)."""
+    out = []
+    for a in record.get("author") or []:
+        if isinstance(a, dict):
+            words = _normalize_text(a.get("given") or "").split()
+            if words and len(words[-1]) > 1:
+                out.append(words[-1])
+    return out
+
+
+def _listed_name_words(text: str, family: str) -> set[str]:
+    """The other words of the listed name whose last word is ``family`` ("Chen Siyu" for "siyu")."""
+    m = re.search(rf"(?i)([A-Z][\w'-]*)\s+{re.escape(family)}\b", _strip_accents(text[:700]))
+    return {_normalize_text(m.group(1))} if m else set()
+
+
+def _identical_title(own: str, registered: str) -> bool:
+    """Whether the title read from an entry is the registered one word for word (case, accents,
+    and punctuation aside), or differs only by a subtitle the entry leaves out after a colon."""
+    a, b = _normalize_text(own), _normalize_text(_work_title(registered))
+    if not a or not b:
+        return False
+    if a == b or title_similarity(own, registered) >= 0.97:
+        return True
+    return ":" in registered and a == _normalize_text(registered.split(":", 1)[0])
+
+
+def _author_segment(text: str) -> str:
+    """The author list that opens a reference-list entry, as one lower-case run of letters."""
+    text = re.sub(r"^\s*(?:\[\d+\]|\d+[.)])\s*", "", text)
+    end = _PROSE_AUTHORS_END.search(text, 0, 700)
+    return re.sub(r"[^a-z]", "", _normalize_text(text[: end.start()] if end else text[:300]))
+
+
+def _named_in(family: str, words: set[str], segment: str) -> bool:
+    """Whether a registered family name is in an entry: as a word, or (four letters or more) inside
+    its author list read without spaces, where extraction split it ("Khas Ahmadi" for Khasahmadi)."""
+    return family in words or (len(family) >= 4 and family in segment)
+
+
+# Capital letters, Latin-1 and Latin Extended-A included, so an initial like "Ł." does not end the list.
+_UPPER = "".join(c for c in map(chr, range(0x250)) if c.isupper())
+_PROSE_AUTHORS_END = re.compile(rf"(?<![{_UPPER}])\.\s+(?=\S)")
 
 
 def _prose_title(text: str) -> str:
     """The title of a reference-list entry: the sentence after its author list (and year, if it comes first)."""
     text = re.sub(r"^\s*(?:\[\d+\]|\d+[.)])\s*", "", text)
+    # BibTeX's case-protecting braces, copied out of the .bbl ("et al.{Quant-LLM}: ... {GPUs}").
+    text = re.sub(r"\}(?=[^\s.,:;{}])", " ", re.sub(r"(?<=\S)\{", " ", text)).replace("{", "").replace("}", "")
     end = _PROSE_AUTHORS_END.search(text, 0, 500)
     if end is None:
         return ""
     rest = re.sub(r"^\(?(?:19|20)\d{2}[a-z]?\)?[.,:]?\s*", "", text[end.end():])
     # A title may hold a question ("Do LLMs Overcome Shortcut Learning? An Evaluation ..."),
     # so only a period or the venue's "In" ends it.
-    stop = re.search(r"\.(?:\s|$)|\s+In\s+(?=[A-Z])", rest)
-    return rest[: stop.start()] if stop else rest[:200]
+    # ... and a period glued to the venue, where the extraction lost the space ("geometries.arXiv
+    # e-prints", "Haiku.Advances in ...", "InInternational Conference").
+    stop = re.search(r"\.(?:\s|$)|\s+In\s+(?=[A-Z])|(?<=[a-z0-9)])\.(?=arXiv\b|In[A-Z]|[A-Z][a-z])|\s+In(?=[A-Z][a-z])", rest)
+    title = rest[: stop.start()] if stop else rest[:200]
+    # ICML's position papers: "Position: ..." is not in the registered title.
+    title = re.sub(r"^Position\s*:\s*", "", title)
+    # A year run on after a comma ("Mistral 7b, 2023").
+    return re.sub(r",\s*(?:19|20)\d{2}[a-z]?\s*$", "", title)
 
 
 def _entry_families(text: str) -> list[str]:
@@ -1105,7 +1243,8 @@ def _entry_families(text: str) -> list[str]:
 def _entry_lead_author(text: str) -> str:
     """The first author's family name in a reference-list entry, in either name order."""
     text = re.sub(r"^\s*(?:\[\d+\]|\d+[.)])\s*", "", text)
-    first = re.split(r",|\s+and\s+|\s+et\s+al\b|\.\s", text, maxsplit=1)[0]
+    # A middle initial ("Diederik P. Kingma") does not end the name; a full stop after a word does.
+    first = re.split(rf",|\s+and\s+|\s+et\s+al\b|(?<![{_UPPER}])\.\s", text, maxsplit=1)[0]
     words = [w for w in first.split() if not re.fullmatch(r"[A-Z]\.?(?:-[A-Z]\.?)?", w)]
     if not words:
         return ""
@@ -1157,8 +1296,19 @@ def _lead_given_conflict(text: str, record: dict) -> str:
     # "NovelSeek Team" and "InternAgent Team" (one project, renamed): a team, not a person.
     if family in _TEAM_WORDS or reg_family in _TEAM_WORDS:
         return ""
-    g, r = given.split()[0], reg_given.split()[0]
+    # Particles are not given names ("De Chezelles, Thibault Le Sellier").
+    particles = {"de", "le", "la", "van", "von", "der", "den", "da", "di", "del", "du", "dos", "das"}
+    given_words = [w for w in given.split() if w not in particles] or given.split()
+    g, r = given_words[0], reg_given.split()[0]
     if g[0] == r[0] or g == reg_family or _family(r) == family:
+        return ""
+    # The entry's "given name" is one of the work's names (a reversed or garbled author list:
+    # "Li Guo, Li and Liu"), or the co-authors the entry lists are the work's: the same people.
+    names = _registered_name_words(record)
+    if g in names:
+        return ""
+    listed = _entry_families(text)
+    if len(listed) >= 3 and sum(f in names for f in listed[1:]) >= 0.8 * (len(listed) - 1):
         return ""
     # A preferred name among several given names ("Zhenyu Chen" for Dave Zhenyu Chen), also when
     # registered as an initial ("Tian Qi Chen" for Ricky T. Q. Chen, "Yuan Li" for Christy Y. Li).
@@ -1173,7 +1323,7 @@ def _lead_given_conflict(text: str, record: dict) -> str:
 
 
 _INDEXED_VENUE = re.compile(r"\bIn\s*(?:Proc|Advances|International|Annual|The\s+\w+\s+(?:Conference|Workshop)|Conference|Findings|Workshop|Forty|Thirty|Twenty)|Proceedings|Conference|Transactions|Journal|\barXiv\b|Letters|\bNature\b|\bScience\b", re.IGNORECASE)
-_UNINDEXED_KIND = re.compile(r"\b(?:thesis|dissertation|technical\s+report|tech\.\s*rep|white\s*paper|blog|github|gitlab|hugging\s*face|huggingface|kaggle|accessed|retrieved|website|web\s+page|model\s+card|system\s+card|press|book|chapter|manual|documentation|patent|standard|lecture|slides|tutorial|preprint\s+server|ssrn)\b", re.IGNORECASE)
+_UNINDEXED_KIND = re.compile(r"\b(?:thesis|dissertation|technical\s+report|tech\.\s*rep|white\s*paper|blog|github|gitlab|hugging\s*face|huggingface|kaggle|accessed|retrieved|website|web\s+page|model\s+card|system\s+card|press|book|chapter|manual|documentation|patent|standard|lecture|slides|tutorial|preprint\s+server|ssrn|talk|keynote|developers\s+conference|science\s*(?:&|and)\s*business\s+media)\b", re.IGNORECASE)
 
 
 def claims_indexed_venue(text: str) -> bool:
@@ -1202,7 +1352,7 @@ def _title_conflict(own: str, registered: str) -> bool:
 
 
 _ORGANIZATION_AUTHOR = re.compile(
-    r"(?:[A-Z][\w&-]*\s+){0,4}(?:AI|Research|Team|Lab|Labs|Inc|Corporation|Foundation|Institute|Group|Consortium|Collaboration|DeepMind|OpenAI|Anthropic|Google|Meta|Microsoft|NVIDIA|Mistral|Qwen|DeepSeek|xAI|Xiaomi|Alibaba|Tencent|Baidu|ByteDance|Moonshot|Kimi|Gemma|Apple|Amazon|IBM|Cohere|Zhipu|MiniMax|StepFun)(?:\s+(?:AI|Research|Team|Lab|Labs|Inc))?[.,]\s"
+    r"(?:[A-Z][\w&-]*\s+){0,4}(?:AI|Research|Team|Lab|Labs|Inc|Corporation|Foundation|Institute|Group|Consortium|Collaboration|DeepMind|OpenAI|Anthropic|Google|Meta|Microsoft|NVIDIA|Mistral|Qwen|DeepSeek|xAI|Xiaomi|Alibaba|Tencent|Baidu|ByteDance|Moonshot|Kimi|Gemma|Apple|Amazon|IBM|Cohere|Zhipu|MiniMax|StepFun)(?:\s+(?:AI|Research|Team|Lab|Labs|Inc|Computer))?[.,]\s|(?:Project|Together)\s+[A-Z][\w-]*[.,]\s"
 )
 
 
@@ -1229,20 +1379,29 @@ def _prose_problems(text: str, words: set[str], record: dict, title_score: float
     if _not_a_title(own):
         own = ""
     same_title = _credible_title(own, _title_of(record)) and _same_title(own, _title_of(record))
+    name_words = _registered_name_words(record)
+    segment = _author_segment(text)
     if families and not truncated and len(families) >= 2 and title_score >= PROSE_STRONG_TITLE and same_title:
-        present = [f for f in families if f in words]
+        present = [f for f in families if _named_in(f, words, segment)]
+        # A registry that swapped an author's names has the family name among the given ones.
+        present += [a for a in _registered_given_names(record)[:10] if a in words and a not in present]
+        present = present[: len(families)]
         lead = _family(_entry_lead_author(text))
         if len(present) < PROSE_AUTHOR_SHARE * len(families):
             listed = f"of its registered authors ({', '.join(families[:4])}{', ...' if len(families) > 4 else ''}) the entry names {len(present)} of {len(families)}"
             # A wrong first author is reported outright; the right first author with other
             # co-authors may be another version of the work (a solo working paper later
             # co-authored) or a review registered under its reviewer, so a reader decides.
-            if lead and lead not in _registered_families(record):
+            if lead and lead not in name_words:
                 problems.append(f"{WRONG_AUTHORS}: {listed}")
             else:
                 problems.append(f"the entry's co-authors differ from the work's: {listed}")
     listed = _entry_families(text)
-    all_registered = set(_registered_families(record))
+    # Any word of a registered name: "Chen Siyu" lists the family name first.
+    all_registered = name_words | {f for f in _registered_families(record)}
+    for i, f in enumerate(listed):
+        if f not in all_registered and (other := _listed_name_words(text, f) & all_registered):
+            listed[i] = next(iter(other))
     if same_title and not problems and not organization and len(listed) >= 3 and all_registered and sum(f in all_registered for f in listed) < PROSE_AUTHOR_SHARE * len(listed):
         # The names the entry does list, even cut short by "et al.", should be the work's.
         lead = listed[0]
@@ -1257,8 +1416,15 @@ def _prose_problems(text: str, words: set[str], record: dict, title_score: float
             problems = [given] + [p for p in problems if not p.startswith("the entry's co-authors differ")]
     found_year = _year_value(_year_of(record))
     years = [int(y) for y in re.findall(r"\b(?:19|20)\d{2}\b", text)]
-    if same_title and found_year and years and all(abs(y - found_year) > YEAR_TOLERANCE for y in years):
+    far_year = bool(found_year and years and all(abs(y - found_year) > YEAR_TOLERANCE for y in years))
+    if same_title and far_year:
         problems.append(f"the entry's year ({years[-1]}) is not the work's ({found_year})")
+    # Reported outright only when the record is plainly the work the entry names: the very same
+    # title. A review of a book, a reproduction study, or a namesake under a similar title carries
+    # other people, so those go to a reader instead. A far year alone does not: a fabricated entry
+    # often gives a real title a made-up year as well as made-up people.
+    if any(p.startswith(WRONG_AUTHORS) for p in problems) and not _identical_title(own, _title_of(record)):
+        problems = [p.replace(WRONG_AUTHORS, "the authors differ from those of a registered work with this title (perhaps another edition, a review, or a namesake)", 1) if p.startswith(WRONG_AUTHORS) else p for p in problems]
     return problems
 
 
@@ -1272,6 +1438,7 @@ def match_text(ref: Reference, candidates: list[dict]) -> Lookup:
     candidates = [c for c in candidates if _is_candidate(c) and (len(_significant_words(_work_title(_title_of(c)))) >= MIN_TITLE_WORDS or _same_title(own_title, _title_of(c)))]
     words = set(_normalize_text(ref.text).split())
     scored = sorted(((_prose_overlap(ref.text, c), c) for c in candidates), key=lambda t: -t[0])
+    first_fit = None
     for score, c in scored:
         if score < PROSE_TITLE_OVERLAP:
             break
@@ -1293,8 +1460,16 @@ def match_text(ref: Reference, candidates: list[dict]) -> Lookup:
         if not _registered_families(c) and not _same_title(own_title, _title_of(c)):
             continue
         family = _family(_first_author_of(c))
-        if not family or family in words:
-            return Lookup(ref, MATCHED, record=c, problems=_prose_problems(ref.text, words, c, score))
+        if not family or family in words or _umlaut_spelled(family) in {_umlaut_spelled(w) for w in words}:
+            problems = _prose_problems(ref.text, words, c, score)
+            if not problems:
+                return Lookup(ref, MATCHED, record=c, problems=problems)
+            # Another record of the same work may fit cleanly (a 2025 re-post of a 2017 paper
+            # ahead of the paper itself), so the first fit with problems waits for the rest.
+            if first_fit is None:
+                first_fit = Lookup(ref, MATCHED, record=c, problems=problems)
+    if first_fit is not None:
+        return first_fit
     # A title that matches outright, under a first author the registered work does not have:
     # the entry names the wrong people (a fabricated author list on a real title).
     if scored and scored[0][0] >= PROSE_STRONG_TITLE and len(_registered_families(scored[0][1])) >= 2:
@@ -1323,13 +1498,61 @@ def _same_authors(ref: Reference, record: dict) -> bool:
     return bool(ref.author) and _family(ref.author) == families[0]
 
 
+def _registered_initials(record: dict) -> dict[str, set[str]]:
+    """Each word of a registered author's name -> the initials of that author's other name words."""
+    out: dict[str, set[str]] = {}
+    for a in record.get("author") or []:
+        if not isinstance(a, dict):
+            continue
+        words = []
+        for key in ("given", "family") if (a.get("given") or a.get("family")) else ("literal", "name"):
+            words += [w for w in _normalize_text(a.get(key) or "").split() if w]
+        if not words and a.get("literal"):
+            words = _normalize_text(a["literal"]).split()
+        for w in words:
+            out.setdefault(w, set()).update(x[0] for x in words if x != w)
+    return out
+
+
+def _listed_among(ref: Reference, record: dict) -> bool:
+    """Whether the people a reference lists are among the record's authors, in any order.
+
+    An arXiv record is the latest version, which can add authors and reorder them
+    ("Jian Hu" alone on v1 of REINFORCE++, fourth of four later), so the entry's own names are
+    held to the whole registered list rather than to its first places. Each name has to agree
+    in full, family name and initial, since common surnames (Yang, Zhang, Li, Liu) turn up in
+    any two long author lists.
+    """
+    if not ref.text:
+        return False
+    initials = _registered_initials(record)
+    text = re.sub(r"^\s*(?:\[\d+\]|\d+[.)])\s*", "", ref.text)
+    end = _PROSE_AUTHORS_END.search(text, 0, 700)
+    if not initials or end is None:
+        return False
+    names = [n for n in re.split(r",\s*(?:and\s+)?|\s+and\s+|\s+&\s+", re.sub(r",?\s*et\s+al\.?$", "", text[: end.start() + 1].rstrip("."))) if n.strip()]
+    names = [_normalize_text(n).split() for n in names]
+    names = [n for n in names if 1 <= len(n) <= 4]
+    if not names:
+        return False
+
+    def agrees(words: list[str]) -> bool:
+        for w in words:
+            others = {x[0] for x in words if x != w}
+            if w in initials and (not others or others & initials[w]):
+                return True
+        return False
+
+    return sum(agrees(n) for n in names) >= 0.8 * len(names)
+
+
 def match_arxiv(ref: Reference, record: dict | None) -> Lookup:
     """Compare a reference citing an arXiv id with what arXiv has under that id."""
     if record is None:
         return Lookup(ref, MATCHED, problems=[f"it cites arXiv:{ref.arxiv_id}, which arXiv has no record of"], source="arXiv")
     # arXiv papers are often retitled between versions ("EraseBench: ..." became "Erasing More
     # Than Intended? ..."), so a title that disagrees counts only when the authors do too.
-    same_people = _same_authors(ref, record)
+    same_people = _same_authors(ref, record) or _listed_among(ref, record)
     if ref.title and title_similarity(ref.title, record["title"]) < NEAR_TITLE_RATIO and not same_people:
         return Lookup(ref, MATCHED, record=record, source="arXiv", problems=[f'it cites arXiv:{ref.arxiv_id}, but that identifier is "{record["title"]}"'])
     if ref.text and not ref.title and _prose_overlap(ref.text, record) < PROSE_NEAR_OVERLAP and not same_people:
@@ -1359,7 +1582,7 @@ _NAME_LIST = re.compile(rf"^{_NAME}(?:\s*,\s*{_NAME})*,?\s+and\s+{_NAME}\.?$")
 
 # ... or the venue ("Proceedings of the National Academy of Sciences, 115(34):8505-8510, 2018",
 # read after an author named "Weinan E." whose initial looked like the end of the author list).
-_VENUE_TITLE = re.compile(r"(?i)^(?:in\s+)?(?:proceedings\b|proc\.|advances\s+in\b|journal\s+of\b|transactions\s+on\b|(?:ieee|acm)\b|international\s+conference\b|conference\s+on\b)|\b\d+\s*\(\d+\)\s*:\s*\d+")
+_VENUE_TITLE = re.compile(r"(?i)^(?:in\s*)?(?:proceedings\b|proc\.|advances\s+in\b|journal\s+of\b|transactions\s+on\b|(?:ieee|acm)\b|international\s+conference\b|conference\s+on\b|(?:the\s+)?(?:forty|thirty|twenty)[\w-]*\s+(?:international|annual|conference)\b|the\s+\w+\s+(?:international|annual)\s+conference\b)|\b\d+\s*\(\d+\)\s*:\s*\d+")
 
 
 def _not_a_title(title: str) -> bool:
@@ -1381,13 +1604,32 @@ def _arxiv_second_look(ref: Reference, lookup: Lookup | None, title: str, svc: _
     # Not "arXiv": that source means the entry cited an arXiv identifier (see search_references).
     names = [n for n in re.split(r",? and |, ", (lookup.source if lookup is not None else "") or "Crossref") if n] + ["arXiv titles"]
     source = names[0] if len(names) == 1 else f"{names[0]} and {names[1]}" if len(names) == 2 else ", ".join(names[:-1]) + ", and " + names[-1]
-    if lookup is None or second.status == MATCHED or (second.status == NEAR and lookup.status in (NOT_FOUND, UNKNOWN)):
+    if _better(second, lookup) or (second.status == NEAR and lookup.status == UNKNOWN):
         second.source = source
         return second, arx
     lookup.source = source
     if not lookup.candidates and second.candidates:
         lookup.candidates = second.candidates[:1]
     return lookup, arx
+
+
+def _settled(lookup: Lookup | None) -> bool:
+    """Whether a lookup ends the search: a match, unless it says the entry names the wrong people.
+
+    A title matched under other authors may be a namesake (a later edition, a review, a copy
+    under the same title) when another registry holds the work the entry names, so the search
+    goes on to the next registry before that is reported.
+    """
+    return lookup is not None and lookup.status == MATCHED and not any(p.startswith(WRONG_AUTHORS) for p in lookup.problems)
+
+
+def _better(second: Lookup, lookup: Lookup | None) -> bool:
+    """Whether the next registry's lookup replaces the one so far."""
+    if lookup is None or _settled(second):
+        return True
+    if lookup.status == MATCHED:
+        return False
+    return second.status == MATCHED or (second.status == NEAR and lookup.status == NOT_FOUND)
 
 
 def _search_one(ref: Reference, svc: _Services) -> Lookup:
@@ -1398,19 +1640,21 @@ def _search_one(ref: Reference, svc: _Services) -> Lookup:
         if lookup is not None:
             lookup.source = "Crossref"
         works = None
-        if lookup is None or lookup.status != MATCHED:
+        if not _settled(lookup):
             works = openalex_search(ref.title, svc.openalex) if svc.openalex.available else None
             if works is not None:
                 second = match_entry(ref, works)
                 second.source = "OpenAlex" if lookup is None else "Crossref and OpenAlex"
-                if lookup is None or second.status == MATCHED or (second.status == NEAR and lookup.status == NOT_FOUND):
+                if _better(second, lookup):
                     lookup = second
                 else:
                     lookup.source = "Crossref and OpenAlex"
                     lookup.candidates += second.candidates[:1]
         arx = None
-        if lookup is None or lookup.status != MATCHED:
+        if not _settled(lookup):
             lookup, arx = _arxiv_second_look(ref, lookup, ref.title, svc, match_entry)
+        if not _settled(lookup):
+            lookup = _s2_last_look(ref, lookup, ref.title, svc, match_entry)
         # A miss means something only when Crossref and a second registry (OpenAlex or arXiv) answered.
         if lookup is not None and lookup.status == NOT_FOUND and (items is None or (works is None and arx is None)):
             lookup.status = UNKNOWN
@@ -1426,22 +1670,61 @@ def _search_one(ref: Reference, svc: _Services) -> Lookup:
     if _not_a_title(own):
         own = ""  # misread: neither searched nor counted as a confident miss
     works = None
-    if (lookup is None or lookup.status != MATCHED) and len(own.split()) >= MIN_TITLE_WORDS and svc.openalex.available:
+    if (not _settled(lookup)) and len(own.split()) >= MIN_TITLE_WORDS and svc.openalex.available:
         works = openalex_search(own, svc.openalex)
         if works is not None:
             second = match_text(ref, works)
             second.source = "OpenAlex" if lookup is None else "Crossref and OpenAlex"
-            if lookup is None or second.status == MATCHED or (second.status == NEAR and lookup.status == NOT_FOUND):
+            if _better(second, lookup):
                 lookup = second
             else:
                 lookup.source = "Crossref and OpenAlex"
                 lookup.candidates += second.candidates[:1]
             lookup.confident_miss = lookup.status == NOT_FOUND and items is not None
-        if (lookup is None or lookup.status != MATCHED) and works is None:
-            lookup, arx = _arxiv_second_look(ref, lookup, own, svc, match_text)
-            if arx is not None and lookup is not None:
-                lookup.confident_miss = lookup.status == NOT_FOUND and items is not None
+    # arXiv's titles also when OpenAlex answered: OpenAlex's free search misses many recent preprints.
+    if not _settled(lookup) and len(own.split()) >= MIN_TITLE_WORDS:
+        lookup, arx = _arxiv_second_look(ref, lookup, own, svc, match_text)
+        if arx is not None and lookup is not None:
+            lookup.confident_miss = lookup.status == NOT_FOUND and items is not None
+    if not _settled(lookup) and len(own.split()) >= MIN_TITLE_WORDS:
+        lookup = _s2_last_look(ref, lookup, own, svc, match_text)
     return lookup or Lookup(ref, UNKNOWN)
+
+
+# Compound halves that a line-break hyphen joined into one word when the extraction dropped the
+# hyphen ("self-" / "supervised" read as "selfsupervised"); re-split for the last search only.
+_GLUED_COMPOUND = re.compile(r"\b(self|vision|cross|zero|few|semi|multi|open|fine|end|data|text|image|video|language|graph|reward|policy|task|model|object|sample|knowledge|domain|time|high|low|large|long|token|human)(?=[a-z]{4,}\b)", re.IGNORECASE)
+
+
+def _rehyphenate(title: str) -> str:
+    """``title`` with glued compounds split back ("selfsupervised" -> "self-supervised", "Allin-one" -> "All-in-one")."""
+    title = re.sub(r"\b(all|one|end)(in|to)-", r"\1-\2-", title, flags=re.IGNORECASE)
+    return _GLUED_COMPOUND.sub(r"\1-", title)
+
+
+def _s2_last_look(ref: Reference, lookup: Lookup | None, title: str, svc: _Services, match) -> Lookup | None:
+    """Ask Semantic Scholar for a reference every other registry missed or matched under other people.
+
+    A match there replaces the lookup; its "not found" is added to the registries named in the
+    finding; no answer leaves the lookup as it was.
+    """
+    if lookup is None or lookup.status not in (NOT_FOUND, MATCHED) or not svc.semanticscholar.available:
+        return lookup
+    found = semantic_scholar_match(title, svc.semanticscholar)
+    if found == [] and _rehyphenate(title) != title:
+        found = semantic_scholar_match(_rehyphenate(title), svc.semanticscholar)
+    if found is None:
+        return lookup
+    names = [n for n in re.split(r",? and |, ", lookup.source or "Crossref") if n] + ["Semantic Scholar"]
+    source = names[0] if len(names) == 1 else f"{names[0]} and {names[1]}" if len(names) == 2 else ", ".join(names[:-1]) + ", and " + names[-1]
+    if found:
+        second = match(ref, found)
+        if _better(second, lookup):
+            second.source = source
+            second.confident_miss = False
+            return second
+    lookup.source = source
+    return lookup
 
 
 def search_references(refs: list[Reference], *, services: _Services | None = None) -> SearchResult:

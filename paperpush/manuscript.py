@@ -106,8 +106,12 @@ def _extra_heading_pattern(headings: tuple[str, ...]) -> re.Pattern[str] | None:
     # Our study ...", "Reproducibility. We ...", a bold paragraph lead) also counts when it opens
     # its line and a colon or period and a capitalized sentence follow.
     alternatives = "|".join(r"\s*".join(" ?".join(re.escape(ch) for ch in word) for word in phrase.split()) for phrase in phrases)
+    # The section number can be glued to a split small-caps heading ("6E THICS STATEMENT"), and a
+    # run-in \paragraph heading can lack the colon or period ("Reproducibility statement We ...",
+    # "AcknowledgmentsThis work ..."). The heading itself has to start with a capital, so a line
+    # wrapped in the middle of a sentence ("contributions. We ...") is not one.
     return re.compile(
-        r"^\s*" + _MD_HEADING_OPEN + r"(?:\d+\.?\s+|[A-Za-z]\.?\s+|[ivxlcIVXLC]+\.?\s+)?" rf"(?:{alternatives})" r"(?:(?:\s+[A-Za-z0-9]{1,3})?" r"\s*:?" + _MD_HEADING_CLOSE + r"\s*$" r"|" + _MD_HEADING_CLOSE + r"\s*[:.][ \t]*[A-Z])",
+        r"^\s*" + _MD_HEADING_OPEN + r"(?:\d+\.?\s*|[A-Za-z]\.?\s+|[ivxlcIVXLC]+\.?\s+)?" r"(?=(?-i:[A-Z]))" rf"(?:{alternatives})" r"(?:(?:\s+[A-Za-z0-9]{1,3})?" r"\s*:?" + _MD_HEADING_CLOSE + r"\s*$" r"|" + _MD_HEADING_CLOSE + r"\s*[:.]?[ \t]*(?-i:[A-Z]))",
         re.IGNORECASE | re.MULTILINE,
     )
 
@@ -816,7 +820,9 @@ def pages_before_references(path: Path, headings: tuple[str, ...] = ()) -> int |
         if not headings:
             return index + 1
         preceding = (page_text or "")[: match.start()]
-        return index if len(preceding.split()) <= _PAGE_FURNITURE_WORDS else index + 1
+        # The review copy's margin line numbers ("541" ... "593") are furniture too.
+        words = [w for w in preceding.split() if not re.fullmatch(r"\d{1,3}", w)]
+        return index if len(words) <= _PAGE_FURNITURE_WORDS else index + 1
     return len(pages)
 
 

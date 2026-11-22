@@ -1335,12 +1335,14 @@ def _anonymity_issues(venue: Venue, values: dict[str, str], *, check_repos: bool
 
 
 def _hidden_text_level(finding) -> str:
-    """ERROR for a hidden prompt, LIKELY_ERROR for a visible one (it may quote an example), else WARNING."""
+    """ERROR for a hidden prompt, else WARNING (a visible one may quote an example)."""
     from . import hidden_text
 
     if finding.is_error:
         return ERROR
-    return LIKELY_ERROR if finding.category == hidden_text.VISIBLE_INJECTION else WARNING
+    # Visible text addressed to an AI reviewer is a WARNING: a paper on prompt injection quotes such
+    # text as its subject, and a hidden prompt (the desk-rejection case) is caught as an ERROR above.
+    return WARNING
 
 
 def _hidden_text_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
@@ -1350,8 +1352,7 @@ def _hidden_text_issues(venue: Venue, values: dict[str, str]) -> list[Issue]:
     microscopic, or off-page text (see :mod:`paperpush.hidden_text`). Hidden
     text that instructs a reviewer or language model is an ERROR -- conferences
     treat it as an ethics violation --, visible text addressed to an AI reviewer
-    is a LIKELY_ERROR (it may be a quoted example), and other hidden prose is a
-    WARNING. Runs by default (disable with
+    is a WARNING (it may be a quoted example), as is other hidden prose. Runs by default (disable with
     ``--disable-integrity.hidden_text``); makes no network requests.
     """
     from . import hidden_text, pdf_layout

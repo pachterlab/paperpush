@@ -54,6 +54,7 @@ quiet and only a genuinely different work is reported.
 from __future__ import annotations
 
 import difflib
+import functools
 import html
 import json
 import logging
@@ -64,7 +65,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator
 
-from .sensitive import ARCHIVE_EXTS, LEVEL_LIKELY, MAX_ARCHIVE_MEMBERS, MAX_TEXT_BYTES, UNREAD, Finding, _decode, _read_capped, _dedup_paths, _iter_archive_members, _iter_text_blobs
+from .sensitive import ARCHIVE_EXTS, LEVEL_LIKELY, LEVEL_WARNING, MAX_ARCHIVE_MEMBERS, MAX_TEXT_BYTES, UNREAD, Finding, _decode, _read_capped, _dedup_paths, _iter_archive_members, _iter_text_blobs
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +200,81 @@ def _doi_continuation(text: str, pos: int) -> re.Match[str] | None:
     if wrapped and text[pos - 1: pos] == "/" and re.fullmatch(r"\d{1,3}", wrapped.group(1)) and text[wrapped.end(): wrapped.end() + 1] in ("\n", "\r"):
         return _DOI_AFTER_PAGE_BREAK.match(text, pos) or wrapped
     return wrapped
+# A DOI split on its own line by PDF text extraction (pypdf), which the match above stops at:
+# an underscore drawn as a backslash and a space ("10.1007/3-540-36755-1\ 29",
+# "10.1162/NECO \ a\ 00949"), and a kerning gap read as a space before a dot, hyphen, or
+# underscore ("10.48550/ARXIV .2401.15884", "10.1109/TIP .2003.819861"). Neither leaves
+# anything a reader would take for the end of the DOI, so the pieces are joined outright.
+# LaTeX's escaped underscore copied out verbatim ("10.1162/ISAL\_A\_00369") is joined the same way.
+_DOI_BACKSLASH_UNDERSCORE = re.compile(r" ?\\[ _]([A-Za-z0-9][A-Za-z0-9._;()/:-]*)")
+_DOI_KERNING_GAP = re.compile(r" ([._-])(?:[ \t]*\r?\n[ \t]*(?=\d))?([A-Za-z0-9][A-Za-z0-9._;()/:-]*)")
+# A space where the extraction dropped an underscore or split a word: "10.1162/tacl a 00718"
+# (tacl_a_00718), "10.1109/W ACV56688.2023.00466" (WACV56688). A space can also end the DOI
+# ("10.1000/x URL ..."), so these are only fallbacks, used when the cut form does not resolve.
+_DOI_SPACED_WORD = re.compile(r" ([A-Za-z0-9][A-Za-z0-9._-]{0,24})")
+# How many space-separated pieces a fallback joins (tacl / a / 00718).
+_MAX_SPACED_PIECES = 2
+
+
+def _same_line_rest(text: str, pos: int) -> tuple[str, int]:
+    """The rest of a DOI that PDF extraction split on its line at ``pos``, and where it ends.
+
+    The rest starts with the joining underscore when the match took the backslash of a "\\ ".
+    """
+    rest = ""
+    if text[pos - 1: pos] == "\\" and (m := re.compile(r" ([A-Za-z0-9][A-Za-z0-9._;()/:-]*)").match(text, pos)):
+        rest, pos = "_" + m.group(1), m.end()
+    while True:
+        m = _DOI_BACKSLASH_UNDERSCORE.match(text, pos) or _DOI_KERNING_GAP.match(text, pos)
+        if not m:
+            return rest, pos
+        rest += ("_" + m.group(1)) if m.re is _DOI_BACKSLASH_UNDERSCORE else (m.group(1) + m.group(2))
+        pos = m.end()
+
+
+def _spaced_alternates(raw: str, text: str, pos: int) -> list[str]:
+    """Fallback DOIs for one cut at a space at ``pos``: the next pieces joined directly and with underscores."""
+    # A DOI that ends a sentence, or is followed by its link, is whole -- unless its suffix has no
+    # digit yet ("10.5281/zenodo. 2559634"), which no registered DOI of that shape is.
+    if (raw[-1:] in ".,;" and _has_digit_suffix(raw)) or re.match(r" (?:URL|url|https?:|doi)", text[pos:pos + 6]):
+        pieces_allowed = False
+    else:
+        pieces_allowed = True
+    pieces = []
+    while pieces_allowed and len(pieces) < _MAX_SPACED_PIECES and (m := _DOI_SPACED_WORD.match(text, pos)):
+        pieces.append(m.group(1).rstrip("."))
+        pos = m.end()
+        if m.group(1).endswith("."):
+            break
+    out = []
+    if pieces:
+        out.append(raw + pieces[0])
+        out += ["_".join([raw.rstrip("._"), *pieces[: n + 1]]) for n in range(len(pieces))]
+    # A publisher's article link with its own id after the DOI: ".../10.1093/jigpal/jzae062/7689640".
+    if re.search(r"/\d{5,}\.?$", raw) and raw.count("/") >= 2:
+        out.append(re.sub(r"/\d{5,}\.?$", "", raw))
+    # A link to the article's PDF: "10.3758/BF03208078.pdf".
+    if raw.lower().rstrip(".").endswith(".pdf"):
+        out.append(raw.rstrip(".")[:-4])
+    return [normalize_doi(o) for o in out]
+
+
+def _has_digit_suffix(doi: str) -> bool:
+    """Whether the part of ``doi`` after the prefix holds a digit, as nearly every registered DOI does."""
+    return bool(re.search(r"\d", doi.partition("/")[2]))
+
+
+def looks_cut_off(doi: str) -> bool:
+    """Whether ``doi`` is plausibly the head of a DOI that text extraction cut ("10.1162/tacl", "10.1109/w")."""
+    suffix = doi.partition("/")[2]
+    return not _has_digit_suffix(doi) and len(suffix) <= 12
+
+
+# A Springer book DOI (ISBN-13 shaped) followed by a chapter number the extraction split off.
+_SPRINGER_BOOK_DOI = re.compile(r"10\.1007/978-[\d-]{13}")
+_SPRINGER_CHAPTER_CUT = re.compile(r" (\d{1,4})\b(?![.-]\d)")
+
+
 # A hyphen the layout inserted at a line break, rejoined before the surrounding
 # reference text is compared against the registered record.
 _LINE_WRAP_HYPHEN = re.compile(r"-\s*\r?\n\s*")
@@ -290,6 +366,9 @@ class Citation:
     context: str
     in_reference_list: bool
     continuation: str = ""
+    # Other readings of a DOI the extraction may have cut at a space (:func:`_spaced_alternates`),
+    # tried in order when neither form above resolves.
+    alternates: tuple = ()
 
 
 # --- DOI shapes ------------------------------------------------------------
@@ -304,7 +383,8 @@ def normalize_doi(raw: str) -> str:
     same work in different cases must compare equal. Returns ``""`` for a value
     that holds no DOI-ish text at all.
     """
-    value = _DOI_WRAPPER.sub("", raw.strip()).strip("{}").strip()
+    # NFKC: a PDF's ligatures ("2023.\ufb01ndings-acl") are two letters in the registered DOI.
+    value = _DOI_WRAPPER.sub("", unicodedata.normalize("NFKC", raw).strip()).strip("{}").strip()
     while prefix := _DOI_PREFIX.match(value):
         value = value[prefix.end() :]
     value = value.strip()
@@ -659,13 +739,54 @@ def _entry_context(text: str, refs_at: int | None, start: int, end: int) -> str:
     floor = refs_at if refs_at is not None else 0
     begin = max(floor, start - CONTEXT_BEFORE)
     finish = min(len(text), end + CONTEXT_AFTER)
+    numbered = _numbered_markers(text, floor)
     # The last boundary before the DOI opens its entry; the first after closes it.
+    opened = False
     for match in _ENTRY_BOUNDARY.finditer(text, begin, start):
-        begin = match.end()
-    closing = _ENTRY_BOUNDARY.search(text, end, finish)
+        if _real_boundary(text, match, numbered):
+            begin, opened = match.end(), True
+    closing = next((m for m in _ENTRY_BOUNDARY.finditer(text, end, finish) if _real_boundary(text, m, numbered)), None)
     if closing is not None:
         finish = closing.start()
+    if not opened:
+        # No marker: an author-year list (ICLR's style), whose entries can run past CONTEXT_BEFORE
+        # with editors and a venue between the title and the DOI. The entry reaches back to the
+        # previous entry's DOI, which also keeps a DOI pasted from the row above from finding
+        # that row's title here.
+        begin = max(floor, start - CONTEXT_BEFORE_UNMARKED)
+        own = normalize_doi(text[start:end])
+        for match in _DOI_IN_TEXT.finditer(text, begin, start):
+            other = normalize_doi(match.group(0))
+            if other and not own.startswith(other) and not other.startswith(own):
+                begin = match.end()
     return _normalize_text(_LINE_WRAP_HYPHEN.sub("", text[begin:finish]))
+
+
+# How far back an entry with no marker may reach for its title and authors.
+CONTEXT_BEFORE_UNMARKED = 1000
+_NUMBERED_MARKER = re.compile(r"(?m)^[ \t]*(\d{1,3})[.)]\s")
+_ANY_NUMBERED_MARKER = re.compile(r"(?m)^[ \t]*[\[(]?(\d{1,3})[\].)]\s")
+
+
+@functools.lru_cache(maxsize=8)
+def _numbered_markers(text: str, floor: int) -> frozenset:
+    """The numbers that open lines of the reference list as "12." / "12)" markers."""
+    return frozenset(int(m.group(1)) for m in _ANY_NUMBERED_MARKER.finditer(text, floor))
+
+
+def _real_boundary(text: str, match: re.Match, numbered: frozenset) -> bool:
+    """Whether an entry-boundary match is one. A number opening a line ("113. Springer") can be the
+    end of a page range, an ISBN, or a DOI wrapped from the line above; it marks an entry only
+    when the list is numbered around it (k-1 or k+1 opens another line) and the line above does
+    not break off mid-number."""
+    m = _NUMBERED_MARKER.match(text, match.start())
+    if not m or text[match.start(): match.end()].strip().startswith(("[", "(", "\\")):
+        return True
+    k = int(m.group(1))
+    if (k - 1) not in numbered and (k + 1) not in numbered:
+        return False
+    before = text[max(0, match.start() - 3): match.start()].rstrip()
+    return not before.endswith(("-", "\u2013", "/"))
 
 
 def _same_entry(text: str, previous_end: int, start: int) -> bool:
@@ -702,18 +823,33 @@ def collect_citations(paths: Iterable[Path]) -> list[Citation]:
             seen_outside: set[str] = set()
             last_in_list: dict[str, int] = {}
             for match in _DOI_IN_TEXT.finditer(text):
-                doi = normalize_doi(match.group(0))
-                wrapped = _doi_continuation(text, match.end())
+                rest, end = _same_line_rest(text, match.end())
+                raw = (match.group(0)[:-1] if rest.startswith("_") and match.group(0).endswith("\\") else match.group(0)) + rest
+                doi = normalize_doi(raw)
+                wrapped = _doi_continuation(text, end)
                 # Rebuilt from the raw match, not the normalized DOI: normalization
                 # trims the trailing punctuation that a break can fall right after,
                 # and that character is part of the DOI when the rest follows it.
-                joined = normalize_doi(match.group(0) + wrapped.group(1)) if wrapped else ""
+                joined = normalize_doi(raw + wrapped.group(1)) if wrapped else ""
+                alternates = tuple(a for a in _spaced_alternates(raw, text, end) if _is_well_formed(a) and a != doi)
+                # A Springer chapter's "_26" read as " 26": the bare book DOI resolves too (to the
+                # volume), so the chapter is not left to a fallback.
+                chapter = _SPRINGER_CHAPTER_CUT.match(text, end)
+                if chapter and _SPRINGER_BOOK_DOI.fullmatch(doi):
+                    doi, end = f"{doi}_{chapter.group(1)}", chapter.end()
+                    alternates = ()
                 if not _is_well_formed(doi):
                     # Wrapped at the slash: the continuation is the whole DOI.
                     if not _is_well_formed(joined):
                         continue
-                    doi, joined = joined, ""
-                elif joined and _is_well_formed(joined) and _breaks_mid_doi(match.group(0), wrapped.group(1)):
+                    # Read the rest of the suffix on its new line the same way: "10.1162/" / "tacl a 00321",
+                    # "10.1162/" / "ISAL\_A\_00369", "10.5281/" / "zenodo. 2559634".
+                    raw = raw + wrapped.group(1)
+                    rest, end = _same_line_rest(text, wrapped.end())
+                    raw += rest
+                    doi, joined = normalize_doi(raw), ""
+                    alternates = tuple(a for a in _spaced_alternates(raw, text, end) if _is_well_formed(a) and a != doi)
+                elif joined and _is_well_formed(joined) and _breaks_mid_doi(raw, wrapped.group(1)):
                     doi, joined = joined, ""
 
                 in_list = refs_at is not None and refs_at <= match.start() < refs_end
@@ -722,12 +858,16 @@ def collect_citations(paths: Iterable[Path]) -> list[Citation]:
                         continue
                     seen_outside.add(doi)
                 else:
-                    previous_end = last_in_list.get(doi)
-                    last_in_list[doi] = match.end()
+                    # A repeat in the entry's link may be wrapped ("doi.org/10.1609/aaai.\nv34i05.6239")
+                    # and read under its cut form, so every reading of it counts as the same DOI.
+                    keys = {k for k in (doi, joined, *alternates) if k}
+                    previous_end = max((last_in_list[k] for k in keys if k in last_in_list), default=None)
+                    for k in keys:
+                        last_in_list[k] = match.end()
                     if previous_end is not None and _same_entry(text, previous_end, match.start()):
                         continue
                 context = _entry_context(text, refs_at, match.start(), match.end())
-                citations.append(Citation(doi=doi, where=where, context=context, in_reference_list=in_list, continuation=joined))
+                citations.append(Citation(doi=doi, where=where, context=context, in_reference_list=in_list, continuation=joined, alternates=alternates))
     return citations
 
 
@@ -790,10 +930,25 @@ def _context_supports(citation: Citation, record: dict) -> bool:
     if family and (family.split()[-1] in words or family.replace(" ", "") in words):
         return True
 
-    title_words = _significant_words(_work_title(_title_of(record)))
+    # A corporate author's acronym: "Intergovernmental Panel on Climate Change (IPCC)".
+    acronym = re.search(r"\(([A-Za-z]{2,10})\)\s*$", _first_author_of(record))
+    if acronym and acronym.group(1).lower() in words:
+        return True
+
+    # Words the extraction glued together ("Programsynthesisbenchmarkforvisualprogramming") are
+    # found inside the context read without spaces.
+    compact = citation.context.replace(" ", "")
+
+    def share(title: str) -> float:
+        tw = _significant_words(_work_title(title))
+        return sum(1 for w in tw if w in words or (len(w) >= 5 and w in compact)) / len(tw) if tw else 0.0
+
+    full = _title_of(record)
+    title_words = _significant_words(_work_title(full))
     if title_words:
-        hits = sum(1 for w in title_words if w in words)
-        if hits / len(title_words) >= TITLE_CONTEXT_OVERLAP:
+        # ... and a reference may give only the main title of a long registered one.
+        main = re.split(r":|\s[\u2013\u2014-]\s", full, maxsplit=1)[0]
+        if share(full) >= TITLE_CONTEXT_OVERLAP or (main != full and len(_significant_words(main)) >= 3 and share(main) >= TITLE_CONTEXT_OVERLAP):
             return True
 
     return bool(not family and not title_words)
@@ -915,6 +1070,9 @@ def _normalize_text(value: str) -> str:
     that is not a letter or digit to single spaces -- so ``{The}
     \\emph{C. elegans} Genome`` and ``The C. elegans genome`` compare equal.
     """
+    # Spacing accents, which PDF extraction can leave beside the letter they belong on
+    # ("K\u00fcc \u00b8\u00a8ukg\u00fcl" for K\u00fc\u00e7\u00fckg\u00fcl): dropped, not read as word breaks.
+    value = re.sub(r"[\u00a8\u00b4\u00b8\u02c6-\u02dd]", "", value)
     text = _strip_accents(_strip_latex(value)).lower()
     return " ".join(re.sub(r"[^a-z0-9]+", " ", text).split())
 
@@ -949,6 +1107,10 @@ def title_similarity(a: str, b: str) -> float:
     a, b = _normalize_text(_work_title(a)), _normalize_text(_work_title(b))
     if not a or not b:
         return 0.0
+    # A hyphen the PDF put at a line break and the extraction then dropped ("selfsupervised",
+    # "visionlanguage"): the same letters in the same order are the same title.
+    if len(a) >= 20 and re.sub(r"\W", "", a) == re.sub(r"\W", "", b):
+        return 1.0
     short, long_ = sorted((a, b), key=len)
     if len(short.split()) >= 4 and long_.startswith(short):
         return 1.0
@@ -1129,10 +1291,21 @@ def _resolve_with_fallback(candidate: tuple[str, str]) -> tuple[str, dict | None
     whichever form it belongs to.
     """
     status, record = _resolve_doi(candidate[0])
-    if status == DOI_MISSING and candidate[1] and candidate[1] != candidate[0] and _is_well_formed(candidate[1]):
-        alt_status, alt_record = _resolve_doi(candidate[1])
-        if alt_status == DOI_FOUND:
-            return alt_status, alt_record, candidate[1]
+    if status == DOI_MISSING:
+        # doi.org answers 404 now and then for registered DOIs (arXiv's 10.48550 among them, seen
+        # on the GPT-4 report), and "not registered" is an accusation, so it is asked twice.
+        status, record = _resolve_doi(candidate[0])
+    # A whole volume with no author (Springer's book DOI for a chapter cut short) is no answer
+    # either when another reading of the DOI is there to try.
+    volume = status == DOI_FOUND and record is not None and record.get("type") in ("book", "edited-book", "proceedings", "book-set", "monograph") and not record.get("author")
+    if status != DOI_MISSING and not (volume and (candidate[1] or (len(candidate) > 2 and candidate[2]))):
+        return status, record, candidate[0]
+    # Then the readings of a DOI cut at a space (``candidate[2]``, when given).
+    for alt in (candidate[1], *(candidate[2] if len(candidate) > 2 else ())):
+        if alt and alt != candidate[0] and _is_well_formed(alt):
+            alt_status, alt_record = _resolve_doi(alt)
+            if alt_status == DOI_FOUND:
+                return alt_status, alt_record, alt
     return status, record, candidate[0]
 
 
@@ -1182,8 +1355,21 @@ def _retraction_finding(where: str, cited: str, doi: str, record: dict) -> list[
     ]
 
 
+# ACM's Digital Library gives the works it holds without a DOI an identifier under 10.5555, which
+# looks like a DOI but was never registered: doi.org answers 404 for every one of them, and
+# authors copy it from the ACM page in good faith.
+_ACM_UNREGISTERED_PREFIX = "10.5555/"
+
+
+def _acm_placeholder_finding(where: str, cited: str, doi: str) -> Finding:
+    """A warning for an ACM 10.5555 identifier, which no registry resolves."""
+    return Finding(where, "unresolvable DOI", f"{cited} DOI {doi}, which is an ACM Digital Library identifier (10.5555) rather than a registered DOI; doi.org cannot resolve it, so cite the work's published DOI or leave the DOI out", LEVEL_WARNING)
+
+
 def _entry_findings(entry: Entry, status: str, record: dict | None) -> list[Finding]:
     """Report a ``.bib`` entry against the record its DOI resolved to."""
+    if status == DOI_MISSING and entry.doi.startswith(_ACM_UNREGISTERED_PREFIX):
+        return [_acm_placeholder_finding(entry.where, f"{_cite(entry)} cites", entry.doi)]
     if status == DOI_MISSING:
         return [
             Finding(
@@ -1219,6 +1405,11 @@ def _citation_findings(citation: Citation, status: str, record: dict | None, doi
     -- a dataset DOI in a data-availability sentence, a DOI in a footnote --
     there is nothing to compare it against, so a resolving DOI passes quietly.
     """
+    if status == DOI_MISSING and doi.startswith(_ACM_UNREGISTERED_PREFIX):
+        return [_acm_placeholder_finding(citation.where, "the " + ("reference list" if citation.in_reference_list else "manuscript text") + " cites", doi)]
+    if status == DOI_MISSING and looks_cut_off(doi):
+        # A suffix with no digit is almost always the head of a DOI the extraction cut, not a dead one.
+        return [Finding(citation.where, "unresolvable DOI", f"DOI {doi}, cited " + ("in the reference list" if citation.in_reference_list else "in the manuscript text") + ", looks cut off and does not resolve; check that the full DOI is printed", LEVEL_WARNING)]
     if status == DOI_MISSING:
         where_in_text = "in the reference list" if citation.in_reference_list else "in the manuscript text"
         return [
@@ -1310,9 +1501,9 @@ def scan_references(paths: Iterable[Path], *, check_registry: bool = True, resol
     # two references sharing a wrong DOI should each be told about it. The .bib
     # DOIs come first so a huge reference list cannot crowd them out of the
     # budget -- they are the ones that can be checked field by field.
-    candidates = list(dict.fromkeys((e.doi, "") for e in checkable))
+    candidates = list(dict.fromkeys((e.doi, "", ()) for e in checkable))
     from_bib = len(candidates)
-    candidates += list(dict.fromkeys((c.doi, c.continuation) for c in citations))
+    candidates += list(dict.fromkeys((c.doi, c.continuation, c.alternates) for c in citations))
     if not candidates:
         return findings
 
@@ -1329,25 +1520,29 @@ def scan_references(paths: Iterable[Path], *, check_registry: bool = True, resol
 
     workers = min(DOI_CHECK_WORKERS, len(budgeted))
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="paperpush-doicheck") as pool:
-        resolved = {doi: outcome for (doi, _), outcome in zip(budgeted, pool.map(_resolve_with_fallback, budgeted))}
+        # Keyed by the whole candidate: DOIs cut short ("10.48550/arxiv") share the cut form but not the rest.
+        outcomes = dict(zip(budgeted, pool.map(_resolve_with_fallback, budgeted)))
+
+    def outcome_of(doi: str, continuation: str = "", alternates: tuple = ()) -> tuple[str, dict | None, str]:
+        return outcomes.get((doi, continuation, alternates), (DOI_UNKNOWN, None, doi))
     if coverage_out is not None:
-        coverage_out.update(total=len(candidates), unknown=sum(1 for status, _, _ in resolved.values() if status == DOI_UNKNOWN), unbudgeted=len(candidates) - len(budgeted))
+        coverage_out.update(total=len(candidates), unknown=sum(1 for status, _, _ in outcomes.values() if status == DOI_UNKNOWN), unbudgeted=len(candidates) - len(budgeted))
 
     for entry in checkable:
-        status, record, _ = resolved.get(entry.doi, (DOI_UNKNOWN, None, entry.doi))
+        status, record, _ = outcome_of(entry.doi)
         findings.extend(_entry_findings(entry, status, record))
 
     for citation in citations:
-        status, record, doi = resolved.get(citation.doi, (DOI_UNKNOWN, None, citation.doi))
+        status, record, doi = outcome_of(citation.doi, citation.continuation, citation.alternates)
         findings.extend(_citation_findings(citation, status, record, doi))
 
     if resolved_out is not None:
         for entry in checkable:
-            status, record, _ = resolved.get(entry.doi, (DOI_UNKNOWN, None, entry.doi))
+            status, record, _ = outcome_of(entry.doi)
             if status == DOI_FOUND and record is not None and not _mismatches(entry, record):
                 resolved_out[entry.doi] = record
         for citation in citations:
-            status, record, doi = resolved.get(citation.doi, (DOI_UNKNOWN, None, citation.doi))
+            status, record, doi = outcome_of(citation.doi, citation.continuation, citation.alternates)
             if status == DOI_FOUND and record is not None and (not citation.in_reference_list or _context_supports(citation, record)):
                 resolved_out.setdefault(doi, record)
 

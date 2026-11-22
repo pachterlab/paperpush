@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import re
+import statistics
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +42,17 @@ MIN_LINES_FOR_EXTENT = 20
 # A page's text reaching past the template's top/bottom is reported once this
 # many pages do it (a single overfull page is a LaTeX warning, not a template).
 MIN_PAGES_OVER = 2
+# ... and it is evidence of a modified template (not a few overfull pages or floats placed close
+# to the edge) when at least this share of the measured pages does it, or the median page does.
+SYSTEMATIC_SHARE = 0.5
+# A line sets its page's top or bottom only with this many letters: a row of subscripts, a
+# fraction's denominator, or a big operator's limits under the last line is not a text line.
+MIN_LETTERS_FOR_EXTENT = 12
+# Pages that set the body font, line spacing, and margins: the main text. Appendices typeset in
+# \small or full of indented lists would otherwise outvote it in a long paper.
+MAIN_TEXT_PAGES = 10
+# Wording of a top/bottom overflow on a few pages only, which layout_problems reports as minor.
+LOCAL_OVERFLOW = "on a few pages only"
 
 
 @dataclass(frozen=True)
@@ -111,15 +123,17 @@ def _lines(page: Page, body_font: float, running_head: str, repeated: set[tuple[
         glyphs.sort(key=lambda g: g.x0)
         text = "".join(g.text for g in glyphs)
         squashed = _squash(text)
-        if squashed.isdigit() and len(squashed) <= 3:
-            continue  # page number
+        if re.fullmatch(r"[a-z]?\d{1,3}|[ivxlc]{1,7}", squashed):
+            continue  # page number, also an appendix's "A12" or a roman numeral
         if head and head in squashed:
             continue
         if (round(glyphs[0].y0), squashed) in repeated:
             continue  # running head / footer
         if re.fullmatch(r"(underreviewas|publishedas)[a-z0-9]*", squashed):
             continue  # another year's/venue's running head
-        lines.append(_Line(page.number, y, glyphs[0].x0, glyphs[-1].x1, text))
+        # The row's own height, not its 0.5 pt bucket, so the line spacing is measured exactly.
+        raw_y = sorted(g.y0 for g in glyphs)[len(glyphs) // 2]
+        lines.append(_Line(page.number, raw_y, glyphs[0].x0, glyphs[-1].x1, text))
     return sorted(lines, key=lambda line: -line.y)
 
 
@@ -128,7 +142,8 @@ def measure(path: Path, running_head: str = "", max_pages: int = MAX_TEMPLATE_PA
     pages = read_pages(path, max_pages)
     if not pages:
         return None
-    sizes = [g.size for p in pages for g in p.glyphs if not g.in_figure and g.text.strip()]
+    main = pages[:MAIN_TEXT_PAGES]
+    sizes = [g.size for p in main for g in p.glyphs if not g.in_figure and g.text.strip()]
     body_font = _mode(sizes)
     if body_font is None:
         return None
@@ -140,18 +155,24 @@ def measure(path: Path, running_head: str = "", max_pages: int = MAX_TEMPLATE_PA
     repeated = _repeated_rows(pages, body_font)
     for page in pages:
         lines = _lines(page, body_font, running_head, repeated)
-        all_lines.extend(lines)
-        if len(lines) >= MIN_LINES_FOR_EXTENT:
-            tops.append(lines[0].y)
-            bottoms.append(lines[-1].y)
-        for above, below in zip(lines, lines[1:]):
-            gap = above.y - below.y
-            if 0.8 * body_font <= gap <= 1.6 * body_font:
-                gaps.append(gap)
+        if page.number <= main[-1].number:
+            all_lines.extend(lines)
+            for above, below in zip(lines, lines[1:]):
+                gap = above.y - below.y
+                if 0.8 * body_font <= gap <= 1.6 * body_font:
+                    gaps.append(gap)
+        texty = [line for line in lines if len(re.findall(r"[A-Za-z]", re.sub(r"\(cid:\d+\)", "", line.text))) >= MIN_LETTERS_FOR_EXTENT]
+        if len(lines) >= MIN_LINES_FOR_EXTENT and texty:
+            tops.append(texty[0].y)
+            bottoms.append(texty[-1].y)
 
     first = pages[0]
     first_text = "".join(g.text for g in first.glyphs)
-    left_edge = _mode([line.x0 for line in all_lines], 0)
+    right_edge = _mode([line.x1 for line in all_lines], 0)
+    # The left margin from justified lines (those reaching the right margin): indented lists,
+    # equations, and centered captions start further right.
+    justified = [line.x0 for line in all_lines if right_edge is not None and abs(line.x1 - right_edge) <= 2]
+    left_edge = _mode(justified if len(justified) >= 20 else [line.x0 for line in all_lines], 0)
     # Small digits left of the text block: the review line-number ruler.
     ruler = sum(1 for g in first.glyphs if g.text.isdigit() and g.size < body_font - 0.5 and left_edge is not None and g.x1 < left_edge)
     return LayoutMeasurement(
@@ -159,9 +180,9 @@ def measure(path: Path, running_head: str = "", max_pages: int = MAX_TEMPLATE_PA
         page_width=first.width,
         page_height=first.height,
         body_font=body_font,
-        baseline_skip=_mode(gaps),
+        baseline_skip=round(statistics.median(gaps), 2) if gaps else None,
         left=left_edge,
-        right=_mode([line.x1 for line in all_lines], 0),
+        right=right_edge,
         top_by_page=tuple(tops),
         bottom_by_page=tuple(bottoms),
         first_page_text=first_text,
@@ -188,15 +209,29 @@ def layout_problems(m: LayoutMeasurement, layout: TemplateLayout, font_size_pt: 
     if layout.text_top_pt is not None:
         over = [t for t in m.top_by_page if t > layout.text_top_pt + tol]
         if len(over) >= MIN_PAGES_OVER:
-            yield f"body text starts {(max(over) - layout.text_top_pt) / 72:.2f} in above the template's top margin on {len(over)} page(s)"
+            local = "" if _systematic(over, m.top_by_page, lambda t: t > layout.text_top_pt + tol) else f" ({LOCAL_OVERFLOW}: a float or an overfull page, not the margin itself)"
+            yield f"body text starts {(max(over) - layout.text_top_pt) / 72:.2f} in above the template's top margin on {len(over)} page(s){local}"
     if layout.text_bottom_pt is not None:
         over = [b for b in m.bottom_by_page if b < layout.text_bottom_pt - tol]
         if len(over) >= MIN_PAGES_OVER:
-            yield f"body text runs {(layout.text_bottom_pt - min(over)) / 72:.2f} in into the template's bottom margin on {len(over)} page(s)"
+            local = "" if _systematic(over, m.bottom_by_page, lambda b: b < layout.text_bottom_pt - tol) else f" ({LOCAL_OVERFLOW}: a float or an overfull page, not the margin itself)"
+            yield f"body text runs {(layout.text_bottom_pt - min(over)) / 72:.2f} in into the template's bottom margin on {len(over)} page(s){local}"
     if layout.running_head and _squash(layout.running_head) not in _squash(m.first_page_text):
         yield f"the running head '{layout.running_head}' is missing from page 1 (wrong template year, camera-ready mode, or an edited style file)"
     if layout.margin_line_numbers and not m.margin_line_numbers:
         yield "the review line numbers in the margin are missing (camera-ready mode or an edited style file)"
+
+
+def _systematic(over: list[float], measured: tuple[float, ...], beyond) -> bool:
+    """Whether a top/bottom overflow is the template's (most pages, or the median page) and not a few pages'."""
+    return len(over) >= SYSTEMATIC_SHARE * len(measured) or beyond(statistics.median(measured))
+
+
+def is_minor_layout_problem(problem: str) -> bool:
+    """A departure that is no sign of a modified template on its own: a few overfull pages, or a
+    missing running head or line numbers (another year's style file or camera-ready mode, which
+    the anonymity check covers), with the page geometry intact."""
+    return LOCAL_OVERFLOW in problem or problem.startswith(("the running head", "the review line numbers"))
 
 
 # --- LaTeX source ---------------------------------------------------------------

@@ -134,7 +134,7 @@ def test_a_credential_is_a_likely_error():
     assert found and all(f.level == LEVEL_LIKELY for f in found)
 
 
-def test_hidden_prompt_is_an_error_a_visible_one_likely_and_other_hidden_text_a_warning():
+def test_hidden_prompt_is_an_error_a_visible_one_and_other_hidden_text_a_warning():
     from paperpush import hidden_text
     from paperpush.validate import _hidden_text_level
 
@@ -142,7 +142,8 @@ def test_hidden_prompt_is_an_error_a_visible_one_likely_and_other_hidden_text_a_
         return _hidden_text_level(hidden_text.Finding("paper.pdf", category, "..."))
 
     assert level(hidden_text.HIDDEN_INJECTION) == ERROR
-    assert level(hidden_text.VISIBLE_INJECTION) == LIKELY_ERROR
+    # A paper on prompt injection quotes such text as its subject.
+    assert level(hidden_text.VISIBLE_INJECTION) == WARNING
     assert level(hidden_text.HIDDEN_TEXT) == WARNING
 
 
