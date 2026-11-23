@@ -17,8 +17,15 @@ description: >-
 Populate a `<venue>.sub.txt` file (creating it with `paperpush subfile` first if
 it does not exist) from a directory of manuscript files. You read
 the files and decide the values; the `paperpush autofill` command does all
-the writing, gating, and validation, so you cannot accidentally overwrite a
+the writing, gating, and form checks, so you cannot accidentally overwrite a
 policy field or produce an invalid file. Your job is extraction, not writing.
+
+Autofill checks the **form only** (required fields, allowed options, file
+paths, the author list). It does not check the manuscript against the venue's
+guidelines, look up references or links, or run the AI checks: that is
+`paperpush-validate`, the next step. Don't run validate from this skill. When
+`paperpush-prepare-submission`, `paperpush-transfer`, or
+`paperpush-respond-to-reviewers` called you, they run it next themselves.
 
 ## First: fresh fill or update?
 
@@ -187,7 +194,7 @@ named the venue, use it; otherwise infer or ask per the inputs below.
 
    Add `--dry-run` first if you want to preview without writing. The command
    prints a summary of what was filled, what needs review, and what was left for
-   the user, and re-validates the result.
+   the user, and re-checks the form fields (not the manuscript).
 
 6. **Report to the user.** Relay the command's summary, then make the handoff
    unambiguous. State plainly:
@@ -195,7 +202,8 @@ named the venue, use it; otherwise infer or ask per the inputs below.
    - which need their review (classifications, yes/no declarations, and anything
      below high confidence) — name them so they can scan quickly,
    - **what remains for them to do** — see the checklist below,
-   - any validation errors still in the file.
+   - any form errors still in the file, and that the manuscript itself has
+     not been checked yet.
 
    ### What remains for the user (always spell this out)
    After the skill runs, only these are left for the user, because the skill
@@ -208,18 +216,22 @@ named the venue, use it; otherwise infer or ask per the inputs below.
      attestations among them, add that the user can set them to `yes` or ask
      you to rerun with `--confirm-attestations`.
    - **Any review-flagged values** they should confirm or correct in the `.sub`.
-   - **Remaining validation errors** (the command lists these) — the file will
+   - **Remaining form errors** (the command lists these) — the file will
      not submit until they are resolved.
 
-   Then give them the next step: `paperpush-submit` (it signs them in
-   through `paperpush-login` if needed and fills the portal), or the commands,
-   with the absolute `.sub` path:
+   Then give them the next step: `paperpush-validate`, which checks the
+   manuscript against the venue's guidelines and runs the AI checks (skip this
+   when a calling skill runs validate next). After that, `paperpush-submit`
+   (it signs them in through `paperpush-login` if needed and fills the
+   portal). Or the commands, with the absolute `.sub` path:
    ```
+   paperpush validate <venue>.sub.txt
    paperpush login <venue> --browser
    paperpush submit <venue>.sub.txt
    ```
-   Remind them these open the portal and stop before the final click, so they
-   can review everything in the submission system before submitting.
+   Remind them that `login` and `submit` open the portal and stop before the
+   final click, so they can review everything in the submission system before
+   submitting.
 
 ## Large data files
 
@@ -312,7 +324,7 @@ already tells you and **without** losing anything the author typed in by hand.
 6. **Report** as in step 6 of the fresh fill, but lead with what changed:
    the fields updated from the new draft, the ones the user chose to keep, any
    remapped or newly added files, and then what remains (the `never` fields
-   and validation errors, as before). Since the manuscript changed, suggest
+   and form errors, as before). Since the manuscript changed, suggest
    running `paperpush-validate` again.
 
 ## Rules

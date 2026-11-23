@@ -197,6 +197,20 @@ def _code_in_archive(path: Path) -> bool:
     return any(Path(n).suffix.lower() in _CODE_SUFFIXES for n in names)
 
 
+# A URL the PDF's line-wrapping cut: inside the host after a dot ("https://github." /
+# "com/owner/repo"), or in the path after a slash or hyphen. A dot then a lower-case
+# word only, so a sentence ending in a URL is not glued to the next one.
+_WRAPPED_URL = re.compile(r"((?:https?://|\b(?:github|gitlab|bitbucket|codeberg|zenodo|figshare|osf)(?=\.))\S*?(?:\.(?=[ \t]*\n[ \t]*(?-i:[a-z0-9]))|[/-](?=[ \t]*\n[ \t]*[\w.-])))[ \t]*\n[ \t]*", re.IGNORECASE)
+
+
+def _rejoin_wrapped_urls(text: str) -> str:
+    """``text`` with URLs broken across lines put back together."""
+    previous = None
+    while previous != text:  # a URL can be cut more than once
+        previous, text = text, _WRAPPED_URL.sub(r"\1", text)
+    return text
+
+
 def code_sources(venue: Venue, values: dict[str, str]) -> CodeSources:
     """The code this manuscript links or attaches, read from its main text (not its reference list)."""
     from . import sensitive
@@ -207,7 +221,7 @@ def code_sources(venue: Venue, values: dict[str, str]) -> CodeSources:
     body_parts = []
     for field_id, _, text in _texts(venue, values, roles=("manuscript", "supplementary")):
         found.field_id = found.field_id or field_id
-        body = without_reference_list(text)
+        body = _rejoin_wrapped_urls(without_reference_list(text))
         body_parts.append(body)
         found.statements.extend((field_id, s) for s in statements(body))
     for key, value in values.items():

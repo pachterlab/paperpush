@@ -5,5 +5,5 @@ conferences. The parts that are OpenReview rather than the conference -- signing
 in, and the profile-search author widget -- live in :mod:`.main`; each conference
 is a separate venue leaf under this subpackage (``<slug>.py`` exposing a
 module-level ``VENUE``) carrying only its own submission form. AAAI 2027, ICLR 2027,
-and the NAACL 2027 Demo Track are the venues here.
+and the NAACL 2027 and ACL 2027 Demo Tracks are the venues here.
 """

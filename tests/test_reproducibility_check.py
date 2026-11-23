@@ -215,3 +215,17 @@ def test_reproduce_flag_reaches_validate_report_and_refuses_the_api(tmp_path):
     assert "ai.figure_reproduction.1" in {t.id for t in only.ai_tasks}
     with pytest.raises(ValueError, match="cannot"):
         validate_report(sub, VENUE, reproduce_figures=True, ai=AiOptions.api(), **flags)
+
+
+@pytest.mark.parametrize(
+    ("text", "joined"),
+    [
+        ("open source at https://github.\ncom/pachterlab/paperpush, with", "open source at https://github.com/pachterlab/paperpush, with"),
+        ("at github.\ncom/a/b", "at github.com/a/b"),
+        ("at https://github.com/\npachterlab/paper-\npush now", "at https://github.com/pachterlab/paper-push now"),
+        # A sentence that ends in a URL is not glued to the next one.
+        ("see https://x.org.\nThe next", "see https://x.org.\nThe next"),
+    ],
+)
+def test_urls_wrapped_across_lines_are_rejoined(text, joined):
+    assert rc._rejoin_wrapped_urls(text) == joined

@@ -28,8 +28,14 @@ the change. With ``keep_existing`` the file's existing values win outright: only
 fields that are blank or still at their template default are written, and each
 differing proposal is reported as kept rather than applied.
 
-Every written field is run back through :func:`paperpush.validate.validate`
-so an autofilled file carries the same guarantees as one filled in by hand.
+Every written field is run back through the form checks of
+:func:`paperpush.validate.validate` (required fields, allowed options, file
+existence, the author list) so an autofilled file carries the same form
+guarantees as one filled in by hand. The manuscript, network, and
+file-content checks are left to ``paperpush validate``, which runs next in
+every flow that fills a ``.sub``: running them here would repeat them, make
+network requests the user did not ask for, and present a partial pass (no AI
+checks, no report) as if it were a validation.
 
 The API extraction engine (``paperpush autofill --engine api``) lives in the
 "API extraction engine" section at the bottom of this module: it reads the
@@ -77,6 +83,20 @@ _ROLE_BY_TYPE = {
 # Confidence levels, ordered low -> high.
 _CONFIDENCE_ORDER = {"low": 0, "medium": 1, "high": 2}
 DEFAULT_CONFIDENCE = "medium"
+
+# What autofill re-checks after writing: the form only (required fields,
+# options, file existence, authors). Everything that reads the uploaded files or
+# goes online is ``paperpush validate``'s job.
+FORM_CHECKS_ONLY = dict(
+    check_manuscript=False,
+    check_sensitive=False,
+    check_links=False,
+    check_references=False,
+    check_anonymous=False,
+    check_hidden_text=False,
+    check_openreview=False,
+    network=False,
+)
 
 # What happened to each field, for the summary the front-ends print.
 FILLED = "filled"  # written, high confidence, not a judgment call
@@ -494,7 +514,7 @@ def autofill(
         result, attest_outcomes = _confirm_attestations(result, venue)
         outcomes.extend(attest_outcomes)
 
-    issues = validate(parse(result), venue)
+    issues = validate(parse(result), venue, **FORM_CHECKS_ONLY)
     logger.info("autofill %s: %d filled, %d to review, %d unchanged, %d kept, %d skipped, %d " "validation issue(s)", venue.slug, sum(1 for o in outcomes if o.action == FILLED), sum(1 for o in outcomes if o.action == REVIEW), sum(1 for o in outcomes if o.action == UNCHANGED), sum(1 for o in outcomes if o.action == KEPT), sum(1 for o in outcomes if o.action.startswith("skipped") or o.action == UNKNOWN), len(issues))
     return AutofillResult(text=result, outcomes=outcomes, issues=issues)
 

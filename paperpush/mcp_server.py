@@ -732,6 +732,7 @@ def validate_subfile(
     ai_results: Optional[list[dict[str, Any]]] = None,
     output: Optional[str] = None,
     colorblind: bool = False,
+    dark: bool = False,
     initial_submission: bool = False,
     strict_style: bool = False,
     ai_only: bool = False,
@@ -894,7 +895,8 @@ def validate_subfile(
     `ok` is true when there are no errors. `output`, an absolute path ending in .pdf,
     .html, .md, or .txt, also saves the colour-coded report there
     (`colorblind` for a colour-blind-friendly palette, the same as
-    `paperpush validate --colorblind`).
+    `paperpush validate --colorblind`; `dark` swaps the white background and
+    black text for a dark-view report, the same as `paperpush validate --dark`).
     """
     from . import report as report_mod
     from .ai_validate import AiOptions, tasks_payload
@@ -940,7 +942,7 @@ def validate_subfile(
         "ai_tasks": tasks_payload([t for t in result.ai_tasks if t.id in {r.id for r in result.by_status(report_mod.NEEDS_AI)}], venue_def, str(path or ""))["tasks"],
     }
     if output:
-        saved = report_mod.save(result, report_mod.output_path(str(_resolve(output, manuscript_dir)), str(path or (result.files or ["paperpush"])[0])), alt_color=colorblind)
+        saved = report_mod.save(result, report_mod.output_path(str(_resolve(output, manuscript_dir)), str(path or (result.files or ["paperpush"])[0])), alt_color=colorblind, dark=dark)
         out["report"] = str(saved)
     return out
 
@@ -1037,7 +1039,9 @@ def autofill_subfile(
     The gates are deliberate and not negotiable from here: `never`-role fields
     are always left alone, `classify`-role and sub-`high` values are written
     but flagged for review, and `filemap` paths are resolved against
-    `manuscript_dir`. The result is validated before returning.
+    `manuscript_dir`. The result's form fields are re-checked before
+    returning (required fields, options, file paths, authors); the manuscript
+    itself is not -- run validate_subfile next for that.
 
     `subfile` may name a file that does not exist yet -- a fresh template is
     rendered from the venue in its filename. Relative paths resolve against
@@ -1107,6 +1111,7 @@ def autofill_subfile(
         # autofill is a preparation step, not the final gate -- it leaves policy
         # fields empty on purpose, so leftover errors here are expected. Run
         # validate_subfile once a human has filled those in.
+        "checked": "form fields only (required fields, options, file paths, authors); run validate_subfile next to check the manuscript against the venue's guidelines",
         "errors": _issue_dicts(result.errors),
         "likely_errors": _issue_dicts(result.likely_errors),
         "warnings": _issue_dicts(result.warnings),

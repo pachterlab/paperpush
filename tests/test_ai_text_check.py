@@ -158,7 +158,7 @@ def test_validate_scans_the_manuscript_without_its_references(calls, tmp_path):
     # Not an error, not a warning: the report still reads ready, with the scan to review.
     assert rep.ok and rep.similarities and not any(i.is_similarity for i in rep.warnings)
     text = report.to_text(rep)
-    assert "Review the similarity scan (pink)" in text and "similarity: [manuscript_file] AI text:" in text
+    assert "Review the similarity scan (pink)" in text and "- [manuscript_file] AI text:" in text
 
 
 def test_validate_reports_a_service_failure_as_not_checked(monkeypatch, tmp_path):

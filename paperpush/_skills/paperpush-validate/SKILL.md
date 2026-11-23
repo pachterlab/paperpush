@@ -70,7 +70,7 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
   `-o <abs path> --overwrite` only when the user names another place or
   format (`.html`/`.md`/`.txt`), and `--no-report` on the final run only when
   they say not to save it. Mention `--colorblind` if they ask for
-  color-blind-friendly colors.
+  color-blind-friendly colors, and `--dark` if they want a dark-view report.
 - Whether this is an initial submission, if the venue accepts an initial
   submission in any format (the report's "Format for initial submission" note;
   `describe_venue` shows `manuscript.initial_submission_any_format`). If so,
@@ -257,11 +257,15 @@ guess failed.
    ```json
    {"results": [
      {"id": "ai.figures.raster_lettering", "status": "fail",
-      "details": "fig2.png: y-axis tick labels are ~4 pt printed (minimum 5 pt); panel labels A-C are not bold",
+      "details": ["fig2.png: y-axis tick labels are ~4 pt printed (minimum 5 pt)", "fig2.png: panel labels A-C are not bold"],
       "evidence": "fig2.png, left axis"},
      {"id": "ai.consistency", "status": "pass", "details": "all fields agree with the manuscript", "evidence": ""}
    ]}
    ```
+
+   When a verdict has several separate findings, give `details` as a list of
+   strings, one finding each: the report shows each as its own bullet.
+   (A string numbered "1) ... 2) ..." is split the same way.)
 
    Every task id from the file should get a result. Do not mark a task `pass`
    to make the report greener: an honest `unclear` is better.

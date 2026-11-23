@@ -2075,7 +2075,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     if report_out is not None:
         out = report_out
         try:
-            report_mod.save(result, out, alt_color=alt, hide=hide, paragraph=paragraph)
+            report_mod.save(result, out, alt_color=alt, dark=getattr(args, "dark", False), hide=hide, paragraph=paragraph)
         except OSError as exc:
             if explicit_report:
                 print(f"error: could not save the report to {out}: {exc}", file=sys.stderr)
@@ -2953,7 +2953,7 @@ def _print_autofill_summary(result, extraction, venue, out_path, dry_run: bool) 
     for o in unknown:
         print(f"\nignored proposed field '{o.id}': {o.note}")
 
-    for title, group in (("likely error(s), each serious if real: confirm them", result.likely_errors), ("similarity finding(s) from the plagiarism or AI-text scan: review them", result.similarities), ("validation warning(s)", result.warnings)):
+    for title, group in (("likely error(s), each serious if real: confirm them", result.likely_errors), ("similarity finding(s) from the plagiarism or AI-text scan: review them", result.similarities), ("form warning(s)", result.warnings)):
         if group:
             print(f"\n{len(group)} {title}:")
             for issue in group:
@@ -2970,11 +2970,12 @@ def _print_autofill_summary(result, extraction, venue, out_path, dry_run: bool) 
         print(f"\nFinish the items above in {out_path}, then run")
     else:
         print(f"\nNext: review {out_path}, then run")
+    # Autofill re-checks the form only; the manuscript itself is checked by validate.
+    print(f"  paperpush validate {out_path}")
     if venue.supports_submit:
         print(f"  paperpush login {venue.slug}")
         print(f"  paperpush submit {out_path}")
-    else:
-        print(f"  paperpush validate {out_path}")
+    print("(autofill checked the form fields only; validate checks the manuscript against the venue's guidelines)")
 
 
 def _find_document(candidates: list[Path], search_dirs: list[Path], explicit: str | None, stems: tuple[str, ...]) -> Path | None:
@@ -3796,6 +3797,7 @@ def build_parser() -> argparse.ArgumentParser:
     display_group.add_argument("--paragraph", dest="paragraph", action="store_true", help="write each finding as one paragraph, its examples separated by semicolons, instead of listing the examples (doubled words, flagged references, figures, ...) one per sub-bullet under it")
     display_group.add_argument("--hide-suggestions", dest="hide_suggestions", action="store_true", help="leave the suggestions on style out of the saved report as well")
     p_validate.add_argument("--colorblind", "--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours in the terminal and saved report: blue for passed, vermillion for failed, dark yellow for warnings, bluish green for suggestions, reddish purple for needs AI, grey for could not run / not implemented (the same palette as the web app's \"Colorblind-friendly colors\" setting). --alt-color is an older name for it")
+    p_validate.add_argument("--dark", action="store_true", help="save the report in dark view: swap the white background and black text of the PDF (or HTML) report, keeping every other colour as it is")
     p_validate.add_argument(
         "--ai",
         action="store_true",

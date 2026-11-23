@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Optional
@@ -47,7 +48,7 @@ CRITICAL_AI_TASKS = frozenset({"ai.unverified_references", "ai.flagged_reference
 
 VERDICTS = ("pass", "fail", "suggest", "unclear", "not_applicable")
 
-_SYSTEM = "You are a meticulous pre-submission checker for academic manuscripts. You are given " "the files of one submission and a list of checks. For each check, read the files it " "names and decide: 'pass' if the submission meets it, 'fail' if it does not, " "'suggest' if nothing is wrong but you have points of style the author could defensibly leave as they are, " "'not_applicable' if the check does not apply to this submission, or 'unclear' if the " "files do not let you decide. Judge only from the files; do not assume. For 'fail', " "'details' must say exactly what is wrong and where (file, page, figure, panel) so the " "author can fix it; for 'pass', say briefly what you verified. Quote short evidence."
+_SYSTEM = "You are a meticulous pre-submission checker for academic manuscripts. You are given " "the files of one submission and a list of checks. For each check, read the files it " "names and decide: 'pass' if the submission meets it, 'fail' if it does not, " "'suggest' if nothing is wrong but you have points of style the author could defensibly leave as they are, " "'not_applicable' if the check does not apply to this submission, or 'unclear' if the " "files do not let you decide. Judge only from the files; do not assume. For 'fail', " "'details' must say exactly what is wrong and where (file, page, figure, panel) so the " "author can fix it; when you find several separate problems, number them '1) ... 2) ...' " "so each is listed on its own line; for 'pass', say briefly what you verified. Quote short evidence."
 
 
 @dataclass(frozen=True)
@@ -123,6 +124,47 @@ def parse_results(data: Any) -> dict[str, dict]:
             raise ValueError(f"result {task_id!r} has status {item.get('status')!r}; use one of {', '.join(VERDICTS)}")
         item["status"] = status
     return out
+
+
+# "1) ...", "2. ...", "(3) ..." at the start of the details or after a space.
+_NUMBERED = re.compile(r"(?:^|(?<=\s))\(?(\d{1,2})[.)]\s+")
+
+
+def split_findings(details: Any) -> tuple[str, tuple[str, ...]]:
+    """``(head, items)``: a verdict's ``details`` cut into the separate findings it lists.
+
+    ``details`` may be a list of strings (one finding each) or a string that
+    numbers its findings "1) ... 2) ...". The numbers must run 1, 2, 3, ... for
+    the string to be split; otherwise (or with fewer than two findings) it
+    comes back whole as the head. Each item loses its number and a closing
+    period, so the report can show it as a sub-bullet (``Issue.items``).
+    """
+    if isinstance(details, (list, tuple)):
+        items = tuple(_finding(str(d)) for d in details if str(d or "").strip())
+        if len(items) == 1:
+            return items[0], ()
+        return "", items
+    text = str(details or "").strip()
+    marks = list(_NUMBERED.finditer(text))
+    # Keep only the run 1, 2, 3, ...: a "3." inside a finding (a section number) is not a new one.
+    run: list[re.Match] = []
+    for m in marks:
+        if int(m.group(1)) == len(run) + 1:
+            run.append(m)
+    if len(run) < 2:
+        return text, ()
+    head = text[: run[0].start()].strip().rstrip(":").strip()
+    bounds = [m.end() for m in run] + [len(text)]
+    starts = [m.start() for m in run[1:]] + [len(text)]
+    items = tuple(_finding(text[bounds[i]:starts[i]]) for i in range(len(run)))
+    return (head + ":" if head else ""), tuple(i for i in items if i)
+
+
+def _finding(text: str) -> str:
+    text = text.strip().rstrip(";").strip()
+    if text.endswith(".") and not text.endswith(".."):
+        text = text[:-1]
+    return text
 
 
 # --- tasks the guidelines themselves call for ----------------------------------
@@ -302,8 +344,9 @@ def resolve(checks, venue: Venue, values: dict[str, str], ai: Optional[AiOptions
         if verdict is None:
             checks.record(task.id, task.title, task.category, report.NEEDS_AI, detail=reason)
             continue
-        details = str(verdict.get("details", "") or "").strip()
+        head, items = split_findings(verdict.get("details"))
         evidence = str(verdict.get("evidence", "") or "").strip()
+        details = " ".join(p for p in (head, "; ".join(items)) if p)
         message = details + (f" (evidence: {evidence})" if evidence else "")
         status = verdict["status"]
         if status == "pass":
@@ -315,12 +358,12 @@ def resolve(checks, venue: Venue, values: dict[str, str], ai: Optional[AiOptions
             # failure is critical it is a likely error, and elsewhere a warning.
             likely = task.id in CRITICAL_AI_TASKS
             level, st = (LIKELY_ERROR, report.LIKELY_ERROR) if likely else (WARNING, report.WARNING)
-            checks.record(task.id, task.title, task.category, st, issues=[Issue(level, "", message or "the AI check failed (no details given)")], source="ai")
+            checks.record(task.id, task.title, task.category, st, issues=[Issue(level, "", message or "the AI check failed (no details given)", items=items)], source="ai")
         elif status == "suggest":
             from .validate import SUGGESTION, Issue
 
             if message:
-                checks.record(task.id, task.title, task.category, report.SUGGESTION, issues=[Issue(SUGGESTION, "", message)], source="ai")
+                checks.record(task.id, task.title, task.category, report.SUGGESTION, issues=[Issue(SUGGESTION, "", message, items=items)], source="ai")
             else:
                 checks.record(task.id, task.title, task.category, report.PASSED, detail="no problems; the AI suggested changes of style but gave none", source="ai")
         elif status == "not_applicable":
@@ -440,7 +483,7 @@ def tasks_payload(tasks: list[AiTask], venue: Venue, subfile: str = "", command:
     return {
         "venue": venue.slug,
         "subfile": subfile,
-        "instructions": ("For each task, read the files it lists and judge it as the task says. " 'Write {"results": [{"id": <task id>, "status": "pass" | "fail" | "suggest" | "unclear" | "not_applicable", ' '"details": <what you found>, "evidence": <a short quote or location>}]} to a JSON file, then run ' f"`{command} --ai-results <that file>` to merge the verdicts into the report."),
+        "instructions": ("For each task, read the files it lists and judge it as the task says. " 'Write {"results": [{"id": <task id>, "status": "pass" | "fail" | "suggest" | "unclear" | "not_applicable", ' '"details": <what you found; a list of strings, one per finding, when there are several>, "evidence": <a short quote or location>}]} to a JSON file, then run ' f"`{command} --ai-results <that file>` to merge the verdicts into the report."),
         "system": _SYSTEM,
         "tasks": [t.to_dict() for t in tasks],
     }

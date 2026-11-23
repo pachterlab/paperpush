@@ -259,6 +259,7 @@ See the YouTube tutorial [PaperPush Tutorial](https://youtu.be/ChCYoud0uBk)
 
 | Venue | Slug | Validate + basic .sub | Submit + full .sub |
 | --- | --- | :---: | :---: |
+| [ACL 2027 Demo Track](https://2027.aclweb.org) | `acl_2027_demo` | ✅ | ✅ |
 | [ACL Rolling Review](https://aclrollingreview.org) | `acl_arr` | ✅ |  |
 | [CVPR 2027](https://cvpr.thecvf.com/Conferences/2027) | `cvpr_2027` | ✅ |  |
 | [NAACL 2027 Demo Track](https://2027.naacl.org) | `naacl_2027_demo` | ✅ | ✅ |

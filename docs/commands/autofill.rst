@@ -200,6 +200,11 @@ each field the new draft would change.
    and run :doc:`validate` before submitting. Author lists, affiliations, and
    funding details are the fields most worth double-checking.
 
+   After writing, ``autofill`` re-checks only the form: required fields,
+   allowed options, file paths, and the author list. It does not check the
+   manuscript against the venue's guidelines, look up references or links, or
+   make any network request; :doc:`validate` does that.
+
 See also
 --------
 

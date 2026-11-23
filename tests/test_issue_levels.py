@@ -87,7 +87,9 @@ def test_a_likely_error_does_not_block_but_changes_the_verdict():
     text = report.to_text(rep)
     assert "No blocking errors, but confirm the 1 likely error(s) before submitting" in text
     assert "LIKELY ERRORS (CONFIRM BEFORE SUBMITTING) (1)" in text
-    assert "[LIKELY] [Integrity] check 0" in text and "likely error: reference 3 matches no work" in text
+    assert "[LIKELY] [Integrity] check 0" in text and "- reference 3 matches no work" in text
+    # The heading names the level, so the finding under it is not labelled again.
+    assert "likely error: reference 3" not in text
     assert "[LIKELY] 1 with likely errors" in text
     assert rep.counts()[report.LIKELY_ERROR] == 1
 

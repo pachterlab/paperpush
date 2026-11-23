@@ -177,7 +177,7 @@ def _sample_report() -> report.ValidationReport:
 def test_text_and_markdown_list_every_section():
     rep = _sample_report()
     text = report.to_text(rep)
-    for marker in ("[PASS] [Cat] Passes", "[FAIL] [Cat] Breaks", "[WARN]", "[AI] [Cat] Judgement", "[NOT IMPLEMENTED] [Cat] Rule", "[SKIP] [Cat] Off", "error: [title] title is required"):
+    for marker in ("[PASS] [Cat] Passes", "[FAIL] [Cat] Breaks", "[WARN]", "[AI] [Cat] Judgement", "[NOT IMPLEMENTED] [Cat] Rule", "[SKIP] [Cat] Off", "- [title] title is required"):
         assert marker in text
     # Not-applicable checks get a line each, without their reasons.
     assert "  [NA] [Cat] Irrelevant\n  [NA] [Other] Also irrelevant\n" in text and "no such rule" not in text
@@ -192,7 +192,7 @@ def test_errors_only_shows_just_the_failed_section():
     # The summary still counts every check, and the report says what it left out.
     assert "[WARN] 1 with warnings" in text and "Not shown: Warnings (1); " in text
     body = text.split("Not shown:", 1)[1]
-    assert "[FAIL] [Cat] Breaks" in body and "error: [title] title is required" in body
+    assert "[FAIL] [Cat] Breaks" in body and "- [title] title is required" in body
     for gone in ("PASSED (", "WARNINGS (", "[AI] [", "[NOT IMPLEMENTED] [", "[SKIP] [", "[NA] ["):
         assert gone not in body
 
@@ -274,6 +274,28 @@ def test_pdf_report_is_a_readable_pdf_with_colours(tmp_path):
     assert f"{r_:.3f} {g_:.3f} {b_:.3f} rg" in content
 
 
+def test_dark_pdf_swaps_only_the_page_and_black_text(tmp_path):
+    from paperpush import pdf_report
+
+    def rgb(hex_):
+        return " ".join(f"{int(hex_[i : i + 2], 16) / 255:.3f}" for i in (1, 3, 5))
+
+    light = pdf_report.render_pdf(report._layout(_sample_report()), report._summary_line(_sample_report()), report.DEFAULT_PALETTE, report._ASCII_MARKS)
+    dark = pdf_report.render_pdf(report._layout(_sample_report()), report._summary_line(_sample_report()), report.DEFAULT_PALETTE, report._ASCII_MARKS, dark=True)
+    pypdf = pytest.importorskip("pypdf")
+    import io
+
+    def content(data):
+        return pypdf.PdfReader(io.BytesIO(data)).pages[0].get_contents().get_data().decode("latin-1")
+
+    lc, dc = content(light), content(dark)
+    page = f"{rgb(pdf_report.INK)} rg 0 0 {pdf_report.PAGE_WIDTH:g} {pdf_report.PAGE_HEIGHT:g} re f"
+    assert page in dc and page not in lc
+    assert f"{rgb(pdf_report.PAPER)} rg" in dc and f"{rgb(pdf_report.PAPER)} rg" not in lc
+    failed = f"{rgb(report.DEFAULT_PALETTE.failed)} rg"
+    assert failed in lc and failed in dc
+
+
 def test_pdf_report_wraps_long_lines_onto_more_pages(tmp_path):
     pypdf = pytest.importorskip("pypdf")
     rep = report.ValidationReport(venue="v", results=[report.CheckResult(str(i), "x" * 30, "C", report.WARNING, issues=[Issue(WARNING, "", "word " * 120)]) for i in range(30)])
@@ -328,6 +350,8 @@ def test_cli_saves_the_report_in_the_requested_format(_use, tmp_path, monkeypatc
     assert (tmp_path / "paper_validation.pdf").read_bytes().startswith(b"%PDF-")
     assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "-o", str(tmp_path / "r.html"), "--colorblind"]) == 0
     assert report.ALT_PALETTE.passed in (tmp_path / "r.html").read_text()
+    assert main(["validate", str(sub), "--dont-check-links", "--dont-check-references", "-o", str(tmp_path / "d.html"), "--dark"]) == 0
+    assert "--bg: #1f2328; --fg: #ffffff" in (tmp_path / "d.html").read_text()
     out = capsys.readouterr().out
     assert "PASSED" in out and "Saved the report to" in out
 
@@ -513,6 +537,27 @@ def test_api_verdicts_become_check_results(_use, tmp_path, monkeypatch):
     assert rep.ai == f"anthropic {autofill.DEFAULT_MODELS['anthropic']}"
     assert seen["files"] == [pdf] and "Number every page." in seen["instructions"] and "pre-submission checker" in seen["system"]
     assert not rep.by_status(report.NEEDS_AI)
+
+
+@pytest.mark.parametrize("details", [
+    "1) p5: 'compiled PDF.Claude' is missing a space. 2) p9: 'a agent' should be 'an agent'. 3) Section 3. is cut off.",
+    ["p5: 'compiled PDF.Claude' is missing a space.", "p9: 'a agent' should be 'an agent'", "Section 3. is cut off"],
+])
+def test_ai_verdict_findings_become_sub_bullets(_use, tmp_path, details):
+    pdf = _manuscript_with_notes(_use, tmp_path)
+    ai = ai_validate.AiOptions.from_results({"results": [{"id": "ai.notes.general", "status": "fail", "details": details, "evidence": "main.pdf p5, p9"}]})
+    rep = _report(_venue(TITLE, MANUSCRIPT), {"title": "A study", "manuscript_file": str(pdf)}, ai=ai)
+    issue = _result(rep, "ai.notes.general").issues[0]
+    assert issue.items == ("p5: 'compiled PDF.Claude' is missing a space", "p9: 'a agent' should be 'an agent'", "Section 3. is cut off")
+    text = report.to_text(rep)
+    assert "    - p9: 'a agent' should be 'an agent'\n" in text and "(evidence: main.pdf p5, p9)" in text
+    assert report.issue_dict(issue)["items"] == list(issue.items)
+
+
+def test_ai_verdict_split_needs_a_numbered_run():
+    assert ai_validate.split_findings("Only one problem, in section 2) of the text.") == ("Only one problem, in section 2) of the text.", ())
+    assert ai_validate.split_findings("Two issues: 1) x. 2) y; 4) z") == ("Two issues:", ("x", "y; 4) z"))
+    assert ai_validate.split_findings(["just one."]) == ("just one", ())
 
 
 def test_raster_figures_queue_an_ai_task_with_a_size_threshold(_use, tmp_path, samples):

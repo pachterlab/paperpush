@@ -317,6 +317,24 @@ def test_unresolved_path_is_left_for_validation(skeleton, tmp_path):
     assert any(i.is_error and i.field == "manuscript_file" for i in result.issues)
 
 
+def test_autofill_checks_the_form_only(skeleton, tmp_path, monkeypatch):
+    # The manuscript, file-content, and network checks belong to `paperpush
+    # validate`, which runs next; autofill must not repeat them or go online.
+    seen = {}
+    real_validate = af.validate
+
+    def spy(subfile, venue, **kwargs):
+        seen.update(kwargs)
+        return real_validate(subfile, venue, **kwargs)
+
+    monkeypatch.setattr(af, "validate", spy)
+    (tmp_path / "paper.pdf").write_bytes(b"%PDF-1.4\n" + b"x" * 2000)
+    af.autofill(skeleton, BIORXIV, _extract({"id": "manuscript_file", "value": "paper.pdf", "confidence": "high"}), manuscript_dir=tmp_path)
+    assert seen["network"] is False
+    for flag in ("check_manuscript", "check_sensitive", "check_links", "check_references", "check_anonymous", "check_hidden_text", "check_openreview"):
+        assert seen[flag] is False, flag
+
+
 # --- extraction schema loader ----------------------------------------------
 
 

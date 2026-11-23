@@ -138,10 +138,18 @@ class _Writer:
                     x += _width(text, style, size)
 
 
-def render_pdf(lines, summary, palette, marks) -> bytes:
-    """The PDF for a report laid out by :func:`paperpush.report._layout`."""
+# The two colours ``dark`` swaps: the page and the near-black body text.
+PAPER, INK = "#ffffff", "#1f2328"
+
+
+def render_pdf(lines, summary, palette, marks, *, dark: bool = False) -> bytes:
+    """The PDF for a report laid out by :func:`paperpush.report._layout`.
+
+    ``dark`` (``paperpush validate --dark``) swaps only the white page and the
+    black text, for a dark-view PDF; the status colours and greys stay as they are.
+    """
     w = _Writer()
-    black, grey = "#1f2328", "#59636e"
+    black, grey = (PAPER if dark else INK), "#59636e"
     for line in lines:
         color = palette.for_status(line.status) if line.status else black
         indent = INDENT * line.indent
@@ -177,10 +185,10 @@ def render_pdf(lines, summary, palette, marks) -> bytes:
             w.paragraph([(line.text, "regular", color)], 9, indent=indent - INDENT + 8)
         else:
             w.paragraph([(line.text, "italic", color)], 9, indent=max(0.0, indent - INDENT + 8))
-    return _assemble(w.pages)
+    return _assemble(w.pages, background=INK if dark else None)
 
 
-def _assemble(pages: list[list[bytes]]) -> bytes:
+def _assemble(pages: list[list[bytes]], background: str | None = None) -> bytes:
     objects: list[bytes] = []
     n = len(pages)
     # 1 catalog, 2 pages, 3-5 fonts, 6 info, then (page, contents) pairs.
@@ -193,7 +201,11 @@ def _assemble(pages: list[list[bytes]]) -> bytes:
     fonts = " ".join(f"/{key} {3 + i} 0 R" for i, (key, _, _w) in enumerate(_FONTS.values()))
     for number, ops in enumerate(pages, start=1):
         footer = f"BT /F1 8 Tf 0.45 0.45 0.45 rg {MARGIN:.2f} {MARGIN - 18:.2f} Td (paperpush validate  -  page {number} of {n}) Tj ET\n".encode()
-        stream = zlib.compress(b"".join(ops) + footer)
+        fill = b""
+        if background:
+            r, g, b = _rgb(background)
+            fill = f"{r:.3f} {g:.3f} {b:.3f} rg 0 0 {PAGE_WIDTH:g} {PAGE_HEIGHT:g} re f\n".encode()
+        stream = zlib.compress(fill + b"".join(ops) + footer)
         objects.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_WIDTH:g} {PAGE_HEIGHT:g}] /Resources << /Font << {fonts} >> >> /Contents {8 + 2 * (number - 1)} 0 R >>".encode())
         objects.append(f"<< /Length {len(stream)} /Filter /FlateDecode >>\nstream\n".encode() + stream + b"\nendstream")
     out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")

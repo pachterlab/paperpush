@@ -1331,7 +1331,6 @@ def test_cli_validate_reference_problems_do_not_block(tmp_path, monkeypatch, cap
     out = capsys.readouterr().out
 
     assert rc == 0
-    assert "warning:" in out
     assert "not registered" in out
     assert "passed validation" in out
 

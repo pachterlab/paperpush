@@ -26,7 +26,7 @@ find venues that fit your manuscript's topic.
 
 .. BEGIN SUPPORTED VENUES
 
-*82 supported venues.*
+*83 supported venues.*
 
 .. list-table::
    :header-rows: 1
@@ -564,6 +564,13 @@ find venues that fit your manuscript's topic.
      - https://jmlr.org/tmlr/
      - ✅
      -
+   * - ``acl_2027_demo``
+     - ACL 2027 Demo Track
+     - natural language processing, machine learning
+     - Conference
+     - https://2027.aclweb.org
+     - ✅
+     - ✅
    * - ``acl_arr``
      - ACL Rolling Review
      - natural language processing, machine learning

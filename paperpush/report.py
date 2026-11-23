@@ -535,12 +535,19 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
                     item_status = status
                 if item_status in hide:
                     continue
+                # The section heading already names the level, so a finding at that
+                # level is not labelled again; one at another level keeps its label.
+                label = "" if item_status == status else f"{level}: "
                 head, items, more, tail = ("", [], "", "") if paragraph else split_items(issue)
                 if not items:
-                    lines.append(_Line("item", f"{level}: {where}{issue.message}", indent=2, status=item_status))
+                    lines.append(_Line("item", f"{label}{where}{issue.message}", indent=2, status=item_status))
+                    continue
+                if not (label or where or head):
+                    # Nothing to put above the list (an AI verdict made only of findings): one bullet each.
+                    lines += [_Line("item", text, indent=2, status=item_status) for text in (*items, f"({more})" if more else "", tail) if text]
                     continue
                 # One finding per sub-bullet, then what the message says after the list.
-                lines.append(_Line("item", f"{level}: {where}{head}", indent=2, status=item_status))
+                lines.append(_Line("item", f"{label}{where}{head}", indent=2, status=item_status))
                 lines += [_Line("subitem", item, indent=3, status=item_status) for item in items]
                 lines += [_Line("continuation", text, indent=3, status=item_status) for text in (f"({more})" if more else "", tail) if text]
     return lines
@@ -673,7 +680,7 @@ def to_markdown(report: ValidationReport, *, hide: frozenset[str] = frozenset(),
     return "\n".join(out) + "\n"
 
 
-def to_html(report: ValidationReport, *, alt_color: bool = False, hide: frozenset[str] = frozenset(), paragraph: bool = False) -> str:
+def to_html(report: ValidationReport, *, alt_color: bool = False, dark: bool = False, hide: frozenset[str] = frozenset(), paragraph: bool = False) -> str:
     pal = palette(alt_color)
     body: list[str] = []
     open_list = False
@@ -716,7 +723,7 @@ def to_html(report: ValidationReport, *, alt_color: bool = False, hide: frozense
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 <style>
-:root {{ --bg: #ffffff; --fg: #1f2328; --muted: #59636e; }}
+:root {{ --bg: {"#1f2328" if dark else "#ffffff"}; --fg: {"#ffffff" if dark else "#1f2328"}; --muted: #59636e; }}
 body {{ background: var(--bg); color: var(--fg); font: 15px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 16px; }}
 h1 {{ font-size: 1.5rem; margin-bottom: .25rem; }}
 h2 {{ font-size: 1.1rem; border-bottom: 2px solid; padding-bottom: .2rem; margin-top: 1.75rem; }}
@@ -739,12 +746,16 @@ li.na {{ font-style: italic; }}
 """
 
 
-def save(report: ValidationReport, path: Path, *, alt_color: bool = False, hide: frozenset[str] = frozenset(), paragraph: bool = False) -> Path:
-    """Write ``report`` to ``path`` in the format its extension names."""
+def save(report: ValidationReport, path: Path, *, alt_color: bool = False, dark: bool = False, hide: frozenset[str] = frozenset(), paragraph: bool = False) -> Path:
+    """Write ``report`` to ``path`` in the format its extension names.
+
+    ``dark`` swaps the white background and black text of a PDF or HTML report
+    (the status colours are unchanged); Markdown and text have no colours.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     suffix = path.suffix.lower()
     if suffix in (".html", ".htm"):
-        path.write_text(to_html(report, alt_color=alt_color, hide=hide, paragraph=paragraph), encoding="utf-8")
+        path.write_text(to_html(report, alt_color=alt_color, dark=dark, hide=hide, paragraph=paragraph), encoding="utf-8")
     elif suffix == ".md":
         path.write_text(to_markdown(report, hide=hide, paragraph=paragraph), encoding="utf-8")
     elif suffix == ".txt":
@@ -752,6 +763,6 @@ def save(report: ValidationReport, path: Path, *, alt_color: bool = False, hide:
     else:
         from .pdf_report import render_pdf
 
-        path.write_bytes(render_pdf(_layout(report, hide=hide, paragraph=paragraph), _summary_line(report), palette(alt_color), _ASCII_MARKS))
+        path.write_bytes(render_pdf(_layout(report, hide=hide, paragraph=paragraph), _summary_line(report), palette(alt_color), _ASCII_MARKS, dark=dark))
     logger.info("Saved the validation report to %s", path)
     return path

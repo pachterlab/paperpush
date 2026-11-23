@@ -50,7 +50,7 @@ def test_text_report_lists_suggestions_with_their_own_marker():
     text = report.to_text(_sample())
     assert "SUGGESTIONS (STYLE) (1)" in text
     assert "[HINT] [Prose] Word choice" in text
-    assert "suggestion: [manuscript] 'robust' used 9 times" in text
+    assert "- [manuscript] 'robust' used 9 times" in text and "suggestion: [manuscript] 'robust'" not in text
     # A suggestion under a warning check is labelled as one, not as a warning.
     assert "suggestion: a side note on style" in text
     assert "[HINT] 1 with suggestions" in text
@@ -61,7 +61,7 @@ def test_hiding_suggestions_counts_them_instead():
     assert "SUGGESTIONS (STYLE)" not in text and "robust" not in text and "a side note" not in text
     assert "Not shown: 2 suggestion(s) on style (show them with --suggestions)." in text
     # The warning they sat beside stays.
-    assert "warning: looks single-spaced" in text
+    assert "- looks single-spaced" in text
 
 
 def test_errors_only_hides_suggestions():

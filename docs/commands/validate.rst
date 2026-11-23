@@ -15,6 +15,7 @@ check manuscript files without a ``.sub``, with or without a venue (see
                              [--show-errors-only] [--hide-warnings]
                              [--hide-unchecked] [--suggestions]
                              [--paragraph] [--hide-suggestions] [--colorblind]
+                             [--dark]
                              [--ai] [--provider {anthropic,openai,google}]
                              [--model MODEL] [--ai-only] [--json [FILE]]
                              [--ai-tasks FILE] [--ai-results FILE] [--venue VENUE]
@@ -523,6 +524,12 @@ Arguments
    *Colorblind-friendly colors* setting uses the same palette, and with
    ``--web`` the page opens with that setting on. ``--alt-color`` is an older
    name for this flag.
+
+``--dark``
+   Save the report in dark view: the PDF (or HTML) report's white background
+   and black text are swapped. Every other color, including the status colors
+   and ``--colorblind``'s palette, stays as it is. Markdown and text reports
+   have no colors, so the flag does nothing for them.
 
 ``--ai``
    Also run the checks that need a reader's judgment through an LLM API, with
