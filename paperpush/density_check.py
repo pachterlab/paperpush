@@ -510,8 +510,9 @@ def density_check(venue: Venue, values: dict[str, str]) -> Outcome:
     notes = [f"main text {d.main_pages:.1f} pages" + (f" of {limit}" if limit else "")]
     sparse = [p for p in d.pages if p.empty_share >= PAGE_EMPTY_SHARE]
     if sparse:
-        listed = ", ".join(f"p. {p.number} ({_pct(p.empty_share)} empty, largest gap ~{round(p.largest_gap_lines)} lines at the {p.where})" for p in sparse[:6])
-        issues.append(Issue(SUGGESTION, field_.id, f"{path.name}: {len(sparse)} main-text page(s) have large empty areas: {listed}. Reviewers at AI conferences read pages with large blank areas as an unpolished paper; usually a float pushed to the next page leaves the gap. Try moving the figure or table earlier, [t] or [tbp] placement, resizing it, or putting two side by side."))
+        pages = tuple(f"p. {p.number} ({_pct(p.empty_share)} empty, largest gap ~{round(p.largest_gap_lines)} lines at the {p.where})" for p in sparse[:6])
+        listed = ", ".join(pages)
+        issues.append(Issue(SUGGESTION, field_.id, f"{path.name}: {len(sparse)} main-text page(s) have large empty areas: {listed}. Reviewers at AI conferences read pages with large blank areas as an unpolished paper; usually a float pushed to the next page leaves the gap. Try moving the figure or table earlier, [t] or [tbp] placement, resizing it, or putting two side by side.", items=pages))
     if limit and d.ref_found and limit - d.main_pages >= UNUSED_PAGES:
         issues.append(Issue(SUGGESTION, field_.id, f"{path.name}: the main text fills about {d.main_pages:.1f} of the {limit} pages allowed. Most accepted papers at these venues use the full limit, and a paper that stops short can read as less complete; consider moving key results, ablations, or a figure up from the appendix."))
     if not d.ref_found:

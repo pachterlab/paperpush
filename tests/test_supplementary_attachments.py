@@ -115,3 +115,38 @@ def test_a_supplement_captioned_in_the_manuscript_itself_is_not_reported(tmp_pat
     path.write_text("Results are in Supplementary Figure 1.\n\nSupplementary Figure 1. Raw data for every sample.\n")
     _, check = _run(path)
     assert check.status == report.NOT_APPLICABLE
+
+
+FILLER = " ".join(["The supplementary analysis repeats the main experiment on every held-out sample."] * 20)
+BIB = "\nReferences\nA. Author. A paper title. Journal, 2020.\nB. Author. Another paper. Journal, 2021.\n"
+MAIN = "Introduction\n" + " ".join(["The main text describes the method and its results in detail."] * 15) + "\n"
+
+
+@pytest.mark.parametrize("text", [
+    # The appendix sits at the end of the file, before the reference list (LaTeX \appendix before \bibliography is rare, Word often does this).
+    MAIN + "Details are in the Supplementary Material.\n\nSupplementary Material\n" + FILLER + "\n" + BIB,
+    # After the reference list.
+    MAIN + "Details are in the Supporting Information.\n" + BIB + "\nSupporting Information\n" + FILLER + "\n",
+    # A numbered note whose heading is in the file's own supplement.
+    MAIN + "The derivation is in Supplementary Note 2.\n\nSupplementary Information\nSupplementary Note 1: Data\n" + FILLER + "\nSupplementary Note 2: Derivation\n" + FILLER + "\n" + BIB,
+])
+def test_supplement_at_the_end_of_the_same_file_is_not_reported(tmp_path, text):
+    path = tmp_path / "manuscript.txt"
+    path.write_text(text)
+    _, check = _run(path)
+    assert check.status == report.NOT_APPLICABLE, check.issues
+
+
+@pytest.mark.parametrize("text", [
+    # The note the text cites is not in the file's supplement.
+    MAIN + "The derivation is in Supplementary Note 3.\n\nSupplementary Information\nSupplementary Note 1: Data\n" + FILLER + "\n" + BIB,
+    # A data file or a video cannot be carried in the manuscript, supplement or not.
+    MAIN + "Raw counts are in Supplementary Data 1.\n\nSupplementary Information\nSupplementary Data 1\n" + FILLER + "\n" + BIB,
+    # Only a short list of the separate files' legends at the end.
+    MAIN + "Details are in the Supplementary Information.\n\nSupplementary Information\nSupplementary Figures 1-5 and Supplementary Tables 1-3.\n" + BIB,
+])
+def test_supplement_not_carried_in_the_file_is_still_reported(tmp_path, text):
+    path = tmp_path / "manuscript.txt"
+    path.write_text(text)
+    _, check = _run(path)
+    assert check.status == report.LIKELY_ERROR

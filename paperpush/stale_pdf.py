@@ -192,11 +192,12 @@ def check(venue: Venue, values: dict[str, str]) -> Outcome:
                 notes.append(f"{pdf.name}: not newer than {source.name}; {why}")
             continue
         if result.missing and (newer or len(result.missing) >= 2):
-            shown = "; ".join(_quote(s) for s in result.missing[:MAX_QUOTED])
+            quoted = tuple(_quote(s) for s in result.missing[:MAX_QUOTED])
+            shown = "; ".join(quoted)
             more = f" and {len(result.missing) - MAX_QUOTED} more" if len(result.missing) > MAX_QUOTED else ""
             lead = f"{when}, and " if newer else ""
             verb = "is" if len(result.missing) == 1 else "are"
-            issues.append(Issue(WARNING, field_id, f"{pdf.name} looks out of date with {source.name}: {lead}{len(result.missing)} of its {result.compared} prose sentences {verb} not in the PDF ({shown}{more}). Rebuild the PDF from {source.name} before uploading."))
+            issues.append(Issue(WARNING, field_id, f"{pdf.name} looks out of date with {source.name}: {lead}{len(result.missing)} of its {result.compared} prose sentences {verb} not in the PDF ({shown}{more}). Rebuild the PDF from {source.name} before uploading.", items=quoted))
         elif newer:
             notes.append(f"{when}, but all {result.compared} of its prose sentences appear in the PDF")
         else:

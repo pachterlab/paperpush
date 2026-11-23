@@ -579,6 +579,44 @@ def test_statement_after_the_bibliography_is_found(tmp_path, uncompiled):
     assert result.status == report.PASSED
 
 
+_COMPETING = ["Competing interests", "The first author holds shares in the two companies whose", "tools are compared here (Smith et al., 2020; Jones, 2021).", "She also consults for both of them."]
+_COMPETING_SUB = "The first author holds shares in the two companies whose tools are compared here. She also consults for both of them."
+
+
+def test_statement_matches_without_its_citations(tmp_path):
+    pdf = _pdf(tmp_path, ["Introduction", "Text."] + _COMPETING)
+    result = _run(consistency._statements_check, get_venue("biorxiv"), {"competing_interest": _COMPETING_SUB, "manuscript_file": str(pdf)})
+    assert result.status == report.PASSED
+
+
+def test_statement_split_by_a_float_matches_the_latex_source_beside_the_pdf(tmp_path):
+    # A two-column PDF reads a figure's labels and caption into the middle of the paragraph.
+    figure = ["0 25 50 75 100%", "Figure 2: Share of papers flagged by each check, per group.", "Boxes span the quartiles and whiskers the 5th to 95th", "percentiles; diamonds mark the mean of each group."]
+    pdf = _pdf(tmp_path, ["Introduction", "Text."] + _COMPETING[:2] + figure + _COMPETING[2:], name="main.pdf")
+    values = {"competing_interest": _COMPETING_SUB, "manuscript_file": str(pdf)}
+    assert _run(consistency._statements_check, get_venue("biorxiv"), values).status == report.WARNING
+    (tmp_path / "main.tex").write_text(r"\section{Introduction} Text. \section*{Competing interests} " + " ".join(_COMPETING[1:]).replace(" (Smith et al., 2020; Jones, 2021)", r"~\citep{smith2020,jones2021}"))
+    assert _run(consistency._statements_check, get_venue("biorxiv"), values).status == report.PASSED
+    # A statement that says something else is still reported.
+    values["competing_interest"] = "The second author is employed by one of the companies whose tools are compared here and holds a patent."
+    assert _run(consistency._statements_check, get_venue("biorxiv"), values).status == report.WARNING
+
+
+@pytest.mark.parametrize(
+    "text, kept",
+    [
+        ("strained (Gibney, 2026; Association for the Advancement of\nArtificial Intelligence, 2026).", "strained ."),
+        ("shown (see Smith et al. 2020a) here", "shown here"),
+        ("Smith (2020) said", "Smith said"),
+        ("refs [3, 5-7] ok", "refs ok"),
+        ("CI (95% CI, 2.1-3.4) here", "CI (95% CI, 2.1-3.4) here"),
+        ("in (Table 2) and (n=852)", "in (Table 2) and (n=852)"),
+    ],
+)
+def test_strip_citations(text, kept):
+    assert " ".join(consistency.strip_citations(text).split()) == kept
+
+
 def _pdf(tmp_path: Path, lines: list[str], name: str = "m.pdf") -> Path:
     stream = "".join(text_line(72, 720 - 14 * i, line) for i, line in enumerate(lines))
     return write_pdf(tmp_path / name, [stream])

@@ -661,9 +661,8 @@ def _check(name: str, venue: Venue, values: dict[str, str]) -> Outcome:
         if name == SPELLING:
             found = list(dict.fromkeys(found))  # each misspelt word once
         if found:
-            shown = "; ".join(
-                f'"{s}"' if name != SPELLING else s for s in found[:MAX_EXAMPLES]
-            )
+            items = [f'"{s}"' if name != SPELLING else s for s in found[:MAX_EXAMPLES]]
+            shown = "; ".join(items)
             more = (
                 f" (and {len(found) - MAX_EXAMPLES} more)"
                 if len(found) > MAX_EXAMPLES
@@ -674,6 +673,7 @@ def _check(name: str, venue: Venue, values: dict[str, str]) -> Outcome:
                     _LEVELS.get(name, WARNING),
                     fld.id,
                     f"{text.path.name}: {len(found)} {noun}: {shown}{more}",
+                    items=tuple(items),
                 )
             )
         else:
@@ -985,7 +985,7 @@ def _repetition_check(venue: Venue, values: dict[str, str]) -> Outcome:
             if hits:
                 shown = "; ".join(hits[:MAX_EXAMPLES])
                 more = f" (and {len(hits) - MAX_EXAMPLES} more)" if len(hits) > MAX_EXAMPLES else ""
-                issues.append(Issue(SUGGESTION, fld.id, f"{text.path.name}: {len(hits)} {noun}: {shown}{more}; vary the wording"))
+                issues.append(Issue(SUGGESTION, fld.id, f"{text.path.name}: {len(hits)} {noun}: {shown}{more}; vary the wording", items=tuple(hits[:MAX_EXAMPLES])))
         top = ", ".join(f"{w} ({n})" for w, n in found.top)
         prefix = f"{text.path.name}: " if len(files) > 1 else ""
         details.append(f"{prefix}{found.words:,} words; most frequent adjectives and adverbs: {top}" if top else f"{prefix}{found.words:,} words; no adjective or adverb used {found.top_min} or more times" if found.words else f"{prefix}no words read")

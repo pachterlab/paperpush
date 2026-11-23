@@ -618,12 +618,17 @@ def placeholder_problems(pages: list[str], *, citations: bool, word: bool) -> li
     ``pages`` is the text page by page (one item for a file without pages).
     ``citations`` also looks for ``[?]``; ``word`` for Word's field errors.
     """
+    return [text for text, _ in _placeholder_findings(pages, citations=citations, word=word)]
+
+
+def _placeholder_findings(pages: list[str], *, citations: bool, word: bool) -> list[tuple[str, tuple[str, ...]]]:
+    """:func:`placeholder_problems`, each with the examples it quotes."""
     kinds = [(_QUERY_REF, "\u201c??\u201d (a reference to a label that is not defined)")]
     if citations:
         kinds.append((_QUERY_CITE, "\u201c[?]\u201d (a citation with no reference-list entry)"))
     if word:
         kinds.append((_WORD_FIELD_ERRORS, "a broken Word cross-reference field (\u201cError! ...\u201d)"))
-    problems: list[str] = []
+    problems: list[tuple[str, tuple[str, ...]]] = []
     for pattern, what in kinds:
         hits = [(n, page, m) for n, page in enumerate(pages, start=1) for m in pattern.finditer(page)]
         if not hits:
@@ -633,7 +638,7 @@ def placeholder_problems(pages: list[str], *, citations: bool, word: bool) -> li
             where = f"page {n}: " if len(pages) > 1 else ""
             shown.append(where + _snippet(page, m.start(), m.end()))
         more = f", and {len(hits) - MAX_XREF_EXAMPLES} more" if len(hits) > MAX_XREF_EXAMPLES else ""
-        problems.append(f"{len(hits)} \u00d7 {what}: {'; '.join(shown)}{more}")
+        problems.append((f"{len(hits)} \u00d7 {what}: {'; '.join(shown)}{more}", tuple(shown)))
     return problems
 
 
@@ -661,7 +666,7 @@ def _cross_reference_check(venue: Venue, values: dict[str, str]) -> Outcome:
     read: list[str] = []
     for field_id, path in files:
         doc = document.get(path)
-        problems: list[str] = []
+        problems: list[tuple[str, tuple[str, ...]]] = []
         source_checked = False
         if doc.is_tex and doc.tex_source is not None:
             lone_tex_with_includes = doc.suffix == ".tex" and _TEX_INCLUDE.search(doc.tex_source)
@@ -669,18 +674,19 @@ def _cross_reference_check(venue: Venue, values: dict[str, str]) -> Outcome:
             if undefined is not None:
                 source_checked = True
                 if undefined:
-                    shown = ", ".join(undefined[:MAX_XREF_EXAMPLES * 2]) + (f", and {len(undefined) - MAX_XREF_EXAMPLES * 2} more" if len(undefined) > MAX_XREF_EXAMPLES * 2 else "")
-                    problems.append(f"{len(undefined)} reference(s) to a label that no \\label defines, which print as \u201c??\u201d: {shown}")
+                    listed = undefined[:MAX_XREF_EXAMPLES * 2]
+                    shown = ", ".join(listed) + (f", and {len(undefined) - MAX_XREF_EXAMPLES * 2} more" if len(undefined) > MAX_XREF_EXAMPLES * 2 else "")
+                    problems.append((f"{len(undefined)} reference(s) to a label that no \\label defines, which print as \u201c??\u201d: {shown}", tuple(listed)))
         pages = doc.page_texts
         if pages is None and (doc.is_docx or doc.is_markdown or doc.suffix == ".txt"):
             pages = [doc.text] if doc.text is not None else None
         if pages is not None and not (source_checked and problems):
             # A compiled LaTeX source's own \cite keys are bibliography.uncited's.
-            problems += placeholder_problems(pages, citations=not doc.is_tex, word=not doc.is_tex)
+            problems += _placeholder_findings(pages, citations=not doc.is_tex, word=not doc.is_tex)
         if pages is None and not source_checked:
             continue
         read.append(path.name)
-        issues += [Issue(WARNING, field_id, f"{path.name}: {p}") for p in problems]
+        issues += [Issue(WARNING, field_id, f"{path.name}: {p}", items=items) for p, items in problems]
     if not read:
         raise Unchecked("could not read the text of " + ", ".join(p.name for _, p in files))
     return Outcome(issues, "" if issues else f"read {', '.join(read)}")
@@ -705,7 +711,17 @@ _SUPPLEMENT_ATTACHMENT_CUE = re.compile(r"\b(?:zip|tar|archive|code|codebase|sou
 _APPENDIX_CUE = re.compile(r"(?i:\bappendi(?:x|ces)\b)|\b(?:Section|Sec\.|§)\s*[A-Z](?:\.\d+)*\b")
 _SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+(?=[A-Z(\[])|\n\s*\n")
 _APPENDIX_HEADING = re.compile(r"(?im)^[ \t]*(?:appendi(?:x|ces)|supplementary\s+(?:materials?|information)|technical\s+appendi(?:x|ces))\b[^\n.]{0,80}$")
+# A heading that opens a supplement carried in the manuscript file itself, at its end:
+# "Supplementary Information", "Supporting Information", "Supplementary Notes", "Appendix A".
+_SUPPLEMENT_SECTION_HEADING = re.compile(
+    r"(?im)^[ \t]*(?:[A-Z0-9]{1,2}\.?[ \t]+)?(?:appendi(?:x|ces)|technical\s+appendi(?:x|ces)"
+    r"|(?:supplementary|supplemental|supporting)\s+(?:materials?|information|notes?|methods|text|figures|tables|appendi(?:x|ces)))\b[^\n.]{0,80}$"
+)
 _LETTERED_HEADING = re.compile(r"(?m)^[ \t]*([AB])(?:\.1)?[ \t]+[A-Z][^\n.]{2,70}$")
+_MAIN_TEXT_HEADING = re.compile(r"(?im)^[ \t]*(?:\d{1,2}\.?[ \t]+)?(?:introduction|results(?:\s+and\s+discussion)?|discussion|conclusions?)[ \t]*$")
+# A supplement section must hold real content, not only a list of the separate files'
+# legends ("Supplementary Information. Supplementary Figures 1-5 and Tables 1-3.").
+_OWN_SUPPLEMENT_MIN_WORDS = 150
 
 
 def _has_own_appendix(text: str) -> bool:
@@ -713,6 +729,8 @@ def _has_own_appendix(text: str) -> bool:
 
     Read after the reference list when there is one, where an ICLR-style PDF
     puts lettered appendices ("A Related Work", "B Notations"; avgMb57IP5).
+    Otherwise (or also) a supplement section at the end of the file counts,
+    see :func:`_own_supplement_section`.
     """
     from .manuscript import reference_list_span
 
@@ -720,7 +738,53 @@ def _has_own_appendix(text: str) -> bool:
     back = text if span is None else text[span[1]:]
     if _APPENDIX_HEADING.search(back):
         return True
-    return span is not None and {m.group(1) for m in _LETTERED_HEADING.finditer(back)} == {"A", "B"}
+    if span is not None and {m.group(1) for m in _LETTERED_HEADING.finditer(back)} == {"A", "B"}:
+        return True
+    return _own_supplement_section(text) is not None
+
+
+def _own_supplement_section(text: str) -> str | None:
+    """The supplement or appendix the manuscript file carries at its end, or None.
+
+    Looks for a heading such as "Supplementary Information" or "Appendix"
+    past the first fifth of the text (with the reference list cut out, since
+    the supplement often comes before or after it) with no main-text heading
+    (Introduction, Results, Discussion, Conclusions) after it, followed by at
+    least ``_OWN_SUPPLEMENT_MIN_WORDS`` words. Returns the text from that
+    heading to the end of the file.
+    """
+    from .manuscript import without_reference_list
+
+    body = without_reference_list(text)
+    for heading in _SUPPLEMENT_SECTION_HEADING.finditer(body):
+        if heading.start() < len(body) // 5:
+            continue
+        section = body[heading.start():]
+        if _MAIN_TEXT_HEADING.search(section):
+            continue
+        return section if len(section.split()) >= _OWN_SUPPLEMENT_MIN_WORDS else None
+    return None
+
+
+_LABEL_NUMBER = re.compile(r"S?(\d{1,3})")
+
+
+def _defined_in_section(reference: str, section: str) -> bool:
+    """Whether a numbered supplementary item is defined in the file's own supplement.
+
+    "Supplementary Note 2" is defined when a line of the supplement starts with
+    it (its heading); "S1 Text" or "Supplement 1" likewise. Items that name a
+    separate file (Supplementary Data 1, Supplementary Video 2, Additional
+    file 1) are never taken as defined: a PDF cannot carry them.
+    """
+    if _SUPPLEMENT_FILE_NOUN.search(reference) or re.search(r"(?i)\badditional\s+files?\b", reference):
+        return False
+    words = reference.split()
+    number = _LABEL_NUMBER.search(reference)
+    if number is None:
+        return False
+    pattern = r"\s+".join(re.escape(w) for w in words)
+    return re.search(r"(?im)^[ \t]*" + pattern + r"\b", section) is not None
 
 
 def _is_heading_line(text: str, start: int, end: int) -> bool:
@@ -794,6 +858,7 @@ def _supplementary_attachment_check(venue: Venue, values: dict[str, str]) -> Out
         if text is None:
             raise Unchecked(f"could not read {path.name} as text")
         own_appendix = _has_own_appendix(text)
+        section = _own_supplement_section(text)
         text = without_reference_list(text)
         found = mentions(text)
         # Supplementary items captioned in the manuscript itself: the supplement is in this file.
@@ -803,6 +868,10 @@ def _supplementary_attachment_check(venue: Venue, values: dict[str, str]) -> Out
         # Unnumbered phrases that point at the document's own appendix, or are plain
         # prose, made most ICLR camera-ready flags false alarms; leave them out.
         references += [m.group() for m in _SUPPLEMENT_REFERENCE.finditer(text) if not _vague_supplement_reference(text, m, own_appendix)]
+        # A numbered item whose heading is in the supplement at the end of this file
+        # ("Supplementary Note 2" in the text, "Supplementary Note 2: Derivation" at the end).
+        if section is not None:
+            references = [ref for ref in references if not _defined_in_section(" ".join(ref.split()), section)]
         examples = list(dict.fromkeys(" ".join(ref.split()) for ref in references))[:5]
         if examples:
             quoted = ", ".join(f"“{ref}”" for ref in examples)

@@ -171,8 +171,10 @@ def render_pdf(lines, summary, palette, marks) -> bytes:
             style = "bold" if line.status in ("failed", "likely_error", "similarity", "warning") else "regular"
             w.space(3)
             w.paragraph([(f"{mark} ", "bold", color), (line.text, style, color)], 10, indent=indent - INDENT, hanging=_width(mark + " ", "bold", 10))
-        elif line.role == "item":
+        elif line.role in ("item", "subitem"):
             w.paragraph([("- ", "regular", color), (line.text, "regular", color)], 9, indent=indent - INDENT + 8, hanging=_width("- ", "regular", 9))
+        elif line.role == "continuation":
+            w.paragraph([(line.text, "regular", color)], 9, indent=indent - INDENT + 8)
         else:
             w.paragraph([(line.text, "italic", color)], 9, indent=max(0.0, indent - INDENT + 8))
     return _assemble(w.pages)

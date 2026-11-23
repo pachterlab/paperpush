@@ -96,7 +96,7 @@ def test_serial_comma_check_follows_the_venues_rule(monkeypatch, tmp_path):
 
 
 def test_dashes():
-    found = dict((m.split(":")[0], (lvl, m)) for lvl, m in u._dashes(["Ranges of 10-20 cells in 2019-2020 on 2020-01-31 in COVID-19 and chr1:10-20.", "The cells - which grew - died."], "text", None)[0])
+    found = dict((m.split(":")[0], (lvl, m)) for lvl, m, *_ in u._dashes(["Ranges of 10-20 cells in 2019-2020 on 2020-01-31 in COVID-19 and chr1:10-20.", "The cells - which grew - died."], "text", None)[0])
     lvl, msg = found["2 number range(s) with a hyphen"]
     assert lvl == report.SUGGESTION and "»10-20«" in msg and "»2019-2020«" in msg and "»2020-01" not in msg
     assert "2 hyphen(s) used as a dash" in found
@@ -106,10 +106,10 @@ def test_dashes():
 
 def test_dash_spacing_and_latex_quotes():
     found, _ = u._dashes(["One---two and three --- four.", 'He said "hello" to 10--20 people.'], "tex", None)
-    messages = " | ".join(m for _, m in found)
+    messages = " | ".join(m for _, m, *_ in found)
     assert "Dashes that break a sentence written two ways" in messages
     assert "number range" not in messages  # "10--20" is an en dash in LaTeX
-    [(level, quote)] = [(lvl, m) for lvl, m in found if "straight double quote" in m]
+    [(level, quote)] = [(lvl, m) for lvl, m, *_ in found if "straight double quote" in m]
     assert level == report.WARNING and "»\"«hello" in quote
 
 
@@ -118,12 +118,12 @@ def test_dash_spacing_and_latex_quotes():
 
 def test_number_format():
     found, _ = u._number_format(["With n = 12 and n=3 and (n =4); P < 0.05 and p<.01; 5 mg, 3mg, 10 %, 5%."], "text", None)
-    messages = " | ".join(m for _, m in found)
+    messages = " | ".join(m for _, m, *_ in found)
     assert "spaced on one side only" in messages and "»n =4«" in messages
     assert "'=', '<', and '>' written two ways" in messages
     assert "Units after a number written two ways" in messages and "Percent signs written two ways" in messages
     assert "P values written two ways" in messages and "The P of P values written two ways" in messages
-    assert all(level == report.SUGGESTION for level, _ in found)
+    assert all(level == report.SUGGESTION for level, *_ in found)
 
 
 def test_number_format_skips_spacing_in_a_pdf():

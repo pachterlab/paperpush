@@ -157,7 +157,7 @@ def compare_passage(label: str, field_id: str, value: str, hay: list[str], where
         closest = f" (closest passage {100 * ratio:.0f}% similar)" if start is not None else ""
         return [Issue(WARNING, field_id, f"{label} in the .sub was not found in {where}{closest}; paste the manuscript's text, or update the manuscript")], ""
     diffs = differences(needle, hay[start:end])
-    return [Issue(WARNING, field_id, f"{label} in the .sub differs from {where} ({100 * ratio:.0f}% the same): {'; '.join(diffs)}")], ""
+    return [Issue(WARNING, field_id, f"{label} in the .sub differs from {where} ({100 * ratio:.0f}% the same): {'; '.join(diffs)}", items=tuple(diffs))], ""
 
 
 # --- the checks ----------------------------------------------------------------------
@@ -456,13 +456,22 @@ def _statements_check(venue: Venue, values: dict[str, str]) -> Outcome:
     if not fields:
         raise NotApplicable("no statement in the .sub long enough to compare" + (" (the guidelines keep the others out of the manuscript)" if kept_out & set(values) else ""))
     _, path, doc = _manuscript(venue, values)
-    text = _text(doc)
-    if doc.is_tex and doc.pdf is None and doc.tex_source:
-        # Reducing LaTeX to words stops at the bibliography; the declarations often follow it.
-        from .manuscript import _TEX_BIBLIOGRAPHY, _TEX_REFERENCE_SECTION, _tex_to_text
+    text = _statement_text(doc)
+    hay = document.tokens(strip_citations(text))
+    # A PDF's extracted text can split a paragraph around a float (a two-column page puts the
+    # figure's labels and caption mid-sentence): the same-named source beside it reads in order.
+    source_hay: list[str] | None = None
+    source_name = ""
+    if doc.path.suffix.lower() == ".pdf":
+        from .stale_pdf import find_source
 
-        text = _tex_to_text(_TEX_REFERENCE_SECTION.sub(" ", _TEX_BIBLIOGRAPHY.sub(" ", doc.tex_source)))
-    hay = document.tokens(text)
+        source = find_source(doc.path)
+        if source is not None:
+            try:
+                source_hay = document.tokens(strip_citations(_statement_text(document.get(source), from_source=True)))
+                source_name = source.name
+            except Unchecked:
+                source_hay = None
     issues: list[Issue] = []
     matched = []
     for f in fields:
@@ -483,11 +492,43 @@ def _statements_check(venue: Venue, values: dict[str, str]) -> Outcome:
             ratio, start, _ = locate(document.tokens(values[f.id]), hay)
             if start is None or ratio < MIN_SIMILARITY:
                 continue
-        found, detail = compare_passage(f.label, f.id, values[f.id], hay, path.name)
+        value = strip_citations(values[f.id])
+        found, detail = compare_passage(f.label, f.id, value, hay, path.name)
+        if found and source_hay:
+            from_source, source_detail = compare_passage(f.label, f.id, value, source_hay, source_name)
+            if not from_source:
+                found, detail = [], source_detail
         issues.extend(found)
         if detail:
             matched.append(f.label)
     return Outcome(issues, f"{len(matched)} statement(s) match: {', '.join(matched)}" if matched else "")
+
+
+def _statement_text(doc: document.Document, from_source: bool = False) -> str:
+    """The document's words for the statements check, LaTeX declarations after the bibliography included.
+
+    ``from_source`` reads a LaTeX file's source even when a compiled PDF is beside it.
+    """
+    if doc.is_tex and (doc.pdf is None or from_source) and doc.tex_source:
+        # Reducing LaTeX to words stops at the bibliography; the declarations often follow it.
+        from .manuscript import _TEX_BIBLIOGRAPHY, _TEX_REFERENCE_SECTION, _tex_to_text
+
+        return _tex_to_text(_TEX_REFERENCE_SECTION.sub(" ", _TEX_BIBLIOGRAPHY.sub(" ", doc.tex_source)))
+    return _text(doc)
+
+
+# In-text citations, which a portal's plain-text copy of a statement leaves out: "(Gibney, 2026;
+# AAAI, 2026)", "(see Smith et al. 2020a)", "Smith (2020)", "[3, 5-7]".
+_YEAR = r"(?:1[89]|20)\d{2}[a-z]?"
+_CITATION = re.compile(
+    r"\(\s*(?:(?:see|e\.g\.|cf\.)[,\s]+)?(?:[A-Z][^()]{0,200}?[,\s]\s*)?" + _YEAR + r"(?:\s*[;,]\s*(?:[A-Z][^()]{0,200}?[,\s]\s*)?" + _YEAR + r")*\s*\)"
+    r"|\[\s*\d+(?:\s*[,\u2013-]\s*\d+)*\s*\]"
+)
+
+
+def strip_citations(text: str) -> str:
+    """``text`` without its in-text citations."""
+    return _CITATION.sub(" ", text)
 
 
 # --- counts stated on the title page ---------------------------------------------------

@@ -331,6 +331,8 @@ class Conventions:
     problems: list[str] = field(default_factory=list)
     checked: list[str] = field(default_factory=list)
     style: list[str] = field(default_factory=list)
+    # The examples each problem lists, for the report's sub-bullets.
+    items: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
 
 def _minority(forms: Counter, examples: dict[str, list[str]], what: str) -> str | None:
@@ -401,22 +403,26 @@ def conventions(paragraphs: list[str], *, hyphens: bool = True, et_al_period: Op
         # A missing period in 'i.e.'/'e.g.' is minor, and in a PDF often extraction debris ("i.e«.p0"): a suggestion.
         out.problems.append(f"{len(malformed)} malformed 'i.e.'/'e.g.': " + "; ".join(malformed[:MAX_EXAMPLES]))
         out.style.append(out.problems[-1])
+        out.items[out.problems[-1]] = tuple(malformed[:MAX_EXAMPLES])
     ie = _minority(ie_forms, ie_examples, "'i.e.'/'e.g.'")
     if ie:
         out.problems.append(ie)
         out.style.append(ie)
     if et_al_bad:
         out.problems.append(f"{len(et_al_bad)} malformed '{'et al' if et_al_period is False else 'et al.'}': " + "; ".join(et_al_bad[:MAX_EXAMPLES]))
+        out.items[out.problems[-1]] = tuple(et_al_bad[:MAX_EXAMPLES])
     for problem in (_minority(vs_forms, vs_examples, "'vs.'"), _minority(fig_forms, fig_examples, "Figure citations mid-sentence")):
         if problem:
             out.problems.append(problem)
             out.style.append(problem)
     both = [(form, snippet, closed[key]) for key, (form, snippet) in hyphenated.items() if closed[key]]
     if both:
-        shown = "; ".join(f"'{form}' (e.g. {snippet}) and '{form.replace('-', '')}' {n}x" for form, snippet, n in both[:MAX_EXAMPLES])
+        listed = [f"'{form}' (e.g. {snippet}) and '{form.replace('-', '')}' {n}x" for form, snippet, n in both[:MAX_EXAMPLES]]
+        shown = "; ".join(listed)
         more = f" (and {len(both) - MAX_EXAMPLES} more)" if len(both) > MAX_EXAMPLES else ""
         out.problems.append(f"{len(both)} word(s) both hyphenated and closed up: {shown}{more}; pick one form")
         out.style.append(out.problems[-1])
+        out.items[out.problems[-1]] = tuple(listed)
     out.checked = ["i.e./e.g.", "et al" if et_al_period is False else "et al.", "vs."] + (["Fig./Figure"] if fig_forms else []) + (["hyphenation"] if hyphens else [])
     return out
 
@@ -1098,7 +1104,7 @@ def _report(hits: list[str], noun: str, field_id: str, name: str, advice: str = 
         more = f" (and {len(rest)} more: " + ", ".join(h.split(" ", 1)[0] for h in rest) + ")"
     else:
         more = f" (and {len(rest)} more)" if rest else ""
-    return Issue(level, field_id, f"{name}: {len(hits)} {noun}: {shown}{more}" + (f"; {advice}" if advice else ""))
+    return Issue(level, field_id, f"{name}: {len(hits)} {noun}: {shown}{more}" + (f"; {advice}" if advice else ""), items=tuple(hits[:MAX_EXAMPLES]))
 
 
 def _number_rules(venue: Venue, values: dict[str, str]) -> tuple[Optional[str], Optional[bool]]:
@@ -1159,7 +1165,7 @@ def _conventions_check(venue: Venue, values: dict[str, str]) -> Outcome:
         # Legends are left out: a venue may write "Fig." in legends and "Figure" in the text.
         body = [p for p in _body_paragraphs(text) if not _CAPTION_START.match(p)]
         found = conventions(body, hyphens=text.checks != PDF_CHECKS, et_al_period=_et_al_period(venue, values))
-        issues += [Issue(SUGGESTION if p in found.style else WARNING, fld.id, f"{text.path.name}: {p}") for p in found.problems]
+        issues += [Issue(SUGGESTION if p in found.style else WARNING, fld.id, f"{text.path.name}: {p}", items=found.items.get(p, ())) for p in found.problems]
         if not found.problems:
             details.append(f"{text.path.name}: consistent ({', '.join(found.checked)})")
     return Outcome(issues, "; ".join(details))
@@ -1434,7 +1440,7 @@ def _heading_case_check(venue: Venue, values: dict[str, str]) -> Outcome:
         keep = [i for i, h in enumerate(headings) if _norm(h[1]) != title]
         hits, styled = inconsistent_heading_case([headings[i] for i in keep], _proper_words(text.paragraphs), [parts[i] for i in keep] if parts else None)
         if hits:
-            issues.append(Issue(SUGGESTION, fld.id, f"{text.path.name}: {len(hits)} heading(s) capitalized differently from the others at their level: {'; '.join(hits)}; use one style for headings of the same level"))
+            issues.append(Issue(SUGGESTION, fld.id, f"{text.path.name}: {len(hits)} heading(s) capitalized differently from the others at their level: {'; '.join(hits)}; use one style for headings of the same level", items=tuple(hits)))
         elif styled:
             details.append(f"{text.path.name}: {styled} heading(s) capitalized consistently")
     if not issues and not details:

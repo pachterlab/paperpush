@@ -1906,10 +1906,39 @@
         i.unchecked ? "Not checked: " : i.incomplete ? "Incomplete: " : i.level === "suggestion" && status !== "suggestion" ? "Suggestion: " : "",
         i.field && state.fields.has(i.field) ? el("button", { type: "button", class: "link", onclick: () => focusField(i.field), text: state.fields.get(i.field).label }) : null,
         i.field && state.fields.has(i.field) ? ": " : "",
-        i.message))) : null,
+        ...issueText(i)))) : null,
     );
     return el("details", { class: `check ${cls}`, "data-check": c.id, open: status === "failed" || status === "likely_error" || status === "similarity" || status === "unchecked" || (status === "warning" && issues.length <= 6) ? true : null },
       el("summary", {}, ...head), body);
+  }
+
+  // A message that lists several findings ("doubled words: a; b"), cut into its lead,
+  // one sub-bullet per finding, and what follows the list; mirrors report.split_items.
+  function issueText(i) {
+    const items = (i.items || []).filter(Boolean);
+    const msg = i.message || "";
+    if (items.length > 1) {
+      for (const sep of ["; ", ", "]) {
+        const joined = items.join(sep);
+        const at = msg.indexOf(joined);
+        if (at < 0) continue;
+        let head = msg.slice(0, at).trimEnd();
+        let rest = msg.slice(at + joined.length);
+        let more = "";
+        const counted = rest.match(/^\s*[;,]?\s*(\()?\s*(and \d+ more(?::[^)]*)?)/);
+        if (counted) {
+          more = counted[2].trimEnd();
+          rest = rest.slice(counted[0].length);
+          if (counted[1] && rest.startsWith(")")) rest = rest.slice(1);
+        }
+        const opened = head.match(/\s*\((?:e\.g\.,?)?$/);
+        if (opened && rest.startsWith(")")) { head = head.slice(0, opened.index) + ":"; rest = rest.slice(1); }
+        let tail = rest.replace(/^[ ;,.]+/, "");
+        if (tail && /^[ ]*[;.,][ ]*$/.test(rest.slice(0, rest.length - tail.length))) tail = tail[0].toUpperCase() + tail.slice(1);
+        return [head, el("ul", { class: "sub-items" }, items.map((t) => el("li", { text: t }))), more ? el("div", { text: `(${more})` }) : null, tail ? el("div", { text: tail }) : null];
+      }
+    }
+    return [msg];
   }
 
   function renderChecks() {

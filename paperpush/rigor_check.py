@@ -270,7 +270,7 @@ def _rrids_check(venue: Venue, values: dict[str, str], online: bool) -> Outcome:
         counted.append(f"{len(items) - len(missing)}/{len(items)} {_plural(kind, len(items))}")
         if missing:
             shown = ", ".join(missing[:6]) + (f", and {len(missing) - 6} more" if len(missing) > 6 else "")
-            issues.append(Issue(_level_for(venue, values, _RRID_RULE), field_of.get(kind, ""), f"no RRID found next to {len(missing)} {_plural(kind, len(missing))}: {shown}; give each its RRID (scicrunch.org/resources) or say none exists"))
+            issues.append(Issue(_level_for(venue, values, _RRID_RULE), field_of.get(kind, ""), f"no RRID found next to {len(missing)} {_plural(kind, len(missing))}: {shown}; give each its RRID (scicrunch.org/resources) or say none exists", items=tuple(missing[:6])))
     unchecked = 0
     if online and given:
         for rrid, field_id in list(given.items())[:MAX_LOOKUPS]:

@@ -1365,8 +1365,9 @@ def _font_consistency_check(checks: Checks, venue: Venue, values: dict[str, str]
             issues.append(Issue(SUGGESTION, fig.field_id, f"{fig.name} mixes typefaces: {main} ({100 * families[main] / total:.0f}% of its lettering) and {parts}; set all of a figure's lettering in one typeface"))
     if len(main_of) > 1:
         groups = sorted(main_of.items(), key=lambda kv: -len(kv[1]))
-        listed = "; ".join(f"{family}: {', '.join(names[:4])}{' and more' if len(names) > 4 else ''}" for family, names in groups)
-        issues.append(Issue(SUGGESTION, "", f"the figures are set in different typefaces ({listed}); use one typeface for the lettering of every figure"))
+        per_family = [f"{family}: {', '.join(names[:4])}{' and more' if len(names) > 4 else ''}" for family, names in groups]
+        listed = "; ".join(per_family)
+        issues.append(Issue(SUGGESTION, "", f"the figures are set in different typefaces ({listed}); use one typeface for the lettering of every figure", items=tuple(per_family)))
     queued = _raster_ai_task(checks, inv, rules)
     if not main_of:
         raise Unchecked(f"no vector lettering whose font can be read in the {where}" + (f"; {queued} raster figure(s) are queued for the AI check" if queued else ""))
@@ -1600,6 +1601,7 @@ def _colorblind_check(venue: Venue, values: dict[str, str], inv: _Inventory) -> 
                 f"{d.name}: {listed} {'look' if len(pairs) == 1 else 'are pairs that look'} alike with red-green colour blindness "
                 f"(simulated {worst.deficiency}: colour difference {worst.simulated:.0f}, against {worst.normal:.0f} with normal vision). "
                 "Use a colour-blind-safe palette (such as Okabe-Ito or viridis), or tell them apart by lightness, marker, line style or direct labels as well",
+                items=tuple(c.describe() for c in pairs),
             )
         )
     detail = f"{len(checked)} figure(s) checked" + (f"; {photos} photographic image(s) not compared" if photos else "")

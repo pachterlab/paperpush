@@ -214,3 +214,5 @@ tests/manuscript_files/
 steps.py
 *_steps.py
 manuscript/
+# Standalone copies of the paper figures/tables (manuscript_figures/scripts/build_all.py)
+manuscript_figures/

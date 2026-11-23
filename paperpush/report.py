@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import html
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -141,8 +142,14 @@ def palette(alt_color: bool = False) -> Palette:
 
 
 def issue_dict(issue: "Issue") -> dict:
-    """``issue`` for JSON; ``unchecked`` is present only on a message saying a rule went unchecked."""
+    """``issue`` for JSON; ``unchecked`` is present only on a message saying a rule went unchecked.
+
+    ``items`` (present when the message lists two or more findings) holds them
+    one per entry, each as written in ``message``.
+    """
     out = {"level": issue.level, "field": issue.field, "message": issue.message}
+    if split_items(issue)[1]:
+        out["items"] = list(issue.items)
     if issue.unchecked:
         out["unchecked"] = True
     if getattr(issue, "incomplete", False):
@@ -298,7 +305,9 @@ class ValidationReport:
 #
 # The report is laid out once as a list of (role, text, indent, status) lines;
 # each renderer only maps roles to its own styling. Roles: "title", "meta",
-# "notice", "summary", "heading", "check", "item", "note", "footer".
+# "notice", "summary", "heading", "check", "item", "subitem" (one finding of
+# an item that lists several), "continuation" (the rest of such an item, after
+# its list), "note", "footer".
 
 
 @dataclass(frozen=True)
@@ -307,6 +316,42 @@ class _Line:
     text: str
     indent: int = 0
     status: str = ""
+
+
+def split_items(issue: "Issue") -> tuple[str, list[str], str, str]:
+    """``(head, items, more, tail)``: ``issue.message`` cut around the findings it lists.
+
+    The items are found in the message joined by "; " or ", " (as the check
+    wrote them). ``more`` is the count of findings not listed ("and 3 more"),
+    and ``tail`` whatever follows ("Pick one"), without its leading
+    punctuation. A message whose list cannot be found (a later rewrite changed
+    it), or that lists fewer than two, comes back whole as the head.
+    """
+    items = [i for i in getattr(issue, "items", ()) if i]
+    message = issue.message
+    if len(items) > 1:
+        for sep in ("; ", ", "):
+            joined = sep.join(items)
+            at = message.find(joined)
+            if at < 0:
+                continue
+            head, rest = message[:at].rstrip(), message[at + len(joined):]
+            more = ""
+            counted = re.match(r"\s*[;,]?\s*(\()?\s*(and \d+ more(?::[^)]*)?)", rest)
+            if counted:
+                more, rest = counted.group(2).rstrip(), rest[counted.end():]
+                if counted.group(1) and rest.startswith(")"):
+                    rest = rest[1:]
+            # A list in brackets ("no DOI (e.g. a; b); the guidelines ..."): drop the brackets.
+            opened = re.search(r"\s*\((?:e\.g\.,?)?$", head)
+            if opened and rest.startswith(")"):
+                head, rest = head[: opened.start()] + ":", rest[1:]
+            tail = rest.lstrip(" ;,.")
+            # A new clause ("; pick one", ". Rebuild ...") starts with a capital.
+            if tail and rest[: len(rest) - len(tail)].strip(" ") in (";", ".", ",") and tail[0].islower():
+                tail = tail[0].upper() + tail[1:]
+            return head, items, more, tail
+    return message, [], "", ""
 
 
 def _summary_line(report: ValidationReport) -> list[tuple[str, str]]:
@@ -407,7 +452,7 @@ def _hidden_note(report: ValidationReport, hide: frozenset[str]) -> str:
     return ("Not shown: " + "; ".join(parts) + ".") if parts else ""
 
 
-def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide: frozenset[str] = frozenset()) -> list[_Line]:
+def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide: frozenset[str] = frozenset(), paragraph: bool = False) -> list[_Line]:
     lines: list[_Line] = [_Line("title", f"paperpush validation report: {report_name(report)}")]
     if report.command:
         lines.append(_Line("meta", f"Command: {report.command}" + (f" (run in {report.cwd})" if report.cwd else "")))
@@ -490,14 +535,21 @@ def _layout(report: ValidationReport, *, show_passed_details: bool = True, hide:
                     item_status = status
                 if item_status in hide:
                     continue
-                lines.append(_Line("item", f"{level}: {where}{issue.message}", indent=2, status=item_status))
+                head, items, more, tail = ("", [], "", "") if paragraph else split_items(issue)
+                if not items:
+                    lines.append(_Line("item", f"{level}: {where}{issue.message}", indent=2, status=item_status))
+                    continue
+                # One finding per sub-bullet, then what the message says after the list.
+                lines.append(_Line("item", f"{level}: {where}{head}", indent=2, status=item_status))
+                lines += [_Line("subitem", item, indent=3, status=item_status) for item in items]
+                lines += [_Line("continuation", text, indent=3, status=item_status) for text in (f"({more})" if more else "", tail) if text]
     return lines
 
 
 # --- terminal ----------------------------------------------------------------
 
 
-def print_report(report: ValidationReport, *, alt_color: bool = False, console=None, show_passed_details: bool = True, hide: frozenset[str] = frozenset()) -> None:
+def print_report(report: ValidationReport, *, alt_color: bool = False, console=None, show_passed_details: bool = True, hide: frozenset[str] = frozenset(), paragraph: bool = False) -> None:
     """Print ``report`` to the terminal with rich colours."""
     from rich.console import Console
     from rich.text import Text
@@ -507,7 +559,7 @@ def print_report(report: ValidationReport, *, alt_color: bool = False, console=N
     if not console.is_terminal:
         # Piped or captured: keep each message on one line, so it can be grepped.
         console.soft_wrap = True
-    for line in _layout(report, show_passed_details=show_passed_details, hide=hide):
+    for line in _layout(report, show_passed_details=show_passed_details, hide=hide, paragraph=paragraph):
         color = pal.for_status(line.status) if line.status else None
         pad = "  " * line.indent
         if line.role == "title":
@@ -534,10 +586,12 @@ def print_report(report: ValidationReport, *, alt_color: bool = False, console=N
             text.append(f"{_MARKS[line.status]} ", style=f"bold {color}")
             text.append(line.text, style=f"{bold}{color}")
             console.print(text)
-        elif line.role == "item":
+        elif line.role in ("item", "subitem"):
             text = Text(pad + "- ", style=color)
             text.append(line.text, style=color)
             console.print(text)
+        elif line.role == "continuation":
+            console.print(Text(pad + line.text, style=color))
         else:  # note
             console.print(Text(pad + line.text, style=f"{color} italic" if color else "italic"))
 
@@ -565,9 +619,9 @@ def output_path(requested: str, subfile: str) -> Path:
     return path
 
 
-def to_text(report: ValidationReport, *, hide: frozenset[str] = frozenset()) -> str:
+def to_text(report: ValidationReport, *, hide: frozenset[str] = frozenset(), paragraph: bool = False) -> str:
     out: list[str] = []
-    for line in _layout(report, hide=hide):
+    for line in _layout(report, hide=hide, paragraph=paragraph):
         pad = "  " * line.indent
         if line.role == "title":
             out += [line.text, "=" * len(line.text)]
@@ -579,8 +633,10 @@ def to_text(report: ValidationReport, *, hide: frozenset[str] = frozenset()) -> 
             out += ["", line.text.upper(), "-" * len(line.text)]
         elif line.role == "check":
             out.append(f"{pad}{_ASCII_MARKS[line.status]} {line.text}")
-        elif line.role == "item":
+        elif line.role in ("item", "subitem"):
             out.append(f"{pad}- {line.text}")
+        elif line.role == "continuation":
+            out.append(f"{pad}{line.text}")
         else:
             out.append(f"{pad}{line.text}")
     return "\n".join(out) + "\n"
@@ -590,9 +646,9 @@ def _md_escape(text: str) -> str:
     return text.replace("|", "\\|").replace("*", "\\*").replace("_", "\\_")
 
 
-def to_markdown(report: ValidationReport, *, hide: frozenset[str] = frozenset()) -> str:
+def to_markdown(report: ValidationReport, *, hide: frozenset[str] = frozenset(), paragraph: bool = False) -> str:
     out: list[str] = []
-    for line in _layout(report, hide=hide):
+    for line in _layout(report, hide=hide, paragraph=paragraph):
         if line.role == "title":
             out += [f"# {_md_escape(line.text)}", ""]
         elif line.role == "meta":
@@ -607,6 +663,9 @@ def to_markdown(report: ValidationReport, *, hide: frozenset[str] = frozenset())
             out.append(f"- {_MARKS[line.status]} **{_md_escape(line.text)}**")
         elif line.role == "item":
             out.append(f"    - {_md_escape(line.text)}")
+        elif line.role in ("subitem", "continuation"):
+            # A bare line would run on into the last sub-bullet, so the rest of the message is one too.
+            out.append(f"        - {_md_escape(line.text)}")
         elif line.indent >= 2:
             out.append(f"    *{_md_escape(line.text)}*")
         else:
@@ -614,7 +673,7 @@ def to_markdown(report: ValidationReport, *, hide: frozenset[str] = frozenset())
     return "\n".join(out) + "\n"
 
 
-def to_html(report: ValidationReport, *, alt_color: bool = False, hide: frozenset[str] = frozenset()) -> str:
+def to_html(report: ValidationReport, *, alt_color: bool = False, hide: frozenset[str] = frozenset(), paragraph: bool = False) -> str:
     pal = palette(alt_color)
     body: list[str] = []
     open_list = False
@@ -625,7 +684,7 @@ def to_html(report: ValidationReport, *, alt_color: bool = False, hide: frozense
             body.append("</ul>")
             open_list = False
 
-    for line in _layout(report, hide=hide):
+    for line in _layout(report, hide=hide, paragraph=paragraph):
         text = html.escape(line.text)
         color = pal.for_status(line.status) if line.status else "inherit"
         if line.role == "title":
@@ -644,8 +703,10 @@ def to_html(report: ValidationReport, *, alt_color: bool = False, hide: frozense
         elif line.role == "check":
             weight = "600" if line.status in (FAILED, LIKELY_ERROR, SIMILARITY, WARNING) else "500"
             body.append(f'<li class="check" style="color:{color};font-weight:{weight}"><span class="mark">{_MARKS[line.status]}</span> {text}</li>')
-        elif line.role == "item":
-            body.append(f'<li class="item" style="color:{color}">{text}</li>')
+        elif line.role in ("item", "subitem"):
+            body.append(f'<li class="{line.role}" style="color:{color}">{text}</li>')
+        elif line.role == "continuation":
+            body.append(f'<li class="continuation" style="color:{color}">{text}</li>')
         else:
             cls = "note" if line.indent >= 2 else "na"
             body.append(f'<li class="{cls}" style="color:{color}">{text}</li>')
@@ -666,7 +727,9 @@ h2 {{ font-size: 1.1rem; border-bottom: 2px solid; padding-bottom: .2rem; margin
 ul {{ list-style: none; padding-left: 0; }}
 li.check {{ margin-top: .45rem; }}
 li.item {{ margin-left: 2.2rem; text-indent: -0.9rem; }}
-li.item::before {{ content: "– "; }}
+li.item::before, li.subitem::before {{ content: "– "; }}
+li.subitem {{ margin-left: 3.4rem; text-indent: -0.9rem; }}
+li.continuation {{ margin-left: 3.4rem; }}
 li.note {{ margin-left: 1.3rem; font-style: italic; }}
 li.na {{ font-style: italic; }}
 .mark {{ display: inline-block; width: 1.1rem; }}
@@ -676,19 +739,19 @@ li.na {{ font-style: italic; }}
 """
 
 
-def save(report: ValidationReport, path: Path, *, alt_color: bool = False, hide: frozenset[str] = frozenset()) -> Path:
+def save(report: ValidationReport, path: Path, *, alt_color: bool = False, hide: frozenset[str] = frozenset(), paragraph: bool = False) -> Path:
     """Write ``report`` to ``path`` in the format its extension names."""
     path.parent.mkdir(parents=True, exist_ok=True)
     suffix = path.suffix.lower()
     if suffix in (".html", ".htm"):
-        path.write_text(to_html(report, alt_color=alt_color, hide=hide), encoding="utf-8")
+        path.write_text(to_html(report, alt_color=alt_color, hide=hide, paragraph=paragraph), encoding="utf-8")
     elif suffix == ".md":
-        path.write_text(to_markdown(report, hide=hide), encoding="utf-8")
+        path.write_text(to_markdown(report, hide=hide, paragraph=paragraph), encoding="utf-8")
     elif suffix == ".txt":
-        path.write_text(to_text(report, hide=hide), encoding="utf-8")
+        path.write_text(to_text(report, hide=hide, paragraph=paragraph), encoding="utf-8")
     else:
         from .pdf_report import render_pdf
 
-        path.write_bytes(render_pdf(_layout(report, hide=hide), _summary_line(report), palette(alt_color), _ASCII_MARKS))
+        path.write_bytes(render_pdf(_layout(report, hide=hide, paragraph=paragraph), _summary_line(report), palette(alt_color), _ASCII_MARKS))
     logger.info("Saved the validation report to %s", path)
     return path

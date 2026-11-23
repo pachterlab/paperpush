@@ -100,7 +100,7 @@ def _files(venue: Venue, values: dict[str, str]):
 
 
 def _run(venue: Venue, values: dict[str, str], fn) -> Outcome:
-    """Run ``fn(body, kind, path) -> (issues as (level, message), detail)`` on each manuscript file."""
+    """Run ``fn(body, kind, path) -> (issues as (level, message[, items]), detail)`` on each manuscript file."""
     issues: list[Issue] = []
     details: list[str] = []
     files = list(_files(venue, values))
@@ -109,7 +109,7 @@ def _run(venue: Venue, values: dict[str, str], fn) -> Outcome:
             issues.append(Issue(WARNING, fld.id, text.why, unchecked=True))
             continue
         found, detail = fn(body, kind, text.path)
-        issues += [Issue(level, fld.id, f"{text.path.name}: {message}") for level, message in found]
+        issues += [Issue(level, fld.id, f"{text.path.name}: {message}", items=tuple(rest[0]) if rest else ()) for level, message, *rest in found]
         if detail and not found:
             details.append(detail if len(files) == 1 else f"{text.path.name}: {detail}")
     return Outcome(issues, "; ".join(details))
@@ -225,9 +225,9 @@ def _serial_comma(body: list[str], kind: str, path, rule: Optional[bool]):
     serial = [s for p in body for ok, s in serial_lists(p) if ok]
     plain = [s for p in body for ok, s in serial_lists(p) if not ok]
     if rule is True and plain:
-        return [(WARNING, f"{len(plain)} list(s) without the serial comma before the last item: {_list(plain)}; the venue's guidelines use the serial (Oxford) comma ('A, B, and C')")], ""
+        return [(WARNING, f"{len(plain)} list(s) without the serial comma before the last item: {_list(plain)}; the venue's guidelines use the serial (Oxford) comma ('A, B, and C')", tuple(plain[:MAX_EXAMPLES]))], ""
     if rule is False and serial:
-        return [(WARNING, f"{len(serial)} list(s) with a serial comma before the last item: {_list(serial)}; the venue's guidelines leave it out ('A, B and C')")], ""
+        return [(WARNING, f"{len(serial)} list(s) with a serial comma before the last item: {_list(serial)}; the venue's guidelines leave it out ('A, B and C')", tuple(serial[:MAX_EXAMPLES]))], ""
     if serial and plain:
         forms = Counter({"with the serial comma ('A, B, and C')": len(serial), "without it ('A, B and C')": len(plain)})
         examples = {"with the serial comma ('A, B, and C')": serial, "without it ('A, B and C')": plain}
@@ -261,17 +261,17 @@ def _dashes(body: list[str], kind: str, path):
     if tex:
         # LaTeX writes the en dash "--" and the em dash "---".
         body = [p.replace("---", "\u2014").replace("--", "\u2013") for p in body]
-    found: list[tuple[str, str]] = []
+    found: list[tuple] = []  # (level, message) or (level, message, listed items)
     ranges = [_snip(p, m.start(), m.end()) for p in body for m in _HYPHEN_RANGE.finditer(p) if not _is_date_or_id(p, m)]
     if ranges:
         en = "--" if tex else "\u2013"
-        found.append((SUGGESTION, f"{len(ranges)} number range(s) with a hyphen: {_list(ranges)}; use an en dash ({en}) for a range ('10\u201320')"))
+        found.append((SUGGESTION, f"{len(ranges)} number range(s) with a hyphen: {_list(ranges)}; use an en dash ({en}) for a range ('10\u201320')", tuple(ranges[:MAX_EXAMPLES])))
     spaced = [_snip(p, m.start(), m.end()) for p in body for m in _SPACED_HYPHEN.finditer(p)]
     if not tex:
         spaced += [_snip(p, m.start(), m.end()) for p in body for m in _DOUBLE_HYPHEN.finditer(p)]
     if spaced:
         em = "---" if tex else "\u2014"
-        found.append((SUGGESTION, f"{len(spaced)} hyphen(s) used as a dash: {_list(spaced)}; a hyphen joins words, so set a break in the sentence with an em dash ({em})"))
+        found.append((SUGGESTION, f"{len(spaced)} hyphen(s) used as a dash: {_list(spaced)}; a hyphen joins words, so set a break in the sentence with an em dash ({em})", tuple(spaced[:MAX_EXAMPLES])))
     forms: Counter = Counter()
     examples: dict[str, list[str]] = {}
     for name, pattern in (("closed-up em dashes ('a\u2014b')", _EM_CLOSED), ("spaced em dashes ('a \u2014 b')", _EM_SPACED), ("spaced en dashes ('a \u2013 b')", _EN_SPACED)):
@@ -286,7 +286,7 @@ def _dashes(body: list[str], kind: str, path):
     if tex:
         quotes = [_snip(p, m.start(), m.end()) for p in body for m in _TEX_STRAIGHT_QUOTE.finditer(p)]
         if quotes:
-            found.append((WARNING, f"{len(quotes)} straight double quote(s) opening a quotation: {_list(quotes)}; LaTeX prints \" as a closing quote, so write ``word'' (or \\enquote{{word}})"))
+            found.append((WARNING, f"{len(quotes)} straight double quote(s) opening a quotation: {_list(quotes)}; LaTeX prints \" as a closing quote, so write ``word'' (or \\enquote{{word}})", tuple(quotes[:MAX_EXAMPLES])))
     return found, "hyphens, en dashes, and em dashes used as expected"
 
 
@@ -321,7 +321,7 @@ _PERCENT = re.compile(r"(?<![\w.,\-])(\d+(?:\.\d+)?)( ?)%")
 
 
 def _number_format(body: list[str], kind: str, path):
-    found: list[tuple[str, str]] = []
+    found: list[tuple] = []  # (level, message) or (level, message, listed items)
     spacing = kind != "pdf"
     if spacing:
         forms: Counter = Counter()
@@ -338,7 +338,7 @@ def _number_format(body: list[str], kind: str, path):
                 forms[key] += 1
                 examples.setdefault(key, []).append(snip)
         if lopsided:
-            found.append((SUGGESTION, f"{len(lopsided)} '=', '<', or '>' spaced on one side only: {_list(lopsided)}; space both sides or neither"))
+            found.append((SUGGESTION, f"{len(lopsided)} '=', '<', or '>' spaced on one side only: {_list(lopsided)}; space both sides or neither", tuple(lopsided[:MAX_EXAMPLES])))
         mixed = _two_ways(forms, examples, "'=', '<', and '>'")
         if mixed:
             found.append((SUGGESTION, mixed))
@@ -440,10 +440,10 @@ def long_sentences(paragraph: str, limit: int = LONG_SENTENCE_WORDS) -> list[str
 
 
 def _usage(body: list[str], kind: str, path):
-    found: list[tuple[str, str]] = []
+    found: list[tuple] = []  # (level, message) or (level, message, listed items)
     slips = [hit for p in body for hit in agreement(p)]
     if slips:
-        found.append((WARNING, f"{len(slips)} agreement slip(s): {_list(slips)}"))
+        found.append((WARNING, f"{len(slips)} agreement slip(s): {_list(slips)}", tuple(slips[:MAX_EXAMPLES])))
     singular = [_snip(p, m.start(), m.end()) for p in body for m in _DATA_SINGULAR.finditer(p)]
     plural = [_snip(p, m.start(), m.end()) for p in body for m in _DATA_PLURAL.finditer(p)]
     if singular and plural:
@@ -457,7 +457,7 @@ def _usage(body: list[str], kind: str, path):
     if kind != "pdf":
         long = [hit for p in body for hit in long_sentences(p)]
         if long:
-            found.append((SUGGESTION, f"{len(long)} sentence(s) of more than {LONG_SENTENCE_WORDS} words: {_list(long)}; consider splitting them"))
+            found.append((SUGGESTION, f"{len(long)} sentence(s) of more than {LONG_SENTENCE_WORDS} words: {_list(long)}; consider splitting them", tuple(long[:MAX_EXAMPLES])))
     return found, "no agreement slips, contractions" + (", or very long sentences" if kind != "pdf" else " (sentence length not measured in a PDF)")
 
 
@@ -642,7 +642,7 @@ def _significant_check(venue: Venue, values: dict[str, str], unclear: list[str] 
         if uses.plain:
             level = WARNING if rule or has_stats else SUGGESTION
             why = "the guidelines reserve it for statistical significance" if rule else "the manuscript reports statistical tests, so a reader may take it as one" if has_stats else "it can be read as statistical significance"
-            found.append((level, f"{len(uses.plain)} use(s) of 'significant' that mean large or important, not statistically significant ({why}): {_list(uses.plain)}; {_SIGNIFICANT_ADVICE}"))
+            found.append((level, f"{len(uses.plain)} use(s) of 'significant' that mean large or important, not statistically significant ({why}): {_list(uses.plain)}; {_SIGNIFICANT_ADVICE}", tuple(uses.plain[:MAX_EXAMPLES])))
         total = len(uses.statistical) + len(uses.plain) + len(uses.unclear)
         if not total:
             return found, "'significant' not used"

@@ -7,7 +7,8 @@ description: >-
   say, the venue's free-text guideline rules, whether every .sub field says
   what the manuscript says), which you do yourself instead of through an API
   key. Produces the color-coded report of what passed, failed, and was not
-  checked, optionally saved as PDF/HTML/Markdown/text. For a venue paperpush
+  checked, saved by default as a PDF next to the .sub (or HTML/Markdown/text
+  on request). For a venue paperpush
   does not support yet, first builds a temporary entry from the venue's
   guidelines and validates against that. Triggers: "validate my
   sub", "check my submission against the guidelines", "is my manuscript ready
@@ -53,13 +54,23 @@ tasks, you do them, and the CLI merges your verdicts into the report. No
   other flags, `--manuscript <abs main.tex>` and `--manuscript <abs main.pdf>`
   (separate `--ai-tasks` files; do the AI tasks once, from the PDF run, and
   merge them there), and report every Failed and Warnings entry from both.
+  Both runs would save to the same default path, so give the `.tex` run its
+  own report next to the `.sub`, `-o <sub dir>/<sub stem>_tex_validation.pdf
+  --overwrite` (it gets no merge step), and let the PDF run's merge (step 3)
+  save the default `<sub stem>_validation.pdf`.
   The same goes for a `.sub` whose manuscript is one form while the other is
   in the directory. Never validate only the PDF because it is "what will be
   submitted".
-- Where they want the report saved. `validate` saves it by default as
-  `<sub stem>_validation.pdf` next to the `.sub`; `-o <path>` saves it
-  elsewhere, and `--no-report` saves nothing. Mention
-  `--colorblind` if they ask for color-blind-friendly colors.
+- **The report is always saved, next to the `.sub`, by default.** Don't ask
+  where to save it. The final run (step 3) saves it as
+  `<sub stem>_validation.pdf` next to the `.sub` (or next to the first file
+  named, without a `.sub`), replacing an earlier one there, so leave `-o`
+  off. Never point `-o` at the scratch directory: scratch is for the task
+  and result JSON only, and a report saved there is lost to the user. Pass
+  `-o <abs path> --overwrite` only when the user names another place or
+  format (`.html`/`.md`/`.txt`), and `--no-report` on the final run only when
+  they say not to save it. Mention `--colorblind` if they ask for
+  color-blind-friendly colors.
 - Whether this is an initial submission, if the venue accepts an initial
   submission in any format (the report's "Format for initial submission" note;
   `describe_venue` shows `manuscript.initial_submission_any_format`). If so,
@@ -125,8 +136,12 @@ guess failed.
 1. **Run the deterministic checks and export the AI tasks.**
 
    ```
-   paperpush validate <abs .sub> --ai-tasks <scratch>/validate_tasks.json
+   paperpush validate <abs .sub> --ai-tasks <scratch>/validate_tasks.json --no-report
    ```
+
+   `--no-report` here only skips the intermediate report, because step 3
+   saves the final one (the `.tex` run of a LaTeX + PDF pair is the
+   exception: give it `-o`, as in Inputs).
 
    Add `--disable-integrity.links --disable-references` only if the user wants it
    offline. Read the report it prints: note every **Failed** and **Warnings**
@@ -254,10 +269,16 @@ guess failed.
 3. **Merge and report.**
 
    ```
-   paperpush validate <abs .sub> --ai-results <scratch>/validate_results.json [-o <report path> [--overwrite]] [--colorblind] [--initial-submission]
+   paperpush validate <abs .sub> --ai-results <scratch>/validate_results.json [--colorblind] [--initial-submission]
    ```
 
-   (MCP alternative: `validate_subfile(subfile, ai_results=[...], output=...)`.)
+   No `-o`: this run saves the report at its default path next to the
+   `.sub`. Check that the output ends with `Saved the report to <path>`; if
+   it says it could not save there (a read-only directory), rerun with
+   `-o <abs path the user can reach> --overwrite`, never the scratch
+   directory. Add `-o` only for a place or format the user asked for (see
+   Inputs). (MCP alternative: `validate_subfile(subfile, ai_results=[...])`;
+   pass `output=` only for a path the user asked for.)
    Your verdicts appear marked "(AI)". A failed AI check never blocks: it is a
    likely error for the checks where a real failure is critical (unverified
    references, the template, trial registration, ethics approval, anonymity) and a warning
@@ -281,7 +302,8 @@ guess failed.
    (could not run / not implemented), suggestions on style (one line with the
    count and the check ids, unless the user asks for them; the JSON and a
    saved report list them, and so does the terminal with `--suggestions`),
-   and where the saved report is. Never count suggestions as warnings. Relay
+   and the absolute path of every saved report (from the `Saved the report
+   to` line). Never count suggestions as warnings. Relay
    heuristics as things to confirm, not as certainties. List every AI task
    with its verdict (one line each), so it is visible that none was skipped.
    If the user asked for the findings in a file or another format, include
@@ -295,7 +317,8 @@ guess failed.
   If they ask you to fix what validate found, use `paperpush-fix`.
 - Never add hidden text or reviewer instructions anywhere.
 - Use absolute paths; keep the task and result JSON in a scratch directory, not
-  the manuscript directory.
+  the manuscript directory. The saved report is the exception: it goes next
+  to the `.sub`, never into scratch.
 - Run the authors' code only for `ai.figure_reproduction.*` tasks, only in
   the scratch directory, and with no credentials (no tokens, keys, or signed-in
   sessions passed to it).

@@ -2047,6 +2047,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     # The terminal shows only how many suggestions there are, unless asked;
     # the saved report lists them.
     terminal_hide = hide if getattr(args, "suggestions", False) else hide | {report_mod.SUGGESTION}
+    paragraph = getattr(args, "paragraph", False)
     json_out = getattr(args, "json_out", None)
     # With the JSON on stdout, the notes below go to stderr so stdout stays parseable.
     note_stream = sys.stderr if json_out == "-" else sys.stdout
@@ -2054,7 +2055,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         # Machine-readable report on stdout instead of the coloured one.
         print(json.dumps(result.to_dict(), indent=2))
     else:
-        report_mod.print_report(result, alt_color=alt, hide=terminal_hide)
+        report_mod.print_report(result, alt_color=alt, hide=terminal_hide, paragraph=paragraph)
     if json_out and json_out != "-":
         json_path = Path(json_out).expanduser()
         try:
@@ -2074,7 +2075,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     if report_out is not None:
         out = report_out
         try:
-            report_mod.save(result, out, alt_color=alt, hide=hide)
+            report_mod.save(result, out, alt_color=alt, hide=hide, paragraph=paragraph)
         except OSError as exc:
             if explicit_report:
                 print(f"error: could not save the report to {out}: {exc}", file=sys.stderr)
@@ -3792,6 +3793,7 @@ def build_parser() -> argparse.ArgumentParser:
     display_group.add_argument("--hide-warnings", dest="hide_warnings", action="store_true", help="leave out the warnings section, and the warnings listed under failed checks")
     display_group.add_argument("--hide-unchecked", dest="hide_unchecked", action="store_true", help="leave out the checks that were not run: could not run, needs AI, and not implemented")
     display_group.add_argument("--suggestions", dest="suggestions", action="store_true", help="list the suggestions on style (repetitive word choice, spelled-out numbers, ...) in the terminal too; by default the terminal shows only how many there are, and the saved report lists them")
+    display_group.add_argument("--paragraph", dest="paragraph", action="store_true", help="write each finding as one paragraph, its examples separated by semicolons, instead of listing the examples (doubled words, flagged references, figures, ...) one per sub-bullet under it")
     display_group.add_argument("--hide-suggestions", dest="hide_suggestions", action="store_true", help="leave the suggestions on style out of the saved report as well")
     p_validate.add_argument("--colorblind", "--alt-color", dest="alt_color", action="store_true", help="use colour-blind-friendly colours in the terminal and saved report: blue for passed, vermillion for failed, dark yellow for warnings, bluish green for suggestions, reddish purple for needs AI, grey for could not run / not implemented (the same palette as the web app's \"Colorblind-friendly colors\" setting). --alt-color is an older name for it")
     p_validate.add_argument(

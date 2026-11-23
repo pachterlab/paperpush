@@ -536,6 +536,7 @@ body.drop-import main { outline: 2px dashed var(--accent); outline-offset: 4px; 
 .check .tag { font-size: 12px; padding: 0 6px; border-radius: 2px; border: 1px solid currentColor; }
 .check .body { padding: 0 10px 10px 32px; font-size: 14px; color: var(--text); }
 .check .body ul { margin: 4px 0 0; padding-left: 16px; }
+.check .body ul.sub-items { margin: 2px 0; list-style: circle; }
 .check .body li { margin-bottom: 3px; word-break: break-word; }
 .check .body .detail { color: var(--muted); margin: 0; }
 .check.st-passed { border-left-color: var(--st-passed); color: var(--text); }

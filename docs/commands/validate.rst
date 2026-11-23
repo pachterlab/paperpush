@@ -14,7 +14,7 @@ check manuscript files without a ``.sub``, with or without a venue (see
                              [-o [OUT]] [--overwrite] [--cover-letter-max-age DAYS]
                              [--show-errors-only] [--hide-warnings]
                              [--hide-unchecked] [--suggestions]
-                             [--hide-suggestions] [--colorblind]
+                             [--paragraph] [--hide-suggestions] [--colorblind]
                              [--ai] [--provider {anthropic,openai,google}]
                              [--model MODEL] [--ai-only] [--json [FILE]]
                              [--ai-tasks FILE] [--ai-results FILE] [--venue VENUE]
@@ -496,6 +496,20 @@ Arguments
 
 ``--hide-suggestions``
    Leave the suggestions out of the report saved with ``-o`` as well.
+
+``--paragraph``
+   Write each finding on one line, its examples separated by semicolons.
+   By default a finding that lists several examples (doubled words, flagged
+   references, figures, ...) puts each one on its own sub-bullet::
+
+      - warning: [pdf_file] main.pdf: 2 doubled word(s):
+        - "...in to the portal »login login« Fill out the portal..."
+        - "...each), but without »it it« filled a never field,..."
+
+   With ``--paragraph`` the same finding reads
+   ``main.pdf: 2 doubled word(s): "...»login login«..."; "...»it it«..."``.
+   The ``--json`` report is the same either way: ``message`` is always the
+   one-line form, and ``items`` lists the examples.
 
    These display flags filter both the terminal output and the report
    saved with ``-o``. They do not apply with ``--web``. The summary line still

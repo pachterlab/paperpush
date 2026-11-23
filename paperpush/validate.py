@@ -85,6 +85,11 @@ class Issue:
     # it does not set the check's status: a check that found nothing else is
     # INCOMPLETE, and one that did find something is also listed as incomplete.
     incomplete: bool = False
+    # The separate findings the message lists ("doubled words: "a a"; "b b""),
+    # each written exactly as it appears in ``message``. A report shows them as
+    # sub-bullets under the rest of the message (see paperpush.report), or
+    # leaves the message as one paragraph with ``--paragraph``.
+    items: tuple[str, ...] = ()
 
     @property
     def is_error(self) -> bool:
@@ -107,14 +112,14 @@ class Issue:
         return self.level == WARNING
 
 
-def unchecked(field: str, message: str) -> Issue:
+def unchecked(field: str, message: str, items: tuple[str, ...] = ()) -> Issue:
     """A WARNING saying a rule went unchecked, and why."""
-    return Issue(WARNING, field, message, unchecked=True)
+    return Issue(WARNING, field, message, unchecked=True, items=items)
 
 
-def incomplete(field: str, message: str) -> Issue:
+def incomplete(field: str, message: str, items: tuple[str, ...] = ()) -> Issue:
     """A WARNING saying part of a check could not be done (a service did not answer), and what."""
-    return Issue(WARNING, field, message, incomplete=True)
+    return Issue(WARNING, field, message, incomplete=True, items=items)
 
 
 def _truthy_bool(value: str) -> bool:
@@ -855,7 +860,7 @@ def _link_issues(venue: Venue, values: dict[str, str]) -> Outcome:
     if probed and len(unanswered) == probed and not issues:
         raise Unchecked(f"none of the {probed} link(s) could be reached (no network, or the sites did not answer)")
     if unanswered:
-        issues.append(incomplete("", f"{len(unanswered)} of {probed} link(s) got no answer and were not verified: {_listed(unanswered)}"))
+        issues.append(incomplete("", f"{len(unanswered)} of {probed} link(s) got no answer and were not verified: {_listed(unanswered)}", _shown(unanswered)))
     unread = [path.name for path in paths if path.suffix.lower() in (".pdf", ".docx") and not any(True for _ in sensitive._iter_text_blobs(path))]
     if unread:
         issues.append(unchecked("", f"no text could be read from {_listed(unread)}, so any links in it were not checked"))
@@ -954,8 +959,13 @@ class _ReferenceContext:
 _MAX_LISTED_REFERENCES = 8
 
 
+def _shown(labels: list[str]) -> tuple[str, ...]:
+    """The labels :func:`_listed` names, one per item."""
+    return tuple(labels[:_MAX_LISTED_REFERENCES])
+
+
 def _listed(labels: list[str]) -> str:
-    shown = ", ".join(labels[:_MAX_LISTED_REFERENCES])
+    shown = ", ".join(_shown(labels))
     return shown + (f" and {len(labels) - _MAX_LISTED_REFERENCES} more" if len(labels) > _MAX_LISTED_REFERENCES else "")
 
 
@@ -1026,7 +1036,7 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
         listed = [f"{lk.ref.label} -> {lk.record['DOI'].lower()}" for lk in suggestions]
         # Advice, not a problem: a found work is confirmed, and many styles (natbib's ML ones) print
         # no DOIs. A venue that requires them is checked by references.doi_required.
-        issues.append(Issue(SUGGESTION, "", f"{len(suggestions)} reference(s) have no DOI but match a registered work; add the DOI so readers (and this check) can follow them: {_listed(listed)}"))
+        issues.append(Issue(SUGGESTION, "", f"{len(suggestions)} reference(s) have no DOI but match a registered work; add the DOI so readers (and this check) can follow them: {_listed(listed)}", items=_shown(listed)))
 
     unverified = result.unverified
     unknown = result.by_status(reference_search.UNKNOWN)
@@ -1036,7 +1046,7 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
         # check is incomplete, which is a different thing from a doubtful reference.
         if unverified:
             labels = [lk.ref.label for lk in unverified]
-            issues.append(unchecked("", f"{len(labels)} reference(s) without a DOI are unverified: they could not be matched with certainty (near misses, or kinds of work the registries often miss). Check them by hand, or run the AI check: {_listed(labels)}"))
+            issues.append(unchecked("", f"{len(labels)} reference(s) without a DOI are unverified: they could not be matched with certainty (near misses, or kinds of work the registries often miss). Check them by hand, or run the AI check: {_listed(labels)}", _shown(labels)))
         if pending:
             why = []
             if unknown:
@@ -1044,7 +1054,7 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
             if result.skipped:
                 why.append(f"{len(result.skipped)} were not looked up ({result.skipped_reason})")
             labels = [r.label for r in pending]
-            issues.append(incomplete("", f"{len(labels)} reference(s) without a DOI were not checked: {'; '.join(why)}. Run validate again later, check them by hand, or run the AI check: {_listed(labels)}"))
+            issues.append(incomplete("", f"{len(labels)} reference(s) without a DOI were not checked: {'; '.join(why)}. Run validate again later, check them by hand, or run the AI check: {_listed(labels)}", _shown(labels)))
         if ctx.files:
             ctx.ai_tasks.append(
                 ai_validate.AiTask(

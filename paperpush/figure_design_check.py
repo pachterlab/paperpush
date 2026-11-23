@@ -151,6 +151,7 @@ def _grayscale_check(drawings: list, unread: list[str], inv) -> Outcome:
                 WARNING,
                 d.field_id,
                 f"{d.name}: {listed} {'have' if len(pairs) == 1 else 'are pairs with'} nearly the same lightness (difference {worst[2]:.1f} in L*), " "so they merge when the figure is printed in gray. If color is all that tells them apart, add markers, line styles or direct labels, " "or pick colors that also differ in lightness",
+                items=tuple(f"{_describe(a)} and {_describe(b)}" for a, b, _, _ in pairs),
             )
         )
     detail = f"{len(checked)} figure(s) checked" + (f"; {scales} with a continuous color scale not compared" if scales else "")

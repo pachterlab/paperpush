@@ -755,8 +755,9 @@ def _reference_list_issues(field: Field, path: Path, reqs: ManuscriptRequirement
         # A web page has no DOI to give.
         missing = [e for e in entries if not _DOI.search(e) and not is_web_page_entry(e)]
         if missing:
-            sample = "; ".join(_short(e) for e in missing[:3])
-            issues.append(Issue(WARNING, field.id, f"{len(missing)} of {len(entries)} references in {path.name} have no DOI (e.g. {sample}); the author guidelines require DOIs"))
+            examples = tuple(_short(e) for e in missing[:3])
+            sample = "; ".join(examples)
+            issues.append(Issue(WARNING, field.id, f"{len(missing)} of {len(entries)} references in {path.name} have no DOI (e.g. {sample}); the author guidelines require DOIs", items=examples))
     if rules.preprints_allowed is False:
         hits = [e for e in entries if _PREPRINT.search(e)]
         if hits:
@@ -902,10 +903,11 @@ _TEX_ENVIRONMENT_ERROR = re.compile(r"file `[^']+\.(?:sty|cls|clo|def)'|can't fi
 def _latex_compile_issues(field: Field, path: Path, build: "manuscript.TexBuild") -> list[Issue]:
     environment = [e for e in build.errors if _TEX_ENVIRONMENT_ERROR.search(e)]
     real = [e for e in build.errors if e not in environment]
-    shown = "; ".join(_short(e, 160) for e in real[:3])
+    examples = tuple(_short(e, 160) for e in real[:3])
+    shown = "; ".join(examples)
     more = f" (and {len(real) - 3} more)" if len(real) > 3 else ""
     if build.pdf is not None and real:
-        return [Issue(WARNING, field.id, f"{field.label}: {path.name} compiled with {len(real)} LaTeX error(s), so the PDF may be incomplete: {shown}{more}")]
+        return [Issue(WARNING, field.id, f"{field.label}: {path.name} compiled with {len(real)} LaTeX error(s), so the PDF may be incomplete: {shown}{more}", items=examples)]
     if environment:
         return [unchecked(field.id, f"could not compile {path.name} here ({_short(environment[0], 160)}); this may come from this computer's TeX setup rather than the manuscript, since paperpush compiles with pdfLaTeX and no shell escape")]
     if build.pdf is not None:

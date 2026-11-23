@@ -819,18 +819,18 @@ def _uncited_check(venue: Venue, values: dict[str, str]) -> Outcome:
         raise Unchecked(f"could not match the citations in {path.name} to its reference list ({len(uncited)} of {len(bib.refs)} author-year entries unmatched, so the list or its citations were probably misread)")
     if bib.nocite_only:
         n = len(bib.nocite_only)
-        issues.append(Issue(WARNING, field.id, f"{n} {'entry is' if n == 1 else 'entries are'} put in the reference list of {path.name} by \\nocite but never cited in the text: {_list(bib.nocite_only)}"))
+        issues.append(Issue(WARNING, field.id, f"{n} {'entry is' if n == 1 else 'entries are'} put in the reference list of {path.name} by \\nocite but never cited in the text: {_list(bib.nocite_only)}", items=tuple(bib.nocite_only[:MAX_EXAMPLES])))
         uncited = [u for u in uncited if u not in bib.nocite_only]
     if uncited:
         what = "entries" if bib.mode != "numbered" else "references"
         why = f" ({bib.note})" if bib.note else ""
-        issues.append(Issue(WARNING, field.id, f"{len(uncited)} of {len(bib.refs)} {what} in the reference list of {path.name} {'is' if len(uncited) == 1 else 'are'} never cited in the text{why}: {_list(uncited)}"))
+        issues.append(Issue(WARNING, field.id, f"{len(uncited)} of {len(bib.refs)} {what} in the reference list of {path.name} {'is' if len(uncited) == 1 else 'are'} never cited in the text{why}: {_list(uncited)}", items=tuple(uncited[:MAX_EXAMPLES])))
     if bib.mode in ("keys", "numbered", "labels"):
         known = set(defined)
         undefined = sorted(bib.cited - known, key=lambda k: (int(k) if k.isdigit() else 0, k))
         if undefined:
             shown = [f"[{k}]" if bib.mode != "keys" else k for k in undefined]
-            issues.append(Issue(WARNING, field.id, f"{path.name} cites {len(undefined)} reference(s) that {'are' if len(undefined) > 1 else 'is'} not in its reference list: {_list(shown)}"))
+            issues.append(Issue(WARNING, field.id, f"{path.name} cites {len(undefined)} reference(s) that {'are' if len(undefined) > 1 else 'is'} not in its reference list: {_list(shown)}", items=tuple(shown[:MAX_EXAMPLES])))
     via = f" ({bib.note})" if bib.note and bib.mode == "numbered" else ""
     if issues:
         return Outcome(issues)
@@ -1001,7 +1001,7 @@ def _self_citation_check(venue: Venue, values: dict[str, str]) -> Outcome:
     too_large = len(refs) >= MIN_REFERENCES_FOR_SHARE and share > MAX_SELF_CITATION_SHARE
     if too_many or too_large:
         limit = f"more than {MAX_SELF_CITATIONS}" if too_many else f"more than {MAX_SELF_CITATION_SHARE:.0%} of the list"
-        return Outcome([Issue(SUGGESTION, field.id, f"{summary} ({limit}); editors and reviewers may see this as excessive self-citation: {_list([r.label for r in own])}")])
+        return Outcome([Issue(SUGGESTION, field.id, f"{summary} ({limit}); editors and reviewers may see this as excessive self-citation: {_list([r.label for r in own])}", items=tuple(r.label for r in own[:MAX_EXAMPLES]))])
     return Outcome([], summary)
 
 
