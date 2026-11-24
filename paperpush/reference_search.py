@@ -301,6 +301,10 @@ class Lookup:
     candidates: list[dict] = field(default_factory=list)
     # A prose entry neither Crossref nor OpenAlex could match by its full text or its title.
     confident_miss: bool = False
+    # Matched with no problem to report, but only loosely: why (the entry's title or authors
+    # are not quite the work's). A fabricated entry often borrows a real work's title or arXiv
+    # id, so a loose match goes to the AI check rather than counting as confirmed.
+    loose: str = ""
 
 
 @dataclass
@@ -322,7 +326,12 @@ class SearchResult:
     @property
     def suggestions(self) -> list[Lookup]:
         """Matched references with no DOI whose matched work has one."""
-        return [lk for lk in self.lookups if lk.status == MATCHED and not lk.problems and not lk.ref.doi and lk.record and lk.record.get("DOI")]
+        return [lk for lk in self.lookups if lk.status == MATCHED and not lk.problems and not lk.loose and not lk.ref.doi and lk.record and lk.record.get("DOI")]
+
+    @property
+    def loose(self) -> list[Lookup]:
+        """Matched references with nothing to report whose match is loose (see :attr:`Lookup.loose`)."""
+        return [lk for lk in self.lookups if lk.status == MATCHED and not lk.problems and lk.loose]
 
     @property
     def unverified(self) -> list[Lookup]:
@@ -1362,7 +1371,8 @@ def match_entry(ref: Reference, candidates: list[dict]) -> Lookup:
     found_year = _year_value(_year_of(best))
     if want_year and found_year and abs(found_year - want_year) > YEAR_TOLERANCE:
         problems.append(f"the entry says {want_year} but the work is registered as {found_year}")
-    return Lookup(ref, MATCHED, record=best, problems=problems)
+    loose = "" if problems or _same_title(ref.title, _title_of(best)) else LOOSE_TITLE
+    return Lookup(ref, MATCHED, record=best, problems=problems, loose=loose)
 
 
 # Problems a prose entry's own text shows against the work its title matches. One that
@@ -1678,6 +1688,34 @@ def _prose_problems(text: str, words: set[str], record: dict, title_score: float
     return problems
 
 
+LOOSE_TITLE = "the entry's title is not quite the work's"
+LOOSE_AUTHORS = "the entry's authors are not the work's"
+
+
+def _registered_short_form(own: str, registered: str) -> bool:
+    """Whether the registry holds only the head of the entry's title, before its subtitle
+    ("USAD" for "USAD: Unsupervised anomaly detection on multivariate time series")."""
+    a, b = _normalize_text(own.split(":", 1)[0]), _normalize_text(registered)
+    return ":" in own and bool(b) and a == b
+
+
+def _loose_prose(own_title: str, record: dict, score: float) -> str:
+    """Why a clean prose match is loose, or "": the entry's readable title is another title (a
+    longer one holding the registered title, say), or, unreadable, it matched only in part."""
+    registered = _title_of(record)
+    if own_title and _registered_short_form(own_title, registered):
+        return ""
+    if own_title and _credible_title(own_title, registered):
+        return "" if _same_title(own_title, registered) else LOOSE_TITLE
+    # A registered title the entry's title starts with but runs on past ("How Do Vision
+    # Transformers Work?" in "How do vision transformers work? Insights from spatial masking"),
+    # unless what follows is the venue the title ran into.
+    extra = [w for w in _significant_words(_work_title(own_title)) if w not in set(_significant_words(_work_title(registered)))] if own_title else []
+    if len(extra) >= 2 and word_overlap(own_title, registered) < 0.6 and not _INDEXED_VENUE.search(own_title[len(registered) :] if len(own_title) > len(registered) else ""):
+        return LOOSE_TITLE
+    return "" if score >= PROSE_STRONG_TITLE else LOOSE_TITLE
+
+
 def match_text(ref: Reference, candidates: list[dict]) -> Lookup:
     """Compare a reference-list entry (prose) with Crossref's candidates."""
     # A title of a word or two ("New products") turns up in almost any entry.
@@ -1713,7 +1751,7 @@ def match_text(ref: Reference, candidates: list[dict]) -> Lookup:
         if not family or family in words or _umlaut_spelled(family) in {_umlaut_spelled(w) for w in words}:
             problems = _prose_problems(ref.text, words, c, score)
             if not problems:
-                return Lookup(ref, MATCHED, record=c, problems=problems)
+                return Lookup(ref, MATCHED, record=c, problems=problems, loose=_loose_prose(own_title, c, score))
             # Another record of the same work may fit cleanly (a 2025 re-post of a 2017 paper
             # ahead of the paper itself), so the first fit with problems waits for the rest.
             if first_fit is None:
@@ -1810,7 +1848,20 @@ def match_arxiv(ref: Reference, record: dict | None) -> Lookup:
     given = _lead_given_conflict(ref.text, record) if ref.text else ""
     if given:
         return Lookup(ref, MATCHED, record=record, source="arXiv", problems=[f"it cites arXiv:{ref.arxiv_id}, but {given.split(': ', 1)[1]}"])
-    return Lookup(ref, MATCHED, record=record, source="arXiv")
+    # Retitled versions and reordered authors are tolerated above, but a fabricated entry can
+    # pin a real arXiv id to a made-up author list or title, so either disagreement sends it to a reader.
+    own = ref.title or (_prose_title(ref.text) if ref.text else "")
+    if own and _not_a_title(own):
+        own = ""
+    why = []
+    # A work cited under the team that released it ("Llama Team. The Llama 3 herd of models")
+    # names none of its people.
+    team = bool(ref.text and _ORGANIZATION_AUTHOR.match(ref.text.strip())) or _family(ref.author) in _TEAM_WORDS
+    if (ref.text or ref.author) and not same_people and not team:
+        why.append(LOOSE_AUTHORS)
+    if own and not _same_title(own, record["title"]) and not _registered_short_form(own, record["title"]):
+        why.append(LOOSE_TITLE)
+    return Lookup(ref, MATCHED, record=record, source="arXiv", loose="; ".join(why))
 
 
 _WEB_PAGE_ENTRY = re.compile(r"(?is)\bhttps?://(?!(?:dx\.)?doi\.org)\S+.*\b(?:accessed|retrieved|last\s+visited)\b|\bweb\s?site\b.*\bhttps?://(?!(?:dx\.)?doi\.org)")
@@ -2260,22 +2311,28 @@ def version_findings(
 # --- the AI task ------------------------------------------------------------------------
 
 
-def ai_task_instructions(unverified: list[Lookup], skipped: list[Reference]) -> str:
-    """Instructions for ``ai.unverified_references``: the references the lookups could not settle."""
+def ai_task_instructions(unverified: list[Lookup], skipped: list[Reference], loose: list[Lookup] = ()) -> str:
+    """Instructions for ``ai.unverified_references``: the references the lookups could not settle,
+    and the ones that matched a registered work only loosely."""
     lines = []
     for lk in unverified[:MAX_AI_ITEMS]:
         ref = lk.ref
         claim = f'"{ref.title}", {ref.author or "?"}, {ref.year or "?"}' if ref.title else ref.text[:300]
         near = f" Closest registered work found: {_describe(lk.candidates[0] if lk.candidates else lk.record)}." if (lk.candidates or lk.record) else " No similar work was found in the registries."
         lines.append(f"- {ref.label} ({ref.where}): {claim}.{near}")
+    for lk in list(loose)[: max(0, MAX_AI_ITEMS - len(lines))]:
+        ref = lk.ref
+        claim = f'"{ref.title}", {ref.author or "?"}, {ref.year or "?"}' if ref.title else ref.text[:300]
+        lines.append(f"- {ref.label} ({ref.where}): {claim}. Matched only loosely ({lk.loose}) to {_describe(lk.record)}.")
     for ref in skipped[: max(0, MAX_AI_ITEMS - len(lines))]:
         claim = f'"{ref.title}", {ref.author or "?"}, {ref.year or "?"}' if ref.title else ref.text[:300]
         lines.append(f"- {ref.label} ({ref.where}): {claim}. Not looked up.")
-    more = len(unverified) + len(skipped) - len(lines)
+    more = len(unverified) + len(loose) + len(skipped) - len(lines)
     if more > 0:
         lines.append(f"- ... and {more} more in the bibliography.")
     return (
-        "These references have no DOI, and a registry search (Crossref, OpenAlex, arXiv) could not confirm them. "
+        "These references have no DOI, and a registry search (Crossref, OpenAlex, arXiv) could not confirm them: it found "
+        "no work, only a near miss, or (where noted) a work the entry matches only loosely, whose title or authors differ. "
         "For each one, decide whether it is a real work that the entry describes correctly. If you can search the web or "
         "the registries, look each one up. Report 'fail' naming every reference that appears fabricated, or whose title, "
         "authors, or year describe a different work than the one that exists, and give the correct details where you found "

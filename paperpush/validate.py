@@ -1041,7 +1041,8 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
     unverified = result.unverified
     unknown = result.by_status(reference_search.UNKNOWN)
     pending = [lk.ref for lk in unknown] + result.skipped
-    if unverified or pending:
+    loose = result.loose
+    if unverified or pending or loose:
         # Near misses need a reader; lookups that were never made (no answer, or skipped) mean the
         # check is incomplete, which is a different thing from a doubtful reference.
         if unverified:
@@ -1061,7 +1062,7 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
                     id="ai.unverified_references",
                     title="References that could not be verified are real",
                     category="Integrity",
-                    instructions=reference_search.ai_task_instructions(unverified + unknown, result.skipped),
+                    instructions=reference_search.ai_task_instructions(unverified + unknown, result.skipped, loose),
                     files=_ai_files(ctx.files),
                 )
             )
@@ -1069,7 +1070,8 @@ def _unmatched_reference_issues(venue: Venue, values: dict[str, str], ctx: _Refe
     if searched and len(unknown) == searched and not result.findings:
         raise Unchecked("the registries (Crossref, OpenAlex, arXiv) did not answer")
     matched = len(result.by_status(reference_search.MATCHED))
-    return Outcome(issues, f"looked up {searched} of {len(without_doi)} reference(s) without a DOI: {matched} matched a registered work")
+    also = f" ({len(loose)} only loosely, left to the AI check)" if loose else ""
+    return Outcome(issues, f"looked up {searched} of {len(without_doi)} reference(s) without a DOI: {matched} matched a registered work{also}")
 
 
 FLAGGED_REFERENCES_TASK = "ai.flagged_references"
