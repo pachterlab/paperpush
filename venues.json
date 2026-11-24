@@ -1147,6 +1147,19 @@
       "machine learning"
     ]
   },
+  "acl_2027_demo": {
+    "name": "ACL 2027 Demo Track",
+    "full_name": "65th Annual Meeting of the Association for Computational Linguistics (ACL 2027), System Demonstrations Track",
+    "venue_type": "conference",
+    "anonymous": false,
+    "site_url": "https://2027.aclweb.org",
+    "submission_guide": "https://2027.aclweb.org/calls/system_demonstration/",
+    "description": "System demonstrations track of ACL 2027: short papers with a demo video and a live demo or installable package, published in a companion volume of the proceedings. Guidelines provisionally copied from the NAACL 2027 Demo Track until the ACL 2027 call is released.",
+    "keywords": [
+      "natural language processing",
+      "machine learning"
+    ]
+  },
   "iclr_2026": {
     "name": "ICLR 2026",
     "full_name": "The Fourteenth International Conference on Learning Representations",
