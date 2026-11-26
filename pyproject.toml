@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=77", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -55,6 +55,14 @@ all = ["paperpush[ai,web,validate]"]
 all-no-ai = ["paperpush[mcp,web,validate]"]
 docs = ["sphinx>=7.0", "myst-parser>=2.0", "sphinx-rtd-theme>=2.0"]
 dev = ["paperpush[all-no-ai,docs]", "pytest>=7.0", "bandit>=1.9.4", "pip-audit>=2.10.1", "black>=26.1,<27", "jsonschema>=4.18", "isort>=9.0"]
+
+# PEP 735 dependency groups (uv sync / pip install --group dev). The dev tooling only:
+# the runtime extras the tests need still come from the project's extras, e.g.
+# `uv sync --extra all-no-ai` or `pip install -e .[dev]`. Keep in step with the dev extra.
+[dependency-groups]
+test = ["pytest>=7.0", "jsonschema>=4.18"]
+lint = ["bandit>=1.9.4", "pip-audit>=2.10.1", "black>=26.1,<27", "isort>=9.0"]
+dev = [{include-group = "test"}, {include-group = "lint"}]
 
 [project.scripts]
 paperpush = "paperpush.cli:main"
