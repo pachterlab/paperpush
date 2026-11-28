@@ -3,7 +3,7 @@
 <!-- BEGIN SUPPORTED VENUES -->
 _83 supported venues (auto-generated from `paperpush/venues.json`)._
 
-_Rank and Next deadline as of 2026-11-23. Rank: OpenAlex's 2-year mean citedness (an open counterpart of the Journal Impact Factor, not comparable across fields), and for conferences the CORE and CCF ranks, the latest acceptance rate (ccfddl), and size (conference-agent). Deadlines are from conference-agent and ccfddl (~ marks last cycle's dates moved forward a year); check the conference's site. `paperpush venues --columns slug,rank,deadline` shows the current values._
+_Rank and Next deadline as of 2026-11-28. Rank: OpenAlex's 2-year mean citedness (an open counterpart of the Journal Impact Factor, not comparable across fields), and for conferences the CORE and CCF ranks, the latest acceptance rate (ccfddl), and size (conference-agent). Deadlines are from conference-agent and ccfddl (~ marks last cycle's dates moved forward a year); check the conference's site. `paperpush venues --columns slug,rank,deadline` shows the current values._
 
 | Slug | Venue | Keywords | Venue type | Rank | Next deadline | Validate | Submit | Submission platform | Description | Submit walkthrough |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

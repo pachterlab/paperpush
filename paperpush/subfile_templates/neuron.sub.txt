@@ -5,6 +5,13 @@
 #   - to validate against venue guidelines: `paperpush validate neuron.sub.txt`
 # Lines starting with '#' are comments and are ignored.
 #
+# NOTE: paperpush cannot submit to Neuron yet, so this file is NOT the venue's
+# full submission form. It holds only what paperpush's checks need (title,
+# abstract, authors, files, and the statements the guidelines ask for). The
+# venue's submission system will ask for more.
+# See its submission guide:
+#   https://www.cell.com/neuron/information-for-authors
+#
 # To fill this in through a form instead, open it in the paperpush web page:
 #   - run:  paperpush web neuron.sub.txt   (use this file's path)
 #   - or visit https://paperpush.onrender.com and drag this file onto the page

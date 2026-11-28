@@ -13,11 +13,21 @@ git config core.hooksPath .githooks
 
 (`core.hooksPath` is a local setting and is not copied by `git clone`.)
 
+## `pre-push`
+
+Runs the same "generated files are in sync" checks CI runs
+(`scripts/gen_*.py --check`) and blocks the push, naming the script to run,
+if any is stale. This catches what `pre-commit` missed (commits made with
+`--no-verify`, merges, rebases). Bypass with `git push --no-verify`.
+
 ## `pre-commit`
 
 Runs two best-effort scanners on staged content. Each is skipped (with a
 notice) when its tool is not installed, so neither is a hard dependency.
-It also regenerates and stages the validation check count and list in
+On every commit it regenerates and stages the README venues table
+(`venues.md`, `docs/venues.rst`) and the `.sub` templates in
+`paperpush/subfile_templates/`, since they depend on the rendering code as well
+as the venue data. It also regenerates and stages the validation check count and list in
 `README.md` and `docs/validation-checks.rst` when validator code or venue data
 is staged, and re-renders the README comparison table
 (`docs/_static/comparison.*`, via `scripts/gen_comparison_table.py --if-stale`)

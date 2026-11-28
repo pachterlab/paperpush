@@ -91,14 +91,13 @@ fi
 
 # ---------------------------------------------------------------------------
 # Keep artifacts generated from the venue databases in sync with them.
-# Both blocks below only run when venues.json, submission_forms.json,
-# manuscript_requirements.json or common_fields.json is part of this commit (a validate-only venue's
-# .sub template and the venues table's validate/submit columns depend on all
-# three), and re-stage whatever they regenerate so the committed tree never
-# drifts.
+# Both blocks below run on EVERY commit (together they take under a second)
+# and re-stage whatever they regenerate so the committed tree never drifts.
+# They used to run only when a venue .json was staged, which missed commits
+# that changed the rendering code itself (paperpush/subfile.py,
+# paperpush/database.py, ...) and left CI's --check failing on push.
 # ---------------------------------------------------------------------------
-if git diff --cached --name-only --diff-filter=ACM -z \
-    | tr '\0' '\n' | grep -qE '^paperpush/(venues|submission_forms|manuscript_requirements|common_fields)\.json$'; then
+{
     # README.md's supported-venues table (and venues.md).
     if python scripts/gen_readme_venues.py; then
         if ! git diff --quiet -- README.md venues.md docs/venues.rst; then
@@ -122,7 +121,7 @@ if git diff --cached --name-only --diff-filter=ACM -z \
         echo "pre-commit: failed to regenerate .sub templates." >&2
         status=1
     fi
-fi
+}
 
 # ---------------------------------------------------------------------------
 # Keep the documented validation check count and catalog in sync with the
