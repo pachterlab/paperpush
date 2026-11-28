@@ -97,6 +97,15 @@ def test_venue_detail_carries_template_and_field_definitions(client):
     authors = next(f for f in detail["fields"] if f["id"] == "authors")
     assert authors["fields"] and authors["role"]
     assert detail["subfile_name"] == f"{VENUE}.sub.txt"
+    assert detail["form_is_partial"] is get_venue(VENUE).form_is_partial
+
+
+def test_validate_only_venue_detail_flags_a_partial_form(client):
+    slug = next(v.slug for v in list_venues() if v.form_is_partial)
+    detail = client.get(f"/api/venues/{slug}").json()
+    assert detail["form_is_partial"] is True
+    assert "full submission form" in detail["template"]
+    assert client.get(f"/api/venues/{GENERAL_SLUG}").json()["form_is_partial"] is False
 
 
 def test_unknown_venue_is_404(client):

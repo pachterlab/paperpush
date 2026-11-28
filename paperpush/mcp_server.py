@@ -66,7 +66,7 @@ from ._logging import configure_logging
 from .autofill import autofill as _apply_autofill
 from .autofill import field_schema, parse_extraction
 from .database import GENERAL_SLUG, Venue, get_venue, list_venues
-from .subfile import default_filename, find_subfile, is_subfile_name, parse as parse_subfile, subfile_stem, render_template, resolve_paths, write_template
+from .subfile import default_filename, find_subfile, is_subfile_name, parse as parse_subfile, partial_form_note, subfile_stem, render_template, resolve_paths, write_template
 from .validate import Issue
 from .validate import validate_report as _run_validate_report
 
@@ -646,6 +646,8 @@ def create_subfile(
         "required_field_count": sum(1 for f in resolved.fields if f.required),
         "filled_with_defaults": fill_defaults,
         "venue_order": venue_order,
+        # Non-empty for a validate-only venue: the .sub is not the venue's full submission form.
+        "partial_form_note": partial_form_note(resolved),
     }
 
 

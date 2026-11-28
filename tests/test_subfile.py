@@ -568,3 +568,51 @@ def test_autofill_fills_the_existing_twin_instead_of_creating_a_new_file(tmp_pat
 def test_data_repository_sub_headings_describe_a_deposit():
     text = subfile.render_template(get_venue("zenodo"))
     assert "# Deposit details" in text and "# Manuscript details" not in text
+
+
+# --- validate-only venues: the .sub is not the venue's full form ----------
+
+
+def _validate_only_venue():
+    return next(v for v in list_venues() if v.form_is_partial and v.submission_guide)
+
+
+def test_validate_only_sub_says_it_is_not_the_full_form(in_tmp, capsys):
+    venue = _validate_only_venue()
+    assert main(["subfile", venue.slug]) == 0
+    out = capsys.readouterr().out
+    assert "is NOT the venue's full submission form" in out and venue.submission_guide in out
+
+    text = (in_tmp / f"{venue.slug}.sub.txt").read_text()
+    header = text.split("@venue:")[0]
+    assert "NOTE: paperpush cannot submit to" in header and "full submission form" in header
+    # The URL is on a line of its own, never broken by the wrapping.
+    assert f"#   {venue.submission_guide}\n" in header
+    # The note is a comment: the file still parses to the same venue and fields.
+    assert subfile.load(in_tmp / f"{venue.slug}.sub.txt").venue == venue.slug
+
+
+def test_full_form_and_general_subs_carry_no_partial_form_note(in_tmp, capsys):
+    from paperpush.database import general_venue
+
+    for venue in (get_venue("biorxiv"), general_venue()):
+        assert not venue.form_is_partial
+        assert subfile.partial_form_note(venue) == ""
+        assert "full submission form" not in subfile.render_template(venue)
+    assert main(["subfile", "biorxiv"]) == 0
+    assert "Note:" not in capsys.readouterr().out
+
+
+def test_validate_report_notes_a_partial_form(in_tmp):
+    from paperpush import report
+    from paperpush.validate import validate_report as validate
+
+    venue = _validate_only_venue()
+    path = subfile.write_template(venue, in_tmp / f"{venue.slug}.sub.txt")
+    result = validate(subfile.load(path), venue, check_manuscript=False, network=False)
+    assert any("this .sub is NOT the venue's full submission form" in n for n in result.notes)
+    assert "this .sub is NOT the venue's full submission form" in report.to_text(result)
+
+    full = get_venue("biorxiv")
+    path = subfile.write_template(full, in_tmp / "biorxiv.sub.txt")
+    assert not any("full submission form" in n for n in validate(subfile.load(path), full, check_manuscript=False, network=False).notes)

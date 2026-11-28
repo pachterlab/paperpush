@@ -67,7 +67,7 @@ from pydantic import ConfigDict, validate_call
 from . import __url__, __version__, credentials, venue_data
 from ._logging import configure_logging
 from .database import GENERAL_SLUG, Venue, general_venue, get_venue, list_venues, unknown_venue_message
-from .subfile import default_filename, find_subfile, is_subfile_name, subfile_stem, with_subfile_suffix, write_template
+from .subfile import default_filename, find_subfile, is_subfile_name, partial_form_note, subfile_stem, with_subfile_suffix, write_template
 from .venues.common import DEFAULT_TIMEOUT_SECONDS
 
 logger = logging.getLogger(__name__)
@@ -1067,6 +1067,9 @@ def _cmd_subfile(args: argparse.Namespace) -> int:
     required = sum(1 for f in venue.fields if f.required)
     logger.info("subfile: wrote template %s for %s (%d fields, %d required)", path, venue.slug, len(venue.fields), required)
     print(f"Created {path} for {venue.slug}.")
+    note = partial_form_note(venue)
+    if note:
+        print(f"  Note: {note}")
     if getattr(args, "web", False):
         print(f"  {len(venue.fields)} fields ({required} required).")
         return _open_web(Path(path))

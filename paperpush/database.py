@@ -603,6 +603,16 @@ class Venue(SubmissionForm, VenueInfo):
         return self.slug == GENERAL_SLUG
 
     @property
+    def form_is_partial(self) -> bool:
+        """Whether this venue's ``.sub`` holds only what ``validate`` reads, not the venue's full submission form.
+
+        True for a validate-only venue (no ``submission_forms.json`` entry, so
+        its fields are :func:`default_form`'s). The general venue is left out:
+        it stands for no venue, so there is no form it could be mistaken for.
+        """
+        return not self.has_form and not self.is_general
+
+    @property
     def is_house_rules_only(self) -> bool:
         """Whether this stands for a journal paperpush does not list, checked against its publisher's house rules (:func:`publisher_venue`)."""
         return self.slug.startswith("publisher:")

@@ -2464,6 +2464,10 @@ def _record_inputs(result, venue: Venue, values: dict[str, str], subfile_path: s
 def _set_scope(result, venue: Venue, values: dict[str, str], files_only: bool, notes: Optional[list[str]]) -> None:
     """Record on ``result`` what was validated: a .sub, files for a venue, or files alone."""
     result.notes = list(notes or [])
+    if not files_only and venue.form_is_partial:
+        from .subfile import partial_form_note
+
+        result.notes.append(partial_form_note(venue).replace("this file", "this .sub", 1))
     if venue.is_general:
         result.scope = "general"
     elif files_only:

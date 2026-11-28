@@ -909,6 +909,8 @@ def venue_detail(slug: str) -> dict[str, Any]:
         "anonymous": venue.anonymous,
         "max_upload_mb": venue.max_upload_mb,
         "has_form": venue.has_form,
+        # A validate-only venue's .sub holds only what validate reads: the page shows a note saying so.
+        "form_is_partial": venue.form_is_partial,
         "supports_submit": venue.supports_submit,
         "login_required": venue.has_form and venues_pkg.login_required(venue.slug),
         "subfile_name": default_filename(venue),

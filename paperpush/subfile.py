@@ -159,6 +159,24 @@ LEGACY_SUFFIX = ".sub"
 SUFFIXES = (SUFFIX, LEGACY_SUFFIX)
 
 
+def partial_form_note(venue: Venue) -> str:
+    """Why a validate-only venue's ``.sub`` is not the venue's full submission form, or "" when it is.
+
+    Shown in the ``.sub``'s header, by ``paperpush subfile``, and in the
+    validate report, so an author (or a co-author the file is passed to) does
+    not take it for everything the venue's portal will ask.
+    """
+    if not venue.form_is_partial:
+        return ""
+    name = venue.full_name or venue.name or venue.slug
+    text = (
+        f"paperpush cannot submit to {name} yet, so this file is NOT the venue's full submission form. "
+        "It holds only what paperpush's checks need (title, abstract, authors, files, and the statements the guidelines ask for). "
+        "The venue's submission system will ask for more"
+    )
+    return text + (f"; see its submission guide: {venue.submission_guide}" if venue.submission_guide else ".")
+
+
 def is_subfile_name(name: str | Path) -> bool:
     """Whether ``name`` ends in a submission-file suffix (``.sub.txt`` or ``.sub``)."""
     lower = Path(name).name.lower()
@@ -225,6 +243,21 @@ def _format_default(field: Field) -> str:
     return str(field.default)
 
 
+def _partial_form_header(venue: Venue) -> list[str]:
+    """The header comment block warning that a validate-only venue's ``.sub`` is not its full form (empty otherwise)."""
+    note = partial_form_note(venue)
+    if not note:
+        return []
+    import textwrap
+
+    # Keep the URL on a line of its own so it is not broken across lines.
+    body, sep, guide = note.partition("; see its submission guide: ")
+    lines = textwrap.wrap("NOTE: " + body + ("." if sep else ""), width=76)
+    if sep:
+        lines += ["See its submission guide:", f"  {guide}"]
+    return [f"# {line}" for line in lines] + ["#"]
+
+
 def render_template(
     venue: Venue,
     fill_defaults: bool = False,
@@ -266,6 +299,7 @@ def render_template(
         *([f"#   - to fill out submission portal: `paperpush submit {default_filename(venue)}`"] if venue.supports_submit and not venue.is_general else []),
         "# Lines starting with '#' are comments and are ignored.",
         "#",
+        *_partial_form_header(venue),
         "# To fill this in through a form instead, open it in the paperpush web page:",
         f"#   - run:  paperpush web {default_filename(venue)}   (use this file's path)",
         f"#   - or visit {WEB_URL} and drag this file onto the page",

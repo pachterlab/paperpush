@@ -456,6 +456,10 @@
     $("#venue-sub").textContent = v.description || "";
     const general = v.venue_type === "general";
     $("#initial-note").hidden = general;
+    // Validate-only venue: the form is paperpush's, not the venue's, so say it is not everything the portal asks.
+    $("#partial-note").hidden = !v.form_is_partial;
+    $("#partial-guide").hidden = !v.submission_guide;
+    if (v.submission_guide) $("#partial-guide a").href = v.submission_guide;
     const chips = [];
     if (general) chips.push(el("span", { class: "chip plain", title: "Pick a venue to also check its author guidelines and fill its portal", text: "General checks only" }));
     else chips.push(el("span", { class: "chip plain", text: TYPE_LABELS[v.venue_type]?.replace(/s$/, "").replace(/ servers?$/, " server") || v.venue_type }));
